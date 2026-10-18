@@ -1,6 +1,6 @@
-# Inventário da casa
+# InventarIA
 
-Inventário dos itens da casa dentro do Home Assistant: cômodos, zonas, itens com fotos e valores, busca, relatório para seguro e leitura de fotos por IA.
+O InventarIA é o inventário da casa dentro do Home Assistant: cômodos, zonas, itens com fotos e valores, busca, relatório para seguro e leitura de fotos por IA.
 
 O app abre pela barra lateral (Ingress). Quem já está logado no Home Assistant usa direto, sem outra senha.
 

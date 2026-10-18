@@ -1,4 +1,4 @@
-# Inventário da casa
+# InventarIA
 
 App (add-on) do Home Assistant para manter o inventário da casa: cômodos, itens, fotos e valores, com relatório para seguro e leitura de fotos por IA.
 

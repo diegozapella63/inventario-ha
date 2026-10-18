@@ -1,4 +1,4 @@
-/* Inventário da casa: interface do app do Home Assistant.
+/* InventarIA: interface do app de inventário da casa para o Home Assistant.
    JavaScript puro, sem dependências nem etapa de build. Fala com o servidor em api/... (URLs relativas, por causa do Ingress). */
 (() => {
   "use strict";
@@ -349,7 +349,7 @@
     const cur = base;
     const cr = (name) => (cur.name === name ? ' aria-current="page"' : "");
     el.innerHTML = `
-      <a class="brand" href="#/">${BRAND}<span class="brand-name">Inventário</span></a>
+      <a class="brand" href="#/">${BRAND}<span class="brand-name">InventarIA</span></a>
       <nav class="nav" aria-label="Seções">
         <a href="#/"${cr("home")}>${ic("home")}Início</a>
         <a href="#/buscar"${cr("search")}>${ic("search")}Buscar<kbd>/</kbd></a>
@@ -367,7 +367,7 @@
 
   function viewTitle(r) {
     if (r.name === "room") return D.roomById.get(r.id)?.name || "Cômodo";
-    return { home: "Início", search: "Buscar", report: "Relatório", data: "Dados e ajustes" }[r.name] || "Inventário";
+    return { home: "Início", search: "Buscar", report: "Relatório", data: "Dados e ajustes" }[r.name] || "InventarIA";
   }
   function renderTop() {
     const el = $("#topbar");
@@ -413,7 +413,7 @@
     rendered = key;
     renderSide();
     renderTop();
-    document.title = base.name === "home" ? "Inventário" : `Inventário – ${viewTitle(base)}`;
+    document.title = base.name === "home" ? "InventarIA" : `InventarIA – ${viewTitle(base)}`;
     if (navigated) {
       const memo = scrollMemo.get(key);
       window.scrollTo(0, memo || 0);
@@ -489,8 +489,8 @@
         <div class="tagwrap">
           <div class="tagswing">
             <svg class="string" viewBox="0 0 120 140" aria-hidden="true"><path d="M36 132 C 35 104, 27 62, 22 -60"/></svg>
-            <div class="tag" role="img" aria-label="Inventário">
-              <div class="tag-body"><p class="tag-label">Bem-vindo</p><p class="tag-value">Inventário</p><p class="tag-sub">Cômodos, itens, fotos e valores</p></div>
+            <div class="tag" role="img" aria-label="Bem-vindo ao InventarIA">
+              <div class="tag-body"><p class="tag-label">Bem-vindo ao</p><p class="tag-value">InventarIA</p><p class="tag-sub">Cômodos, itens, fotos e valores</p></div>
             </div>
           </div>
         </div>
@@ -717,7 +717,7 @@
             <td>${esc(it.zone || "")}</td><td class="r">${esc(qtyClean(it.qty))}</td><td class="r">${money(it.value)}</td></tr>`).join("")}
           </tbody><tfoot><tr>${withPhotos ? "<td></td>" : ""}<td colspan="4">Subtotal</td><td class="r">${money(D.roomTotals.get(r.id) || 0)}</td></tr></tfoot></table></section>`;
       }).join("")}
-      <p class="rep-foot">Inventário mantido no app Inventário do Home Assistant. Dados em arquivos abertos (JSON e JPG).</p>
+      <p class="rep-foot">Inventário mantido no InventarIA, app do Home Assistant. Dados em arquivos abertos (JSON e JPG).</p>
     </article>`;
   }
 
@@ -774,7 +774,7 @@
     </section>
     <section class="panel">
       <h2>Sobre</h2>
-      <p class="lead">${PREVIEW ? "Esta é uma prévia do app do Home Assistant. Aqui as alterações ficam só nesta tela." : `Inventário ${esc(S.version)}. Os dados ficam em <span class="codepath">inventario.json</span> e as fotos em JPG, dentro do app. Funciona sem internet; só a leitura por IA usa a integração de IA do Home Assistant.`}</p>
+      <p class="lead">${PREVIEW ? "Esta é uma prévia do app do Home Assistant. Aqui as alterações ficam só nesta tela." : `InventarIA ${esc(S.version)}. Os dados ficam em <span class="codepath">inventario.json</span> e as fotos em JPG, dentro do app. Funciona sem internet; só a leitura por IA usa a integração de IA do Home Assistant.`}</p>
     </section>`;
   }
 

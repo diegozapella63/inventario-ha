@@ -1,7 +1,7 @@
-name: Inventário da casa
-version: "1.1.0"
+name: InventarIA
+version: "1.2.0"
 slug: inventario
-description: Inventário dos itens da casa, com fotos, valores, relatório para seguro e leitura de fotos por IA.
+description: Inventário da casa com fotos, valores, relatório para seguro e leitura de fotos por IA.
 arch:
   - amd64
   - aarch64
@@ -10,7 +10,7 @@ boot: auto
 ingress: true
 ingress_port: 8099
 panel_icon: mdi:package-variant-closed
-panel_title: Inventário
+panel_title: InventarIA
 homeassistant_api: true
 map:
   - type: share

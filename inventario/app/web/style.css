@@ -14,7 +14,7 @@
   --ink: #1d2125;
   --ink-2: #3a4148;
   --muted: #5f6670;
-  --faint: #8a929b;
+  --faint: #737b84;
   --line: #dadde1;
   --line-2: #c3c8ce;
   --tag: #f5c400;
@@ -50,7 +50,7 @@
     --ink: #e9ecef;
     --ink-2: #c9cfd5;
     --muted: #9aa3ad;
-    --faint: #6f7882;
+    --faint: #868f99;
     --line: #2f353b;
     --line-2: #3e464e;
     --tag-edge: #b38f00;
@@ -74,7 +74,7 @@
   --ink: #e9ecef;
   --ink-2: #c9cfd5;
   --muted: #9aa3ad;
-  --faint: #6f7882;
+  --faint: #868f99;
   --line: #2f353b;
   --line-2: #3e464e;
   --tag-edge: #b38f00;
@@ -302,6 +302,7 @@ html:has(dialog[open]) { overflow: hidden; }
   content: ""; position: absolute; left: 58px; top: 14px; bottom: 14px; border-left: 2px dashed rgba(29, 33, 37, 0.28);
 }
 .tag-body { grid-column: 2; padding: 22px 26px 22px 22px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+.tag-label, .tag-value, .tag-sub { color: var(--tag-ink); }
 .tag-label { margin: 0; font: 600 16px/1.2 var(--font); }
 .tag-value { margin: 2px 0 0; font: 700 clamp(48px, 13vw, 76px)/0.95 var(--font-c); letter-spacing: -0.01em; white-space: nowrap; }
 .tag-value .cur { font-size: 0.42em; font-weight: 600; margin-right: 0.18em; vertical-align: 0.82em; letter-spacing: 0; }
@@ -696,7 +697,7 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 
 /* boas-vindas (inventário vazio) e progresso de importação */
 .welcome h1 { margin: 0 0 10px; font: 700 clamp(32px, 6vw, 44px)/1.05 var(--font-c); }
-.welcome p { margin: 0 0 12px; max-width: 52ch; color: var(--ink-2); }
+.welcome-text p { margin: 0 0 12px; max-width: 52ch; color: var(--ink-2); }
 .welcome .acts { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 14px; }
 .welcome .tag-value { font-size: clamp(44px, 11vw, 68px); }
 .prog { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }

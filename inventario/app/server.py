@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inventário da casa: servidor do app (add-on) do Home Assistant.
+"""InventarIA: servidor do app (add-on) de inventário da casa para o Home Assistant.
 
 Só usa a biblioteca padrão do Python. Os dados ficam em arquivos abertos:
   /data/inventario.json   cômodos e itens (JSON legível, dá pra abrir em qualquer editor)
@@ -32,7 +32,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -193,7 +193,7 @@ class Store:
         snaps = self.history_list()
         if snaps:
             self.last_snapshot = os.path.getmtime(os.path.join(HISTORY_DIR, snaps[0]["name"]))
-        log.info("Inventário carregado: %d cômodos, %d itens", len(self.data["rooms"]), len(self.data["items"]))
+        log.info("InventarIA: inventário carregado com %d cômodos e %d itens", len(self.data["rooms"]), len(self.data["items"]))
 
     def seed(self):
         src = os.path.join(SEED_DIR, "inventario.json")
@@ -545,8 +545,8 @@ def export_csv_bytes() -> bytes:
     return ("﻿" + out.getvalue()).encode("utf-8")
 
 
-README_ZIP = """Inventário da casa: cópia completa
-====================================
+README_ZIP = """InventarIA: cópia completa do inventário da casa
+================================================
 
 inventario.json  cômodos e itens (JSON). Cada item tem room (cômodo), zone (zona), name, details,
                  cat (categoria), qty (quantidade), value (valor total em reais) e photos (arquivos em photos/).
@@ -886,7 +886,7 @@ def ai_identify(body: dict) -> dict:
     shutil.copyfile(os.path.join(PHOTOS_DIR, file), tmp_path)
     try:
         payload = {
-            "task_name": "Inventário: ler foto",
+            "task_name": "InventarIA: ler foto",
             "instructions": prompt,
             "attachments": [{"media_content_id": f"media-source://media_source/local/{AI_TMP_REL}/{tmp_name}",
                              "media_content_type": "image/jpeg"}],
@@ -933,7 +933,7 @@ MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=ut
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = f"Inventario/{VERSION}"
+    server_version = f"InventarIA/{VERSION}"
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):
@@ -1029,7 +1029,7 @@ class Handler(BaseHTTPRequestHandler):
         self._body_read = False
         try:
             if not DEV and self.client_address[0] not in ALLOWED_IPS:
-                raise ApiError(403, "Abra o inventário pelo Home Assistant.")
+                raise ApiError(403, "Abra o InventarIA pelo Home Assistant.")
             url = urlparse(self.path)
             path = unquote(url.path)
             query = parse_qs(url.query)
@@ -1357,7 +1357,7 @@ def main():
     cleanup_uploads()
     srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     srv.daemon_threads = True
-    log.info("Inventário %s ouvindo na porta %d%s", VERSION, PORT, " (modo dev)" if DEV else "")
+    log.info("InventarIA %s ouvindo na porta %d%s", VERSION, PORT, " (modo dev)" if DEV else "")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

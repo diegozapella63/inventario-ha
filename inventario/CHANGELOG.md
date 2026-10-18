@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0
+
+- Novo nome: InventarIA.
+- Corrige a leitura do texto da etiqueta amarela na tela de boas-vindas no modo escuro (o texto ficava claro sobre o amarelo).
+
 ## 1.1.0
 
 - Importar backup `.zip` (com fotos) ou `.json` direto pelo app, inclusive pelo celular: o arquivo vai em partes, com barra de progresso, e dá para cancelar.
