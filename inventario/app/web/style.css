@@ -23,6 +23,7 @@
   --tag-ring: var(--a-ring);
   --tag-ink: #1d2125;
   --tag-soft: var(--a-soft);
+  --tag-text: var(--a-text);
   --warn: #f5c400;
   --warn-edge: #d4a800;
   --warn-soft: #fff4c4;
@@ -59,6 +60,7 @@
     --tag-edge: var(--a-edge-d);
     --tag-ring: var(--a-ring-d);
     --tag-soft: var(--a-soft-d);
+    --tag-text: var(--a);
     --warn-edge: #b38f00;
     --warn-soft: #3b3417;
     --sw-edge: transparent;
@@ -86,6 +88,7 @@
   --tag-edge: var(--a-edge-d);
   --tag-ring: var(--a-ring-d);
   --tag-soft: var(--a-soft-d);
+  --tag-text: var(--a);
   --warn-edge: #b38f00;
   --warn-soft: #3b3417;
   --sw-edge: transparent;
@@ -103,16 +106,16 @@
 /* Cor do app (data-accent no <html>; o amarelo é o padrão). Cada cor traz o preenchimento, a borda,
    o anel do ilhós e o fundo suave; os nomes com -d são do modo escuro. O texto sobre a cor é sempre
    escuro (--tag-ink), com contraste de 6:1 ou mais. As amostras do seletor usam as mesmas regras. */
-:root, [data-accent="amarelo"] { --a: #f5c400; --a-hover: #ffd21a; --a-edge: #d4a800; --a-edge-d: #b38f00; --a-ring: #fbe27a; --a-ring-d: #ffe27a; --a-soft: #fff4c4; --a-soft-d: #3b3417; }
-[data-accent="laranja"] { --a: #ff9d35; --a-hover: #ffb067; --a-edge: #da852a; --a-edge-d: #b76e1f; --a-ring: #ffc089; --a-ring-d: #ffc28c; --a-soft: #fff0e4; --a-soft-d: #442f1c; }
-[data-accent="coral"] { --a: #fb7e5f; --a-hover: #ff9175; --a-edge: #d4684d; --a-edge-d: #b0543d; --a-ring: #ffa38c; --a-ring-d: #ffa58e; --a-soft: #ffefeb; --a-soft-d: #472c25; }
-[data-accent="rosa"] { --a: #f77cb0; --a-hover: #ff8dbc; --a-edge: #d16794; --a-edge-d: #ae537a; --a-ring: #ffa1c6; --a-ring-d: #ffa3c7; --a-soft: #ffeef4; --a-soft-d: #462b35; }
-[data-accent="lilas"] { --a: #b48cf6; --a-hover: #bf99ff; --a-edge: #9774d0; --a-edge-d: #7c5eac; --a-ring: #c7abfa; --a-ring-d: #c8acfc; --a-soft: #f5f0ff; --a-soft-d: #372f46; }
-[data-accent="azul"] { --a: #5caef8; --a-hover: #6fbaff; --a-edge: #4a92d2; --a-edge-d: #3a78ae; --a-ring: #8ac5fc; --a-ring-d: #8bc6fe; --a-soft: #eaf5ff; --a-soft-d: #253646; }
-[data-accent="turquesa"] { --a: #3ed0c8; --a-hover: #49ddd5; --a-edge: #31b1aa; --a-edge-d: #25948e; --a-ring: #85e2db; --a-ring-d: #86e3dd; --a-soft: #d2fdf9; --a-soft-d: #203a38; }
-[data-accent="verde"] { --a: #5fd37f; --a-hover: #69e089; --a-edge: #4fb36b; --a-edge-d: #3f9658; --a-ring: #94e4a5; --a-ring-d: #95e6a6; --a-soft: #d8ffdf; --a-soft-d: #243a29; }
-[data-accent="kraft"] { --a: #caa377; --a-hover: #d7af81; --a-edge: #aa8962; --a-edge-d: #8d704f; --a-ring: #dabc9c; --a-ring-d: #dbbd9d; --a-soft: #fff1e1; --a-soft-d: #3b3229; }
-[data-accent="cinza"] { --a: #acb2b9; --a-hover: #b8bec5; --a-edge: #91969c; --a-edge-d: #787d82; --a-ring: #c4c9ce; --a-ring-d: #c6cacf; --a-soft: #d4d9de; --a-soft-d: #333436; }
+:root, [data-accent="amarelo"] { --a: #f5c400; --a-text: #846800; --a-hover: #ffd21a; --a-edge: #d4a800; --a-edge-d: #b38f00; --a-ring: #fbe27a; --a-ring-d: #ffe27a; --a-soft: #fff4c4; --a-soft-d: #3b3417; }
+[data-accent="laranja"] { --a: #ff9d35; --a-text: #9e5a00; --a-hover: #ffb067; --a-edge: #da852a; --a-edge-d: #b76e1f; --a-ring: #ffc089; --a-ring-d: #ffc28c; --a-soft: #fff0e4; --a-soft-d: #442f1c; }
+[data-accent="coral"] { --a: #fb7e5f; --a-text: #ba4326; --a-hover: #ff9175; --a-edge: #d4684d; --a-edge-d: #b0543d; --a-ring: #ffa38c; --a-ring-d: #ffa58e; --a-soft: #ffefeb; --a-soft-d: #472c25; }
+[data-accent="rosa"] { --a: #f77cb0; --a-text: #b54076; --a-hover: #ff8dbc; --a-edge: #d16794; --a-edge-d: #ae537a; --a-ring: #ffa1c6; --a-ring-d: #ffa3c7; --a-soft: #ffeef4; --a-soft-d: #462b35; }
+[data-accent="lilas"] { --a: #b48cf6; --a-text: #7f56bb; --a-hover: #bf99ff; --a-edge: #9774d0; --a-edge-d: #7c5eac; --a-ring: #c7abfa; --a-ring-d: #c8acfc; --a-soft: #f5f0ff; --a-soft-d: #372f46; }
+[data-accent="azul"] { --a: #5caef8; --a-text: #116eb3; --a-hover: #6fbaff; --a-edge: #4a92d2; --a-edge-d: #3a78ae; --a-ring: #8ac5fc; --a-ring-d: #8bc6fe; --a-soft: #eaf5ff; --a-soft-d: #253646; }
+[data-accent="turquesa"] { --a: #3ed0c8; --a-text: #007974; --a-hover: #49ddd5; --a-edge: #31b1aa; --a-edge-d: #25948e; --a-ring: #85e2db; --a-ring-d: #86e3dd; --a-soft: #d2fdf9; --a-soft-d: #203a38; }
+[data-accent="verde"] { --a: #5fd37f; --a-text: #007b37; --a-hover: #69e089; --a-edge: #4fb36b; --a-edge-d: #3f9658; --a-ring: #94e4a5; --a-ring-d: #95e6a6; --a-soft: #d8ffdf; --a-soft-d: #243a29; }
+[data-accent="kraft"] { --a: #caa377; --a-text: #886439; --a-hover: #d7af81; --a-edge: #aa8962; --a-edge-d: #8d704f; --a-ring: #dabc9c; --a-ring-d: #dbbd9d; --a-soft: #fff1e1; --a-soft-d: #3b3229; }
+[data-accent="cinza"] { --a: #acb2b9; --a-text: #676c73; --a-hover: #b8bec5; --a-edge: #91969c; --a-edge-d: #787d82; --a-ring: #c4c9ce; --a-ring-d: #c6cacf; --a-soft: #d4d9de; --a-soft-d: #333436; }
 
 /* ---------- base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -187,52 +190,53 @@ button.side-room:hover { color: var(--ink); }
 .side-room .rv { font: 500 15px/1 var(--font-c); color: var(--muted); }
 .side-foot { margin-top: auto; padding: 18px 10px 0; font-size: 13px; color: var(--faint); }
 
-/* barra superior */
+/* topo de cada tela, como nos outros apps (EconomIA, ResolvIA): nome do app com "IA" na cor do app,
+   saudação ao usuário do Home Assistant e o título grande da tela. Rola junto com a página. */
 .topbar {
-  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; align-items: center; gap: 8px;
-  min-height: 60px; padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  background: var(--paper); border-bottom: 1px solid transparent;
-  transition: border-color 0.2s;
+  width: 100%; max-width: 1040px; margin: 0 auto; padding-top: 18px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.topbar.scrolled { border-bottom-color: var(--line); }
-@media (min-width: 700px) { .topbar { padding-block: 12px; padding-left: max(32px, env(safe-area-inset-left, 0px)); padding-right: max(32px, env(safe-area-inset-right, 0px)); } }
-@media (min-width: 1000px) { .topbar { padding-block: 14px; padding-left: 40px; padding-right: 40px; } }
-.crumbs { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; font-weight: 500; color: var(--muted); }
-.crumbs a { text-decoration: none; color: var(--muted); }
-.crumbs a:hover { color: var(--ink); }
-.crumbs .here { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.crumbs .sep { color: var(--faint); }
-.top-title { font: 600 21px/1.1 var(--font-c); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.crumbs .crumb { text-decoration: none; color: var(--muted); font-weight: 500; }
-.crumbs .crumb:hover { color: var(--ink); text-decoration: underline; }
-.only-wide { display: none; }
-@media (min-width: 1000px) {
-  .only-wide { display: inline; }
-  .only-narrow { display: none !important; }
-  .top-title.sub { font: 500 16px/1.2 var(--font); }
+@media (min-width: 700px) { .topbar { padding-top: 24px; padding-left: max(32px, env(safe-area-inset-left, 0px)); padding-right: max(32px, env(safe-area-inset-right, 0px)); } }
+@media (min-width: 1000px) { .topbar { padding-top: 28px; padding-left: 40px; padding-right: 40px; } }
+.mh-row { display: flex; align-items: center; gap: 12px; min-height: 26px; }
+.eyebrow {
+  flex: 1; min-width: 0; margin: 0; font-size: 12px; font-weight: 600; line-height: 1.2; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.top-actions { display: flex; gap: 8px; align-items: center; }
-.top-actions .wide { display: none; }
-@media (min-width: 700px) { .top-actions .wide { display: inline-flex; } .top-actions .narrow { display: none; } }
+.brand-word { font: 600 21px/1 var(--font-c); letter-spacing: 0; text-transform: none; color: var(--ink); }
+.brand-word span { color: var(--tag-text); }
+@media (min-width: 1000px) { .eyebrow .brand-word, .eyebrow .sep { display: none; } }
+.uplink {
+  display: inline-flex; align-items: center; gap: 4px; margin: 12px 0 0 -6px; padding: 6px 10px 6px 4px; border-radius: var(--r-sm);
+  color: var(--ink-2); font-weight: 500; text-decoration: none;
+}
+.uplink:hover { background: var(--surface-2); color: var(--ink); }
+.page-title { margin: 4px 0 0; font: 700 clamp(34px, 8vw, 46px)/1.02 var(--font-c); letter-spacing: 0; }
+.page-sub { margin: 10px 0 0; color: var(--muted); font-size: 14px; }
+.top-actions { display: none; gap: 8px; align-items: center; }
+@media (min-width: 700px) { .top-actions { display: flex; } }
 
-/* barra de abas (celular) */
+/* barra de abas (celular): 5 abas com o Adicionar no meio, como nos outros apps */
 .tabbar {
-  position: fixed; inset: auto 0 0 0; z-index: 30; display: grid; grid-template-columns: repeat(4, 1fr);
+  position: fixed; inset: auto 0 0 0; z-index: 30; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
   background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
 }
 @media (min-width: 1000px) { .tabbar { display: none; } }
 .tabbar a, .tabbar button {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 60px;
-  border: 0; background: none; text-decoration: none; color: var(--muted); font-size: 12px; font-weight: 500;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 62px; min-width: 0;
+  border: 0; background: none; text-decoration: none; color: var(--muted); font-size: 12px; font-weight: 500; white-space: nowrap;
 }
-.tabbar [aria-current="page"] { color: var(--ink); }
-.tabbar [aria-current="page"] .ic { stroke-width: 2.1; }
+.tabbar .ic { width: 23px; height: 23px; }
+.tabbar [aria-current="page"] { color: var(--ink); font-weight: 600; }
+.tabbar [aria-current="page"] .ic { stroke: var(--tag-text); stroke-width: 2; }
 .tabbar .tab-add .plus {
-  display: grid; place-items: center; width: 44px; height: 32px; border-radius: 10px;
-  background: var(--tag); color: var(--tag-ink); border: 1px solid var(--tag-edge);
+  display: grid; place-items: center; width: 58px; height: 38px; margin-top: -4px; border-radius: 13px;
+  background: var(--tag); color: var(--tag-ink); border: 1px solid var(--tag-edge); transition: transform 0.12s;
 }
-.tabbar .tab-add { color: var(--ink); }
+.tabbar .tab-add:active .plus { transform: scale(0.94); }
+.tabbar .tab-add .plus .ic { width: 24px; height: 24px; stroke-width: 2.3; }
+.tabbar .tab-add { color: var(--ink); font-weight: 600; }
 
 /* ---------- botões e campos */
 .btn {
@@ -263,7 +267,6 @@ button.side-room:hover { color: var(--ink); }
 @media (max-width: 480px) { .dlg-f .btn .lbl { display: none; } .dlg-f .btn:has(.lbl) { padding: 0 12px; } .hide-narrow { display: none; } }
 html { scrollbar-gutter: stable; }
 html:has(dialog[open]) { overflow: hidden; }
-@media (min-width: 1000px) { .crumbs [data-narrow] { display: none; } }
 
 .field { display: grid; gap: 6px; min-width: 0; align-content: start; }
 .field > label, .field > .lbl { font-size: 14px; font-weight: 500; color: var(--ink-2); }
@@ -331,9 +334,10 @@ html:has(dialog[open]) { overflow: hidden; }
 .tag-value .cur { font-size: 0.42em; font-weight: 600; margin-right: 0.18em; vertical-align: 0.82em; letter-spacing: 0; }
 .tag-sub { margin: 10px 0 0; font: 500 16px/1.3 var(--font); }
 .tag-code { position: absolute; right: 16px; bottom: 12px; font: 600 13px/1 var(--font-c); letter-spacing: 0.06em; opacity: 0.55; }
-.string { position: absolute; left: 0; top: 0; width: 120px; height: 140px; overflow: visible; pointer-events: none; z-index: 2; }
+/* o fio fica preso na .tagswing (que gira junto) e sobe até o topo da .tagwrap: -6px e -34px desfazem o padding dela */
+.string { position: absolute; left: -6px; top: -34px; width: 120px; height: 140px; overflow: visible; pointer-events: none; z-index: 2; }
 .string path { fill: none; stroke: var(--ink-2); stroke-width: 1.6; stroke-linecap: round; }
-.tagswing { transform-origin: 36px 132px; }
+.tagswing { position: relative; transform-origin: 19px -34px; }
 .tagswing.go { animation: swing 1.25s cubic-bezier(0.3, 0.7, 0.35, 1) both; }
 @keyframes swing {
   0% { transform: rotate(-9deg); }
@@ -414,6 +418,17 @@ mark { background: var(--tag-soft); color: inherit; border-radius: 2px; padding:
   .thumb { width: 48px; height: 48px; }
   .irow .meta .z { display: none; }
 }
+
+/* ---------- aba Cômodos */
+.rooms-bar { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 14px; }
+@media (max-width: 560px) { .rooms-bar .btn { flex: 1; } }
+.rooms-hint { margin: -2px 0 14px; color: var(--muted); font-size: 14px; max-width: 64ch; }
+.croom .meta .rc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.croom .thumb .ic { width: 24px; height: 24px; }
+div.croom:hover { background: none; }
+.croom .ra { display: flex; gap: 6px; }
+.croom.moved { animation: moved 1.1s ease-out; }
+@keyframes moved { from { background: var(--tag-soft); } }
 
 /* ---------- cômodo */
 .rhead { display: grid; gap: 18px; padding: 14px 0 6px; }

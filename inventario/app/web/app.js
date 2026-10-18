@@ -331,6 +331,7 @@
       case "i": return { name: "item", id: parts[1], q };
       case "buscar": return { name: "search", q };
       case "relatorio": return { name: "report", q };
+      case "comodos": return { name: "rooms", q };
       case "dados": return { name: "data", q };
       default: return { name: "home", q };
     }
@@ -345,6 +346,7 @@
         return "#/buscar" + (qs ? "?" + qs : "");
       }
       case "report": return "#/relatorio";
+      case "rooms": return "#/comodos";
       case "data": return "#/dados";
       default: return "#/";
     }
@@ -390,6 +392,7 @@
       <nav class="nav" aria-label="Seções">
         <a href="#/"${cr("home")}>${ic("home")}Início</a>
         <a href="#/buscar"${cr("search")}>${ic("search")}Buscar<kbd>/</kbd></a>
+        <a href="#/comodos"${cr("rooms")}>${ic("rooms")}Cômodos</a>
         <a href="#/relatorio"${cr("report")}>${ic("report")}Relatório</a>
         <a href="#/dados"${cr("data")}>${ic("gear")}Dados e ajustes</a>
       </nav>
@@ -404,26 +407,31 @@
 
   function viewTitle(r) {
     if (r.name === "room") return D.roomById.get(r.id)?.name || "Cômodo";
-    return { home: "Início", search: "Buscar", report: "Relatório", data: "Dados e ajustes" }[r.name] || "InventarIA";
+    return { home: "Início", search: "Buscar", rooms: "Cômodos", report: "Relatório", data: "Dados e ajustes" }[r.name] || "InventarIA";
   }
+  // Topo de cada tela, igual nos apps da família (EconomIA, ResolvIA): nome do app com "IA" na cor
+  // do app, saudação ao usuário do Home Assistant e o título grande da tela.
+  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", data: "data", report: "data" };
   function renderTop() {
     const el = $("#topbar");
     const r = base;
-    const crumbs = r.name === "home"
-      ? `<span class="top-title">Início</span>`
-      : `<a class="btn ghost icon only-narrow" href="#/" aria-label="Voltar ao início">${ic("back")}</a>
-         <a class="crumb only-wide" href="#/">Início</a><span class="sep only-wide" aria-hidden="true">/</span>
-         <span class="top-title sub">${esc(viewTitle(r))}</span>`;
+    const first = (S.user || "").trim().split(/\s+/)[0];
+    const up = r.name === "room" ? ["#/comodos", "Cômodos"] : r.name === "report" ? ["#/dados", "Dados e ajustes"] : null;
+    const title = r.name === "room" || r.name === "report" ? "" : viewTitle(r);
+    const sub = r.name === "rooms" && D.rooms.length
+      ? `${plural(D.rooms.length, "cômodo", "cômodos")}, ${plural(S.items.length, "item", "itens")}, ${money(D.total)}` : "";
     el.innerHTML = `
-      <div class="crumbs">${crumbs}</div>
-      <div class="top-actions">
-        ${r.name !== "search" ? `<a class="btn ghost icon narrow" href="#/buscar" aria-label="Buscar">${ic("search")}</a>` : ""}
-        ${r.name !== "room" ? `<button type="button" class="btn wide" data-act="catalog">${ic("scan")}Catalogar foto com IA</button>
-        <button type="button" class="btn primary wide" data-act="item-new">${ic("plus")}Adicionar item</button>` : ""}
-      </div>`;
+      <div class="mh-row">
+        <p class="eyebrow"><span class="brand-word">Inventar<span>IA</span></span>${first ? `<span class="hello"><span class="sep"> · </span>Olá, ${esc(first)}</span>` : ""}</p>
+        ${r.name !== "room" ? `<div class="top-actions">
+          <button type="button" class="btn wide" data-act="catalog">${ic("scan")}Catalogar foto com IA</button>
+          <button type="button" class="btn primary wide" data-act="item-new">${ic("plus")}Adicionar item</button></div>` : ""}
+      </div>
+      ${up ? `<a class="uplink" href="${up[0]}">${ic("back", "sm")}${up[1]}</a>` : ""}
+      ${title ? `<h1 class="page-title">${esc(title)}</h1>` : ""}
+      ${sub ? `<p class="page-sub">${sub}</p>` : ""}`;
     $$(".tabbar [data-tab]").forEach((a) => {
-      const on = a.dataset.tab === r.name || (a.dataset.tab === "data" && r.name === "report") || (a.dataset.tab === "home" && r.name === "room");
-      if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+      if (a.dataset.tab === TAB_OF[r.name]) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
   }
 
@@ -434,11 +442,13 @@
     const focus = navigated ? null : captureFocus();
     const y = window.scrollY;
     let html;
+    if (navigated) roomsOrganize = false;
     try {
       switch (base.name) {
         case "room": html = viewRoom(base.id); break;
         case "search": html = viewSearch(base.q); break;
         case "report": html = viewReport(); break;
+        case "rooms": html = viewRooms(); break;
         case "data": html = viewData(); break;
         default: html = viewHome();
       }
@@ -525,7 +535,7 @@
       return `<section class="hero welcome">
         <div class="tagwrap">
           <div class="tagswing">
-            <svg class="string" viewBox="0 0 120 140" aria-hidden="true"><path d="M36 132 C 35 104, 27 62, 22 -60"/></svg>
+            <svg class="string" viewBox="0 0 120 140" aria-hidden="true"><path d="M36 132 C 35 104, 28 50, 25 0"/></svg>
             <div class="tag" role="img" aria-label="Bem-vindo ao InventarIA">
               <div class="tag-body"><p class="tag-label">Bem-vindo ao</p><p class="tag-value">InventarIA</p><p class="tag-sub">Cômodos, itens, fotos e valores</p></div>
             </div>
@@ -552,7 +562,7 @@
     <section class="hero">
       <div class="tagwrap">
         <div class="tagswing">
-          <svg class="string" viewBox="0 0 120 140" aria-hidden="true"><path d="M36 132 C 35 104, 27 62, 22 -60"/></svg>
+          <svg class="string" viewBox="0 0 120 140" aria-hidden="true"><path d="M36 132 C 35 104, 28 50, 25 0"/></svg>
           <div class="tag" role="img" aria-label="Patrimônio: ${esc(money(D.total))} em ${esc(plural(n, "item", "itens"))}">
             <div class="tag-body">
               <p class="tag-label">Patrimônio</p>
@@ -598,7 +608,7 @@
   // -- cômodo
   function viewRoom(id) {
     const r = D.roomById.get(id);
-    if (!r) return `<div class="empty">${emptyMark()}<h2>Cômodo não encontrado</h2><p>Ele pode ter sido excluído ou renomeado.</p><div class="acts"><a class="btn" href="#/">Voltar ao início</a></div></div>`;
+    if (!r) return `<div class="empty">${emptyMark()}<h2>Cômodo não encontrado</h2><p>Ele pode ter sido excluído ou renomeado.</p><div class="acts"><a class="btn" href="#/comodos">Ver os cômodos</a></div></div>`;
     const list = D.byRoom.get(id) || [];
     const total = D.roomTotals.get(id) || 0;
     const photos = r.photos || [];
@@ -758,6 +768,41 @@
     </article>`;
   }
 
+  // -- cômodos (aba própria): lista para abrir cada cômodo; em "Organizar", setas e edição
+  let roomsOrganize = false;
+  function roomThumb(r) {
+    const ps = r.photos || [];
+    const p = ps.length ? ps[Math.min(Math.max(r.cover || 0, 0), ps.length - 1)] : null;
+    return p ? `<img class="thumb" src="${esc(src(p.file))}" alt="" loading="lazy" decoding="async" width="56" height="56">` : `<span class="thumb">${ic("rooms")}</span>`;
+  }
+  function viewRooms() {
+    if (!D.rooms.length) {
+      return `<div class="empty">${emptyMark()}<h2>Nenhum cômodo ainda</h2><p>Crie o primeiro cômodo para começar a cadastrar os itens da casa.</p>
+        <div class="acts"><button type="button" class="btn primary" data-act="room-new">${ic("plus")}Novo cômodo</button></div></div>`;
+    }
+    const org = roomsOrganize, last = D.rooms.length - 1;
+    const rows = D.rooms.map((r, i) => {
+      const n = (D.byRoom.get(r.id) || []).length, nph = (r.photos || []).length;
+      const id = esc(r.id), name = esc(r.name);
+      const body = `<span class="ib"><span class="nm">${name}</span><span class="meta"><span class="mt soft">${esc(r.code)}</span>${org ? "" : `<span class="rc">${plural(n, "item", "itens")}, ${plural(nph, "foto", "fotos")}</span>`}</span></span>`;
+      if (!org) {
+        return `<li><a class="irow croom" href="#/c/${encodeURIComponent(r.id)}" data-room-row="${id}">${roomThumb(r)}${body}
+          <span class="iv"><span class="val">${moneyR(D.roomTotals.get(r.id) || 0)}</span></span></a></li>`;
+      }
+      return `<li><div class="irow croom org" data-room-row="${id}">${roomThumb(r)}${body}<span class="ra">
+        <button type="button" class="btn sm icon" data-act="room-up" data-room="${id}" aria-label="Subir ${name}"${i === 0 ? " disabled" : ""}>${ic("up", "sm")}</button>
+        <button type="button" class="btn sm icon" data-act="room-down" data-room="${id}" aria-label="Descer ${name}"${i === last ? " disabled" : ""}>${ic("down", "sm")}</button>
+        <button type="button" class="btn sm icon" data-act="room-edit" data-room="${id}" aria-label="Editar ${name}">${ic("edit", "sm")}</button></span></div></li>`;
+    }).join("");
+    return `
+    <div class="rooms-bar">
+      <button type="button" class="btn primary" data-act="room-new">${ic("plus")}Novo cômodo</button>
+      <button type="button" class="btn${org ? " dark" : ""}" data-act="rooms-organize">${ic(org ? "check" : "sort")}${org ? "Concluir" : "Organizar"}</button>
+    </div>
+    ${org ? `<p class="rooms-hint">As setas mudam a ordem dos cômodos no app e no relatório. O lápis edita o nome, o código e as fotos.</p>` : ""}
+    <ul class="ilist rooms">${rows}</ul>`;
+  }
+
   // -- dados e ajustes
   const SW_TAG = "M8 0h20a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8L0 13V7z";
   const SWATCH = `<svg viewBox="-5 -5 40 30" aria-hidden="true"><path class="sw-ring" d="${SW_TAG}"/><path class="sw-gap" d="${SW_TAG}"/><path class="sw-fill" d="${SW_TAG}M9.7 10a2.7 2.7 0 1 0-5.4 0a2.7 2.7 0 1 0 5.4 0z"/><path class="sw-check" d="m14.6 10.3 3.2 3.2 6.5-6.9"/></svg>`;
@@ -784,16 +829,6 @@
       <h2>Leitura de fotos por IA</h2>
       <p class="lead">O app usa a integração de IA que estiver configurada no Home Assistant (Anthropic Claude, OpenAI, Google Gemini ou um modelo local pelo Ollama). Dá para trocar de IA quando quiser, sem mexer no inventário.</p>
       <div data-slot="ai"><p class="muted">Verificando…</p></div>
-    </section>
-    <section class="panel" id="p-rooms">
-      <h2>Cômodos</h2>
-      <p class="lead">Mude nomes, códigos e a ordem em que os cômodos aparecem.</p>
-      <ul class="opts">${D.rooms.map((r, i) => `<li><div class="ot"><b><span class="mt soft">${esc(r.code)}</span> ${esc(r.name)}</b><span>${plural((D.byRoom.get(r.id) || []).length, "item", "itens")}, ${plural((r.photos || []).length, "foto", "fotos")}</span></div>
-        <div class="oa"><button class="btn sm icon" data-act="room-up" data-room="${esc(r.id)}" aria-label="Subir ${esc(r.name)}"${i === 0 ? " disabled" : ""}>${ic("up", "sm")}</button>
-        <button class="btn sm icon" data-act="room-down" data-room="${esc(r.id)}" aria-label="Descer ${esc(r.name)}"${i === D.rooms.length - 1 ? " disabled" : ""}>${ic("down", "sm")}</button>
-        <button class="btn sm" data-act="room-edit" data-room="${esc(r.id)}">${ic("edit", "sm")}Editar</button></div></li>`).join("")}
-        <li><div class="ot"><b>Novo cômodo</b><span>Uma área nova da casa, como depósito ou garagem.</span></div><div class="oa"><button class="btn" data-act="room-new">${ic("plus")}Novo cômodo</button></div></li>
-      </ul>
     </section>
     <section class="panel" id="p-history">
       <h2>Versões anteriores</h2>
@@ -1661,19 +1696,32 @@
         try {
           const res = await API.del(`api/rooms/${encodeURIComponent(id)}`);
           setRev(res.rev); S.rooms = res.rooms; derive(); R.dirty = false;
-          finalizeThen(entry, () => { nav("#/"); toast("Cômodo excluído"); });
+          finalizeThen(entry, () => { nav("#/comodos"); toast("Cômodo excluído"); });
         } catch (er) { fail(er); }
       }
     });
   }
 
-  async function moveRoom(id, d) {
+  // Um movimento por vez (toques seguidos entram na fila), e a linha movida fica sob o dedo
+  // para dar para subir o mesmo cômodo várias posições seguidas.
+  let roomMoves = Promise.resolve();
+  function moveRoom(id, d) { roomMoves = roomMoves.then(() => moveRoomNow(id, d)); return roomMoves; }
+  async function moveRoomNow(id, d) {
     const ids = D.rooms.map((r) => r.id);
     const i = ids.indexOf(id), j = i + d;
     if (i < 0 || j < 0 || j >= ids.length) return;
     [ids[i], ids[j]] = [ids[j], ids[i]];
-    try { const res = await API.post("api/rooms/order", { ids }); setRev(res.rev); S.rooms = res.rooms; derive(); refreshAll(); }
-    catch (e) { fail(e); }
+    const rowOf = () => $(`#view [data-room-row="${CSS.escape(id)}"]`);
+    const before = rowOf()?.getBoundingClientRect().top;
+    try {
+      const res = await API.post("api/rooms/order", { ids }); setRev(res.rev); S.rooms = res.rooms; derive(); refreshAll();
+      const row = rowOf();
+      if (!row) return;
+      if (before != null) window.scrollBy(0, row.getBoundingClientRect().top - before);
+      row.classList.add("moved");
+      const btn = $(`[data-act="${d < 0 ? "room-up" : "room-down"}"]:not([disabled])`, row) || $(`[data-act="${d < 0 ? "room-down" : "room-up"}"]`, row);
+      btn?.focus({ preventScroll: true });
+    } catch (e) { fail(e); }
   }
 
   function openAddMenu() {
@@ -1684,7 +1732,7 @@
         <div class="dlg-b" style="padding:8px 12px 16px"><ul class="opts" style="border-top:0">
           <li style="padding:0;border:0"><button class="rrow nocode" data-go="item" style="grid-template-columns:auto 1fr;padding:14px 8px">${ic("plus", "lg")}<span class="rn">Adicionar item<small style="display:block;margin:2px 0 0">Com foto e valor, preenchendo os campos</small></span></button></li>
           <li style="padding:0;border:0"><button class="rrow nocode" data-go="catalog" style="grid-template-columns:auto 1fr;padding:14px 8px">${ic("scan", "lg")}<span class="rn">Catalogar foto com IA<small style="display:block;margin:2px 0 0">A IA lista vários itens de uma foto</small></span></button></li>
-          <li style="padding:0;border:0"><button class="rrow nocode" data-go="room" style="grid-template-columns:auto 1fr;padding:14px 8px;border-bottom:0">${ic("door", "lg")}<span class="rn">Novo cômodo<small style="display:block;margin:2px 0 0">Uma área nova da casa</small></span></button></li>
+          <li style="padding:0;border:0"><button class="rrow nocode" data-go="room" style="grid-template-columns:auto 1fr;padding:14px 8px;border-bottom:0">${ic("rooms", "lg")}<span class="rn">Novo cômodo<small style="display:block;margin:2px 0 0">Uma área nova da casa</small></span></button></li>
         </ul></div></div>`,
     });
     entry.dlg.addEventListener("click", (e) => {
@@ -1858,6 +1906,7 @@
       case "room-edit": openRoomEdit(b.dataset.room); break;
       case "room-up": moveRoom(b.dataset.room, -1); break;
       case "room-down": moveRoom(b.dataset.room, 1); break;
+      case "rooms-organize": roomsOrganize = !roomsOrganize; renderView(false); $('#view [data-act="rooms-organize"]')?.focus({ preventScroll: true }); break;
       case "room-photo-add": {
         const rid = b.dataset.room;
         pickFiles(async (files) => {
@@ -1946,7 +1995,6 @@
     } else if (e.key === "n" || e.key === "N") { e.preventDefault(); openEditor({ room: base.name === "room" ? base.id : null }); }
   });
   window.addEventListener("hashchange", () => { onRoute(); });
-  window.addEventListener("scroll", () => { $("#topbar").classList.toggle("scrolled", window.scrollY > 4); }, { passive: true });
 
   // atualização quando outro aparelho mexer no inventário
   async function checkRev() {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0
+
+- Nova aba **Cômodos** na barra de baixo, ao lado de Adicionar: todos os cômodos com foto, número de itens e valor. Toque num cômodo para abrir. Em **Organizar**, as setas mudam a ordem e o lápis edita nome, código e fotos. A lista de cômodos saiu de Dados e ajustes.
+- Topo das telas como nos outros apps da casa: o nome InventarIA, com "IA" na cor do app, "Olá" com o nome do usuário do Home Assistant e o título grande da tela.
+- Barra de baixo com 5 abas e o Adicionar no meio; o ícone da aba aberta fica na cor do app.
+- Dentro de um cômodo, "Cômodos" no topo volta para a lista.
+- O fio da etiqueta da tela inicial balança preso ao ilhós.
+
 ## 1.4.0
 
 - Cor do app: em **Dados e ajustes > Aparência** (aba **Mais** no celular), escolha entre amarelo (o padrão), laranja, coral, rosa, lilás, azul, turquesa, verde, kraft e cinza. A cor muda a etiqueta, os botões principais e os destaques, e o texto continua legível em todas elas. Cada aparelho guarda a sua escolha.
