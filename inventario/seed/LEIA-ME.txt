@@ -1,0 +1,2 @@
+Pasta vazia de propósito: o app começa sem dados e você importa o seu backup pelo próprio app.
+Quem quiser já instalar com dados pode colocar aqui um inventario.json e as pastas photos/ e thumbs/.
