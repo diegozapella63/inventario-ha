@@ -7,7 +7,7 @@
 <meta name="referrer" content="same-origin">
 <title>InventarIA</title>
 <link rel="stylesheet" href="style.css?v=%%V%%">
-<script>try{var t=JSON.parse(localStorage.getItem("inv:theme")||"null");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<script>try{var t=JSON.parse(localStorage.getItem("inv:theme")||"null");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;var a=JSON.parse(localStorage.getItem("inv:accent")||"null");if(typeof a==="string"&&/^[a-z]{2,16}$/.test(a)&&a!=="amarelo")document.documentElement.dataset.accent=a}catch(e){}</script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">

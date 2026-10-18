@@ -21,6 +21,7 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - **Catalogar foto com IA**: tire uma foto de uma prateleira ou de um canto da casa; a IA lista os objetos com nome, categoria, quantidade e valor estimado. Você confere, ajusta e escolhe o que entra.
 - **Buscar**: por nome, marca, detalhe ou zona, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome ou data.
 - **Relatório**: lista por cômodo com fotos e valores, pronta para imprimir ou salvar em PDF (útil para seguro).
+- **Aparência** (em **Dados e ajustes**, a aba **Mais** no celular): tema claro, escuro ou automático e a cor do app (amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza). Cada aparelho guarda a sua escolha.
 - Atalhos no computador: `/` abre a busca, `N` cria um item, `Ctrl+Enter` salva o formulário.
 
 Os valores são de mercado de usados (o que o item vale hoje), somando todas as unidades.

@@ -17,12 +17,15 @@
   --faint: #737b84;
   --line: #dadde1;
   --line-2: #c3c8ce;
-  --tag: #f5c400;
-  --tag-hover: #ffd21a;
-  --tag-edge: #d4a800;
-  --tag-ring: #fbe27a;
+  --tag: var(--a);
+  --tag-hover: var(--a-hover);
+  --tag-edge: var(--a-edge);
+  --tag-ring: var(--a-ring);
   --tag-ink: #1d2125;
-  --tag-soft: #fff4c4;
+  --tag-soft: var(--a-soft);
+  --warn: #f5c400;
+  --warn-edge: #d4a800;
+  --warn-soft: #fff4c4;
   --bar: #3a4148;
   --danger: #b3261e;
   --danger-soft: #fdecea;
@@ -53,14 +56,17 @@
     --faint: #868f99;
     --line: #2f353b;
     --line-2: #3e464e;
-    --tag-edge: #b38f00;
-    --tag-ring: #ffe27a;
-    --tag-soft: #3b3417;
+    --tag-edge: var(--a-edge-d);
+    --tag-ring: var(--a-ring-d);
+    --tag-soft: var(--a-soft-d);
+    --warn-edge: #b38f00;
+    --warn-soft: #3b3417;
+    --sw-edge: transparent;
     --bar: #c9cfd5;
     --danger: #ff8a80;
     --danger-soft: #3a1f1d;
     --ok: #79d39f;
-    --focus: #f5c400;
+    --focus: var(--a);
     --scrim: rgba(0, 0, 0, 0.62);
     --shadow: 0 28px 70px -18px rgba(0, 0, 0, 0.7);
     --toast-bg: #2b3137;
@@ -77,19 +83,36 @@
   --faint: #868f99;
   --line: #2f353b;
   --line-2: #3e464e;
-  --tag-edge: #b38f00;
-  --tag-ring: #ffe27a;
-  --tag-soft: #3b3417;
+  --tag-edge: var(--a-edge-d);
+  --tag-ring: var(--a-ring-d);
+  --tag-soft: var(--a-soft-d);
+  --warn-edge: #b38f00;
+  --warn-soft: #3b3417;
+  --sw-edge: transparent;
   --bar: #c9cfd5;
   --danger: #ff8a80;
   --danger-soft: #3a1f1d;
   --ok: #79d39f;
-  --focus: #f5c400;
+  --focus: var(--a);
   --scrim: rgba(0, 0, 0, 0.62);
   --shadow: 0 28px 70px -18px rgba(0, 0, 0, 0.7);
   --toast-bg: #2b3137;
   color-scheme: dark;
 }
+
+/* Cor do app (data-accent no <html>; o amarelo é o padrão). Cada cor traz o preenchimento, a borda,
+   o anel do ilhós e o fundo suave; os nomes com -d são do modo escuro. O texto sobre a cor é sempre
+   escuro (--tag-ink), com contraste de 6:1 ou mais. As amostras do seletor usam as mesmas regras. */
+:root, [data-accent="amarelo"] { --a: #f5c400; --a-hover: #ffd21a; --a-edge: #d4a800; --a-edge-d: #b38f00; --a-ring: #fbe27a; --a-ring-d: #ffe27a; --a-soft: #fff4c4; --a-soft-d: #3b3417; }
+[data-accent="laranja"] { --a: #ff9d35; --a-hover: #ffb067; --a-edge: #da852a; --a-edge-d: #b76e1f; --a-ring: #ffc089; --a-ring-d: #ffc28c; --a-soft: #fff0e4; --a-soft-d: #442f1c; }
+[data-accent="coral"] { --a: #fb7e5f; --a-hover: #ff9175; --a-edge: #d4684d; --a-edge-d: #b0543d; --a-ring: #ffa38c; --a-ring-d: #ffa58e; --a-soft: #ffefeb; --a-soft-d: #472c25; }
+[data-accent="rosa"] { --a: #f77cb0; --a-hover: #ff8dbc; --a-edge: #d16794; --a-edge-d: #ae537a; --a-ring: #ffa1c6; --a-ring-d: #ffa3c7; --a-soft: #ffeef4; --a-soft-d: #462b35; }
+[data-accent="lilas"] { --a: #b48cf6; --a-hover: #bf99ff; --a-edge: #9774d0; --a-edge-d: #7c5eac; --a-ring: #c7abfa; --a-ring-d: #c8acfc; --a-soft: #f5f0ff; --a-soft-d: #372f46; }
+[data-accent="azul"] { --a: #5caef8; --a-hover: #6fbaff; --a-edge: #4a92d2; --a-edge-d: #3a78ae; --a-ring: #8ac5fc; --a-ring-d: #8bc6fe; --a-soft: #eaf5ff; --a-soft-d: #253646; }
+[data-accent="turquesa"] { --a: #3ed0c8; --a-hover: #49ddd5; --a-edge: #31b1aa; --a-edge-d: #25948e; --a-ring: #85e2db; --a-ring-d: #86e3dd; --a-soft: #d2fdf9; --a-soft-d: #203a38; }
+[data-accent="verde"] { --a: #5fd37f; --a-hover: #69e089; --a-edge: #4fb36b; --a-edge-d: #3f9658; --a-ring: #94e4a5; --a-ring-d: #95e6a6; --a-soft: #d8ffdf; --a-soft-d: #243a29; }
+[data-accent="kraft"] { --a: #caa377; --a-hover: #d7af81; --a-edge: #aa8962; --a-edge-d: #8d704f; --a-ring: #dabc9c; --a-ring-d: #dbbd9d; --a-soft: #fff1e1; --a-soft-d: #3b3229; }
+[data-accent="cinza"] { --a: #acb2b9; --a-hover: #b8bec5; --a-edge: #91969c; --a-edge-d: #787d82; --a-ring: #c4c9ce; --a-ring-d: #c6cacf; --a-soft: #d4d9de; --a-soft-d: #333436; }
 
 /* ---------- base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -558,6 +581,7 @@ details.more-fields .form { margin-top: 14px; }
 .scan::before {
   content: ""; position: absolute; left: 0; right: 0; height: 34%; top: -34%;
   background: linear-gradient(180deg, transparent, rgba(245, 196, 0, 0.18) 70%, rgba(245, 196, 0, 0.9) 99%, transparent);
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--tag) 18%, transparent) 70%, color-mix(in srgb, var(--tag) 90%, transparent) 99%, transparent);
   animation: scan 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 @keyframes scan { to { top: 100%; } }
@@ -578,7 +602,7 @@ details.more-fields .form { margin-top: 14px; }
 .found .fdet { font-size: 14px; color: var(--muted); margin: 0; }
 .found .fflag { font-size: 13px; color: var(--ink-2); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .found .pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 11px; font-size: 12px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
-.found .pill.warn { background: var(--tag-soft); border-color: var(--tag-edge); color: var(--ink); }
+.found .pill.warn { background: var(--warn-soft); border-color: var(--warn-edge); color: var(--ink); }
 @media (max-width: 560px) {
   .found .frow { grid-template-columns: 1fr 1fr; }
   .found .frow .fname { grid-column: span 2; }
@@ -632,10 +656,27 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .status { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
 .status i { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); }
 .status.ok i { background: var(--ok); }
-.status.warn i { background: var(--tag); }
+.status.warn i { background: var(--warn); }
 .status.bad i { background: var(--danger); }
 .steps { margin: 10px 0 0; padding-left: 20px; color: var(--ink-2); font-size: 15px; display: grid; gap: 6px; }
 .codepath { font: 500 14px/1.4 var(--font); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
+
+/* cor do app: amostras em forma de etiqueta, cada uma pintada pelo próprio data-accent */
+.swatches { flex: 1 1 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: -6px -4px 0; min-width: 0; }
+@media (min-width: 700px) { .swatches { grid-template-columns: repeat(10, minmax(0, 76px)); } }
+.sw { --sw-bg: var(--paper); position: relative; display: grid; justify-items: center; gap: 4px; padding: 8px 2px 7px; border-radius: 10px; background: var(--sw-bg); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+@media (hover: hover) { .sw:hover { --sw-bg: var(--surface-2); } }
+.sw input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.sw svg { width: 48px; height: 36px; overflow: visible; }
+.sw .sw-fill { fill: var(--a); fill-rule: evenodd; stroke: var(--sw-edge, var(--a-edge)); stroke-width: 1; }
+.sw .sw-ring, .sw .sw-gap, .sw .sw-check { fill: none; stroke-linejoin: round; stroke-linecap: round; visibility: hidden; }
+.sw .sw-ring { stroke: var(--ink); stroke-width: 7; }
+.sw .sw-gap { stroke: var(--sw-bg); stroke-width: 3.6; }
+.sw .sw-check { stroke: var(--tag-ink); stroke-width: 2.4; }
+.sw span { font-size: 13px; line-height: 1.2; color: var(--muted); white-space: nowrap; }
+.sw input:checked ~ svg .sw-ring, .sw input:checked ~ svg .sw-gap, .sw input:checked ~ svg .sw-check { visibility: visible; }
+.sw input:checked ~ span { color: var(--ink); font-weight: 600; }
+.sw:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 0; }
 
 /* ---------- toasts */
 .toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 2000; display: grid; gap: 8px; width: max-content; max-width: calc(100vw - 32px); pointer-events: none; }
@@ -693,7 +734,7 @@ dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
   .tagswing.go { animation: none; }
-  .scan::before { animation: none; top: 0; height: 100%; background: rgba(245, 196, 0, 0.12); }
+  .scan::before { animation: none; top: 0; height: 100%; background: rgba(245, 196, 0, 0.12); background: color-mix(in srgb, var(--tag) 12%, transparent); }
 }
 
 /* boas-vindas (inventário vazio) e progresso de importação */

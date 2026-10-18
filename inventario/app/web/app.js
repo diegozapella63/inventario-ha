@@ -73,6 +73,15 @@
     get(k, d) { try { const v = localStorage.getItem("inv:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) { try { localStorage.setItem("inv:" + k, JSON.stringify(v)); } catch { /* sem armazenamento */ } },
   };
+  // Cor do app (as cores ficam no style.css, em [data-accent]). Cada aparelho guarda a sua.
+  const ACCENTS = [["amarelo", "Amarelo"], ["laranja", "Laranja"], ["coral", "Coral"], ["rosa", "Rosa"], ["lilas", "Lilás"],
+    ["azul", "Azul"], ["turquesa", "Turquesa"], ["verde", "Verde"], ["kraft", "Kraft"], ["cinza", "Cinza"]];
+  const accentOf = () => { const a = LS.get("accent", "amarelo"); return ACCENTS.some(([k]) => k === a) ? a : "amarelo"; };
+  function applyAccent(a) {
+    if (a === "amarelo") delete document.documentElement.dataset.accent;
+    else document.documentElement.dataset.accent = a;
+  }
+  applyAccent(accentOf());
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
   const tokens = (q) => norm(q).split(/\s+/).filter(Boolean);
   function hl(text, toks) {
@@ -750,8 +759,11 @@
   }
 
   // -- dados e ajustes
+  const SW_TAG = "M8 0h20a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8L0 13V7z";
+  const SWATCH = `<svg viewBox="-5 -5 40 30" aria-hidden="true"><path class="sw-ring" d="${SW_TAG}"/><path class="sw-gap" d="${SW_TAG}"/><path class="sw-fill" d="${SW_TAG}M9.7 10a2.7 2.7 0 1 0-5.4 0a2.7 2.7 0 1 0 5.4 0z"/><path class="sw-check" d="m14.6 10.3 3.2 3.2 6.5-6.9"/></svg>`;
   function viewData() {
     const theme = LS.get("theme", "auto");
+    const accent = accentOf();
     return `
     <section class="panel" id="p-export" style="margin-top:14px">
       <h2>Exportar</h2>
@@ -798,7 +810,9 @@
       <ul class="opts"><li><div class="ot"><b>Tema</b><span>Automático segue o modo claro ou escuro do aparelho.</span></div>
         <div class="oa"><div class="seg" role="group" aria-label="Tema">
           ${[["auto", "Automático"], ["light", "Claro"], ["dark", "Escuro"]].map(([k, v]) => `<button type="button" data-act="theme" data-theme="${k}" aria-pressed="${theme === k}">${v}</button>`).join("")}
-        </div></div></li></ul>
+        </div></div></li>
+        <li><div class="ot"><b id="accent-h">Cor do app</b><span>Muda a etiqueta, os botões principais e os destaques. Cada aparelho guarda a sua escolha.</span></div>
+          <div class="swatches" role="radiogroup" aria-labelledby="accent-h">${ACCENTS.map(([k, v]) => `<label class="sw" data-accent="${k}"><input type="radio" name="accent" value="${k}" data-input="accent"${k === accent ? " checked" : ""}>${SWATCH}<span>${v}</span></label>`).join("")}</div></li></ul>
     </section>
     <section class="panel">
       <h2>Sobre</h2>
@@ -1822,6 +1836,11 @@
     else delete document.documentElement.dataset.theme;
     $$('[data-act="theme"]').forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === t)));
   }
+  function setAccent(a) {
+    if (!ACCENTS.some(([k]) => k === a)) a = "amarelo";
+    LS.set("accent", a);
+    applyAccent(a);
+  }
 
   // ------------------------------------------------------------------ eventos globais
   document.addEventListener("click", async (e) => {
@@ -1906,6 +1925,7 @@
     else if (k === "search-cat") updateSearch({ cat: t.value });
     else if (k === "search-ord") updateSearch({ ord: t.value });
     else if (k === "rep-photos") { LS.set("reportPhotos", t.checked); renderView(false); }
+    else if (k === "accent" && t.checked) setAccent(t.value);
     else if (k === "ai-entity") {
       try { await API.put("api/settings", { ai_entity: t.value }); S.settings.ai_entity = t.value; const slot = $('[data-slot="ai"]'); if (slot) renderAiPanel(slot, await aiStatus(true)); toast("IA do app atualizada"); }
       catch (er) { fail(er); }
