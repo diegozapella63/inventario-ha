@@ -15,6 +15,12 @@
   const ORDERS = [["rel", "Mais relevantes"], ["val", "Maior valor"], ["valasc", "Menor valor"], ["az", "Nome, de A a Z"], ["new", "Mais recentes"], ["code", "Código"]];
   const PREVIEW = !!window.INV_PREVIEW;
   const COARSE = window.matchMedia("(pointer: coarse)").matches;
+  // Dentro do app do Home Assistant no Android (WebView), o botão de câmera abre a galeria
+  // e a seleção de vários arquivos pode não voltar para a página: lá usamos um arquivo por vez.
+  const UA = navigator.userAgent || "";
+  const ANDROID_APP = /Android/i.test(UA) && (/Home ?Assistant\//i.test(UA) || /; wv\)/.test(UA));
+  const CAMERA_DIRECT = COARSE && !ANDROID_APP;
+  const MULTI_PICK = !ANDROID_APP;
   const BRAND = '<svg class="brand-mark" viewBox="0 0 30 20" aria-hidden="true"><path d="M8 0h20a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8L0 13V7z" style="fill:var(--tag)"/><circle cx="7" cy="10" r="2.7" style="fill:var(--paper)"/></svg>';
 
   // ------------------------------------------------------------------ utilidades
@@ -186,8 +192,18 @@
   }
 
   // ------------------------------------------------------------------ avisos
+  function toastBox() {
+    let box = document.getElementById("toasts");
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "toasts"; box.id = "toasts";
+      box.setAttribute("role", "status"); box.setAttribute("aria-live", "polite");
+      document.body.append(box);
+    }
+    return box;
+  }
   function toast(msg, opts = {}) {
-    const box = $("#toasts");
+    const box = toastBox();
     const el = document.createElement("div");
     el.className = "toast" + (opts.error ? " err" : "");
     el.innerHTML = `<span class="tmsg">${esc(msg)}</span>${opts.action ? `<button type="button">${esc(opts.action)}</button>` : ""}`;
@@ -196,10 +212,18 @@
     if (opts.action) el.querySelector("button").addEventListener("click", () => { close(); opts.onAction && opts.onAction(); });
     box.append(el);
     while (box.children.length > 3) box.firstElementChild.remove();
+    showToasts();
     setTimeout(close, opts.ms || (opts.action ? 8000 : 3800));
     return close;
   }
   const fail = (e) => toast(e?.message || String(e), { error: true, ms: 7000 });
+  function showToasts() {
+    // Janelas abertas ficam numa camada acima da página; os avisos vão para dentro da janela de cima
+    // para aparecer (e o botão "Desfazer" funcionar) mesmo com o editor aberto.
+    const box = toastBox();
+    const host = (stack.length && stack[stack.length - 1].dlg) || document.body;
+    if (box.parentElement !== host) host.append(box);
+  }
 
   // ------------------------------------------------------------------ janelas (dialog) com botão voltar do celular
   const stack = [];
@@ -217,6 +241,8 @@
       // fechada pelo navegador (ex.: Esc duas vezes seguidas no Chrome): limpa o que ficou para trás
       if (!stack.includes(entry)) return;
       stack.splice(stack.indexOf(entry), 1);
+      const box = $("#toasts");
+      if (box && dlg.contains(box)) ((stack.length && stack[stack.length - 1].dlg) || document.body).append(box);
       dlg.remove();
       entry.onClose && entry.onClose();
       if (entry.routed) { entry.onRouteClose && entry.onRouteClose(); }
@@ -247,6 +273,8 @@
   function finalize(entry) {
     const i = stack.indexOf(entry);
     if (i >= 0) stack.splice(i, 1);
+    const box = $("#toasts");
+    if (box && entry.dlg.contains(box)) ((stack.length && stack[stack.length - 1].dlg) || document.body).append(box);
     try { entry.dlg.close(); } catch { /* já fechado */ }
     entry.dlg.remove();
     entry.onClose && entry.onClose();
@@ -499,7 +527,7 @@
           <p>Já tem um inventário salvo? Importe o arquivo de backup (.zip) e tudo volta, com fotos e valores. Se preferir, comece do zero criando o primeiro cômodo.</p>
           <div class="acts"><button type="button" class="btn primary" data-act="import-file">${ic("upload")}Importar backup</button>
             <button type="button" class="btn" data-act="room-new">${ic("plus")}Começar do zero</button></div>
-          <p class="muted" style="font-size:14px;margin:0">O backup é o arquivo .zip criado em Dados e ajustes, ou o que você recebeu junto com o app.</p>
+          <p class="muted" style="font-size:14px;margin:0">O backup é o arquivo .zip criado em Dados e ajustes, ou o que você recebeu junto com o app. ${MULTI_PICK ? "Se ele veio em várias partes, escolha todas de uma vez." : "Se ele veio em várias partes, importe uma de cada vez, começando pela parte 1."}</p>
         </div>
       </section>`;
     }
@@ -763,7 +791,7 @@
     <section class="panel" id="p-import">
       <h2>Importar</h2>
       <p class="lead">Traz um inventário de um arquivo: o backup .zip, com as fotos, ou um .json exportado pelo app. Antes de importar, o app guarda uma cópia do que existe hoje.</p>
-      <ul class="opts"><li><div class="ot"><b>Importar backup ou JSON</b><span>Funciona pelo celular: escolha o arquivo nos seus downloads.</span></div><div class="oa"><button class="btn" data-act="import-file">${ic("upload")}Escolher arquivo</button></div></li></ul>
+      <ul class="opts"><li><div class="ot"><b>Importar backup ou JSON</b><span>Funciona pelo celular: escolha o arquivo nos seus downloads. ${MULTI_PICK ? "Se o backup veio em partes, escolha todas de uma vez ou uma de cada vez" : "Se o backup veio em partes, importe uma de cada vez, começando pela parte 1"}; as partes só com fotos não mexem nos itens.</span></div><div class="oa"><button class="btn" data-act="import-file">${ic("upload")}Escolher arquivo</button></div></li></ul>
     </section>
     <section class="panel" id="p-look">
       <h2>Aparência</h2>
@@ -880,7 +908,16 @@
     if (!file || !/^image\//.test(file.type || "image/")) throw new Error("Escolha um arquivo de imagem (JPG ou PNG).");
     let img, url;
     try { img = await createImageBitmap(file, { imageOrientation: "from-image" }); }
-    catch { url = URL.createObjectURL(file); img = await loadImg(url); }
+    catch {
+      url = URL.createObjectURL(file);
+      try { img = await loadImg(url); }
+      catch (e) {
+        if (/hei[cf]/i.test(file.type || "") || /\.hei[cf]$/i.test(file.name || "")) {
+          throw new Error("Esta foto está em HEIC, formato que o navegador não abre. Na câmera do celular, desligue a opção de salvar em HEIF (fica nas configurações da câmera) ou escolha outra foto.");
+        }
+        throw e;
+      }
+    }
     try {
       const full = await toJpeg(img, 1600, 0.85);
       const thumb = await toJpeg(img, 480, 0.78);
@@ -893,7 +930,7 @@
   function pickFiles(cb, { camera = false, multiple = true } = {}) {
     pickCb = cb;
     const inp = camera ? $("#pick-camera") : $("#pick-files");
-    inp.multiple = multiple && !camera;
+    inp.multiple = multiple && !camera && MULTI_PICK;
     inp.value = "";
     inp.click();
   }
@@ -902,7 +939,9 @@
     e.target.value = "";
     if (files.length && pickCb) pickCb(files);
   }));
-  function imageFiles(list) { return [...(list || [])].filter((f) => /^image\//.test(f.type)); }
+  // Alguns seletores do Android devolvem a foto sem tipo: aceita e deixa a leitura da imagem decidir.
+  const IMG_EXT = /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif)$/i;
+  function imageFiles(list) { return [...(list || [])].filter((f) => /^image\//.test(f.type || "") || (!f.type && (IMG_EXT.test(f.name || "") || !/\.[a-z0-9]{2,5}$/i.test(f.name || "")))); }
   function wireDrop(entry, el, onFiles) {
     entry.onFiles = onFiles;
     el.addEventListener("dragover", (e) => { if ([...e.dataTransfer.types].includes("Files")) { e.preventDefault(); el.classList.add("over"); } });
@@ -945,7 +984,13 @@
   // ------------------------------------------------------------------ detalhe do item
   function showItemSheet(it) {
     const html = itemSheetHtml(it);
-    if (sheet) { sheet.dlg.innerHTML = html; sheet.dlg.setAttribute("aria-label", it.name); sheet.itemId = it.id; sheet.closing = false; return; }
+    if (sheet) {
+      const box = sheet.dlg.querySelector("#toasts");
+      sheet.dlg.innerHTML = html;
+      if (box) sheet.dlg.append(box);
+      sheet.dlg.setAttribute("aria-label", it.name); sheet.itemId = it.id; sheet.closing = false;
+      return;
+    }
     sheet = openDialog({ cls: "sheet", html, routed: true, label: it.name });
     sheet.itemId = it.id;
     sheet.onRouteClose = leaveItem;
@@ -1065,7 +1110,7 @@
         <form class="dlg-b drop" data-ed-form novalidate autocomplete="off">
           <div class="form">
             <div class="field"><span class="lbl">Fotos</span><div class="phs" data-slot="photos"></div>
-              <p class="help">${COARSE ? "Tire uma foto ou escolha da galeria." : "Arraste fotos para cá ou cole uma imagem com Ctrl+V."}</p></div>
+              <p class="help">${ANDROID_APP ? "No app do Home Assistant as fotos vêm da galeria. Para fotografar na hora, tire a foto antes com a câmera do celular." : COARSE ? "Tire uma foto ou escolha da galeria." : "Arraste fotos para cá ou cole uma imagem com Ctrl+V."}</p></div>
             <div class="aibox" data-slot="ai"></div>
             <div class="field"><label for="f-name">Nome</label><input id="f-name" class="input" name="name" maxlength="200" value="${esc(F.name)}" placeholder="Ex.: Cafeteira Nespresso Inissia" enterkeyhint="next">
               <p class="err" data-err="name" hidden></p></div>
@@ -1110,8 +1155,8 @@
           ${i === 0 ? `<span class="cover">Capa</span>` : `<button type="button" class="mkcover" data-ed="cover" data-i="${i}">Usar como capa</button>`}
           <button type="button" class="x" data-ed="rmphoto" data-i="${i}" aria-label="Remover foto ${i + 1}">${ic("close")}</button></div>`).join("")
         + Array.from({ length: F.uploading }, () => `<div class="ph loading"><span class="spin lg"></span></div>`).join("")
-        + (COARSE ? `<button type="button" class="add" data-ed="camera">${ic("camera")}Tirar foto</button>` : "")
-        + `<button type="button" class="add" data-ed="upload">${ic(COARSE ? "image" : "upload")}${COARSE ? "Galeria" : "Enviar foto"}</button>`
+        + (CAMERA_DIRECT ? `<button type="button" class="add" data-ed="camera">${ic("camera")}Tirar foto</button>` : "")
+        + `<button type="button" class="add" data-ed="upload">${ic(COARSE ? "image" : "upload")}${ANDROID_APP ? "Escolher foto" : COARSE ? "Galeria" : "Enviar foto"}</button>`
         + (hasRoomPhotos ? `<button type="button" class="add" data-ed="roomphotos">${ic("images")}Fotos do cômodo</button>` : "");
       renderAi();
     };
@@ -1281,10 +1326,10 @@
               <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-ct="change">${ic("image", "sm")}Trocar foto</button></div>`
             : `<div class="phs" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
                 ${C.uploading ? `<div class="ph loading" style="aspect-ratio:4/3"><span class="spin lg"></span></div>` : `
-                ${COARSE ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="camera">${ic("camera", "lg")}Tirar foto</button>` : ""}
-                <button type="button" class="add" style="aspect-ratio:4/3" data-ct="upload">${ic(COARSE ? "image" : "upload", "lg")}${COARSE ? "Galeria" : "Enviar foto"}</button>
+                ${CAMERA_DIRECT ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="camera">${ic("camera", "lg")}Tirar foto</button>` : ""}
+                <button type="button" class="add" style="aspect-ratio:4/3" data-ct="upload">${ic(COARSE ? "image" : "upload", "lg")}${ANDROID_APP ? "Escolher foto" : COARSE ? "Galeria" : "Enviar foto"}</button>
                 ${hasRoomPhotos ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="roomphoto">${ic("images", "lg")}Foto do cômodo</button>` : ""}`}
-              </div>${COARSE ? "" : `<p class="help" style="margin:0">Você também pode arrastar a foto para cá ou colar com Ctrl+V.</p>`}`}
+              </div>${ANDROID_APP ? `<p class="help" style="margin:0">No app do Home Assistant as fotos vêm da galeria. Tire a foto antes com a câmera do celular.</p>` : COARSE ? "" : `<p class="help" style="margin:0">Você também pode arrastar a foto para cá ou colar com Ctrl+V.</p>`}`}
           <div class="row2">
             <div class="field"><label for="c-room">Cômodo</label><select id="c-room" class="select" data-ct-in="room">${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === C.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
             <div class="field"><label for="c-zone">Zona (opcional)</label><input id="c-zone" class="input" data-ct-in="zone" list="c-zones" value="${esc(C.zone)}" placeholder="Deixe vazio para a IA sugerir" autocomplete="off">
@@ -1555,7 +1600,7 @@
           <button type="button" class="btn sm icon" data-re="rm" data-i="${i}" aria-label="Tirar foto">${ic("trash", "sm")}</button></li>`).join("")}</ul>
         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
           ${R.uploading ? `<span class="muted"><span class="spin sm"></span> Enviando ${R.uploading} foto(s)…</span>` : ""}
-          ${COARSE ? `<button type="button" class="btn sm" data-re="camera">${ic("camera", "sm")}Tirar foto</button>` : ""}
+          ${CAMERA_DIRECT ? `<button type="button" class="btn sm" data-re="camera">${ic("camera", "sm")}Tirar foto</button>` : ""}
           <button type="button" class="btn sm" data-re="upload">${ic("upload", "sm")}Enviar fotos</button></div>`;
     };
     const addFiles = async (files) => {
@@ -1666,75 +1711,106 @@
     catch (e) { fail(e); }
   }
   $("#pick-import").addEventListener("change", (e) => {
-    const f = e.target.files[0];
+    const files = [...e.target.files];
     e.target.value = "";
-    if (f) importFile(f);
+    if (files.length) importFiles(files);
   });
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const mb = (n) => (n / 1048576).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  async function importFile(file) {
-    const name = file.name || "arquivo";
-    const isZip = /\.zip$/i.test(name) || /zip/.test(file.type || "");
-    const isJson = /\.json$/i.test(name) || /json/.test(file.type || "");
-    if (!isZip && !isJson) { fail(new Error("Escolha o backup .zip ou um .json exportado pelo app.")); return; }
-    if (S.items.length || S.rooms.length) {
-      const ok = await confirmBox({ title: "Trocar o inventário atual?", body: `O inventário de agora (${plural(S.items.length, "item", "itens")}) vai ser trocado pelo conteúdo de <b>${esc(name)}</b>. Antes, o app guarda uma cópia do que existe hoje.`, ok: "Importar", danger: true });
-      if (!ok) return;
-    }
+  // Importa um backup (.zip ou .json). Aceita vários arquivos de uma vez: um backup dividido em partes,
+  // em que só uma parte tem o inventario.json e as outras trazem fotos.
+  async function importFiles(files) {
+    files = files.filter(Boolean).sort((a, b) => (a.name || "").localeCompare(b.name || "", "pt-BR", { numeric: true }));
+    const bad = files.find((f) => !(/\.(zip|json)$/i.test(f.name || "") || /zip|json/.test(f.type || "")));
+    if (bad) { fail(new Error(`${bad.name || "Um dos arquivos"} não é um backup .zip nem um .json exportado pelo app.`)); return; }
+    const many = files.length > 1;
+    const total = files.reduce((n, f) => n + f.size, 0) || 1;
     let cancelled = false, done = false, uid = null, lock = null;
+    let confirmed = !(S.items.length || S.rooms.length);
+    const result = { replaced: false, items: 0, rooms: 0, photos: 0 };
+    const stop = () => Object.assign(new Error("cancelado"), { cancelled: true });
     const entry = openDialog({
       cls: "modal narrow", label: "Importando inventário",
       html: `<div class="dlg"><div class="dlg-h"><h2>Importando inventário</h2></div>
-        <div class="dlg-b"><p style="margin:0 0 12px;overflow-wrap:anywhere"><b>${esc(name)}</b></p>
+        <div class="dlg-b"><p style="margin:0 0 12px;overflow-wrap:anywhere"><b data-name>${esc(many ? plural(files.length, "arquivo", "arquivos") : files[0].name)}</b></p>
           <div class="prog" role="progressbar" aria-label="Progresso do envio" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
           <p class="muted" data-st style="margin:10px 0 0">Preparando o envio…</p>
           <p class="muted" style="margin:6px 0 0;font-size:14px">Deixe esta tela aberta até terminar.</p></div>
         <div class="dlg-f"><span class="grow"></span><button type="button" class="btn ghost" data-x>Cancelar</button></div></div>`,
       guard: async () => {
         if (done) return true;
-        const ok = await confirmBox({ title: "Cancelar a importação?", body: "O envio para no ponto em que está e nada muda no inventário.", ok: "Cancelar importação", cancel: "Continuar", danger: true });
+        const ok = await confirmBox({
+          title: "Cancelar a importação?",
+          body: many ? "O envio para no ponto em que está. Os arquivos que já terminaram continuam importados." : "O envio para no ponto em que está e nada muda no inventário.",
+          ok: "Cancelar importação", cancel: "Continuar", danger: true,
+        });
         if (ok) cancelled = true;
         return ok;
       },
     });
     const dlg = entry.dlg;
-    const st = $("[data-st]", dlg), bar = $(".prog", dlg), xbtn = $("[data-x]", dlg);
-    const setProg = (p) => { bar.firstElementChild.style.width = `${(p * 100).toFixed(1)}%`; bar.setAttribute("aria-valuenow", String(Math.round(p * 100))); };
+    const st = $("[data-st]", dlg), bar = $(".prog", dlg), xbtn = $("[data-x]", dlg), nameEl = $("[data-name]", dlg);
+    const setProg = (p) => { bar.firstElementChild.style.width = `${Math.min(100, p * 100).toFixed(1)}%`; bar.setAttribute("aria-valuenow", String(Math.round(p * 100))); };
     xbtn.addEventListener("click", () => requestClose(entry));
     try { lock = navigator.wakeLock ? await navigator.wakeLock.request("screen") : null; } catch { lock = null; }
     try {
-      const start = await API.post("api/upload", { name, size: file.size });
-      uid = start.id;
-      let off = 0;
-      while (off < file.size) {
-        if (cancelled) throw Object.assign(new Error("cancelado"), { cancelled: true });
-        const part = file.slice(off, Math.min(file.size, off + start.chunk));
-        for (let tries = 0; ; tries++) {
-          try { const r = await API.raw("PUT", `api/upload/${uid}?offset=${off}`, part); off = r.received; break; }
-          catch (e) {
-            if (e.status === 409 && e.data && e.data.received != null) { off = e.data.received; break; }
-            if (tries >= 3 || (e.status >= 400 && e.status < 500)) throw e;
-            st.textContent = "A conexão oscilou. Tentando de novo…";
-            await sleep(1500 * (tries + 1));
+      let sent = 0;
+      for (const [k, file] of files.entries()) {
+        const label = many ? `Arquivo ${k + 1} de ${files.length}: ` : "";
+        nameEl.textContent = file.name;
+        const start = await API.post("api/upload", { name: file.name, size: file.size });
+        uid = start.id;
+        let off = 0;
+        while (off < file.size) {
+          if (cancelled) throw stop();
+          const part = file.slice(off, Math.min(file.size, off + start.chunk));
+          for (let tries = 0; ; tries++) {
+            try { const r = await API.raw("PUT", `api/upload/${uid}?offset=${off}`, part); off = r.received; break; }
+            catch (e) {
+              if (e.status === 409 && e.data && e.data.received != null) { off = e.data.received; break; }
+              if (tries >= 3 || (e.status >= 400 && e.status < 500)) throw e;
+              st.textContent = "A conexão oscilou. Tentando de novo…";
+              await sleep(1500 * (tries + 1));
+            }
           }
+          setProg((sent + off) / total);
+          st.textContent = `${label}enviando ${mb(off)} de ${mb(file.size)} MB`;
         }
-        setProg(off / file.size);
-        st.textContent = `Enviando ${mb(off)} de ${mb(file.size)} MB`;
+        sent += file.size;
+        if (cancelled) throw stop();
+        const info = await API.get(`api/upload/${uid}`);
+        if (info.hasData && !confirmed) {
+          const ok = await confirmBox({
+            title: "Trocar o inventário atual?",
+            body: `O inventário de agora (${plural(S.items.length, "item", "itens")}) vai ser trocado pelo de <b>${esc(file.name)}</b> (${plural(info.items, "item", "itens")} em ${plural(info.rooms, "cômodo", "cômodos")}). Antes, o app guarda uma cópia do que existe hoje.`,
+            ok: "Trocar inventário", cancel: "Cancelar", danger: true,
+          });
+          if (!ok) { cancelled = true; throw stop(); }
+          confirmed = true;
+        }
+        st.textContent = `${label}${info.hasData ? "restaurando itens e fotos…" : "guardando as fotos…"}`;
+        xbtn.disabled = true;
+        const res = await API.post(`api/upload/${uid}/restore`);
+        uid = null;
+        xbtn.disabled = false;
+        result.photos += res.photosAdded || 0;
+        if (res.replaced) result.replaced = true;
+        result.items = res.items;
+        result.rooms = res.rooms;
       }
-      if (cancelled) throw Object.assign(new Error("cancelado"), { cancelled: true });
-      st.textContent = "Restaurando itens e fotos…";
-      xbtn.disabled = true;
-      const res = await API.post(`api/upload/${uid}/restore`);
       done = true;
       await loadData();
       requestClose(entry, { force: true });
       if (base.name !== "home") nav("#/"); else refreshAll();
-      toast(`Inventário importado: ${plural(res.items, "item", "itens")} em ${plural(res.rooms, "cômodo", "cômodos")}`);
+      if (result.replaced) toast(`Inventário importado: ${plural(result.items, "item", "itens")} em ${plural(result.rooms, "cômodo", "cômodos")}${result.photos ? `, ${plural(result.photos, "foto", "fotos")}` : ""}`);
+      else toast(result.photos ? `${plural(result.photos, "foto adicionada", "fotos adicionadas")} ao inventário` : "As fotos desse arquivo já estavam no inventário.");
     } catch (e) {
       done = true;
       if (uid) API.del(`api/upload/${uid}`).catch(() => {});
       if (stack.includes(entry)) requestClose(entry, { force: true });
-      if (e.cancelled || cancelled) toast("Importação cancelada. Nada mudou no inventário.");
+      const partial = result.replaced || result.photos > 0;
+      if (partial) { try { await loadData(); refreshAll(); } catch { /* ok */ } }
+      if (e.cancelled || cancelled) toast(partial ? "Importação interrompida. O que já tinha chegado ficou salvo." : "Importação cancelada. Nada mudou no inventário.");
       else fail(e);
     } finally {
       try { if (lock) await lock.release(); } catch { /* ok */ }
@@ -1793,7 +1869,7 @@
       case "backup-create": createBackup(b); break;
       case "backup-restore": restoreBackup(b.dataset.name); break;
       case "history-restore": restoreHistory(b.dataset.name, b.closest("li")?.querySelector("b")?.textContent || ""); break;
-      case "import-file": $("#pick-import").click(); break;
+      case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }
       case "ai-refresh": { const slot = $('[data-slot="ai"]'); if (slot) { slot.innerHTML = `<p class="muted">Verificando…</p>`; renderAiPanel(slot, await aiStatus(true)); } break; }
       case "theme": setTheme(b.dataset.theme); break;
       case "print": if (window.INV_PRINT) toast(window.INV_PRINT); else window.print(); break;

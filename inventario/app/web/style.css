@@ -242,7 +242,7 @@ html { scrollbar-gutter: stable; }
 html:has(dialog[open]) { overflow: hidden; }
 @media (min-width: 1000px) { .crumbs [data-narrow] { display: none; } }
 
-.field { display: grid; gap: 6px; min-width: 0; }
+.field { display: grid; gap: 6px; min-width: 0; align-content: start; }
 .field > label, .field > .lbl { font-size: 14px; font-weight: 500; color: var(--ink-2); }
 .field .help { font-size: 13px; color: var(--muted); margin: 0; }
 .field .err { font-size: 13px; color: var(--danger); margin: 0; }
@@ -640,6 +640,7 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 /* ---------- toasts */
 .toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 2000; display: grid; gap: 8px; width: max-content; max-width: calc(100vw - 32px); pointer-events: none; }
 @media (max-width: 999px) { .toasts { bottom: calc(76px + env(safe-area-inset-bottom)); } }
+dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; }
 .toast {
   pointer-events: auto; display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 10px 10px 10px 16px;
   background: var(--toast-bg); color: var(--toast-ink); border-radius: 10px; box-shadow: var(--shadow); font-size: 15px;

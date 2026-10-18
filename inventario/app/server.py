@@ -32,7 +32,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -619,42 +619,85 @@ def safety_backup(prefix):
     return None
 
 
-def restore_zip(path: str, prefix: str):
-    """Restaura um .zip de backup: inventario.json (em qualquer pasta do zip) + photos/ + thumbs/."""
+def _media_entries(z: zipfile.ZipFile):
+    """Fotos e miniaturas dentro do zip (pastas photos/ e thumbs/, em qualquer nível)."""
+    for info in z.infolist():
+        if info.is_dir() or "__MACOSX" in info.filename:
+            continue
+        parts = info.filename.split("/")
+        if len(parts) >= 2 and parts[-2] in ("photos", "thumbs") and SAFE_FILE.fullmatch(parts[-1]):
+            yield info, parts[-2], parts[-1]
+
+
+def _zip_inventory(z: zipfile.ZipFile):
+    cands = sorted((n for n in z.namelist() if n.split("/")[-1] == "inventario.json" and "__MACOSX" not in n),
+                   key=lambda n: n.count("/"))
+    if not cands:
+        return None
     try:
-        z = zipfile.ZipFile(path)
+        return STORE.check_inventory(json.loads(z.read(cands[0]).decode("utf-8")))
+    except (UnicodeDecodeError, ValueError):
+        raise ApiError(400, "O inventario.json de dentro do .zip está corrompido.")
+
+
+def _extract_media(z: zipfile.ZipFile) -> int:
+    added, total = 0, 0
+    for info, kind, name in _media_entries(z):
+        if info.file_size > 60 * 1024 * 1024:
+            continue
+        total += info.file_size
+        if total > 8 * 1024 ** 3:
+            raise ApiError(400, "O .zip é grande demais para restaurar.")
+        dst = os.path.join(DATA_DIR, kind, name)
+        if not os.path.exists(dst):
+            with z.open(info) as src, open(dst + ".tmp", "wb") as out:
+                shutil.copyfileobj(src, out)
+            os.replace(dst + ".tmp", dst)
+            if kind == "photos":
+                added += 1
+    return added
+
+
+def _open_zip(path):
+    try:
+        return zipfile.ZipFile(path)
     except zipfile.BadZipFile:
         raise ApiError(400, "O arquivo não é um .zip válido.")
-    with z:
-        cands = sorted((n for n in z.namelist() if n.split("/")[-1] == "inventario.json" and "__MACOSX" not in n),
-                       key=lambda n: n.count("/"))
-        if not cands:
-            raise ApiError(400, "O .zip não tem o arquivo inventario.json. Use um backup criado pelo app.")
-        root = cands[0][: -len("inventario.json")]
-        try:
-            data = STORE.check_inventory(json.loads(z.read(cands[0]).decode("utf-8")))
-        except (UnicodeDecodeError, ValueError):
-            raise ApiError(400, "O inventario.json de dentro do .zip está corrompido.")
+
+
+def inspect_file(path: str) -> dict:
+    """O que tem no arquivo enviado: inventário completo, só fotos (parte de um backup) ou JSON."""
+    if zipfile.is_zipfile(path):
+        with _open_zip(path) as z:
+            data = _zip_inventory(z)
+            media = list(_media_entries(z))
+            photos = sum(1 for _, kind, _ in media if kind == "photos")
+            if data is not None:
+                return {"kind": "backup", "hasData": True, "items": len(data["items"]), "rooms": len(data["rooms"]), "photos": photos}
+            if media:
+                return {"kind": "photos", "hasData": False, "items": 0, "rooms": 0, "photos": photos}
+        raise ApiError(400, "Este .zip não tem inventário nem fotos do InventarIA.")
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            data = STORE.check_inventory(json.load(f))
+    except (UnicodeDecodeError, ValueError):
+        raise ApiError(400, "Use um backup .zip ou um .json exportado pelo app.")
+    return {"kind": "json", "hasData": True, "items": len(data["items"]), "rooms": len(data["rooms"]), "photos": 0}
+
+
+def restore_zip(path: str, prefix: str):
+    """Restaura um .zip: com inventario.json troca o inventário e traz as fotos; sem ele (parte só de fotos)
+    apenas acrescenta as fotos, sem mexer nos itens. Devolve (backup de segurança, fotos novas, trocou dados)."""
+    with _open_zip(path) as z:
+        data = _zip_inventory(z)
+        if data is None:
+            if not any(True for _ in _media_entries(z)):
+                raise ApiError(400, "Este .zip não tem inventário nem fotos do InventarIA.")
+            return None, _extract_media(z), False
         safety = safety_backup(prefix)
-        total = 0
-        for info in z.infolist():
-            if info.is_dir() or not info.filename.startswith(root):
-                continue
-            parts = info.filename[len(root):].split("/")
-            if len(parts) != 2 or parts[0] not in ("photos", "thumbs") or not SAFE_FILE.fullmatch(parts[1]):
-                continue
-            if info.file_size > 60 * 1024 * 1024:
-                continue
-            total += info.file_size
-            if total > 8 * 1024 ** 3:
-                raise ApiError(400, "O .zip é grande demais para restaurar.")
-            dst = os.path.join(DATA_DIR, parts[0], parts[1])
-            if not os.path.exists(dst):
-                with z.open(info) as src, open(dst + ".tmp", "wb") as out:
-                    shutil.copyfileobj(src, out)
-                os.replace(dst + ".tmp", dst)
+        added = _extract_media(z)
     STORE.replace_all(data)
-    return safety
+    return safety, added, True
 
 
 def restore_backup(name: str):
@@ -663,7 +706,7 @@ def restore_backup(name: str):
     path = os.path.join(SHARE_DIR, name)
     if not os.path.isfile(path):
         raise ApiError(404, "Backup não encontrado na pasta share/inventario.")
-    return restore_zip(path, "antes-de-restaurar")
+    return restore_zip(path, "antes-de-restaurar")[0]
 
 
 # -- envio de arquivos grandes em partes (o Ingress do Home Assistant limita cada pedido a 16 MB)
@@ -1078,8 +1121,12 @@ class Handler(BaseHTTPRequestHandler):
             if not SAFE_FILE.fullmatch(name):
                 raise ApiError(404, "Foto não encontrada.")
             p = os.path.join(DATA_DIR, m.group(1), name)
-            if m.group(1) == "thumbs" and not os.path.isfile(p):
-                p = os.path.join(PHOTOS_DIR, name)
+            if not os.path.isfile(p):
+                # miniatura no lugar da foto grande (ou o contrário) enquanto a outra não chegou
+                p = os.path.join(PHOTOS_DIR if m.group(1) == "thumbs" else THUMBS_DIR, name)
+                if not os.path.isfile(p):
+                    raise ApiError(404, "Foto não encontrada.")
+                return self.send_file(p, cache="no-cache")
             return self.send_file(p, cache="private, max-age=31536000, immutable")
         rel = os.path.normpath(path.lstrip("/"))
         if rel.startswith("..") or os.path.isabs(rel):
@@ -1279,9 +1326,10 @@ def r_upload_restore(h, uid, query):
     part, _, m = upload_meta(uid)
     if os.path.getsize(part) != m["size"]:
         raise ApiError(400, "O envio do arquivo não terminou. Tente de novo.")
+    added, replaced = 0, True
     try:
         if zipfile.is_zipfile(part):
-            safety = restore_zip(part, "antes-de-importar")
+            safety, added, replaced = restore_zip(part, "antes-de-importar")
         else:
             try:
                 with open(part, encoding="utf-8-sig") as f:
@@ -1294,7 +1342,14 @@ def r_upload_restore(h, uid, query):
         drop_upload(uid)
     with STORE.lock:
         h.send_json({"ok": True, "rev": STORE.data["rev"], "items": len(STORE.data["items"]),
-                     "rooms": len(STORE.data["rooms"]), "safety": safety})
+                     "rooms": len(STORE.data["rooms"]), "safety": safety, "photosAdded": added, "replaced": replaced})
+
+
+def r_upload_info(h, uid, query):
+    part, _, m = upload_meta(uid)
+    if os.path.getsize(part) != m["size"]:
+        raise ApiError(400, "O envio do arquivo não terminou. Tente de novo.")
+    h.send_json(inspect_file(part))
 
 
 def r_upload_cancel(h, uid, query):
@@ -1344,6 +1399,7 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/import", r_import),
     ("POST", r"/api/upload", r_upload_start),
     ("PUT", r"/api/upload/([a-f0-9]{16})", r_upload_chunk),
+    ("GET", r"/api/upload/([a-f0-9]{16})", r_upload_info),
     ("POST", r"/api/upload/([a-f0-9]{16})/restore", r_upload_restore),
     ("DELETE", r"/api/upload/([a-f0-9]{16})", r_upload_cancel),
     ("GET", r"/api/history", r_history),

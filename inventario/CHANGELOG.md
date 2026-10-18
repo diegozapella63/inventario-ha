@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0
+
+- Importar backup dividido em partes (para celulares que não baixam arquivos grandes): no navegador dá para escolher todas as partes de uma vez; no app do Home Assistant, uma de cada vez. Partes só com fotos acrescentam as fotos sem mexer nos itens.
+- Enquanto a foto grande não chega, o app mostra a miniatura.
+- No app do Home Assistant para Android: a escolha de fotos pela galeria voltou a funcionar (um arquivo por vez) e o botão "Tirar foto", que lá abria a galeria, deu lugar a "Escolher foto".
+- Fotos em HEIC mostram uma mensagem explicando como resolver, em vez de não fazer nada.
+- Avisos e erros agora aparecem também com uma janela aberta (antes ficavam escondidos atrás do editor).
+- Corrige o alinhamento dos campos Quantidade e Valor no editor.
+
 ## 1.2.0
 
 - Novo nome: InventarIA.
