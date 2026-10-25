@@ -14,25 +14,36 @@ from __future__ import annotations
 
 import base64
 import csv
+import hashlib
+import html
+import http.client
 import io
+import ipaddress
 import json
 import logging
 import os
 import re
 import secrets
 import shutil
+import socket
+import ssl
+import struct
 import tempfile
 import threading
 import time
 import unicodedata
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
+import zlib
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -166,6 +177,14 @@ def clean_photos(v) -> list[str]:
     return out
 
 
+def clean_photo_src(v, photos: list[str]) -> dict:
+    """De onde veio cada foto tirada da internet: {foto: endereço da página}. Só fotos que o item ainda tem."""
+    if not isinstance(v, dict):
+        return {}
+    return {k: u for k, u in v.items()
+            if k in photos and isinstance(u, str) and u.startswith(("https://", "http://")) and len(u) <= 1000}
+
+
 # ---------------------------------------------------------------------------
 # Armazenamento
 
@@ -291,6 +310,9 @@ class Store:
             "approx": True, "source": text(body.get("source") or "manual", 40, "origem"),
             "createdAt": ts, "updatedAt": ts,
         }
+        src = clean_photo_src(body.get("photoSrc"), it["photos"])
+        if src:
+            it["photoSrc"] = src
         if user:
             it["createdBy"] = it["updatedBy"] = user
         want_id = body.get("id") if restore else None
@@ -350,6 +372,12 @@ class Store:
                 new["value"] = parse_value(body["value"])
             if "photos" in body:
                 new["photos"] = clean_photos(body["photos"])
+            if "photos" in body or "photoSrc" in body:
+                src = clean_photo_src(body.get("photoSrc", it.get("photoSrc")), new["photos"])
+                if src:
+                    new["photoSrc"] = src
+                else:
+                    new.pop("photoSrc", None)
             if "flag" in body:
                 new["flag"] = text(body["flag"], 200, "observação") or None
             if "checked" in body:
@@ -774,32 +802,38 @@ def ha_request(method: str, path: str, body=None, timeout=20):
 
 
 def ai_entities():
+    """Tarefas de IA (ai_task.*) e assistentes de conversa (conversation.*) do Home Assistant."""
     if AI_MOCK:
-        return [{"id": "ai_task.simulado", "name": "IA simulada (teste)", "attachments": True}]
+        return ([{"id": "ai_task.simulado", "name": "IA simulada (teste)", "attachments": True}],
+                [{"id": "conversation.simulado", "name": "Assistente simulado (teste)"}])
     states = ha_request("GET", "/states") or []
-    out = []
+    tasks, agents = [], []
     for s in states:
         eid = s.get("entity_id", "")
+        attrs = s.get("attributes") or {}
         if eid.startswith("ai_task."):
-            attrs = s.get("attributes") or {}
             feats = int(attrs.get("supported_features") or 0)
-            out.append({"id": eid, "name": attrs.get("friendly_name") or eid,
-                        "attachments": bool(feats & 2), "state": s.get("state")})
-    return sorted(out, key=lambda e: (not e["attachments"], e["name"].lower()))
+            tasks.append({"id": eid, "name": attrs.get("friendly_name") or eid,
+                          "attachments": bool(feats & 2), "state": s.get("state")})
+        elif eid.startswith("conversation.") and eid != "conversation.home_assistant":
+            agents.append({"id": eid, "name": attrs.get("friendly_name") or eid})
+    return (sorted(tasks, key=lambda e: (not e["attachments"], e["name"].lower())),
+            sorted(agents, key=lambda e: e["name"].lower()))
 
 
 def ai_status():
+    search = STORE.settings.get("ai_search") or ""
     if not SUPERVISOR_TOKEN and not AI_MOCK:
-        return {"ready": False, "reason": "no_api", "entities": [], "selected": ""}
+        return {"ready": False, "reason": "no_api", "entities": [], "agents": [], "selected": "", "search": search}
     try:
-        ents = ai_entities()
+        ents, agents = ai_entities()
     except ApiError as e:
-        return {"ready": False, "reason": "error", "message": e.msg, "entities": [], "selected": ""}
+        return {"ready": False, "reason": "error", "message": e.msg, "entities": [], "agents": [], "selected": "", "search": search}
     sel = STORE.settings.get("ai_entity") or ""
     usable = [e for e in ents if e["attachments"]]
     ready = bool(usable) if not sel else any(e["id"] == sel and e["attachments"] for e in ents)
     return {"ready": ready, "reason": None if ready else ("no_entity" if not ents else "no_vision"),
-            "entities": ents, "selected": sel}
+            "entities": ents, "agents": agents, "selected": sel, "search": search}
 
 
 AI_RULES = """Para cada item, devolva:
@@ -946,6 +980,450 @@ def ai_identify(body: dict) -> dict:
     if data is None:
         raise ApiError(502, "A IA não devolveu resposta.")
     return {"items": clean_ai_items(extract_json(data), room), "entity": entity or "padrão do Home Assistant"}
+
+
+# ---------------------------------------------------------------------------
+# Fotos da internet: a IA, com a busca na web, acha páginas do produto (fabricante e lojas); o app lê a
+# foto principal de cada página (JSON-LD de produto, og:image), confere se é uma imagem de verdade e de
+# bom tamanho e mostra as opções. Só busca em endereços públicos da internet (nada da rede de casa).
+
+WEB_UA = f"Mozilla/5.0 (compatible; InventarIA/{VERSION}; +https://github.com/diegozapella63/inventario-ha)"
+WEB_ALLOW_LOCAL = DEV and os.environ.get("INV_WEB_ALLOW_LOCAL") == "1"  # só nos testes locais
+WEB_PAGE_MAX = 3 * 1024 * 1024
+WEB_IMG_MAX = 8 * 1024 * 1024
+WEB_JOB_TTL = 30 * 60
+WEB_JOB_ID = re.compile(r"[a-f0-9]{16}")
+WEB_JOBS: dict[str, dict] = {}
+WEB_LOCK = threading.Lock()
+WEB_KINDS = {"jpeg": ("jpg", "image/jpeg"), "png": ("png", "image/png"), "webp": ("webp", "image/webp"), "avif": ("avif", "image/avif")}
+SEARCH_HOWTO = ("Na Anthropic, ligue \"Enable web search\" nas opções da tarefa de IA. No Google Gemini, a Pesquisa Google só "
+                "funciona num assistente de conversa: ligue \"Enable Google Search tool\" nele e escolha esse assistente em "
+                "Dados e ajustes, IA do Home Assistant, Buscar fotos na internet.")
+
+
+class WebError(Exception):
+    pass
+
+
+class _PinnedHTTP(http.client.HTTPConnection):
+    """Conecta no IP já conferido (evita que o nome aponte para outro lugar entre a conferência e a conexão)."""
+
+    def __init__(self, host, port, ip, timeout):
+        super().__init__(host, port, timeout=timeout)
+        self._ip = ip
+
+    def connect(self):
+        self.sock = socket.create_connection((self._ip, self.port), self.timeout)
+
+
+class _PinnedHTTPS(http.client.HTTPSConnection):
+    def __init__(self, host, port, ip, timeout):
+        super().__init__(host, port, timeout=timeout, context=ssl.create_default_context())
+        self._ip = ip
+
+    def connect(self):
+        sock = socket.create_connection((self._ip, self.port), self.timeout)
+        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+
+
+def _public_ip(host: str, port: int) -> str:
+    try:
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except (socket.gaierror, UnicodeError) as e:
+        raise WebError("site não encontrado") from e
+    addrs = []
+    for *_, sa in infos:
+        ip = ipaddress.ip_address(str(sa[0]).split("%")[0])
+        if not ip.is_global and not WEB_ALLOW_LOCAL:
+            raise WebError("endereço fora da internet")
+        addrs.append(str(sa[0]))
+    if not addrs:
+        raise WebError("site não encontrado")
+    return addrs[0]
+
+
+def web_get(url: str, max_bytes: int, accept: str, timeout=12, hops=5):
+    """GET de um endereço público, seguindo até 5 redirecionamentos. Devolve (url final, tipo, conteúdo)."""
+    for _ in range(hops + 1):
+        u = urllib.parse.urlsplit(url)
+        if u.scheme not in ("http", "https") or not u.hostname or u.username or u.password:
+            raise WebError("endereço inválido")
+        try:
+            host = u.hostname.encode("idna").decode("ascii")
+            port = u.port or (443 if u.scheme == "https" else 80)
+        except (UnicodeError, ValueError) as e:
+            raise WebError("endereço inválido") from e
+        if port not in (80, 443) and not WEB_ALLOW_LOCAL:
+            raise WebError("porta não permitida")
+        ip = _public_ip(host, port)
+        conn = (_PinnedHTTPS if u.scheme == "https" else _PinnedHTTP)(host, port, ip, timeout)
+        path = (u.path or "/") + (f"?{u.query}" if u.query else "")
+        try:
+            conn.request("GET", path, headers={"User-Agent": WEB_UA, "Accept": accept, "Accept-Encoding": "gzip",
+                                               "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.5"})
+            r = conn.getresponse()
+            if r.status in (301, 302, 303, 307, 308):
+                loc = (r.getheader("Location") or "").strip()
+                if not loc:
+                    raise WebError("redirecionamento sem destino")
+                url = urllib.parse.urljoin(url, loc)
+                continue
+            if r.status != 200:
+                raise WebError(f"o site respondeu {r.status}")
+            size = r.getheader("Content-Length") or ""
+            if size.isdigit() and int(size) > max_bytes:
+                raise WebError("arquivo grande demais")
+            body = r.read(max_bytes + 1)
+            if len(body) > max_bytes:
+                raise WebError("arquivo grande demais")
+            if (r.getheader("Content-Encoding") or "").lower() == "gzip":
+                d = zlib.decompressobj(16 + zlib.MAX_WBITS)
+                body = d.decompress(body, max_bytes + 1)
+                if len(body) > max_bytes or d.unconsumed_tail:
+                    raise WebError("arquivo grande demais")
+            ctype = (r.getheader("Content-Type") or "").split(";")[0].strip().lower()
+            return url, ctype, body
+        except (OSError, http.client.HTTPException, zlib.error) as e:
+            raise WebError(f"sem resposta do site ({e.__class__.__name__})") from e
+        finally:
+            conn.close()
+    raise WebError("redirecionamentos demais")
+
+
+class _PageImages(HTMLParser):
+    """Lê as fotos que a página declara: JSON-LD de produto, og:image, twitter:image e image_src."""
+    META = {"og:image:secure_url": 1, "og:image": 1, "og:image:url": 1, "twitter:image": 2, "twitter:image:src": 2, "image": 3}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.metas: list[tuple[int, str]] = []
+        self.ld: list[str] = []
+        self.title = ""
+        self._mode = None
+        self._buf: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        a = {k.lower(): (v or "") for k, v in attrs}
+        if tag == "meta":
+            key = (a.get("property") or a.get("name") or a.get("itemprop") or "").lower()
+            if key in self.META and a.get("content"):
+                self.metas.append((self.META[key], a["content"]))
+        elif tag == "link" and "image_src" in a.get("rel", "").lower() and a.get("href"):
+            self.metas.append((4, a["href"]))
+        elif tag == "script" and "ld+json" in a.get("type", "").lower():
+            self._mode, self._buf = "ld", []
+        elif tag == "title" and not self.title:
+            self._mode, self._buf = "title", []
+
+    def handle_data(self, data):
+        if self._mode:
+            self._buf.append(data)
+
+    def handle_endtag(self, tag):
+        if self._mode == "ld" and tag == "script":
+            self.ld.append("".join(self._buf))
+            self._mode = None
+        elif self._mode == "title" and tag == "title":
+            self.title = " ".join("".join(self._buf).split())[:200]
+            self._mode = None
+
+
+def _ld_images(raw: str) -> list[str]:
+    try:
+        data = json.loads(raw.strip())
+    except ValueError:
+        return []
+    out: list[str] = []
+
+    def walk(o, depth=0):
+        if depth > 8 or len(out) >= 8:
+            return
+        if isinstance(o, list):
+            for x in o:
+                walk(x, depth + 1)
+            return
+        if not isinstance(o, dict):
+            return
+        types = o.get("@type") if isinstance(o.get("@type"), list) else [o.get("@type")]
+        if any(str(t).lower() in ("product", "productgroup", "individualproduct", "productmodel") for t in types):
+            img = o.get("image")
+            for v in img if isinstance(img, list) else [img]:
+                if isinstance(v, dict):
+                    v = v.get("contentUrl") or v.get("url")
+                if isinstance(v, str):
+                    out.append(v)
+        for k in ("@graph", "mainEntity", "hasVariant", "itemListElement", "item"):
+            if k in o:
+                walk(o[k], depth + 1)
+    walk(data)
+    return out
+
+
+def _fix_url(u, base="") -> str | None:
+    if not isinstance(u, str):
+        return None
+    u = html.unescape(u.strip())
+    if u.startswith("//"):
+        u = "https:" + u
+    if base:
+        u = urllib.parse.urljoin(base, u)
+    return u if u.startswith(("https://", "http://")) and len(u) <= 1000 and " " not in u else None
+
+
+def page_images(url: str):
+    """Fotos declaradas pela página do produto. Devolve (url final, [fotos])."""
+    final, ctype, body = web_get(url, WEB_PAGE_MAX, "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5")
+    if ctype.startswith("image/"):
+        return final, [final]
+    p = _PageImages()
+    try:
+        p.feed(body.decode("utf-8", "replace"))
+        p.close()
+    except Exception:  # noqa: BLE001  HTML quebrado: fica com o que já leu
+        pass
+    found = [u for raw in p.ld for u in _ld_images(raw)] + [u for _, u in sorted(p.metas, key=lambda m: m[0])]
+    out = []
+    for raw in found:
+        u = _fix_url(raw, final)
+        if u and u not in out:
+            out.append(u)
+    return final, out[:4]
+
+
+def image_kind(b: bytes) -> str | None:
+    if b[:3] == b"\xff\xd8\xff":
+        return "jpeg"
+    if b[:8] == b"\x89PNG\r\n\x1a\n":
+        return "png"
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        return "webp"
+    if b[4:8] == b"ftyp" and b[8:12] in (b"avif", b"avis"):
+        return "avif"
+    return None
+
+
+def image_size(b: bytes, kind: str):
+    """Largura e altura lendo só o cabeçalho (JPEG, PNG, WebP e AVIF); None se não der."""
+    try:
+        if kind == "png":
+            return struct.unpack(">II", b[16:24])
+        if kind == "webp":
+            chunk = b[12:16]
+            if chunk == b"VP8 ":
+                w, h = struct.unpack("<HH", b[26:30])
+                return w & 0x3FFF, h & 0x3FFF
+            if chunk == b"VP8L":
+                v = int.from_bytes(b[21:25], "little")
+                return (v & 0x3FFF) + 1, ((v >> 14) & 0x3FFF) + 1
+            if chunk == b"VP8X":
+                return int.from_bytes(b[24:27], "little") + 1, int.from_bytes(b[27:30], "little") + 1
+        if kind == "avif":
+            i = b.find(b"ispe")
+            if i > 0:
+                return struct.unpack(">II", b[i + 8:i + 16])
+        if kind == "jpeg":
+            i = 2
+            while i + 9 < len(b):
+                if b[i] != 0xFF:
+                    i += 1
+                    continue
+                marker = b[i + 1]
+                if marker in (0xD8, 0x01) or 0xD0 <= marker <= 0xD7 or marker == 0xFF:
+                    i += 1 if marker == 0xFF else 2
+                    continue
+                seg = struct.unpack(">H", b[i + 2:i + 4])[0]
+                if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+                    h, w = struct.unpack(">HH", b[i + 5:i + 9])
+                    return w, h
+                i += 2 + seg
+    except struct.error:
+        pass
+    return None
+
+
+def fetch_image(url: str):
+    final, _, body = web_get(url, WEB_IMG_MAX, "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8")
+    kind = image_kind(body)
+    if not kind:
+        raise WebError("não é uma foto")
+    size = image_size(body, kind)
+    if len(body) < 3000 or (size and min(size) < 200):
+        raise WebError("foto pequena demais")
+    return final, kind, size, body
+
+
+def site_of(url: str) -> str:
+    host = (urllib.parse.urlsplit(url).hostname or "").lower()
+    return re.sub(r"^(www\d?|m)\.", "", host)
+
+
+def ai_call_text(task_name: str, instructions: str, entity: str, timeout=300):
+    """Pergunta à IA escolhida: uma tarefa de IA (ai_task) ou um assistente de conversa (conversation)."""
+    if entity.startswith("conversation."):
+        res = ha_request("POST", "/services/conversation/process?return_response",
+                         {"text": instructions, "agent_id": entity}, timeout=timeout)
+        resp = ((res or {}).get("service_response") or {}).get("response") or {}
+        speech = (((resp.get("speech") or {}).get("plain") or {}).get("speech")) or ""
+        if resp.get("response_type") == "error":
+            raise ApiError(502, "O assistente de conversa respondeu com erro: " + " ".join(speech.split())[:160])
+        return speech
+    payload = {"task_name": task_name, "instructions": instructions}
+    if entity:
+        payload["entity_id"] = entity
+    res = ha_request("POST", "/services/ai_task/generate_data?return_response", payload, timeout=timeout)
+    return ((res or {}).get("service_response") or {}).get("data")
+
+
+def web_prompt(name: str, details: str) -> str:
+    return "\n".join(filter(None, [
+        "Você ajuda a montar o inventário de uma casa no Brasil e precisa de fotos de produto para um item.",
+        f"Produto: {name}",
+        f"Detalhes: {details}" if details else "",
+        "",
+        "Use a busca na web agora. Procure este produto, de preferência o mesmo modelo, no site do fabricante e em lojas grandes "
+        "do Brasil (como Mercado Livre, Amazon, Magazine Luiza, Kabum, Casas Bahia, Americanas, Fast Shop e Leroy Merlin). "
+        "Se for um item comum, sem marca, procure um produto bem parecido.",
+        "Responda somente com um objeto JSON, sem texto antes ou depois:",
+        '{"paginas": [{"url": "endereço da página do produto", "titulo": "título da página"}], '
+        '"imagens": ["endereço direto de uma foto do produto (.jpg, .png ou .webp), se você viu algum"]}',
+        "Traga de 3 a 6 páginas, de sites diferentes. Use só endereços que apareceram na busca: não invente.",
+        'Se não conseguir usar a busca na web, responda apenas {"erro": "sem_busca"}.',
+    ]))
+
+
+def ai_find_pages(name: str, details: str, entity: str) -> dict:
+    if AI_MOCK:
+        time.sleep(0.4)
+        data = read_json(os.environ.get("INV_MOCK_SEARCH") or "", {}) or {}
+    else:
+        raw = ai_call_text("InventarIA: buscar foto", web_prompt(name, details), entity)
+        try:
+            data = extract_json(raw)
+        except ApiError:
+            log.info("busca de fotos: resposta da IA fora do formato: %s", " ".join(str(raw or "").split())[:400])
+            raise ApiError(502, "A IA respondeu sem usar a busca na web. " + SEARCH_HOWTO) from None
+    if not isinstance(data, dict):
+        data = {}
+    pages, images = [], []
+    for p in data.get("paginas") or data.get("pages") or []:
+        u = _fix_url(p.get("url") if isinstance(p, dict) else p)
+        if u and u not in pages:
+            pages.append(u)
+    for p in data.get("imagens") or data.get("images") or []:
+        u = _fix_url(p.get("url") if isinstance(p, dict) else p)
+        if u and u not in images:
+            images.append(u)
+    if data.get("erro") or not (pages or images):
+        raise ApiError(502, "A IA não usou a busca na web. " + SEARCH_HOWTO)
+    return {"pages": pages[:8], "images": images[:6]}
+
+
+def search_entity() -> str:
+    return STORE.settings.get("ai_search") or STORE.settings.get("ai_entity") or ""
+
+
+def _web_job_files(jid: str):
+    try:
+        return [os.path.join(TMP_DIR, n) for n in os.listdir(TMP_DIR) if n.startswith(f"web-{jid}-")]
+    except OSError:
+        return []
+
+
+def web_jobs_cleanup(max_age=WEB_JOB_TTL):
+    now = time.time()
+    with WEB_LOCK:
+        for jid in [j for j, v in WEB_JOBS.items() if now - v["at"] > max_age]:
+            WEB_JOBS.pop(jid, None)
+    try:
+        names = [n for n in os.listdir(TMP_DIR) if n.startswith("web-")]
+    except OSError:
+        names = []
+    for n in names:
+        p = os.path.join(TMP_DIR, n)
+        try:
+            if now - os.path.getmtime(p) > max_age:
+                os.unlink(p)
+        except OSError:
+            pass
+
+
+def _web_job_run(jid: str, name: str, details: str, entity: str):
+    job = WEB_JOBS[jid]
+    try:
+        found = ai_find_pages(name, details, entity)
+        if job.get("cancelled"):
+            return
+        job["msg"] = "Conferindo as fotos das páginas…"
+        cands: list[tuple[str, str]] = []
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            futs = [(p, ex.submit(page_images, p)) for p in found["pages"]]
+            for p, f in futs:
+                try:
+                    final, imgs = f.result()
+                    cands += [(u, final) for u in imgs[:2]]
+                except WebError as e:
+                    log.info("busca de fotos: página %s: %s", site_of(p), e)
+        cands += [(u, "") for u in found["images"]]
+        seen, uniq = set(), []
+        for u, page in cands:
+            if u not in seen:
+                seen.add(u)
+                uniq.append((u, page))
+        good, hashes = [], set()
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            futs = [(u, page, ex.submit(fetch_image, u)) for u, page in uniq[:14]]
+            for u, page, f in futs:
+                try:
+                    final, kind, size, body = f.result()
+                except WebError as e:
+                    log.info("busca de fotos: foto de %s: %s", site_of(u), e)
+                    continue
+                h = hashlib.sha1(body).hexdigest()
+                if h in hashes or len(good) >= 8 or job.get("cancelled"):
+                    continue
+                hashes.add(h)
+                n = len(good)
+                with open(os.path.join(TMP_DIR, f"web-{jid}-{n}.{WEB_KINDS[kind][0]}"), "wb") as fh:
+                    fh.write(body)
+                good.append({"n": n, "kind": kind, "image": final, "page": page, "site": site_of(page or final),
+                             "w": size[0] if size else None, "h": size[1] if size else None})
+        if job.get("cancelled"):
+            return
+        if not good:
+            raise ApiError(404, "Não achei fotos desse produto nas páginas que a IA encontrou. Tente buscar só pela marca e o modelo.")
+        job.update(stage="done", msg="", results=good)
+    except ApiError as e:
+        job.update(stage="error", msg=e.msg)
+    except Exception:  # noqa: BLE001
+        log.exception("busca de fotos")
+        job.update(stage="error", msg="Não deu para buscar agora. Tente de novo em instantes.")
+    finally:
+        if job.get("cancelled"):
+            for p in _web_job_files(jid):
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
+
+
+def web_job_start(body: dict) -> dict:
+    name = text(body.get("name"), 200, "nome", required=True)
+    details = " ".join(text(body.get("details"), 4000, "detalhes").split())[:300]
+    if not SUPERVISOR_TOKEN and not AI_MOCK:
+        raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
+    web_jobs_cleanup()
+    jid = secrets.token_hex(8)
+    with WEB_LOCK:
+        WEB_JOBS[jid] = {"stage": "busy", "msg": "Procurando o produto na internet…", "results": [], "at": time.time()}
+    threading.Thread(target=_web_job_run, args=(jid, name, details, search_entity()), daemon=True).start()
+    return {"id": jid}
+
+
+def web_job(jid: str) -> dict:
+    job = WEB_JOBS.get(jid)
+    if not job:
+        raise ApiError(404, "Esta busca terminou. Busque de novo.")
+    return job
 
 
 # ---------------------------------------------------------------------------
@@ -1219,6 +1697,38 @@ def r_ai_identify(h, query):
     h.send_json(ai_identify(h.read_body()))
 
 
+def r_web_start(h, query):
+    h.send_json(web_job_start(h.read_body()), 202)
+
+
+def r_web_status(h, jid, query):
+    job = web_job(jid)
+    h.send_json({"stage": job["stage"], "msg": job["msg"], "results": job["results"]})
+
+
+def r_web_image(h, jid, n, query):
+    job = web_job(jid)
+    r = next((x for x in job["results"] if x["n"] == int(n)), None)
+    if not r:
+        raise ApiError(404, "Foto não encontrada.")
+    ext, ctype = WEB_KINDS[r["kind"]]
+    h.send_file(os.path.join(TMP_DIR, f"web-{jid}-{r['n']}.{ext}"), ctype, cache="no-store")
+
+
+def r_web_cancel(h, jid, query):
+    job = WEB_JOBS.get(jid)
+    if job:
+        job["cancelled"] = True
+        if job["stage"] != "busy":
+            for p in _web_job_files(jid):
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
+            WEB_JOBS.pop(jid, None)
+    h.send_json({"ok": True})
+
+
 def r_settings_get(h, query):
     h.send_json(STORE.settings)
 
@@ -1231,6 +1741,11 @@ def r_settings_put(h, query):
             if e and not re.fullmatch(r"ai_task\.[a-z0-9_]+", e):
                 raise ApiError(400, "Entidade de IA inválida.")
             STORE.settings["ai_entity"] = e
+        if "ai_search" in body:
+            e = str(body.get("ai_search") or "")
+            if e and not re.fullmatch(r"(ai_task|conversation)\.[a-z0-9_]+", e):
+                raise ApiError(400, "Entidade de IA inválida.")
+            STORE.settings["ai_search"] = e
         STORE.save_settings()
     h.send_json(STORE.settings)
 
@@ -1390,6 +1905,10 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/photos", r_photo),
     ("GET", r"/api/ai/status", r_ai_status),
     ("POST", r"/api/ai/identify", r_ai_identify),
+    ("POST", r"/api/web-photos", r_web_start),
+    ("GET", r"/api/web-photos/([a-f0-9]{16})", r_web_status),
+    ("GET", r"/api/web-photos/([a-f0-9]{16})/(\d)", r_web_image),
+    ("DELETE", r"/api/web-photos/([a-f0-9]{16})", r_web_cancel),
     ("GET", r"/api/settings", r_settings_get),
     ("PUT", r"/api/settings", r_settings_put),
     ("GET", r"/api/export\.(csv|json|zip)", r_export),
@@ -1411,6 +1930,7 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     STORE.load()
     cleanup_uploads()
+    web_jobs_cleanup(max_age=0)
     srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     srv.daemon_threads = True
     log.info("InventarIA %s ouvindo na porta %d%s", VERSION, PORT, " (modo dev)" if DEV else "")

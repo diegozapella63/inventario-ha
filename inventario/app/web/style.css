@@ -223,15 +223,17 @@ button.side-room:hover { color: var(--ink); }
   padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
 }
 @media (min-width: 1000px) { .tabbar { display: none; } }
+/* tudo alinhado por baixo (rótulos na mesma linha); o botão + fica inteiro dentro da barra */
 .tabbar a, .tabbar button {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 62px; min-width: 0;
-  border: 0; background: none; text-decoration: none; color: var(--muted); font-size: 12px; font-weight: 500; white-space: nowrap;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; min-height: 64px; min-width: 0;
+  padding: 6px 0 5px; border: 0; background: none; text-decoration: none; color: var(--muted);
+  font-size: 12px; font-weight: 500; line-height: 1.25; white-space: nowrap;
 }
 .tabbar .ic { width: 23px; height: 23px; }
 .tabbar [aria-current="page"] { color: var(--ink); font-weight: 600; }
 .tabbar [aria-current="page"] .ic { stroke: var(--tag-text); stroke-width: 2; }
 .tabbar .tab-add .plus {
-  display: grid; place-items: center; width: 58px; height: 38px; margin-top: -4px; border-radius: 13px;
+  display: grid; place-items: center; width: 56px; height: 34px; border-radius: 12px;
   background: var(--tag); color: var(--tag-ink); border: 1px solid var(--tag-edge); transition: transform 0.12s;
 }
 .tabbar .tab-add:active .plus { transform: scale(0.94); }
@@ -534,7 +536,10 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .gal { position: relative; background: var(--surface-2); border-radius: var(--r); overflow: hidden; }
 .gal-main { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
 .gal-main img { width: 100%; max-height: 52vh; aspect-ratio: 4 / 3; object-fit: contain; background: var(--surface-2); }
-.gal-none { display: grid; place-items: center; gap: 8px; aspect-ratio: 16 / 9; color: var(--muted); text-align: center; padding: 20px; }
+.gal-none { display: grid; place-items: center; align-content: center; gap: 8px; aspect-ratio: 16 / 9; color: var(--muted); text-align: center; padding: 20px; }
+.gal-acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.gal-src { display: flex; align-items: center; gap: 6px; margin: 8px 2px 0; color: var(--muted); font-size: 13px; }
+.gal-src a { color: var(--ink-2); }
 .gal-thumbs { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; padding-bottom: 4px; }
 .gal-thumbs button { flex: none; width: 64px; height: 48px; padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: var(--line); }
 .gal-thumbs button[aria-current="true"] { border-color: var(--ink); }
@@ -571,6 +576,23 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .phs .ph:hover .mkcover, .phs .ph:focus-within .mkcover { opacity: 1; }
 @media (pointer: coarse) { .phs .ph .mkcover { opacity: 1; } }
 .phs .ph.loading { display: grid; place-items: center; color: var(--muted); }
+.phs .ph .web { position: absolute; left: 5px; top: 5px; padding: 3px 7px; border-radius: 5px; background: rgba(18, 21, 24, 0.72); color: #fff; font: 600 11px/1 var(--font); }
+
+/* buscar foto na internet */
+.wq { display: flex; gap: 8px; }
+.wq .input { flex: 1; }
+.wbusy { display: flex; align-items: center; gap: 14px; padding: 26px 4px 14px; color: var(--muted); }
+.wbusy p { margin: 0; display: grid; gap: 2px; font-size: 14px; }
+.wbusy b { color: var(--ink); font-size: 16px; font-weight: 600; }
+.wsum { margin: 16px 0 10px; color: var(--muted); font-size: 14px; }
+.wgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.wimg { display: grid; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: var(--muted); font-size: 13px; text-align: center; }
+.wimg img { width: 100%; aspect-ratio: 1; object-fit: contain; background: #fff; border-radius: 5px; }
+.wimg span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wimg:hover { border-color: var(--ink-2); }
+.wimg[aria-checked="true"] { border-color: var(--tag-edge); box-shadow: 0 0 0 3px var(--tag); color: var(--ink); font-weight: 600; }
+.wtip { font-size: 13px; margin: 12px 0 0; }
+.wq + div > .formerr { margin-top: 16px; }
 .phs .add {
   aspect-ratio: 1; border-radius: var(--r); border: 1.5px dashed var(--line-2); background: transparent; color: var(--ink-2);
   display: grid; place-items: center; align-content: center; gap: 6px; font-size: 13px; font-weight: 500; padding: 6px; text-align: center;

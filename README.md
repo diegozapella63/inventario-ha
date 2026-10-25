@@ -31,6 +31,7 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 - **Cômodos** com foto, número de itens e valor. Dentro de cada um, os itens ficam agrupados por zona (sofá, estante, bancada), com o subtotal de cada zona. Em **Organizar**, as setas mudam a ordem.
 - **Cadastro de itens** com várias fotos (câmera, galeria, arrastar ou colar), quantidade e valor de mercado de usados.
 - **Leitura de fotos por IA**: a IA preenche um item a partir da foto, ou lista tudo o que aparece numa foto de prateleira, e você confere antes de salvar. Funciona com Anthropic Claude, OpenAI, Google Gemini ou um modelo local no Ollama, pela ação `ai_task.generate_data` do Home Assistant.
+- **Fotos da internet**: num item sem foto, a IA procura o produto no fabricante e nas lojas e o app mostra as fotos para você escolher. A foto fica marcada como ilustrativa, com o site de onde veio.
 - **Buscar** por nome, marca, detalhe ou zona, sem se importar com acentos, com filtros por cômodo e categoria.
 - **Relatório para seguro** por cômodo, com fotos, pronto para imprimir ou salvar em PDF.
 - **Exportar** em CSV, JSON ou ZIP com fotos, **backup** na pasta `share/inventario` e versões automáticas a cada 10 minutos de uso.

@@ -760,7 +760,7 @@
           <p class="rs">${plural(its.length, "item", "itens")}, ${money(D.roomTotals.get(r.id) || 0)}</p>
           <table class="rtable"><thead><tr>${withPhotos ? '<th class="t"><span class="sr">Foto</span></th>' : ""}<th>Código</th><th>Item</th><th>Zona</th><th class="r">Qtd.</th><th class="r">Valor</th></tr></thead><tbody>
           ${its.map((it) => `<tr>${withPhotos ? `<td class="t">${it.photos && it.photos[0] ? `<img src="${esc(src(it.photos[0]))}" alt="" width="44" height="44">` : ""}</td>` : ""}
-            <td class="c">${esc(tagOf(it))}</td><td>${esc(it.name)}${it.details ? `<span class="d">${esc(snippet(it.details, 140))}</span>` : ""}</td>
+            <td class="c">${esc(tagOf(it))}</td><td>${esc(it.name)}${it.details ? `<span class="d">${esc(snippet(it.details, 140))}</span>` : ""}${withPhotos && it.photos && it.photos[0] && (it.photoSrc || {})[it.photos[0]] ? `<span class="d">Foto ilustrativa, de ${esc(siteOf(it.photoSrc[it.photos[0]]))}</span>` : ""}</td>
             <td>${esc(it.zone || "")}</td><td class="r">${esc(qtyClean(it.qty))}</td><td class="r">${money(it.value)}</td></tr>`).join("")}
           </tbody><tfoot><tr>${withPhotos ? "<td></td>" : ""}<td colspan="4">Subtotal</td><td class="r">${money(D.roomTotals.get(r.id) || 0)}</td></tr></tfoot></table></section>`;
       }).join("")}
@@ -826,8 +826,8 @@
       <div data-slot="backups"><p class="muted">Carregando backups…</p></div>
     </section>
     <section class="panel" id="p-ai">
-      <h2>Leitura de fotos por IA</h2>
-      <p class="lead">O app usa a integração de IA que estiver configurada no Home Assistant (Anthropic Claude, OpenAI, Google Gemini ou um modelo local pelo Ollama). Dá para trocar de IA quando quiser, sem mexer no inventário.</p>
+      <h2>IA do Home Assistant</h2>
+      <p class="lead">O app usa a integração de IA configurada no Home Assistant (Anthropic Claude, OpenAI, Google Gemini ou um modelo local pelo Ollama) para ler fotos e para buscar fotos de produtos na internet. Dá para trocar de IA quando quiser, sem mexer no inventário.</p>
       <div data-slot="ai"><p class="muted">Verificando…</p></div>
     </section>
     <section class="panel" id="p-history">
@@ -910,15 +910,22 @@
       slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status warn"><i></i>Exemplo simulado na prévia</span></b><span>Aqui a IA não lê as fotos de verdade: os botões mostram como fica a revisão. No Home Assistant, a leitura usa a integração de IA que você configurar.</span></div></li></ul><div style="margin-top:12px"><b>Como configurar no Home Assistant</b>${AI_STEPS}</div>`;
       return;
     }
-    const ents = st.entities || [];
+    const ents = st.entities || [], agents = st.agents || [];
     const cls = st.ready ? "ok" : st.reason === "no_vision" ? "warn" : "bad";
+    const opt = (e, sel) => `<option value="${esc(e.id)}"${e.id === sel ? " selected" : ""}>${esc(e.name)}</option>`;
     slot.innerHTML = `<ul class="opts">
       <li><div class="ot"><b><span class="status ${cls}"><i></i>${st.ready ? "Pronta para ler fotos" : "Não configurada"}</span></b><span>${esc(aiReasonText(st))}</span></div>
         <div class="oa"><button class="btn sm" data-act="ai-refresh">${ic("refresh", "sm")}Verificar de novo</button></div></li>
-      ${ents.length ? `<li><div class="ot"><b>IA usada pelo app</b><span>Padrão do Home Assistant usa a IA preferida definida lá.</span></div>
-        <div class="oa"><select class="select" data-input="ai-entity" aria-label="IA usada pelo app" style="min-width:240px">
+      ${ents.length ? `<li><div class="ot"><b>IA para ler fotos</b><span>Padrão do Home Assistant usa a IA preferida definida lá.</span></div>
+        <div class="oa"><select class="select" data-input="ai-entity" aria-label="IA para ler fotos" style="min-width:240px">
           <option value="">Padrão do Home Assistant</option>
           ${ents.map((e) => `<option value="${esc(e.id)}"${e.id === st.selected ? " selected" : ""}${e.attachments ? "" : " disabled"}>${esc(e.name)}${e.attachments ? "" : " (não lê fotos)"}</option>`).join("")}
+        </select></div></li>` : ""}
+      ${ents.length || agents.length ? `<li><div class="ot"><b>IA para buscar fotos na internet</b><span>Ela precisa da busca na web ligada. Na Anthropic, ligue "Enable web search" na tarefa de IA. No Google Gemini, use um assistente de conversa com "Enable Google Search tool".</span></div>
+        <div class="oa"><select class="select" data-input="ai-search" aria-label="IA para buscar fotos na internet" style="min-width:240px">
+          <option value="">A mesma de ler fotos</option>
+          ${ents.length ? `<optgroup label="Tarefas de IA">${ents.map((e) => opt(e, st.search)).join("")}</optgroup>` : ""}
+          ${agents.length ? `<optgroup label="Assistentes de conversa">${agents.map((e) => opt(e, st.search)).join("")}</optgroup>` : ""}
         </select></div></li>` : ""}
     </ul>${st.ready ? "" : `<div style="margin-top:12px"><b>Como configurar</b>${AI_STEPS}</div>`}`;
   }
@@ -1030,6 +1037,105 @@
     });
   }
 
+  // ------------------------------------------------------------------ fotos da internet
+  // A IA do Home Assistant (com a busca na web) acha páginas do produto e o servidor separa as fotos.
+  // Devolve { file, src } com a foto já enviada ao app, ou null se a pessoa desistir.
+  const siteOf = (u) => { try { return new URL(u).hostname.replace(/^(www\d?|m)\./, ""); } catch { return ""; } };
+  function webPhotoSearch({ name, details = "" }) {
+    if (PREVIEW) { toast("Na prévia não dá para buscar na internet. No Home Assistant, a IA busca as fotos de verdade."); return Promise.resolve(null); }
+    return new Promise((resolve) => {
+      let job = null, timer = null, chosen = null, results = [], got = null, gen = 0;
+      const entry = openDialog({
+        cls: "modal", label: "Buscar foto na internet",
+        html: `<div class="dlg"><div class="dlg-h"><h2>Buscar foto na internet</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+          <div class="dlg-b"><form class="wq" data-wq><label class="sr" for="wq">O que buscar</label>
+            <input id="wq" class="input" name="q" value="${esc(name)}" maxlength="200" autocomplete="off" enterkeyhint="search">
+            <button type="submit" class="btn" data-go>${ic("search")}<span class="lbl">Buscar</span></button></form>
+            <div data-slot="web" aria-live="polite"></div></div>
+          <div class="dlg-f"><span class="grow"></span><button type="button" class="btn ghost" data-x>Cancelar</button>
+            <button type="button" class="btn primary" data-ok disabled>Usar foto</button></div></div>`,
+        onClose: () => { gen++; clearTimeout(timer); if (job) API.del(`api/web-photos/${job}`).catch(() => {}); resolve(got); },
+      });
+      const dlg = entry.dlg, form = $("[data-wq]", dlg), slot = $('[data-slot="web"]', dlg), ok = $("[data-ok]", dlg);
+      const show = (html) => { slot.innerHTML = html; };
+      const busy = (msg) => show(`<div class="wbusy"><span class="spin lg"></span><p><b>${esc(msg)}</b><span>A IA procura no fabricante e nas lojas. Pode levar até um minuto.</span></p></div>`);
+      async function start() {
+        const q = form.q.value.trim();
+        if (!q) { form.q.focus(); return; }
+        const my = ++gen;
+        clearTimeout(timer);
+        if (job) { API.del(`api/web-photos/${job}`).catch(() => {}); job = null; }
+        chosen = null; results = []; ok.disabled = true;
+        busy("Procurando o produto na internet…");
+        try {
+          const r = await API.post("api/web-photos", { name: q, details: q === name ? details : "" });
+          if (my !== gen) return;
+          job = r.id;
+          poll(my);
+        } catch (e) { if (my === gen) show(`<p class="formerr">${esc(e.message)}</p>`); }
+      }
+      async function poll(my) {
+        let st;
+        try { st = await API.get(`api/web-photos/${job}`); }
+        catch (e) { if (my === gen) show(`<p class="formerr">${esc(e.message)}</p>`); return; }
+        if (my !== gen) return;
+        if (st.stage === "busy") { busy(st.msg); timer = setTimeout(() => poll(my), 1200); return; }
+        if (st.stage === "error") {
+          show(`<p class="formerr">${esc(st.msg)}</p>${/busca na web/.test(st.msg) ? `<p class="muted wtip">A IA de busca fica em Dados e ajustes, IA do Home Assistant.</p>` : ""}`);
+          return;
+        }
+        results = st.results || [];
+        show(`<p class="wsum">${results.length === 1 ? "1 foto encontrada" : `${results.length} fotos encontradas`}. Toque na que mais parece com o seu item.</p>
+          <div class="wgrid" role="radiogroup" aria-label="Fotos encontradas">${results.map((x) => `<button type="button" class="wimg" role="radio" aria-checked="false" data-n="${x.n}">
+            <img src="api/web-photos/${job}/${x.n}" alt="Foto de ${esc(x.site)}" loading="lazy"><span>${esc(x.site)}</span></button>`).join("")}</div>
+          <p class="muted wtip">Fotos de lojas e fabricantes ficam marcadas como ilustrativas, com o site de onde vieram. Para o seguro, uma foto sua do item vale mais.</p>`);
+      }
+      async function use() {
+        const r = results.find((x) => x.n === chosen);
+        if (!r || !job) return;
+        ok.disabled = true; ok.innerHTML = `<span class="spin"></span>Salvando`;
+        try {
+          const res = await fetch(`api/web-photos/${job}/${r.n}`, { cache: "no-store", credentials: "same-origin" });
+          if (!res.ok) throw new Error("Esta busca terminou. Busque de novo.");
+          const blob = await res.blob();
+          const file = await uploadPhoto(new File([blob], `internet.${(blob.type.split("/")[1] || "jpg")}`, { type: blob.type || "image/jpeg" }));
+          got = { file, src: r.page || r.image };
+          requestClose(entry, { force: true });
+        } catch (e) { fail(e); ok.disabled = false; ok.textContent = "Usar foto"; }
+      }
+      form.addEventListener("submit", (e) => { e.preventDefault(); start(); });
+      dlg.addEventListener("click", (e) => {
+        if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
+        if (e.target.closest("[data-ok]")) { use(); return; }
+        const t = e.target.closest(".wimg");
+        if (t) {
+          chosen = +t.dataset.n;
+          $$(".wimg", dlg).forEach((b) => b.setAttribute("aria-checked", String(b === t)));
+          ok.disabled = false;
+        }
+      });
+      dlg.addEventListener("dblclick", (e) => { if (e.target.closest(".wimg")) use(); });
+      start();
+    });
+  }
+  async function addWebPhoto(it) {
+    const got = await webPhotoSearch({ name: it.name, details: it.details });
+    const cur = got && D.itemById.get(it.id);
+    if (!cur) return;
+    const before = { photos: [...(cur.photos || [])], photoSrc: { ...(cur.photoSrc || {}) } };
+    try {
+      const res = await API.put(`api/items/${encodeURIComponent(cur.id)}`, { photos: [...before.photos, got.file], photoSrc: { ...before.photoSrc, [got.file]: got.src }, _base: cur.updatedAt });
+      setRev(res.rev); upsertItem(res.item); derive(); refreshAll();
+      toast(`Foto de ${siteOf(got.src)} adicionada`, { action: "Desfazer", onAction: async () => {
+        try {
+          const now = D.itemById.get(cur.id);
+          const back = await API.put(`api/items/${encodeURIComponent(cur.id)}`, { ...before, _base: now?.updatedAt });
+          setRev(back.rev); upsertItem(back.item); derive(); refreshAll();
+        } catch (e) { fail(e); }
+      } });
+    } catch (e) { fail(e); }
+  }
+
   // ------------------------------------------------------------------ detalhe do item
   function showItemSheet(it) {
     const html = itemSheetHtml(it);
@@ -1051,8 +1157,10 @@
   }
   function galleryHtml(it, i = 0) {
     const ph = it.photos || [];
+    const web = (it.photoSrc || {})[ph[i]];
     return `<div class="gal"><button type="button" class="gal-main" data-act="viewer-item" data-id="${esc(it.id)}" data-i="${i}" aria-label="Ampliar foto">
         <img src="${esc(src(ph[i], "photos"))}" alt="Foto de ${esc(it.name)}" decoding="async"></button></div>
+      ${web ? `<p class="gal-src">${ic("info", "sm")}<span>Foto ilustrativa de <a href="${esc(web)}" target="_blank" rel="noopener noreferrer">${esc(siteOf(web))}</a></span></p>` : ""}
       ${ph.length > 1 ? `<div class="gal-thumbs">${ph.map((p, k) => `<button type="button" data-act="gal" data-id="${esc(it.id)}" data-i="${k}" aria-current="${k === i}" aria-label="Foto ${k + 1}"><img src="${esc(src(p))}" alt=""></button>`).join("")}</div>` : ""}`;
   }
   function itemSheetHtml(it) {
@@ -1065,7 +1173,9 @@
         <button type="button" class="btn ghost icon" data-act="sheet-close" aria-label="Fechar">${ic("close")}</button></div>
       <div class="dlg-b">
         <div data-slot="gallery">${(it.photos || []).length ? galleryHtml(it, 0)
-          : `<div class="gal"><div class="gal-none">${ic("image", "lg")}<span>Sem foto</span><button type="button" class="btn sm" data-act="item-edit" data-id="${esc(it.id)}">Adicionar foto</button></div></div>`}</div>
+          : `<div class="gal"><div class="gal-none">${ic("image", "lg")}<span>Sem foto</span><div class="gal-acts">
+              <button type="button" class="btn sm" data-act="item-edit" data-id="${esc(it.id)}">${ic("plus", "sm")}Adicionar foto</button>
+              <button type="button" class="btn sm" data-act="web-photo" data-id="${esc(it.id)}">${ic("search", "sm")}Buscar na internet</button></div></div></div>`}</div>
         <div class="ihead"><h1>${esc(it.name)}</h1>
           <div class="ival"><span class="big">${money(it.value)}</span>${n && n > 1 ? `<span class="unit">${int(n)} unidades, ${money((+it.value || 0) / n)} cada</span>` : qtyClean(it.qty) !== "1" ? `<span class="unit">${esc(qtyLabel(it.qty))}</span>` : ""}</div></div>
         ${it.details ? `<p class="idet">${esc(it.details)}</p>` : ""}
@@ -1148,7 +1258,8 @@
       name: from.name || "", details: from.details || "", room: rid,
       zone: from.zone != null ? from.zone : zone != null ? zone : LS.get("lastZone:" + rid, "") || "",
       cat: from.cat || "", qty: from.qty ? qtyClean(from.qty) : "1", value: from.value ? moneyInput(from.value) : "",
-      flag: from.flag || "", photos: [...(from.photos || photos || [])], source: item ? item.source || "manual" : dup ? dup.source || "manual" : "manual",
+      flag: from.flag || "", photos: [...(from.photos || photos || [])], photoSrc: { ...(from.photoSrc || {}) },
+      source: item ? item.source || "manual" : dup ? dup.source || "manual" : "manual",
       dirty: !!(dup || (photos && photos.length)), busy: false, uploading: 0, aiBusy: false, hint: "",
     };
     const title = item ? "Editar item" : dup ? "Duplicar item" : "Novo item";
@@ -1201,12 +1312,14 @@
     const renderPhotos = () => {
       const hasRoomPhotos = (D.roomById.get(F.room)?.photos || []).some((p) => !F.photos.includes(p.file));
       slot("photos").innerHTML = F.photos.map((f, i) => `<div class="ph"><img src="${esc(src(f))}" alt="Foto ${i + 1}">
+          ${F.photoSrc[f] ? `<span class="web" title="Foto ilustrativa de ${esc(siteOf(F.photoSrc[f]))}">Internet</span>` : ""}
           ${i === 0 ? `<span class="cover">Capa</span>` : `<button type="button" class="mkcover" data-ed="cover" data-i="${i}">Usar como capa</button>`}
           <button type="button" class="x" data-ed="rmphoto" data-i="${i}" aria-label="Remover foto ${i + 1}">${ic("close")}</button></div>`).join("")
         + Array.from({ length: F.uploading }, () => `<div class="ph loading"><span class="spin lg"></span></div>`).join("")
         + (CAMERA_DIRECT ? `<button type="button" class="add" data-ed="camera">${ic("camera")}Tirar foto</button>` : "")
         + `<button type="button" class="add" data-ed="upload">${ic(COARSE ? "image" : "upload")}${ANDROID_APP ? "Escolher foto" : COARSE ? "Galeria" : "Enviar foto"}</button>`
-        + (hasRoomPhotos ? `<button type="button" class="add" data-ed="roomphotos">${ic("images")}Fotos do cômodo</button>` : "");
+        + (hasRoomPhotos ? `<button type="button" class="add" data-ed="roomphotos">${ic("images")}Fotos do cômodo</button>` : "")
+        + (F.photos.length < 12 ? `<button type="button" class="add" data-ed="web">${ic("search")}Buscar na internet</button>` : "");
       renderAi();
     };
     const renderAi = async () => {
@@ -1299,7 +1412,7 @@
       if (!name) { fieldErr("name", "Dê um nome ao item."); bad = true; }
       if (Number.isNaN(value)) { fieldErr("value", "Use só números, como 1200 ou 1.200,50."); bad = true; }
       if (bad) { (name ? form.value : form.name).focus(); return; }
-      const body = { name, details: F.details.trim(), room: F.room, zone: F.zone.trim(), cat: F.cat || "outros", qty: F.qty.trim() || "1", value, photos: F.photos, flag: F.flag.trim(), source: F.source };
+      const body = { name, details: F.details.trim(), room: F.room, zone: F.zone.trim(), cat: F.cat || "outros", qty: F.qty.trim() || "1", value, photos: F.photos, photoSrc: F.photoSrc, flag: F.flag.trim(), source: F.source };
       setBusy(true);
       try {
         const res = F.id
@@ -1309,7 +1422,7 @@
         LS.set("lastRoom", res.item.room); LS.set("lastZone:" + res.item.room, res.item.zone || "");
         refreshAll();
         if (again) {
-          Object.assign(F, { name: "", details: "", qty: "1", value: "", flag: "", photos: [], source: "manual", hint: "", dirty: false });
+          Object.assign(F, { name: "", details: "", qty: "1", value: "", flag: "", photos: [], photoSrc: {}, source: "manual", hint: "", dirty: false });
           fill(); renderPhotos();
           form.name.focus();
           toast(`${res.item.name} adicionado. Pode cadastrar o próximo.`);
@@ -1340,6 +1453,12 @@
       else if (act === "upload") pickFiles(addFiles);
       else if (act === "camera") pickFiles(addFiles, { camera: true });
       else if (act === "roomphotos") { const chosen = await roomPhotoPicker(F.room, F.photos); if (chosen.length) { F.photos.push(...chosen.slice(0, 12 - F.photos.length)); F.dirty = true; renderPhotos(); } }
+      else if (act === "web") {
+        const q = F.name.trim();
+        if (!q) { fieldErr("name", "Escreva o nome do item para buscar a foto."); form.name.focus(); return; }
+        const got = await webPhotoSearch({ name: q, details: F.details.trim() });
+        if (got && document.contains(dlg) && F.photos.length < 12) { F.photos.push(got.file); F.photoSrc = { ...F.photoSrc, [got.file]: got.src }; F.dirty = true; renderPhotos(); }
+      }
       else if (act === "rmphoto") { F.photos.splice(+b.dataset.i, 1); F.dirty = true; renderPhotos(); }
       else if (act === "cover") { const [p] = F.photos.splice(+b.dataset.i, 1); F.photos.unshift(p); F.dirty = true; renderPhotos(); }
       else if (act === "ai") runAi();
@@ -1926,6 +2045,7 @@
       case "viewer-item": if (item) openViewer({ photos: item.photos.map((f) => ({ file: f, label: item.name })), index: +b.dataset.i }); break;
       case "gal": if (item) { const g = $('[data-slot="gallery"]', sheet ? sheet.dlg : document); if (g) g.innerHTML = galleryHtml(item, +b.dataset.i); } break;
       case "item-edit": if (item) openEditor({ item }); break;
+      case "web-photo": if (item) addWebPhoto(item); break;
       case "item-dup": if (item) openEditor({ dup: item }); break;
       case "item-move": if (item) moveItem(item); break;
       case "item-delete": if (item) deleteItem(item); break;
@@ -1976,7 +2096,11 @@
     else if (k === "rep-photos") { LS.set("reportPhotos", t.checked); renderView(false); }
     else if (k === "accent" && t.checked) setAccent(t.value);
     else if (k === "ai-entity") {
-      try { await API.put("api/settings", { ai_entity: t.value }); S.settings.ai_entity = t.value; const slot = $('[data-slot="ai"]'); if (slot) renderAiPanel(slot, await aiStatus(true)); toast("IA do app atualizada"); }
+      try { await API.put("api/settings", { ai_entity: t.value }); S.settings.ai_entity = t.value; const slot = $('[data-slot="ai"]'); if (slot) renderAiPanel(slot, await aiStatus(true)); toast("IA para ler fotos atualizada"); }
+      catch (er) { fail(er); }
+    }
+    else if (k === "ai-search") {
+      try { await API.put("api/settings", { ai_search: t.value }); S.settings.ai_search = t.value; aiCache.at = 0; toast("IA para buscar fotos atualizada"); }
       catch (er) { fail(er); }
     }
   });
