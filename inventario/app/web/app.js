@@ -534,6 +534,7 @@
   }
 
   // -- início
+  const secIc = (name) => `<span class="sec-ic" aria-hidden="true">${ic(name)}</span>`;
   function viewHome() {
     if (!D.rooms.length) {
       return `<section class="hero welcome">
@@ -587,23 +588,23 @@
       ${ic("search")}<input class="input" type="search" name="q" data-input="home-q" placeholder="Buscar entre ${esc(plural(n, "item", "itens"))}" aria-label="Buscar itens" autocomplete="off" enterkeyhint="search"><kbd>/</kbd>
     </form>
     <section class="sec">
-      <div class="sec-h"><h2>Cômodos</h2><button type="button" class="btn ghost sm" data-act="room-new">${ic("plus", "sm")}Novo cômodo</button></div>
+      <div class="sec-h"><h2>${secIc("rooms")}Cômodos</h2><button type="button" class="btn ghost sm" data-act="room-new">${ic("plus", "sm")}Novo cômodo</button></div>
       <ul class="rows">${D.rooms.map((r) => roomRow(r, maxRoom)).join("")}</ul>
     </section>
     <div class="cols">
       <section class="sec">
-        <div class="sec-h"><h2>Categorias</h2><span class="aside">${plural(cats.length, "categoria", "categorias")}</span></div>
+        <div class="sec-h"><h2>${secIc("grid")}Categorias</h2><span class="aside">${plural(cats.length, "categoria", "categorias")}</span></div>
         <ul class="rows">${cats.map(([c, t]) => `<li><a class="rrow nocode" href="#/buscar?cat=${c}&amp;ord=val">
           <span class="rn">${esc(CAT[c])}<small>${plural(t.count, "item", "itens")}</small></span><span class="rv">${moneyR(t.value)}</span>
           <span class="bar"><i style="width:${maxCat ? ((t.value / maxCat) * 100).toFixed(2) : 0}%"></i></span><span class="pct">${pctFmt(pct(t.value, D.total))}</span></a></li>`).join("")}</ul>
       </section>
       <section class="sec">
-        <div class="sec-h"><h2>Mais valiosos</h2><a class="aside" href="#/buscar?ord=val">Ver todos</a></div>
+        <div class="sec-h"><h2>${secIc("gem")}Mais valiosos</h2><a class="aside" href="#/buscar?ord=val">Ver todos</a></div>
         <ul class="ilist">${byValue.slice(0, 7).map((it) => itemRow(it)).join("")}</ul>
       </section>
     </div>
     <section class="sec">
-      <div class="sec-h"><h2>Cadastrados recentemente</h2><a class="aside" href="#/buscar?ord=new">Ver todos</a></div>
+      <div class="sec-h"><h2>${secIc("clock")}Cadastrados recentemente</h2><a class="aside" href="#/buscar?ord=new">Ver todos</a></div>
       <ul class="ilist">${recent.map((it) => itemRow(it)).join("")}</ul>
     </section>`;
   }

@@ -372,8 +372,11 @@ html:has(dialog[open]) { overflow: hidden; }
 
 /* ---------- seções */
 .sec { margin-top: 44px; }
-.sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 10px; }
-.sec-h h2 { margin: 0; font: 600 25px/1.1 var(--font-c); letter-spacing: 0.005em; }
+.sec-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+.sec-h h2 { display: flex; align-items: center; gap: 12px; min-width: 0; margin: 0; font: 600 25px/1.1 var(--font-c); letter-spacing: 0.005em; }
+/* ícone dos títulos de seção: quadradinho no tom suave da cor do app */
+.sec-ic { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 11px; background: var(--tag-soft); color: var(--tag-text); }
+.sec-ic .ic { width: 21px; height: 21px; stroke-width: 1.9; }
 .sec-h .aside { color: var(--muted); font-size: 14px; white-space: nowrap; }
 .sec-h a.aside { text-decoration: none; font-weight: 500; color: var(--ink-2); }
 .sec-h a.aside:hover { text-decoration: underline; }
