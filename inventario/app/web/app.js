@@ -77,8 +77,8 @@
   const ACCENTS = [["amarelo", "Amarelo"], ["laranja", "Laranja"], ["coral", "Coral"], ["rosa", "Rosa"], ["lilas", "Lilás"],
     ["azul", "Azul"], ["turquesa", "Turquesa"], ["verde", "Verde"], ["kraft", "Kraft"], ["cinza", "Cinza"]];
   const accentOf = () => { const a = LS.get("accent", "amarelo"); return ACCENTS.some(([k]) => k === a) ? a : "amarelo"; };
-  // Mais em abas, como no CronologIA e no ResolvIA: #/mais (Exportar), #/mais/integracoes, #/mais/dados, #/mais/aparencia.
-  const MORE_TABS = [["exportar", "Exportar", "download"], ["integracoes", "Integrações", "plug"], ["dados", "Dados", "archive"], ["aparencia", "Aparência", "palette"]];
+  // Mais em abas, como no CronologIA e no ResolvIA: #/mais (Dados, com Exportar no alto), #/mais/integracoes e #/mais/aparencia.
+  const MORE_TABS = [["dados", "Dados", "archive"], ["integracoes", "Integrações", "plug"], ["aparencia", "Aparência", "palette"]];
   const moreTab = (t) => (MORE_TABS.some(([k]) => k === t) ? t : MORE_TABS[0][0]);
   function applyAccent(a) {
     if (a === "amarelo") delete document.documentElement.dataset.accent;
@@ -813,7 +813,7 @@
   function viewData() {
     const tab = moreTab(base.tab);
     const label = MORE_TABS.find(([k]) => k === tab)[1];
-    const bodies = { exportar: moreExport, integracoes: moreIntegrations, dados: moreData, aparencia: moreLook };
+    const bodies = { dados: () => moreExport() + moreData(), integracoes: moreIntegrations, aparencia: moreLook };
     return `<div class="more-anchor" aria-hidden="true"></div>
     <div class="more-tabs" role="tablist" aria-label="Seções de Mais">
       ${MORE_TABS.map(([k, l, i]) => `<button type="button" role="tab" id="mt-${k}" aria-controls="mp" aria-selected="${k === tab}" tabindex="${k === tab ? 0 : -1}" data-act="more-tab" data-tab="${k}">${ic(i, "sm")}<span>${l}</span></button>`).join("")}
@@ -823,7 +823,8 @@
   }
   function moreExport() {
     return `
-    <section class="panel">
+    <section class="panel" id="p-export">
+      <h2>Exportar</h2>
       <p class="lead">Baixe o inventário para abrir no Excel, guardar ou levar para outro programa. Os arquivos são abertos e legíveis.</p>
       <ul class="opts">
         <li><div class="ot"><b>Planilha (CSV)</b><span>Abre no Excel e no Google Planilhas, com um item por linha.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="csv">${ic("download")}Baixar CSV</button></div></li>

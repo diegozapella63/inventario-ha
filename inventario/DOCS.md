@@ -23,7 +23,7 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - **Buscar na internet**: num item sem foto (ou no editor do item), a IA procura o produto no fabricante e nas lojas e o app mostra as fotos encontradas para você escolher. Veja [Fotos da internet](#fotos-da-internet).
 - **Buscar**: por nome, marca, detalhe ou zona, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome ou data.
 - **Relatório**: lista por cômodo com fotos e valores, pronta para imprimir ou salvar em PDF (útil para seguro).
-- **Mais**, em abas como nos outros apps: **Exportar** (planilha, JSON, ZIP com fotos e o relatório), **Integrações** (a IA do Home Assistant), **Dados** (backup, importar, versões anteriores) e **Aparência** (tema claro, escuro ou automático e a cor do app: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza; cada aparelho guarda a sua escolha).
+- **Mais**, em abas como nos outros apps: **Dados** (exportar planilha, JSON, ZIP com fotos e o relatório; backup; importar; versões anteriores), **Integrações** (a IA do Home Assistant) e **Aparência** (tema claro, escuro ou automático e a cor do app: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza; cada aparelho guarda a sua escolha).
 - Atalhos no computador: `/` abre a busca, `N` cria um item, `Ctrl+Enter` salva o formulário.
 
 Os valores são de mercado de usados (o que o item vale hoje), somando todas as unidades.
@@ -75,7 +75,7 @@ Formas de guardar uma cópia:
 
 - **Backups do Home Assistant**: incluem o app e os dados dele.
 - **Mais > Dados > Backup na pasta share**: cria um `.zip` completo (JSON, CSV e fotos) em `share/inventario`, que você acessa pela rede (por exemplo `\\homeassistant.local\share\inventario` com o app Samba).
-- **Mais > Exportar**: CSV (abre no Excel), JSON ou ZIP com fotos, direto para o seu computador ou celular.
+- **Mais > Dados > Exportar**: CSV (abre no Excel), JSON ou ZIP com fotos, direto para o seu computador ou celular.
 
 Para restaurar, use **Mais > Dados**: escolha um backup da pasta share, volte para uma versão anterior ou importe um arquivo (`.zip` de backup ou `.json`) do computador ou do celular. Antes de restaurar ou importar, o app guarda uma cópia do que existe naquele momento.
 
