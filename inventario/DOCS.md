@@ -59,7 +59,7 @@ A IA precisa ter a **busca na web** ligada:
 - **Google Gemini**: a Pesquisa Google só funciona num assistente de conversa. Ligue **Enable Google Search tool** nele e escolha esse assistente.
 - **OpenAI**: nas opções da tarefa de IA, ligue **Enable web search** (precisa do gpt-4o ou de um modelo mais novo).
 
-Escolha a IA em **Mais > Integrações > IA para buscar fotos na internet**. "A mesma de ler fotos" usa a IA da leitura de fotos.
+Escolha a IA em **Mais > Integrações > IA para buscar fotos na internet**. Como na leitura de fotos, "Padrão do Home Assistant" usa a tarefa de IA preferida definida no Home Assistant; para o Gemini, escolha o assistente de conversa na lista.
 
 A IA recebe só o nome e o começo dos detalhes do item. O app baixa as fotos apenas de endereços públicos da internet (nunca da rede da casa) e guarda só a foto que você escolher; as outras são apagadas em até 30 minutos. Cada busca usa a busca na web da sua IA, que pode ter custo à parte.
 

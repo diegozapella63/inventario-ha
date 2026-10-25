@@ -825,7 +825,7 @@
   function moreExport() {
     return `
     <section class="panel" id="p-export">
-      <h2>Exportar</h2>
+      <h2>${secIc("download")}Exportar</h2>
       <p class="lead">Baixe o inventário para abrir no Excel, guardar ou levar para outro programa. Os arquivos são abertos e legíveis.</p>
       <ul class="opts">
         <li><div class="ot"><b>Planilha (CSV)</b><span>Abre no Excel e no Google Planilhas, com um item por linha.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="csv">${ic("download")}Baixar CSV</button></div></li>
@@ -838,7 +838,7 @@
   function moreIntegrations() {
     return `
     <section class="panel" id="p-ai">
-      <h2>IA do Home Assistant</h2>
+      <h2>${secIc("scan")}IA do Home Assistant</h2>
       <p class="lead">O app usa a integração de IA configurada no Home Assistant (Anthropic Claude, OpenAI, Google Gemini ou um modelo local pelo Ollama) para ler fotos e para buscar fotos de produtos na internet. Dá para trocar de IA quando quiser, sem mexer no inventário.</p>
       <div data-slot="ai-panel"><p class="muted">Verificando…</p></div>
     </section>`;
@@ -846,22 +846,22 @@
   function moreData() {
     return `
     <section class="panel" id="p-backup">
-      <h2>Backup na pasta share</h2>
+      <h2>${secIc("archive")}Backup na pasta share</h2>
       <p class="lead">Cria uma cópia completa (com fotos) em <span class="codepath">share/inventario</span>, que você acessa pela rede do Home Assistant. Os backups do próprio Home Assistant também incluem o inventário.</p>
       <div data-slot="backups"><p class="muted">Carregando backups…</p></div>
     </section>
     <section class="panel" id="p-import">
-      <h2>Importar</h2>
+      <h2>${secIc("upload")}Importar</h2>
       <p class="lead">Traz um inventário de um arquivo: o backup .zip, com as fotos, ou um .json exportado pelo app. Antes de importar, o app guarda uma cópia do que existe hoje.</p>
       <ul class="opts"><li><div class="ot"><b>Importar backup ou JSON</b><span>Funciona pelo celular: escolha o arquivo nos seus downloads. ${MULTI_PICK ? "Se o backup veio em partes, escolha todas de uma vez ou uma de cada vez" : "Se o backup veio em partes, importe uma de cada vez, começando pela parte 1"}; as partes só com fotos não mexem nos itens.</span></div><div class="oa"><button class="btn" data-act="import-file">${ic("upload")}Escolher arquivo</button></div></li></ul>
     </section>
     <section class="panel" id="p-history">
-      <h2>Versões anteriores</h2>
+      <h2>${secIc("history")}Versões anteriores</h2>
       <p class="lead">O app guarda sozinho uma cópia do inventário a cada 10 minutos de uso. Se algo sair errado, volte para uma versão anterior.</p>
       <div data-slot="history"><p class="muted">Carregando…</p></div>
     </section>
     <section class="panel" id="p-where">
-      <h2>Onde ficam os dados</h2>
+      <h2>${secIc("folder")}Onde ficam os dados</h2>
       <p class="lead">Os itens ficam em <span class="codepath">inventario.json</span> e as fotos em JPG, dentro do app, e entram nos backups do Home Assistant. O app funciona sem internet: só a IA e a busca de fotos na internet precisam dela.</p>
     </section>`;
   }
@@ -955,13 +955,13 @@
       <li><div class="ot"><b><span class="status ${cls}"><i></i>${st.ready ? "Pronta para ler fotos" : "Não configurada"}</span></b><span>${esc(aiReasonText(st))}</span></div>
         <div class="oa"><button class="btn sm" data-act="ai-refresh">${ic("refresh", "sm")}Verificar de novo</button></div></li>
       ${ents.length ? `<li><div class="ot"><b>IA para ler fotos</b><span>Padrão do Home Assistant usa a IA preferida definida lá.</span></div>
-        <div class="oa"><select class="select" data-input="ai-entity" aria-label="IA para ler fotos" style="min-width:240px">
+        <div class="oa"><select class="select" data-input="ai-entity" aria-label="IA para ler fotos" style="min-width:280px">
           <option value="">Padrão do Home Assistant</option>
           ${ents.map((e) => `<option value="${esc(e.id)}"${e.id === st.selected ? " selected" : ""}${e.attachments ? "" : " disabled"}>${esc(e.name)}${e.attachments ? "" : " (não lê fotos)"}</option>`).join("")}
         </select></div></li>` : ""}
-      ${ents.length || agents.length ? `<li><div class="ot"><b>IA para buscar fotos na internet</b><span>Ela precisa da busca na web ligada. Na Anthropic, ligue "Enable web search" na tarefa de IA. No Google Gemini, use um assistente de conversa com "Enable Google Search tool".</span></div>
-        <div class="oa"><select class="select" data-input="ai-search" aria-label="IA para buscar fotos na internet" style="min-width:240px">
-          <option value="">A mesma de ler fotos</option>
+      ${ents.length || agents.length ? `<li><div class="ot"><b>IA para buscar fotos na internet</b><span>Padrão do Home Assistant usa a IA preferida definida lá. A IA precisa ter a busca na web ligada. Na Anthropic, ligue "Enable web search" na tarefa de IA. No Google Gemini, use um assistente de conversa com "Enable Google Search tool".</span></div>
+        <div class="oa"><select class="select" data-input="ai-search" aria-label="IA para buscar fotos na internet" style="min-width:280px">
+          <option value="">Padrão do Home Assistant</option>
           ${ents.length ? `<optgroup label="Tarefas de IA">${ents.map((e) => opt(e, st.search)).join("")}</optgroup>` : ""}
           ${agents.length ? `<optgroup label="Assistentes de conversa">${agents.map((e) => opt(e, st.search)).join("")}</optgroup>` : ""}
         </select></div></li>` : ""}

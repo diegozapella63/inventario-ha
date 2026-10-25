@@ -43,7 +43,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.7.2"
+VERSION = "1.7.3"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -1319,7 +1319,8 @@ def ai_find_pages(name: str, details: str, entity: str) -> dict:
 
 
 def search_entity() -> str:
-    return STORE.settings.get("ai_search") or STORE.settings.get("ai_entity") or ""
+    """IA da busca de fotos; vazio = a tarefa de IA preferida do Home Assistant, como na leitura de fotos."""
+    return STORE.settings.get("ai_search") or ""
 
 
 def _web_job_files(jid: str):
