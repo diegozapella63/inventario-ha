@@ -27,6 +27,7 @@
   --warn: #f5c400;
   --warn-edge: #d4a800;
   --warn-soft: #fff4c4;
+  --seg-on: var(--surface);
   --bar: #3a4148;
   --danger: #b3261e;
   --danger-soft: #fdecea;
@@ -64,6 +65,7 @@
     --warn-edge: #b38f00;
     --warn-soft: #3b3417;
     --sw-edge: transparent;
+    --seg-on: #363d44;
     --bar: #c9cfd5;
     --danger: #ff8a80;
     --danger-soft: #3a1f1d;
@@ -92,6 +94,7 @@
   --warn-edge: #b38f00;
   --warn-soft: #3b3417;
   --sw-edge: transparent;
+  --seg-on: #363d44;
   --bar: #c9cfd5;
   --danger: #ff8a80;
   --danger-soft: #3a1f1d;
@@ -295,7 +298,7 @@ html:has(dialog[open]) { overflow: hidden; }
 .check input { width: 20px; height: 20px; accent-color: var(--ink); margin: 0; flex: none; }
 .seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); }
 .seg button { border: 0; background: none; height: 34px; padding: 0 14px; border-radius: 7px; font-weight: 500; color: var(--muted); }
-.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.seg button[aria-pressed="true"] { background: var(--seg-on); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
 
 /* ---------- etiquetas (o motivo do app) */
 .mt {
@@ -679,6 +682,27 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .pick input { position: absolute; top: 8px; left: 8px; width: 20px; height: 20px; accent-color: var(--ink); z-index: 1; }
 .pick label:has(input:checked) { outline: 3px solid var(--tag); outline-offset: -3px; }
 .pick span { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 8px 6px; font-size: 12px; color: #fff; background: linear-gradient(transparent, rgba(0, 0, 0, 0.7)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Mais: abas no alto, como no CronologIA e no ResolvIA */
+.more-tabs {
+  position: sticky; top: 0; z-index: 15; display: flex; gap: 4px; padding: 4px; margin: 20px 0 4px;
+  border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); box-shadow: 0 0 0 8px var(--paper);
+}
+.more-tabs button {
+  flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 6px;
+  border: 0; border-radius: 10px; background: none; color: var(--muted); font: 500 15px/1 var(--font); white-space: nowrap;
+}
+.more-tabs button span { overflow: hidden; text-overflow: ellipsis; }
+.more-tabs button:hover { color: var(--ink); }
+.more-tabs button[aria-selected="true"] { background: var(--seg-on); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14); }
+.more-tabs .ic { width: 17px; height: 17px; }
+@media (max-width: 600px) { .more-tabs .ic { display: none; } }
+@media (max-width: 400px) { .more-tabs button { font-size: 14px; padding: 0 3px; } }
+/* o conteúdo da aba ocupa ao menos a tela: trocar de aba com a página rolada mantém as abas no alto, sem pular */
+.more-panel { min-height: calc(100vh - 120px); min-height: calc(100dvh - 120px); }
+.more-panel > .panel:first-child { margin-top: 22px; }
+.foot { margin: 44px 0 0; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.foot b { font: 600 19px/1.3 var(--font-c); letter-spacing: 0.01em; }
 
 /* ---------- dados e ajustes */
 .panel { margin-top: 36px; }

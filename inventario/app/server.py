@@ -43,7 +43,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -998,7 +998,7 @@ WEB_LOCK = threading.Lock()
 WEB_KINDS = {"jpeg": ("jpg", "image/jpeg"), "png": ("png", "image/png"), "webp": ("webp", "image/webp"), "avif": ("avif", "image/avif")}
 SEARCH_HOWTO = ("Na Anthropic, ligue \"Enable web search\" nas opções da tarefa de IA. No Google Gemini, a Pesquisa Google só "
                 "funciona num assistente de conversa: ligue \"Enable Google Search tool\" nele e escolha esse assistente em "
-                "Dados e ajustes, IA do Home Assistant, Buscar fotos na internet.")
+                "Mais, Integrações, IA para buscar fotos na internet.")
 
 
 class WebError(Exception):

@@ -77,6 +77,9 @@
   const ACCENTS = [["amarelo", "Amarelo"], ["laranja", "Laranja"], ["coral", "Coral"], ["rosa", "Rosa"], ["lilas", "Lilás"],
     ["azul", "Azul"], ["turquesa", "Turquesa"], ["verde", "Verde"], ["kraft", "Kraft"], ["cinza", "Cinza"]];
   const accentOf = () => { const a = LS.get("accent", "amarelo"); return ACCENTS.some(([k]) => k === a) ? a : "amarelo"; };
+  // Mais em abas, como no CronologIA e no ResolvIA: #/mais (Exportar), #/mais/integracoes, #/mais/dados, #/mais/aparencia.
+  const MORE_TABS = [["exportar", "Exportar", "download"], ["integracoes", "Integrações", "plug"], ["dados", "Dados", "archive"], ["aparencia", "Aparência", "palette"]];
+  const moreTab = (t) => (MORE_TABS.some(([k]) => k === t) ? t : MORE_TABS[0][0]);
   function applyAccent(a) {
     if (a === "amarelo") delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = a;
@@ -332,7 +335,7 @@
       case "buscar": return { name: "search", q };
       case "relatorio": return { name: "report", q };
       case "comodos": return { name: "rooms", q };
-      case "dados": return { name: "data", q };
+      case "mais": case "dados": return { name: "data", tab: moreTab(parts[1]), q };
       default: return { name: "home", q };
     }
   }
@@ -347,7 +350,7 @@
       }
       case "report": return "#/relatorio";
       case "rooms": return "#/comodos";
-      case "data": return "#/dados";
+      case "data": { const t = moreTab(r.tab); return t === MORE_TABS[0][0] ? "#/mais" : `#/mais/${t}`; }
       default: return "#/";
     }
   }
@@ -394,7 +397,7 @@
         <a href="#/buscar"${cr("search")}>${ic("search")}Buscar<kbd>/</kbd></a>
         <a href="#/comodos"${cr("rooms")}>${ic("rooms")}Cômodos</a>
         <a href="#/relatorio"${cr("report")}>${ic("report")}Relatório</a>
-        <a href="#/dados"${cr("data")}>${ic("gear")}Dados e ajustes</a>
+        <a href="#/mais"${cr("data")}>${ic("gear")}Mais</a>
       </nav>
       <div class="side-h"><h2>Cômodos</h2><span>${int(D.rooms.length)}</span></div>
       <div class="side-rooms">
@@ -407,7 +410,7 @@
 
   function viewTitle(r) {
     if (r.name === "room") return D.roomById.get(r.id)?.name || "Cômodo";
-    return { home: "Início", search: "Buscar", rooms: "Cômodos", report: "Relatório", data: "Dados e ajustes" }[r.name] || "InventarIA";
+    return { home: "Início", search: "Buscar", rooms: "Cômodos", report: "Relatório", data: "Mais" }[r.name] || "InventarIA";
   }
   // Topo de cada tela, igual nos apps da família (EconomIA, ResolvIA): nome do app com "IA" na cor
   // do app, saudação ao usuário do Home Assistant e o título grande da tela.
@@ -416,10 +419,11 @@
     const el = $("#topbar");
     const r = base;
     const first = (S.user || "").trim().split(/\s+/)[0];
-    const up = r.name === "room" ? ["#/comodos", "Cômodos"] : r.name === "report" ? ["#/dados", "Dados e ajustes"] : null;
+    const up = r.name === "room" ? ["#/comodos", "Cômodos"] : r.name === "report" ? ["#/mais", "Mais"] : null;
     const title = r.name === "room" || r.name === "report" ? "" : viewTitle(r);
     const sub = r.name === "rooms" && D.rooms.length
-      ? `${plural(D.rooms.length, "cômodo", "cômodos")}, ${plural(S.items.length, "item", "itens")}, ${money(D.total)}` : "";
+      ? `${plural(D.rooms.length, "cômodo", "cômodos")}, ${plural(S.items.length, "item", "itens")}, ${money(D.total)}`
+      : r.name === "data" ? `${plural(S.items.length, "item", "itens")} e ${plural(D.photoCount, "foto", "fotos")} no inventário` : "";
     el.innerHTML = `
       <div class="mh-row">
         <p class="eyebrow"><span class="brand-word">Inventar<span>IA</span></span>${first ? `<span class="hello"><span class="sep"> · </span>Olá, ${esc(first)}</span>` : ""}</p>
@@ -546,7 +550,7 @@
           <p>Já tem um inventário salvo? Importe o arquivo de backup (.zip) e tudo volta, com fotos e valores. Se preferir, comece do zero criando o primeiro cômodo.</p>
           <div class="acts"><button type="button" class="btn primary" data-act="import-file">${ic("upload")}Importar backup</button>
             <button type="button" class="btn" data-act="room-new">${ic("plus")}Começar do zero</button></div>
-          <p class="muted" style="font-size:14px;margin:0">O backup é o arquivo .zip criado em Dados e ajustes, ou o que você recebeu junto com o app. ${MULTI_PICK ? "Se ele veio em várias partes, escolha todas de uma vez." : "Se ele veio em várias partes, importe uma de cada vez, começando pela parte 1."}</p>
+          <p class="muted" style="font-size:14px;margin:0">O backup é o arquivo .zip criado em Mais, Dados, ou o que você recebeu junto com o app. ${MULTI_PICK ? "Se ele veio em várias partes, escolha todas de uma vez." : "Se ele veio em várias partes, importe uma de cada vez, começando pela parte 1."}</p>
         </div>
       </section>`;
     }
@@ -807,11 +811,19 @@
   const SW_TAG = "M8 0h20a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8L0 13V7z";
   const SWATCH = `<svg viewBox="-5 -5 40 30" aria-hidden="true"><path class="sw-ring" d="${SW_TAG}"/><path class="sw-gap" d="${SW_TAG}"/><path class="sw-fill" d="${SW_TAG}M9.7 10a2.7 2.7 0 1 0-5.4 0a2.7 2.7 0 1 0 5.4 0z"/><path class="sw-check" d="m14.6 10.3 3.2 3.2 6.5-6.9"/></svg>`;
   function viewData() {
-    const theme = LS.get("theme", "auto");
-    const accent = accentOf();
+    const tab = moreTab(base.tab);
+    const label = MORE_TABS.find(([k]) => k === tab)[1];
+    const bodies = { exportar: moreExport, integracoes: moreIntegrations, dados: moreData, aparencia: moreLook };
+    return `<div class="more-anchor" aria-hidden="true"></div>
+    <div class="more-tabs" role="tablist" aria-label="Seções de Mais">
+      ${MORE_TABS.map(([k, l, i]) => `<button type="button" role="tab" id="mt-${k}" aria-controls="mp" aria-selected="${k === tab}" tabindex="${k === tab ? 0 : -1}" data-act="more-tab" data-tab="${k}">${ic(i, "sm")}<span>${l}</span></button>`).join("")}
+    </div>
+    <div class="more-panel" id="mp" role="tabpanel" aria-labelledby="mt-${tab}" aria-label="${label}">${bodies[tab]()}</div>
+    <p class="foot"><b>InventarIA</b><br>${PREVIEW ? "Prévia do app do Home Assistant: as alterações ficam só nesta tela." : `v${esc(S.version)}, com os dados em arquivos abertos (JSON e JPG) dentro do Home Assistant.`}</p>`;
+  }
+  function moreExport() {
     return `
-    <section class="panel" id="p-export" style="margin-top:14px">
-      <h2>Exportar</h2>
+    <section class="panel">
       <p class="lead">Baixe o inventário para abrir no Excel, guardar ou levar para outro programa. Os arquivos são abertos e legíveis.</p>
       <ul class="opts">
         <li><div class="ot"><b>Planilha (CSV)</b><span>Abre no Excel e no Google Planilhas, com um item por linha.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="csv">${ic("download")}Baixar CSV</button></div></li>
@@ -819,49 +831,73 @@
         <li><div class="ot"><b>Tudo com fotos (ZIP)</b><span>JSON, CSV e todas as fotos num arquivo só.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="zip">${ic("download")}Baixar ZIP</button></div></li>
         <li><div class="ot"><b>Relatório para seguro</b><span>Lista por cômodo com fotos, pronta para imprimir ou salvar em PDF.</span></div><div class="oa"><a class="btn" href="#/relatorio">${ic("report")}Abrir relatório</a></div></li>
       </ul>
-    </section>
+    </section>`;
+  }
+  function moreIntegrations() {
+    return `
+    <section class="panel" id="p-ai">
+      <h2>IA do Home Assistant</h2>
+      <p class="lead">O app usa a integração de IA configurada no Home Assistant (Anthropic Claude, OpenAI, Google Gemini ou um modelo local pelo Ollama) para ler fotos e para buscar fotos de produtos na internet. Dá para trocar de IA quando quiser, sem mexer no inventário.</p>
+      <div data-slot="ai-panel"><p class="muted">Verificando…</p></div>
+    </section>`;
+  }
+  function moreData() {
+    return `
     <section class="panel" id="p-backup">
       <h2>Backup na pasta share</h2>
       <p class="lead">Cria uma cópia completa (com fotos) em <span class="codepath">share/inventario</span>, que você acessa pela rede do Home Assistant. Os backups do próprio Home Assistant também incluem o inventário.</p>
       <div data-slot="backups"><p class="muted">Carregando backups…</p></div>
-    </section>
-    <section class="panel" id="p-ai">
-      <h2>IA do Home Assistant</h2>
-      <p class="lead">O app usa a integração de IA configurada no Home Assistant (Anthropic Claude, OpenAI, Google Gemini ou um modelo local pelo Ollama) para ler fotos e para buscar fotos de produtos na internet. Dá para trocar de IA quando quiser, sem mexer no inventário.</p>
-      <div data-slot="ai"><p class="muted">Verificando…</p></div>
-    </section>
-    <section class="panel" id="p-history">
-      <h2>Versões anteriores</h2>
-      <p class="lead">O app guarda sozinho uma cópia do inventário a cada 10 minutos de uso. Se algo sair errado, volte para uma versão anterior.</p>
-      <div data-slot="history"><p class="muted">Carregando…</p></div>
     </section>
     <section class="panel" id="p-import">
       <h2>Importar</h2>
       <p class="lead">Traz um inventário de um arquivo: o backup .zip, com as fotos, ou um .json exportado pelo app. Antes de importar, o app guarda uma cópia do que existe hoje.</p>
       <ul class="opts"><li><div class="ot"><b>Importar backup ou JSON</b><span>Funciona pelo celular: escolha o arquivo nos seus downloads. ${MULTI_PICK ? "Se o backup veio em partes, escolha todas de uma vez ou uma de cada vez" : "Se o backup veio em partes, importe uma de cada vez, começando pela parte 1"}; as partes só com fotos não mexem nos itens.</span></div><div class="oa"><button class="btn" data-act="import-file">${ic("upload")}Escolher arquivo</button></div></li></ul>
     </section>
+    <section class="panel" id="p-history">
+      <h2>Versões anteriores</h2>
+      <p class="lead">O app guarda sozinho uma cópia do inventário a cada 10 minutos de uso. Se algo sair errado, volte para uma versão anterior.</p>
+      <div data-slot="history"><p class="muted">Carregando…</p></div>
+    </section>
+    <section class="panel" id="p-where">
+      <h2>Onde ficam os dados</h2>
+      <p class="lead">Os itens ficam em <span class="codepath">inventario.json</span> e as fotos em JPG, dentro do app, e entram nos backups do Home Assistant. O app funciona sem internet: só a IA e a busca de fotos na internet precisam dela.</p>
+    </section>`;
+  }
+  function moreLook() {
+    const theme = LS.get("theme", "auto");
+    const accent = accentOf();
+    return `
     <section class="panel" id="p-look">
-      <h2>Aparência</h2>
       <ul class="opts"><li><div class="ot"><b>Tema</b><span>Automático segue o modo claro ou escuro do aparelho.</span></div>
         <div class="oa"><div class="seg" role="group" aria-label="Tema">
           ${[["auto", "Automático"], ["light", "Claro"], ["dark", "Escuro"]].map(([k, v]) => `<button type="button" data-act="theme" data-theme="${k}" aria-pressed="${theme === k}">${v}</button>`).join("")}
         </div></div></li>
         <li><div class="ot"><b id="accent-h">Cor do app</b><span>Muda a etiqueta, os botões principais e os destaques. Cada aparelho guarda a sua escolha.</span></div>
           <div class="swatches" role="radiogroup" aria-labelledby="accent-h">${ACCENTS.map(([k, v]) => `<label class="sw" data-accent="${k}"><input type="radio" name="accent" value="${k}" data-input="accent"${k === accent ? " checked" : ""}>${SWATCH}<span>${v}</span></label>`).join("")}</div></li></ul>
-    </section>
-    <section class="panel">
-      <h2>Sobre</h2>
-      <p class="lead">${PREVIEW ? "Esta é uma prévia do app do Home Assistant. Aqui as alterações ficam só nesta tela." : `InventarIA ${esc(S.version)}. Os dados ficam em <span class="codepath">inventario.json</span> e as fotos em JPG, dentro do app. Funciona sem internet; só a leitura por IA usa a integração de IA do Home Assistant.`}</p>
     </section>`;
+  }
+  // Trocar de aba substitui o endereço (não enche o histórico: Voltar sai de Mais) e mantém as abas no alto.
+  function setMoreTab(k) {
+    k = moreTab(k);
+    if (base.name !== "data" || moreTab(base.tab) === k) return;
+    const y = window.scrollY;
+    const anchor = $("#view .more-anchor"), tabs = $("#view .more-tabs");
+    const natural = anchor && tabs ? anchor.getBoundingClientRect().top + window.scrollY + (parseFloat(getComputedStyle(tabs).marginTop) || 0) : 0;
+    base = { ...base, tab: k };
+    try { history.replaceState(history.state, "", hashOf(base)); } catch { /* ok */ }
+    renderView(false);
+    window.scrollTo(0, Math.min(y, natural));
+    $(`#mt-${k}`)?.focus({ preventScroll: true });
   }
 
   async function loadDataPanels() {
-    const bslot = $('[data-slot="backups"]');
-    const hslot = $('[data-slot="history"]');
-    const aslot = $('[data-slot="ai"]');
-    try {
+    const tab = moreTab(base.tab);
+    const bslot = tab === "dados" ? $('#view [data-slot="backups"]') : null;
+    const hslot = tab === "dados" ? $('#view [data-slot="history"]') : null;
+    const aslot = tab === "integracoes" ? $('#view [data-slot="ai-panel"]') : null;
+    if (bslot) try {
       const b = await API.get("api/backups");
-      if (bslot && document.contains(bslot)) {
+      if (document.contains(bslot)) {
         bslot.innerHTML = `<ul class="opts">
           <li><div class="ot"><b>Criar backup agora</b><span>${b.available === false ? "A pasta share não está disponível." : "Salva um arquivo .zip com dados e fotos."}</span></div>
             <div class="oa"><button class="btn primary" data-act="backup-create"${b.available === false ? " disabled" : ""}>${ic("archive")}Criar backup</button></div></li>
@@ -869,17 +905,17 @@
             <div class="oa"><button class="btn sm" data-act="backup-restore" data-name="${esc(x.name)}">${ic("history", "sm")}Restaurar</button></div></li>`).join("")}
         </ul>`;
       }
-    } catch (e) { if (bslot) bslot.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
-    try {
+    } catch (e) { bslot.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+    if (hslot) try {
       const h = await API.get("api/history");
-      if (hslot && document.contains(hslot)) {
+      if (document.contains(hslot)) {
         const list = h.history || [];
         hslot.innerHTML = list.length ? `<ul class="opts">${list.slice(0, 10).map((x) => `<li><div class="ot"><b>${esc(dateTime(x.date))}</b><span>${esc(ago(x.date))}</span></div>
           <div class="oa"><button class="btn sm" data-act="history-restore" data-name="${esc(x.name)}">${ic("history", "sm")}Voltar para esta versão</button></div></li>`).join("")}</ul>`
           : `<p class="muted">Ainda não há versões anteriores. Elas aparecem depois das primeiras alterações.</p>`;
       }
-    } catch (e) { if (hslot) hslot.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
-    if (aslot) renderAiPanel(aslot, await aiStatus(true));
+    } catch (e) { hslot.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+    if (aslot) { const st = await aiStatus(true); if (document.contains(aslot)) renderAiPanel(aslot, st); }
   }
   const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
@@ -904,7 +940,7 @@
     <li>No Home Assistant, abra Configurações, Dispositivos e serviços, Adicionar integração.</li>
     <li>Escolha a IA: Anthropic (Claude), OpenAI, Google Gemini ou Ollama (modelo local, de graça). Cole a chave de API quando pedir.</li>
     <li>Na integração, adicione uma tarefa de IA (AI Task) e use um modelo que entenda imagens.</li>
-    <li>Volte aqui em Dados e ajustes e escolha essa IA na lista.</li></ol>`;
+    <li>Volte aqui em Mais, Integrações, e escolha essa IA na lista.</li></ol>`;
   function renderAiPanel(slot, st) {
     if (st.preview) {
       slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status warn"><i></i>Exemplo simulado na prévia</span></b><span>Aqui a IA não lê as fotos de verdade: os botões mostram como fica a revisão. No Home Assistant, a leitura usa a integração de IA que você configurar.</span></div></li></ul><div style="margin-top:12px"><b>Como configurar no Home Assistant</b>${AI_STEPS}</div>`;
@@ -938,7 +974,7 @@
         <div class="dlg-b"><p style="margin-top:0"><span class="status ${st.reason === "no_vision" ? "warn" : "bad"}"><i></i>${esc(aiReasonText(st))}</span></p>
         <p>Para a IA ler as fotos, o Home Assistant precisa de uma integração de IA com tarefa de IA (AI Task):</p>${AI_STEPS}
         <p class="muted" style="margin-bottom:0">Enquanto isso, você pode cadastrar os itens à mão normalmente.</p></div>
-        <div class="dlg-f"><a class="btn" href="#/dados" data-x>Abrir Dados e ajustes</a><button class="btn primary" data-x>Entendi</button></div></div>`,
+        <div class="dlg-f"><a class="btn" href="#/mais/integracoes" data-x>Abrir Integrações</a><button class="btn primary" data-x>Entendi</button></div></div>`,
     });
     entry.dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); });
     return false;
@@ -1081,7 +1117,7 @@
         if (my !== gen) return;
         if (st.stage === "busy") { busy(st.msg); timer = setTimeout(() => poll(my), 1200); return; }
         if (st.stage === "error") {
-          show(`<p class="formerr">${esc(st.msg)}</p>${/busca na web/.test(st.msg) ? `<p class="muted wtip">A IA de busca fica em Dados e ajustes, IA do Home Assistant.</p>` : ""}`);
+          show(`<p class="formerr">${esc(st.msg)}</p>${/busca na web/.test(st.msg) ? `<p class="muted wtip">A IA de busca fica em Mais, Integrações.</p>` : ""}`);
           return;
         }
         results = st.results || [];
@@ -2058,8 +2094,9 @@
       case "backup-restore": restoreBackup(b.dataset.name); break;
       case "history-restore": restoreHistory(b.dataset.name, b.closest("li")?.querySelector("b")?.textContent || ""); break;
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }
-      case "ai-refresh": { const slot = $('[data-slot="ai"]'); if (slot) { slot.innerHTML = `<p class="muted">Verificando…</p>`; renderAiPanel(slot, await aiStatus(true)); } break; }
+      case "ai-refresh": { const slot = $('#view [data-slot="ai-panel"]'); if (slot) { slot.innerHTML = `<p class="muted">Verificando…</p>`; renderAiPanel(slot, await aiStatus(true)); } break; }
       case "theme": setTheme(b.dataset.theme); break;
+      case "more-tab": setMoreTab(b.dataset.tab); break;
       case "print": if (window.INV_PRINT) toast(window.INV_PRINT); else window.print(); break;
       case "retry": boot(); break;
       default: break;
@@ -2096,7 +2133,7 @@
     else if (k === "rep-photos") { LS.set("reportPhotos", t.checked); renderView(false); }
     else if (k === "accent" && t.checked) setAccent(t.value);
     else if (k === "ai-entity") {
-      try { await API.put("api/settings", { ai_entity: t.value }); S.settings.ai_entity = t.value; const slot = $('[data-slot="ai"]'); if (slot) renderAiPanel(slot, await aiStatus(true)); toast("IA para ler fotos atualizada"); }
+      try { await API.put("api/settings", { ai_entity: t.value }); S.settings.ai_entity = t.value; const slot = $('#view [data-slot="ai-panel"]'); if (slot) renderAiPanel(slot, await aiStatus(true)); toast("IA para ler fotos atualizada"); }
       catch (er) { fail(er); }
     }
     else if (k === "ai-search") {
@@ -2105,6 +2142,14 @@
     }
   });
   document.addEventListener("keydown", (e) => {
+    const tabBtn = e.target.closest && e.target.closest('.more-tabs [role="tab"]');
+    if (tabBtn && ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+      e.preventDefault();
+      const keys = MORE_TABS.map(([k]) => k), i = keys.indexOf(tabBtn.dataset.tab);
+      const j = e.key === "Home" ? 0 : e.key === "End" ? keys.length - 1 : (i + (e.key === "ArrowRight" ? 1 : -1) + keys.length) % keys.length;
+      setMoreTab(keys[j]);
+      return;
+    }
     if (stack.length) {
       const top = topEntry();
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && top.onSubmit) { e.preventDefault(); top.onSubmit(); }

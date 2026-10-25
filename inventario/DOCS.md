@@ -23,7 +23,7 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - **Buscar na internet**: num item sem foto (ou no editor do item), a IA procura o produto no fabricante e nas lojas e o app mostra as fotos encontradas para você escolher. Veja [Fotos da internet](#fotos-da-internet).
 - **Buscar**: por nome, marca, detalhe ou zona, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome ou data.
 - **Relatório**: lista por cômodo com fotos e valores, pronta para imprimir ou salvar em PDF (útil para seguro).
-- **Aparência** (em **Dados e ajustes**, a aba **Mais** no celular): tema claro, escuro ou automático e a cor do app (amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza). Cada aparelho guarda a sua escolha.
+- **Mais**, em abas como nos outros apps: **Exportar** (planilha, JSON, ZIP com fotos e o relatório), **Integrações** (a IA do Home Assistant), **Dados** (backup, importar, versões anteriores) e **Aparência** (tema claro, escuro ou automático e a cor do app: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza; cada aparelho guarda a sua escolha).
 - Atalhos no computador: `/` abre a busca, `N` cria um item, `Ctrl+Enter` salva o formulário.
 
 Os valores são de mercado de usados (o que o item vale hoje), somando todas as unidades.
@@ -43,7 +43,7 @@ Para configurar:
 
 1. Em **Configurações > Dispositivos e serviços > Adicionar integração**, escolha a integração e siga os passos.
 2. Na página da integração, adicione uma **tarefa de IA** (AI Task) e escolha um modelo que leia imagens.
-3. No app, abra **Dados e ajustes > IA do Home Assistant** e escolha essa IA em **IA para ler fotos**. "Padrão do Home Assistant" usa a IA preferida definida em **Configurações > Sistema > Geral**.
+3. No app, abra **Mais > Integrações** e escolha essa IA em **IA para ler fotos**. "Padrão do Home Assistant" usa a IA preferida definida em **Configurações > Sistema > Geral**.
 
 Na hora da leitura, o app copia a foto por alguns segundos para `media/inventario/ia-temp`, chama a IA pelo Home Assistant e apaga a cópia em seguida. A IA não recebe número de série, IMEI ou dados pessoais: as instruções pedem só descrição do objeto.
 
@@ -59,7 +59,7 @@ A IA precisa ter a **busca na web** ligada:
 - **Google Gemini**: a Pesquisa Google só funciona num assistente de conversa. Ligue **Enable Google Search tool** nele e escolha esse assistente.
 - **OpenAI**: nas opções da tarefa de IA, ligue **Enable web search** (precisa do gpt-4o ou de um modelo mais novo).
 
-Escolha a IA em **Dados e ajustes > IA do Home Assistant > IA para buscar fotos na internet**. "A mesma de ler fotos" usa a IA da leitura de fotos.
+Escolha a IA em **Mais > Integrações > IA para buscar fotos na internet**. "A mesma de ler fotos" usa a IA da leitura de fotos.
 
 A IA recebe só o nome e o começo dos detalhes do item. O app baixa as fotos apenas de endereços públicos da internet (nunca da rede da casa) e guarda só a foto que você escolher; as outras são apagadas em até 30 minutos. Cada busca usa a busca na web da sua IA, que pode ter custo à parte.
 
@@ -74,10 +74,10 @@ Tudo fica em arquivos abertos, dentro da pasta de dados do app:
 Formas de guardar uma cópia:
 
 - **Backups do Home Assistant**: incluem o app e os dados dele.
-- **Dados e ajustes > Backup na pasta share**: cria um `.zip` completo (JSON, CSV e fotos) em `share/inventario`, que você acessa pela rede (por exemplo `\\homeassistant.local\share\inventario` com o app Samba).
-- **Exportar**: CSV (abre no Excel), JSON ou ZIP com fotos, direto para o seu computador.
+- **Mais > Dados > Backup na pasta share**: cria um `.zip` completo (JSON, CSV e fotos) em `share/inventario`, que você acessa pela rede (por exemplo `\\homeassistant.local\share\inventario` com o app Samba).
+- **Mais > Exportar**: CSV (abre no Excel), JSON ou ZIP com fotos, direto para o seu computador ou celular.
 
-Para restaurar, use **Dados e ajustes**: escolha um backup da pasta share, volte para uma versão anterior ou importe um arquivo (`.zip` de backup ou `.json`) do computador ou do celular. Antes de restaurar ou importar, o app guarda uma cópia do que existe naquele momento.
+Para restaurar, use **Mais > Dados**: escolha um backup da pasta share, volte para uma versão anterior ou importe um arquivo (`.zip` de backup ou `.json`) do computador ou do celular. Antes de restaurar ou importar, o app guarda uma cópia do que existe naquele momento.
 
 ## Atualizar o app
 
