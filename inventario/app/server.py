@@ -43,7 +43,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.8.1"
+VERSION = "1.9.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -58,6 +58,7 @@ AI_MOCK = os.environ.get("INV_AI_MOCK") == "1"
 
 DATA_FILE = os.path.join(DATA_DIR, "inventario.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+USAGE_FILE = os.path.join(DATA_DIR, "uso_ia.json")
 PHOTOS_DIR = os.path.join(DATA_DIR, "photos")
 THUMBS_DIR = os.path.join(DATA_DIR, "thumbs")
 HISTORY_DIR = os.path.join(DATA_DIR, "history")
@@ -839,6 +840,139 @@ def need_ai_on():
         raise ApiError(409, "A IA está desligada. Para usar, ligue em Mais > Integrações.")
 
 
+# -- uso da IA: o Home Assistant não devolve tokens nem custo, então o app conta as chamadas (como no EconomIA)
+USAGE_LOCK = threading.Lock()
+USAGE_DAYS = 120
+USAGE_SENSOR = "sensor.inventaria_ia_hoje"
+USAGE_KINDS = ("foto", "catalogo", "busca")  # Preencher com IA, Catalogar foto, Buscar foto na internet
+_usage_sensor = {"day": None, "checked": 0.0}
+
+
+def usage_day(ts=None) -> str:
+    t = time.time() if ts is None else ts
+    if os.environ.get("TZ"):
+        return time.strftime("%Y-%m-%d", time.localtime(t))
+    return time.strftime("%Y-%m-%d", time.gmtime(t - 3 * 3600))  # sem fuso no ambiente: horário de Brasília
+
+
+def is_quota(msg) -> bool:
+    t = str(msg or "").lower()
+    return "429" in t or "quota" in t or "resource_exhausted" in t or "rate limit" in t
+
+
+def record_usage(kind: str, entity: str, chars_in: int, chars_out: int, images: int, seconds: float, result: str):
+    tokens = round((chars_in + chars_out) / 4)  # estimativa: uns 4 caracteres por token, só o texto
+    day = usage_day()
+    with USAGE_LOCK:
+        u = read_json(USAGE_FILE, {}) or {}
+        days = u.setdefault("days", {})
+        d = days.setdefault(day, {})
+        for k, v in (("calls", 1), ("tokens", tokens), ("images", images), ("seconds", round(seconds, 1)),
+                     ("errors", 0 if result in ("ok", "cota") else 1), ("quota", 1 if result == "cota" else 0)):
+            d[k] = round(d.get(k, 0) + v, 1)
+        name = entity or "padrão do Home Assistant"
+        for group, key in (("kinds", kind), ("entities", name)):
+            g = d.setdefault(group, {})
+            g[key] = g.get(key, 0) + 1
+        for old in sorted(days)[:-USAGE_DAYS]:
+            del days[old]
+        recent = u.setdefault("recent", [])
+        recent.insert(0, {"at": now_iso(), "kind": kind, "entity": name, "result": result,
+                          "seconds": round(seconds, 1), "tokens": tokens, "images": images})
+        del recent[40:]
+        write_json_atomic(USAGE_FILE, u)
+    threading.Thread(target=publish_usage_sensor, daemon=True).start()
+
+
+class AiCall:
+    """Mede uma chamada à IA e registra no uso, com o resultado: ok, cota, formato, sem_busca ou erro."""
+
+    def __init__(self, kind: str, entity: str, prompt: str, images: int = 0):
+        self.kind, self.entity, self.chars_in, self.images = kind, entity, len(prompt or ""), images
+        self.out, self.result = 0, None
+
+    def answer(self, raw):
+        try:
+            self.out = len(raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False))
+        except (TypeError, ValueError):
+            self.out = 0
+
+    def __enter__(self):
+        self.t0 = time.time()
+        return self
+
+    def __exit__(self, et, ev, tb):
+        result = self.result or ("ok" if et is None else "cota" if is_quota(getattr(ev, "msg", ev)) else "erro")
+        try:
+            record_usage(self.kind, self.entity, self.chars_in, self.out, self.images, time.time() - self.t0, result)
+        except Exception:  # noqa: BLE001
+            log.exception("uso da IA")
+        return False
+
+
+def usage_summary() -> dict:
+    with USAGE_LOCK:
+        u = read_json(USAGE_FILE, {}) or {}
+    days = u.get("days") or {}
+    today = usage_day()
+    week = [usage_day(time.time() - i * 86400) for i in range(6, -1, -1)]
+
+    def total(keys):
+        t = {"calls": 0, "errors": 0, "quota": 0, "tokens": 0, "images": 0, "seconds": 0, "kinds": {}, "entities": {}}
+        for k in keys:
+            d = days.get(k) or {}
+            for c in ("calls", "errors", "quota", "tokens", "images", "seconds"):
+                t[c] = round(t[c] + (d.get(c) or 0), 1)
+            for group in ("kinds", "entities"):
+                for name, n in (d.get(group) or {}).items():
+                    t[group][name] = t[group].get(name, 0) + n
+        return t
+
+    return {"today": total([today]), "week": total(week), "month": total([k for k in days if k[:7] == today[:7]]),
+            "days": [{"day": k, **{c: (days.get(k) or {}).get(c, 0) for c in ("calls", "errors", "quota")}} for k in week],
+            "recent": (u.get("recent") or [])[:12], "since": min(days) if days else None, "sensor": USAGE_SENSOR}
+
+
+def publish_usage_sensor():
+    """Sensor no Home Assistant com as chamadas de hoje, para painel e automação."""
+    if not SUPERVISOR_TOKEN or AI_MOCK:
+        return
+    try:
+        r = usage_summary()
+        h = r["today"]
+        ha_request("POST", "/states/" + USAGE_SENSOR, {"state": int(h["calls"]), "attributes": {
+            "friendly_name": "InventarIA: chamadas de IA hoje", "icon": "mdi:robot-outline",
+            "unit_of_measurement": "chamadas", "state_class": "total_increasing",
+            "erros": int(h["errors"]), "cota_excedida": int(h["quota"]), "tokens_texto_estimados": int(h["tokens"]),
+            "imagens": int(h["images"]), "por_tipo": h["kinds"], "ultimos_7_dias": int(r["week"]["calls"]),
+            "este_mes": int(r["month"]["calls"]), "ultima_chamada": r["recent"][0]["at"] if r["recent"] else None}}, timeout=10)
+        _usage_sensor["day"] = usage_day()
+    except Exception as e:  # noqa: BLE001
+        if _usage_sensor["day"] != usage_day():
+            log.info("sensor de uso da IA: %s", getattr(e, "msg", e))
+        _usage_sensor["day"] = usage_day()
+
+
+def usage_sensor_loop():
+    """Zera o sensor na virada do dia e o devolve quando o Home Assistant reinicia (estados da API não ficam salvos lá)."""
+    while True:
+        time.sleep(60)
+        if not SUPERVISOR_TOKEN or AI_MOCK or not ai_enabled():
+            continue
+        try:
+            if _usage_sensor["day"] != usage_day():
+                publish_usage_sensor()
+            elif time.time() - _usage_sensor["checked"] > 300:
+                _usage_sensor["checked"] = time.time()
+                try:
+                    ha_request("GET", "/states/" + USAGE_SENSOR, timeout=10)
+                except ApiError as e:
+                    if "404" in e.msg or "not found" in e.msg.lower() or "Entity not found" in e.msg:
+                        publish_usage_sensor()
+        except Exception:  # noqa: BLE001
+            log.exception("sensor de uso da IA")
+
+
 def ai_status():
     search = STORE.settings.get("ai_search") or ""
     if not SUPERVISOR_TOKEN and not AI_MOCK:
@@ -971,11 +1105,14 @@ def ai_identify(body: dict) -> dict:
     hint = text(body.get("hint"), 300, "dica")
     prompt = ai_prompt(mode, room, hint)
     entity = STORE.settings.get("ai_entity") or ""
+    kind = "foto" if mode == "single" else "catalogo"
     if AI_MOCK:
-        time.sleep(1.2)
-        res = dict(MOCK_RESULT)
-        if mode == "single":
-            res = {"items": MOCK_RESULT["items"][:1]}
+        with AiCall(kind, "ai_task.simulado", prompt, images=1) as call:
+            time.sleep(1.2)
+            res = dict(MOCK_RESULT)
+            if mode == "single":
+                res = {"items": MOCK_RESULT["items"][:1]}
+            call.answer(res)
         return {"items": clean_ai_items(res, room), "entity": "ai_task.simulado"}
     tmp_dir = os.path.join(MEDIA_ROOT, AI_TMP_REL)
     if not os.path.isdir(MEDIA_ROOT):
@@ -984,25 +1121,33 @@ def ai_identify(body: dict) -> dict:
     tmp_name = f"{secrets.token_hex(8)}.jpg"
     tmp_path = os.path.join(tmp_dir, tmp_name)
     shutil.copyfile(os.path.join(PHOTOS_DIR, file), tmp_path)
-    try:
-        payload = {
-            "task_name": "InventarIA: ler foto",
-            "instructions": prompt,
-            "attachments": [{"media_content_id": f"media-source://media_source/local/{AI_TMP_REL}/{tmp_name}",
-                             "media_content_type": "image/jpeg"}],
-        }
-        if entity:
-            payload["entity_id"] = entity
-        res = ha_request("POST", "/services/ai_task/generate_data?return_response", payload, timeout=240)
-    finally:
+    with AiCall(kind, entity, prompt, images=1) as call:
         try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-    data = ((res or {}).get("service_response") or {}).get("data")
-    if data is None:
-        raise ApiError(502, "A IA não devolveu resposta.")
-    return {"items": clean_ai_items(extract_json(data), room), "entity": entity or "padrão do Home Assistant"}
+            payload = {
+                "task_name": "InventarIA: ler foto",
+                "instructions": prompt,
+                "attachments": [{"media_content_id": f"media-source://media_source/local/{AI_TMP_REL}/{tmp_name}",
+                                 "media_content_type": "image/jpeg"}],
+            }
+            if entity:
+                payload["entity_id"] = entity
+            res = ha_request("POST", "/services/ai_task/generate_data?return_response", payload, timeout=240)
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+        data = ((res or {}).get("service_response") or {}).get("data")
+        if data is None:
+            call.result = "formato"
+            raise ApiError(502, "A IA não devolveu resposta.")
+        call.answer(data)
+        try:
+            parsed = extract_json(data)
+        except ApiError:
+            call.result = "formato"
+            raise
+    return {"items": clean_ai_items(parsed, room), "entity": entity or "padrão do Home Assistant"}
 
 
 # ---------------------------------------------------------------------------
@@ -1315,29 +1460,35 @@ def web_prompt(name: str, details: str) -> str:
 
 
 def ai_find_pages(name: str, details: str, entity: str) -> dict:
-    if AI_MOCK:
-        time.sleep(0.4)
-        data = read_json(os.environ.get("INV_MOCK_SEARCH") or "", {}) or {}
-    else:
-        raw = ai_call_text("InventarIA: buscar foto", web_prompt(name, details), entity)
-        try:
-            data = extract_json(raw)
-        except ApiError:
-            log.info("busca de fotos: resposta da IA fora do formato: %s", " ".join(str(raw or "").split())[:400])
-            raise ApiError(502, "A IA respondeu sem usar a busca na web. " + SEARCH_HOWTO) from None
-    if not isinstance(data, dict):
-        data = {}
-    pages, images = [], []
-    for p in data.get("paginas") or data.get("pages") or []:
-        u = _fix_url(p.get("url") if isinstance(p, dict) else p)
-        if u and u not in pages:
-            pages.append(u)
-    for p in data.get("imagens") or data.get("images") or []:
-        u = _fix_url(p.get("url") if isinstance(p, dict) else p)
-        if u and u not in images:
-            images.append(u)
-    if data.get("erro") or not (pages or images):
-        raise ApiError(502, "A IA não usou a busca na web. " + SEARCH_HOWTO)
+    prompt = web_prompt(name, details)
+    with AiCall("busca", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
+        if AI_MOCK:
+            time.sleep(0.4)
+            data = read_json(os.environ.get("INV_MOCK_SEARCH") or "", {}) or {}
+            call.answer(data)
+        else:
+            raw = ai_call_text("InventarIA: buscar foto", prompt, entity)
+            call.answer(str(raw or ""))
+            try:
+                data = extract_json(raw)
+            except ApiError:
+                call.result = "sem_busca"
+                log.info("busca de fotos: resposta da IA fora do formato: %s", " ".join(str(raw or "").split())[:400])
+                raise ApiError(502, "A IA respondeu sem usar a busca na web. " + SEARCH_HOWTO) from None
+        if not isinstance(data, dict):
+            data = {}
+        pages, images = [], []
+        for p in data.get("paginas") or data.get("pages") or []:
+            u = _fix_url(p.get("url") if isinstance(p, dict) else p)
+            if u and u not in pages:
+                pages.append(u)
+        for p in data.get("imagens") or data.get("images") or []:
+            u = _fix_url(p.get("url") if isinstance(p, dict) else p)
+            if u and u not in images:
+                images.append(u)
+        if data.get("erro") or not (pages or images):
+            call.result = "sem_busca"
+            raise ApiError(502, "A IA não usou a busca na web. " + SEARCH_HOWTO)
     return {"pages": pages[:8], "images": images[:6]}
 
 
@@ -1719,6 +1870,10 @@ def r_ai_status(h, query):
     h.send_json(ai_status())
 
 
+def r_ai_usage(h, query):
+    h.send_json(usage_summary())
+
+
 def r_ai_identify(h, query):
     h.send_json(ai_identify(h.read_body()))
 
@@ -1936,6 +2091,7 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/photos", r_photo),
     ("GET", r"/api/ai/status", r_ai_status),
     ("POST", r"/api/ai/identify", r_ai_identify),
+    ("GET", r"/api/ai/usage", r_ai_usage),
     ("POST", r"/api/web-photos", r_web_start),
     ("GET", r"/api/web-photos/([a-f0-9]{16})", r_web_status),
     ("GET", r"/api/web-photos/([a-f0-9]{16})/(\d)", r_web_image),
@@ -1962,6 +2118,7 @@ def main():
     STORE.load()
     cleanup_uploads()
     web_jobs_cleanup(max_age=0)
+    threading.Thread(target=usage_sensor_loop, daemon=True).start()
     srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     srv.daemon_threads = True
     log.info("InventarIA %s ouvindo na porta %d%s", VERSION, PORT, " (modo dev)" if DEV else "")

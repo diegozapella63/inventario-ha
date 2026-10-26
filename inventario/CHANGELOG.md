@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.0
+
+- **Uso da IA**, em Mais > Integrações, como no EconomIA: chamadas de hoje, dos últimos 7 dias e do mês, com tokens estimados; gráfico dos 7 dias (toque numa barra para ver o dia); tipo de uso (Preencher com IA, Catalogar foto, Buscar foto na internet); erros e cota excedida; e as últimas chamadas, com a IA, o tempo e os tokens.
+- Sensor **sensor.inventaria_ia_hoje** no Home Assistant, com as chamadas de hoje e os detalhes nos atributos, para painel e automação.
+- Atalho para o painel de consumo do provedor (Google Cloud Console, OpenAI ou Claude Console).
+
 ## 1.8.1
 
 - Nova aba **Opções** em Mais, com **Usar zonas** (que saiu de Aparência). Aparência fica só com o tema e a cor do app.

@@ -852,7 +852,93 @@
       <ul class="opts"><li><div class="ot"><b id="ai-on-h">Usar IA</b><span>${on ? "Ler fotos para preencher itens, catalogar uma foto inteira e buscar fotos na internet. Desligada, o app esconde esses botões." : "Desligada: o app esconde os botões de IA. Ligue para ler fotos, catalogar e buscar fotos na internet."} Vale para todos os aparelhos.</span></div>
         <div class="oa">${switchHtml("ai-on", on, "ai-on-h")}</div></li></ul>
       ${on ? `<div data-slot="ai-panel"><p class="muted">Verificando…</p></div>` : ""}
-    </section>`;
+    </section>
+    ${on ? `<section class="panel" id="p-usage">
+      <h2>${secIc("bars")}Uso da IA</h2>
+      <p class="lead">Cada leitura de foto, foto catalogada ou busca de foto na internet é uma chamada para a IA do Home Assistant. O Home Assistant não informa tokens nem custo, então o InventarIA conta as chamadas e estima os tokens pelo tamanho do texto.</p>
+      <div data-slot="usage"><p class="muted">Carregando…</p></div>
+    </section>` : ""}`;
+  }
+
+  // -- uso da IA (igual ao do EconomIA): hoje, 7 dias e o mês, gráfico por dia e as últimas chamadas
+  let usageData = null, usageSel = null;
+  const USAGE_KIND = { foto: "Preencher com IA", catalogo: "Catalogar foto", busca: "Buscar foto na internet" };
+  const USAGE_RES = { ok: "", cota: "cota excedida", formato: "fora do formato", sem_busca: "sem busca na web", erro: "erro" };
+  const WEEKDAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const weekday = (day) => WEEKDAY[new Date(`${day}T12:00:00`).getDay()];
+  const ddmm = (day) => `${day.slice(8, 10)}/${day.slice(5, 7)}`;
+  const milTokens = (n) => { n = +n || 0; return n >= 1e6 ? `${(n / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi` : n >= 1000 ? `${Math.round(n / 1000)} mil` : String(Math.round(n)); };
+  function whenShort(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const hm = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const k = ymd(d), today = ymd(new Date()), yest = ymd(new Date(Date.now() - 864e5));
+    return k === today ? `hoje ${hm}` : k === yest ? `ontem ${hm}` : `${ddmm(k)} ${hm}`;
+  }
+  function aiName(id) {
+    if (!id || id === "padrão do Home Assistant") return "Padrão do Home Assistant";
+    const all = [...(aiCache.data?.entities || []), ...(aiCache.data?.agents || [])];
+    const x = all.find((e) => e.id === id);
+    return x ? x.name : id === "ai_task.simulado" ? "IA simulada (teste)" : id.replace(/^[a-z_]+\./, "").replace(/_/g, " ");
+  }
+  function aiProvider(words) {
+    const j = norm(words.join(" "));
+    if (/google|gemini/.test(j)) return "google";
+    if (/openai|chatgpt|gpt/.test(j)) return "openai";
+    if (/anthropic|claude/.test(j)) return "anthropic";
+    return "";
+  }
+  function usageExample() {
+    const day = (i) => ymd(new Date(Date.now() - (6 - i) * 864e5));
+    const recent = [["catalogo", "ok", 8.4, 2100, 1], ["foto", "ok", 5.1, 1300, 1], ["busca", "ok", 31.0, 1900, 0], ["foto", "cota", 1.2, 900, 1]]
+      .map(([kind, result, seconds, tokens, images], i) => ({ at: new Date(Date.now() - (i * 9 + 4) * 60000).toISOString(), kind, entity: "ai_task.google_ai_task", result, seconds, tokens, images }));
+    return { today: { calls: 4, errors: 0, quota: 1, tokens: 6200, images: 3, kinds: { foto: 2, catalogo: 1, busca: 1 }, entities: {} },
+      week: { calls: 19, errors: 1, quota: 1, tokens: 31000, images: 14, kinds: { foto: 9, catalogo: 6, busca: 4 }, entities: { "ai_task.google_ai_task": 19 } },
+      month: { calls: 47, errors: 2, quota: 1, tokens: 78000, images: 36, kinds: {}, entities: {} },
+      days: [2, 0, 5, 3, 0, 5, 4].map((calls, i) => ({ day: day(i), calls, errors: i === 2 ? 1 : 0, quota: i === 6 ? 1 : 0 })), recent, sensor: "sensor.inventaria_ia_hoje" };
+  }
+  function renderUsage(slot) {
+    const u = usageData;
+    if (!u || !u.today || !(u.days || []).length) { slot.innerHTML = `<p class="muted">Sem dados de uso ainda.</p>`; return; }
+    const today = u.days[u.days.length - 1].day;
+    if (!usageSel || !u.days.some((d) => d.day === usageSel)) usageSel = today;
+    const dayLong = (day) => (day === today ? "Hoje" : `${weekday(day).replace(/^./, (c) => c.toUpperCase())}, ${ddmm(day)}`);
+    const sub = (t) => (t.quota ? `<span class="s alerta">${int(t.quota)} ${t.quota > 1 ? "vezes" : "vez"} sem cota</span>`
+      : t.errors ? `<span class="s alerta">${int(t.errors)} com erro</span>` : `<span class="s">≈ ${milTokens(t.tokens)} tokens</span>`);
+    const tile = (k, t) => `<div class="uso-tile"><span class="k">${k}</span><span class="v">${int(t.calls || 0)}</span>${sub(t)}</div>`;
+    const max = Math.max(1, ...u.days.map((d) => d.calls || 0));
+    const bars = u.days.map((d) => {
+      const h = d.calls ? Math.max(4, Math.round((d.calls / max) * 100)) : 0;
+      const lab = `${dayLong(d.day)}: ${plural(d.calls || 0, "chamada", "chamadas")}${d.errors ? `, ${d.errors} com erro` : ""}${d.quota ? `, ${d.quota} sem cota` : ""}`;
+      return `<button type="button" class="uso-bar" data-usage-day="${esc(d.day)}" aria-pressed="${d.day === usageSel}" aria-label="${esc(lab)}" title="${esc(lab)}"><i style="height:${h}%"></i></button>`;
+    }).join("");
+    const sel = u.days.find((d) => d.day === usageSel);
+    const kinds = Object.entries(u.week.kinds || {}).sort((a, b) => b[1] - a[1]);
+    const recent = (u.recent || []).map((c) => {
+      const res = USAGE_RES[c.result] ?? c.result;
+      return `<li><b>${esc(USAGE_KIND[c.kind] || c.kind)}</b><span>${esc(aiName(c.entity))}</span>${res ? `<span class="r-erro">${esc(res)}</span>` : ""}
+        <span class="t">${esc(String(c.seconds).replace(".", ","))} s · ≈ ${milTokens(c.tokens)} tokens${c.images ? ` · ${plural(c.images, "imagem", "imagens")}` : ""} · ${esc(whenShort(c.at))}</span></li>`;
+    }).join("");
+    const ids = [...Object.keys(u.month.entities || {}), ...Object.keys(u.week.entities || {}), S.settings.ai_entity || "", S.settings.ai_search || ""];
+    let prov = aiProvider([...ids, ...ids.filter(Boolean).map(aiName)]);
+    if (!prov) {
+      const ps = new Set([...(aiCache.data?.entities || []), ...(aiCache.data?.agents || [])].map((e) => aiProvider([e.id, e.name])).filter(Boolean));
+      if (ps.size === 1) prov = [...ps][0];
+    }
+    const link = (href, txt) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${txt}</a>`;
+    const provTxt = prov === "google" ? `Consumo exato do Gemini: no ${link("https://console.cloud.google.com/apis/dashboard", "Google Cloud Console")}, abra APIs e serviços ativados e depois Generative Language API; o gráfico de tráfego mostra os pedidos e os erros 429 de cota. Os limites do plano grátis estão no ${link("https://aistudio.google.com/", "Google AI Studio")}. A cota diária volta à meia-noite do horário do Pacífico, de madrugada no Brasil (4h ou 5h).`
+      : prov === "openai" ? `Consumo exato e custo da OpenAI: ${link("https://platform.openai.com/usage", "platform.openai.com/usage")}.`
+      : prov === "anthropic" ? `Consumo exato e custo da Anthropic: ${link("https://platform.claude.com/usage", "Claude Console, Usage")}.`
+      : "O consumo exato e o custo ficam no painel do provedor da sua IA (Google, OpenAI, Anthropic...).";
+    slot.innerHTML = `<div class="uso-tiles">${tile("Hoje", u.today)}${tile("7 dias", u.week)}${tile("Este mês", u.month)}</div>
+      <div class="uso-chart" role="group" aria-label="Chamadas de IA nos últimos 7 dias">${bars}</div>
+      <div class="uso-dias" aria-hidden="true">${u.days.map((d) => `<span>${d.day === today ? "hoje" : weekday(d.day)}</span>`).join("")}</div>
+      <p class="uso-cap" aria-live="polite">${dayLong(sel.day)}: <b>${plural(sel.calls || 0, "chamada", "chamadas")}</b>${sel.errors ? `, ${int(sel.errors)} com erro` : ""}${sel.quota ? `, ${int(sel.quota)} sem cota` : ""}.</p>
+      ${kinds.length ? `<ul class="uso-tipos" aria-label="Nos últimos 7 dias">${kinds.map(([k, n]) => `<li>${esc(USAGE_KIND[k] || k)} <b>${int(n)}</b></li>`).join("")}</ul>` : ""}
+      <details class="uso-ult"><summary>${ic("chev", "sm")}Últimas chamadas</summary><ul>${recent || "<li>Nenhuma chamada ainda.</li>"}</ul></details>
+      <p class="help">${provTxt} A estimativa de tokens daqui conta só o texto; as imagens e a busca na web somam mais.</p>
+      <p class="help">No Home Assistant, o sensor <span class="codepath">${esc(u.sensor || "sensor.inventaria_ia_hoje")}</span> traz as chamadas de hoje, com erros, cota e tokens estimados, para pôr num painel ou numa automação (por exemplo, avisar quando passar de 50 no dia).</p>`;
   }
   function moreData() {
     return `
@@ -943,6 +1029,11 @@
       }
     } catch (e) { hslot.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
     if (aslot) { const st = await aiStatus(true); if (document.contains(aslot)) renderAiPanel(aslot, st); }
+    const uslot = tab === "integracoes" ? $('#view [data-slot="usage"]') : null;
+    if (uslot) {
+      try { usageData = PREVIEW ? usageExample() : await API.get("api/ai/usage"); if (document.contains(uslot)) renderUsage(uslot); }
+      catch (e) { if (document.contains(uslot)) uslot.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+    }
   }
   const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
@@ -2088,6 +2179,13 @@
   document.addEventListener("click", async (e) => {
     const a = e.target.closest("a[href^='#']");
     if (a && !e.defaultPrevented && !e.metaKey && !e.ctrlKey) inAppNavs++;
+    const bar = e.target.closest("[data-usage-day]");
+    if (bar) {
+      usageSel = bar.dataset.usageDay;
+      const slot = bar.closest('[data-slot="usage"]');
+      if (slot) { renderUsage(slot); $(`[data-usage-day="${usageSel}"]`, slot)?.focus({ preventScroll: true }); }
+      return;
+    }
     const b = e.target.closest("[data-act]");
     if (!b) return;
     const act = b.dataset.act;
