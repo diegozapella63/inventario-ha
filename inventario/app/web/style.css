@@ -721,7 +721,7 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
   border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); box-shadow: 0 0 0 8px var(--paper);
 }
 .more-tabs button {
-  flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 6px;
+  flex: 1 1 auto; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 6px;
   border: 0; border-radius: 10px; background: none; color: var(--muted); font: 500 15px/1 var(--font); white-space: nowrap;
 }
 .more-tabs button span { overflow: hidden; text-overflow: ellipsis; }
@@ -729,7 +729,9 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .more-tabs button[aria-selected="true"] { background: var(--seg-on); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14); }
 .more-tabs .ic { width: 17px; height: 17px; }
 @media (max-width: 600px) { .more-tabs .ic { display: none; } }
+/* quatro abas: a largura acompanha o nome, e em celular estreito a letra diminui um pouco para nenhuma cortar */
 @media (max-width: 400px) { .more-tabs button { font-size: 14px; padding: 0 3px; } }
+@media (max-width: 370px) { .more-tabs { gap: 2px; } .more-tabs button { font-size: 13px; padding: 0 2px; } }
 /* o conteúdo da aba ocupa ao menos a tela: trocar de aba com a página rolada mantém as abas no alto, sem pular */
 .more-panel { min-height: calc(100vh - 120px); min-height: calc(100dvh - 120px); }
 .more-panel > .panel:first-child { margin-top: 22px; }

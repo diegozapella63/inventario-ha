@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.1
+
+- Nova aba **Opções** em Mais, com **Usar zonas** (que saiu de Aparência). Aparência fica só com o tema e a cor do app.
+- As abas de Mais acompanham o tamanho do nome, e em celular estreito a letra diminui um pouco para as quatro caberem inteiras.
+- Versões anteriores: o app fica só com as 3 cópias automáticas mais recentes (antes eram 60). As mais antigas são apagadas quando o app inicia.
+
 ## 1.8.0
 
 - **Usar IA**, em Mais > Integrações: desligada, o app esconde tudo o que usa IA (Catalogar foto com IA, Preencher com IA e Buscar na internet). Vem ligada.

@@ -43,7 +43,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.8.0"
+VERSION = "1.8.1"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -65,7 +65,7 @@ TMP_DIR = os.path.join(DATA_DIR, "tmp")
 AI_TMP_REL = "inventario/ia-temp"  # relativo a /media (fonte de mídia "local" do HA)
 
 MAX_BODY = 30 * 1024 * 1024
-HISTORY_KEEP = 60
+HISTORY_KEEP = 3  # versões anteriores: só as 3 mais recentes
 HISTORY_EVERY = 10 * 60  # no máximo uma cópia automática a cada 10 minutos
 
 CATS = {
@@ -209,6 +209,7 @@ class Store:
         self.data.setdefault("rooms", [])
         self.data.setdefault("items", [])
         self.settings = read_json(SETTINGS_FILE, {}) or {}
+        self.prune_history()  # quem vinha de uma versão que guardava mais cópias fica só com as últimas
         snaps = self.history_list()
         if snaps:
             self.last_snapshot = os.path.getmtime(os.path.join(HISTORY_DIR, snaps[0]["name"]))
@@ -249,6 +250,9 @@ class Store:
         name = f"inventario-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
         shutil.copyfile(DATA_FILE, os.path.join(HISTORY_DIR, name))
         self.last_snapshot = time.time()
+        self.prune_history()
+
+    def prune_history(self):
         for old in self.history_list()[HISTORY_KEEP:]:
             try:
                 os.unlink(os.path.join(HISTORY_DIR, old["name"]))

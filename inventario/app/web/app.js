@@ -78,7 +78,7 @@
     ["azul", "Azul"], ["turquesa", "Turquesa"], ["verde", "Verde"], ["kraft", "Kraft"], ["cinza", "Cinza"]];
   const accentOf = () => { const a = LS.get("accent", "amarelo"); return ACCENTS.some(([k]) => k === a) ? a : "amarelo"; };
   // Mais em abas, como no CronologIA e no ResolvIA: #/mais (Dados, com Exportar no alto), #/mais/integracoes e #/mais/aparencia.
-  const MORE_TABS = [["dados", "Dados", "archive"], ["integracoes", "Integrações", "plug"], ["aparencia", "Aparência", "palette"]];
+  const MORE_TABS = [["dados", "Dados", "archive"], ["integracoes", "Integrações", "plug"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
   const moreTab = (t) => (MORE_TABS.some(([k]) => k === t) ? t : MORE_TABS[0][0]);
   function applyAccent(a) {
     if (a === "amarelo") delete document.documentElement.dataset.accent;
@@ -820,7 +820,7 @@
   function viewData() {
     const tab = moreTab(base.tab);
     const label = MORE_TABS.find(([k]) => k === tab)[1];
-    const bodies = { dados: () => moreExport() + moreData(), integracoes: moreIntegrations, aparencia: moreLook };
+    const bodies = { dados: () => moreExport() + moreData(), integracoes: moreIntegrations, aparencia: moreLook, opcoes: moreOptions };
     return `<div class="more-anchor" aria-hidden="true"></div>
     <div class="more-tabs" role="tablist" aria-label="Seções de Mais">
       ${MORE_TABS.map(([k, l, i]) => `<button type="button" role="tab" id="mt-${k}" aria-controls="mp" aria-selected="${k === tab}" tabindex="${k === tab ? 0 : -1}" data-act="more-tab" data-tab="${k}">${ic(i, "sm")}<span>${l}</span></button>`).join("")}
@@ -868,7 +868,7 @@
     </section>
     <section class="panel" id="p-history">
       <h2>${secIc("history")}Versões anteriores</h2>
-      <p class="lead">O app guarda sozinho uma cópia do inventário a cada 10 minutos de uso. Se algo sair errado, volte para uma versão anterior.</p>
+      <p class="lead">O app guarda sozinho uma cópia do inventário a cada 10 minutos de uso e fica com as 3 mais recentes. Se algo sair errado, volte para uma delas.</p>
       <div data-slot="history"><p class="muted">Carregando…</p></div>
     </section>
     <section class="panel" id="p-where">
@@ -891,7 +891,11 @@
       <h2 id="accent-h">${secIc("palette")}Cor do app</h2>
       <p class="lead">Muda a etiqueta, os botões principais e os destaques. Cada aparelho guarda a sua escolha.</p>
       <div class="swatches" role="radiogroup" aria-labelledby="accent-h">${ACCENTS.map(([k, v]) => `<label class="sw" data-accent="${k}"><input type="radio" name="accent" value="${k}" data-input="accent"${k === accent ? " checked" : ""}>${SWATCH}<span>${v}</span></label>`).join("")}</div>
-    </section>
+    </section>`;
+  }
+  // Opções: o que muda o jeito de cadastrar e de ver o inventário, para a casa toda
+  function moreOptions() {
+    return `
     <section class="panel" id="p-zones">
       <h2>${secIc("pin")}Zonas</h2>
       <p class="lead">Partes de um cômodo, como Estante, Bancada ou Rack da TV. Ligadas, o cadastro ganha o campo Zona e os itens de cada cômodo aparecem separados por zona.</p>
@@ -933,7 +937,7 @@
       const h = await API.get("api/history");
       if (document.contains(hslot)) {
         const list = h.history || [];
-        hslot.innerHTML = list.length ? `<ul class="opts">${list.slice(0, 10).map((x) => `<li><div class="ot"><b>${esc(dateTime(x.date))}</b><span>${esc(ago(x.date))}</span></div>
+        hslot.innerHTML = list.length ? `<ul class="opts">${list.slice(0, 3).map((x) => `<li><div class="ot"><b>${esc(dateTime(x.date))}</b><span>${esc(ago(x.date))}</span></div>
           <div class="oa"><button class="btn sm" data-act="history-restore" data-name="${esc(x.name)}">${ic("history", "sm")}Voltar para esta versão</button></div></li>`).join("")}</ul>`
           : `<p class="muted">Ainda não há versões anteriores. Elas aparecem depois das primeiras alterações.</p>`;
       }
