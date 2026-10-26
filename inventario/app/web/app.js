@@ -109,6 +109,10 @@
 
   // ------------------------------------------------------------------ estado
   const S = { rooms: [], items: [], rev: 0, updatedAt: null, user: null, version: "", features: {}, settings: {}, loaded: false, error: null, stale: false };
+  // Opções da casa (Mais), iguais em todos os aparelhos: a IA vem ligada; as zonas, desligadas.
+  // Desligar só esconde: nada do que já foi gravado se perde.
+  const aiOn = () => S.settings.ai !== false;
+  const zonesOn = () => S.settings.zones === true;
   let D = null;
   const roomFilter = {};
   let searchLimit = 120;
@@ -428,7 +432,7 @@
       <div class="mh-row">
         <p class="eyebrow"><span class="brand-word">Inventar<span>IA</span></span>${first ? `<span class="hello"><span class="sep"> · </span>Olá, ${esc(first)}</span>` : ""}</p>
         ${r.name !== "room" ? `<div class="top-actions">
-          <button type="button" class="btn wide" data-act="catalog">${ic("scan")}Catalogar foto com IA</button>
+          ${aiOn() ? `<button type="button" class="btn wide" data-act="catalog">${ic("scan")}Catalogar foto com IA</button>` : ""}
           <button type="button" class="btn primary wide" data-act="item-new">${ic("plus")}Adicionar item</button></div>` : ""}
       </div>
       ${up ? `<a class="uplink" href="${up[0]}">${ic("back", "sm")}${up[1]}</a>` : ""}
@@ -513,7 +517,7 @@
     const room = D.roomById.get(it.room);
     let where;
     if (mode === "room") where = it.details ? hl(snippet(it.details), toks) : "";
-    else where = hl([room?.name, it.zone].filter(Boolean).join(", "), toks);
+    else where = hl([room?.name, zonesOn() ? it.zone : ""].filter(Boolean).join(", "), toks);
     const qty = qtyClean(it.qty);
     return `<li><a class="irow" href="#/i/${encodeURIComponent(it.id)}">
       ${ph ? `<img class="thumb" src="${esc(src(ph))}" alt="" loading="lazy" decoding="async" width="56" height="56">` : `<span class="thumb">${ic("tag")}</span>`}
@@ -622,13 +626,13 @@
     <section class="rhead">
       <div class="rhead-top">
         <div class="rhead-name"><span class="mt lg">${esc(r.code)}</span><h1>${esc(r.name)}</h1>
-          <div class="stats"><span><b>${int(list.length)}</b> ${list.length === 1 ? "item" : "itens"}</span><span><b>${int(zones.size)}</b> ${zones.size === 1 ? "zona" : "zonas"}</span><span><b>${int(photos.length)}</b> ${photos.length === 1 ? "foto" : "fotos"}</span></div>
+          <div class="stats"><span><b>${int(list.length)}</b> ${list.length === 1 ? "item" : "itens"}</span>${zonesOn() ? `<span><b>${int(zones.size)}</b> ${zones.size === 1 ? "zona" : "zonas"}</span>` : ""}<span><b>${int(photos.length)}</b> ${photos.length === 1 ? "foto" : "fotos"}</span></div>
         </div>
         <div class="rhead-val"><div class="big">${moneyR(total)}</div><div class="small">${pctFmt(pct(total, D.total))} do patrimônio</div></div>
       </div>
       <div class="rhead-actions">
         <button type="button" class="btn primary" data-act="item-new" data-room="${esc(id)}">${ic("plus")}Adicionar item</button>
-        <button type="button" class="btn" data-act="catalog" data-room="${esc(id)}" aria-label="Catalogar foto com IA">${ic("scan")}<span class="lbl">Catalogar foto com IA</span><span class="lbl-short">Catalogar</span></button>
+        ${aiOn() ? `<button type="button" class="btn" data-act="catalog" data-room="${esc(id)}" aria-label="Catalogar foto com IA">${ic("scan")}<span class="lbl">Catalogar foto com IA</span><span class="lbl-short">Catalogar</span></button>` : ""}
         <button type="button" class="btn ghost" data-act="room-edit" data-room="${esc(id)}" aria-label="Editar cômodo">${ic("edit")}<span class="lbl">Editar cômodo</span></button>
       </div>
     </section>
@@ -647,13 +651,14 @@
   function zonesHtml(id) {
     const all = D.byRoom.get(id) || [];
     if (!all.length) {
-      return `<div class="empty">${emptyMark()}<h2>Nenhum item aqui ainda</h2><p>Adicione o primeiro item ou tire uma foto e deixe a IA listar o que aparece nela.</p>
+      return `<div class="empty">${emptyMark()}<h2>Nenhum item aqui ainda</h2><p>${aiOn() ? "Adicione o primeiro item ou tire uma foto e deixe a IA listar o que aparece nela." : "Adicione o primeiro item deste cômodo."}</p>
         <div class="acts"><button class="btn primary" data-act="item-new" data-room="${esc(id)}">${ic("plus")}Adicionar item</button>
-        <button class="btn" data-act="catalog" data-room="${esc(id)}">${ic("scan")}Catalogar foto com IA</button></div></div>`;
+        ${aiOn() ? `<button class="btn" data-act="catalog" data-room="${esc(id)}">${ic("scan")}Catalogar foto com IA</button>` : ""}</div></div>`;
     }
     const toks = tokens(roomFilter[id] || "");
     const list = toks.length ? all.filter((it) => matches(it, toks)) : all;
     if (!list.length) return `<div class="empty"><h2>Nada com “${esc(roomFilter[id])}”</h2><p>Tente outra palavra ou limpe o filtro.</p></div>`;
+    if (!zonesOn()) return `<section class="zone"><ul class="ilist">${list.map((it) => itemRow(it, { toks, mode: "room" })).join("")}</ul></section>`;
     const groups = new Map();
     for (const it of list) {
       const z = it.zone || "Sem zona";
@@ -667,7 +672,7 @@
   }
   function matches(it, toks) {
     const room = D.roomById.get(it.room);
-    const hay = norm(`${it.name} ${it.details} ${it.zone} ${room?.name || ""} ${tagOf(it)} ${CAT[it.cat] || ""}`);
+    const hay = norm(`${it.name} ${it.details} ${zonesOn() ? it.zone : ""} ${room?.name || ""} ${tagOf(it)} ${CAT[it.cat] || ""}`);
     return toks.every((t) => hay.includes(t));
   }
 
@@ -677,7 +682,7 @@
     return `
     <section class="sbar">
       <form class="q" data-form="search" role="search">${ic("search")}
-        <input class="input" type="search" name="q" data-input="search-q" value="${esc(q.q || "")}" placeholder="Nome, marca, detalhe ou zona" aria-label="Buscar itens" autocomplete="off" enterkeyhint="search">
+        <input class="input" type="search" name="q" data-input="search-q" value="${esc(q.q || "")}" placeholder="${zonesOn() ? "Nome, marca, detalhe ou zona" : "Nome, marca ou detalhe"}" aria-label="Buscar itens" autocomplete="off" enterkeyhint="search">
         <button type="button" class="btn ghost icon sm clear" data-act="search-clear" aria-label="Limpar busca"${q.q ? "" : " hidden"}>${ic("close", "sm")}</button>
       </form>
       <div class="sfilters">
@@ -750,7 +755,7 @@
     </div>
     <article class="report">
       <h1>Inventário da casa</h1>
-      <p class="rmeta">Gerado em ${esc(dfLong.format(now))}. Valores estimados de mercado de usados, em reais.</p>
+      <p class="rmeta">Gerado em ${esc(dfLong.format(now))}. Valores em reais.</p>
       <div class="rtotal">
         <div><span>Patrimônio</span><b>${money(D.total)}</b></div>
         <div><span>Itens</span><b>${int(S.items.length)}</b></div>
@@ -761,13 +766,14 @@
         <tfoot><tr><td>Total</td><td class="r">${int(S.items.length)}</td><td class="r">${money(D.total)}</td><td class="r">100%</td></tr></tfoot></table>
       ${D.rooms.filter((r) => (D.byRoom.get(r.id) || []).length).map((r) => {
         const its = D.byRoom.get(r.id) || [];
+        const zc = zonesOn();
         return `<section class="rep-room"><h2><span class="mt">${esc(r.code)}</span>${esc(r.name)}</h2>
           <p class="rs">${plural(its.length, "item", "itens")}, ${money(D.roomTotals.get(r.id) || 0)}</p>
-          <table class="rtable"><thead><tr>${withPhotos ? '<th class="t"><span class="sr">Foto</span></th>' : ""}<th>Código</th><th>Item</th><th>Zona</th><th class="r">Qtd.</th><th class="r">Valor</th></tr></thead><tbody>
+          <table class="rtable"><thead><tr>${withPhotos ? '<th class="t"><span class="sr">Foto</span></th>' : ""}<th>Código</th><th>Item</th>${zc ? "<th>Zona</th>" : ""}<th class="r">Qtd.</th><th class="r">Valor</th></tr></thead><tbody>
           ${its.map((it) => `<tr>${withPhotos ? `<td class="t">${it.photos && it.photos[0] ? `<img src="${esc(src(it.photos[0]))}" alt="" width="44" height="44">` : ""}</td>` : ""}
             <td class="c">${esc(tagOf(it))}</td><td>${esc(it.name)}${it.details ? `<span class="d">${esc(snippet(it.details, 140))}</span>` : ""}${withPhotos && it.photos && it.photos[0] && (it.photoSrc || {})[it.photos[0]] ? `<span class="d">Foto ilustrativa, de ${esc(siteOf(it.photoSrc[it.photos[0]]))}</span>` : ""}</td>
-            <td>${esc(it.zone || "")}</td><td class="r">${esc(qtyClean(it.qty))}</td><td class="r">${money(it.value)}</td></tr>`).join("")}
-          </tbody><tfoot><tr>${withPhotos ? "<td></td>" : ""}<td colspan="4">Subtotal</td><td class="r">${money(D.roomTotals.get(r.id) || 0)}</td></tr></tfoot></table></section>`;
+            ${zc ? `<td>${esc(it.zone || "")}</td>` : ""}<td class="r">${esc(qtyClean(it.qty))}</td><td class="r">${money(it.value)}</td></tr>`).join("")}
+          </tbody><tfoot><tr>${withPhotos ? "<td></td>" : ""}<td colspan="${zc ? 4 : 3}">Subtotal</td><td class="r">${money(D.roomTotals.get(r.id) || 0)}</td></tr></tfoot></table></section>`;
       }).join("")}
       <p class="rep-foot">Inventário mantido no InventarIA, app do Home Assistant. Dados em arquivos abertos (JSON e JPG).</p>
     </article>`;
@@ -835,12 +841,17 @@
       </ul>
     </section>`;
   }
+  // chave liga/desliga (um checkbox com papel de switch), rotulada pelo título da linha
+  const switchHtml = (key, on, labelledby) => `<label class="switch"><input type="checkbox" role="switch" data-input="${key}" aria-labelledby="${labelledby}"${on ? " checked" : ""}><span class="track" aria-hidden="true"></span></label>`;
   function moreIntegrations() {
+    const on = aiOn();
     return `
     <section class="panel" id="p-ai">
       <h2>${secIc("scan")}IA do Home Assistant</h2>
       <p class="lead">O app usa a integração de IA configurada no Home Assistant (Anthropic Claude, OpenAI, Google Gemini ou um modelo local pelo Ollama) para ler fotos e para buscar fotos de produtos na internet. Dá para trocar de IA quando quiser, sem mexer no inventário.</p>
-      <div data-slot="ai-panel"><p class="muted">Verificando…</p></div>
+      <ul class="opts"><li><div class="ot"><b id="ai-on-h">Usar IA</b><span>${on ? "Ler fotos para preencher itens, catalogar uma foto inteira e buscar fotos na internet. Desligada, o app esconde esses botões." : "Desligada: o app esconde os botões de IA. Ligue para ler fotos, catalogar e buscar fotos na internet."} Vale para todos os aparelhos.</span></div>
+        <div class="oa">${switchHtml("ai-on", on, "ai-on-h")}</div></li></ul>
+      ${on ? `<div data-slot="ai-panel"><p class="muted">Verificando…</p></div>` : ""}
     </section>`;
   }
   function moreData() {
@@ -870,12 +881,22 @@
     const accent = accentOf();
     return `
     <section class="panel" id="p-look">
-      <ul class="opts"><li><div class="ot"><b>Tema</b><span>Automático segue o modo claro ou escuro do aparelho.</span></div>
-        <div class="oa"><div class="seg" role="group" aria-label="Tema">
-          ${[["auto", "Automático"], ["light", "Claro"], ["dark", "Escuro"]].map(([k, v]) => `<button type="button" data-act="theme" data-theme="${k}" aria-pressed="${theme === k}">${v}</button>`).join("")}
-        </div></div></li>
-        <li><div class="ot"><b id="accent-h">Cor do app</b><span>Muda a etiqueta, os botões principais e os destaques. Cada aparelho guarda a sua escolha.</span></div>
-          <div class="swatches" role="radiogroup" aria-labelledby="accent-h">${ACCENTS.map(([k, v]) => `<label class="sw" data-accent="${k}"><input type="radio" name="accent" value="${k}" data-input="accent"${k === accent ? " checked" : ""}>${SWATCH}<span>${v}</span></label>`).join("")}</div></li></ul>
+      <h2>${secIc("contrast")}Tema</h2>
+      <p class="lead">Automático segue o modo claro ou escuro do aparelho.</p>
+      <div class="seg themes" role="group" aria-label="Tema">
+        ${[["auto", "Automático", "phone"], ["light", "Claro", "sun"], ["dark", "Escuro", "moon"]].map(([k, v, i]) => `<button type="button" data-act="theme" data-theme="${k}" aria-pressed="${theme === k}">${ic(i)}<span>${v}</span></button>`).join("")}
+      </div>
+    </section>
+    <section class="panel" id="p-accent">
+      <h2 id="accent-h">${secIc("palette")}Cor do app</h2>
+      <p class="lead">Muda a etiqueta, os botões principais e os destaques. Cada aparelho guarda a sua escolha.</p>
+      <div class="swatches" role="radiogroup" aria-labelledby="accent-h">${ACCENTS.map(([k, v]) => `<label class="sw" data-accent="${k}"><input type="radio" name="accent" value="${k}" data-input="accent"${k === accent ? " checked" : ""}>${SWATCH}<span>${v}</span></label>`).join("")}</div>
+    </section>
+    <section class="panel" id="p-zones">
+      <h2>${secIc("pin")}Zonas</h2>
+      <p class="lead">Partes de um cômodo, como Estante, Bancada ou Rack da TV. Ligadas, o cadastro ganha o campo Zona e os itens de cada cômodo aparecem separados por zona.</p>
+      <ul class="opts"><li><div class="ot"><b id="zones-h">Usar zonas</b><span>Vale para todos os aparelhos. Desligar só esconde: as zonas já gravadas continuam guardadas.</span></div>
+        <div class="oa">${switchHtml("zones-on", zonesOn(), "zones-h")}</div></li></ul>
     </section>`;
   }
   // Trocar de aba substitui o endereço (não enche o histórico: Voltar sai de Mais) e mantém as abas no alto.
@@ -1081,6 +1102,7 @@
   const siteOf = (u) => { try { return new URL(u).hostname.replace(/^(www\d?|m)\./, ""); } catch { return ""; } };
   function webPhotoSearch({ name, details = "" }) {
     if (PREVIEW) { toast("Na prévia não dá para buscar na internet. No Home Assistant, a IA busca as fotos de verdade."); return Promise.resolve(null); }
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return Promise.resolve(null); }
     return new Promise((resolve) => {
       let job = null, timer = null, chosen = null, results = [], got = null, gen = 0;
       const entry = openDialog({
@@ -1213,14 +1235,14 @@
         <div data-slot="gallery">${(it.photos || []).length ? galleryHtml(it, 0)
           : `<div class="gal"><div class="gal-none">${ic("image", "lg")}<span>Sem foto</span><div class="gal-acts">
               <button type="button" class="btn sm" data-act="item-edit" data-id="${esc(it.id)}">${ic("plus", "sm")}Adicionar foto</button>
-              <button type="button" class="btn sm" data-act="web-photo" data-id="${esc(it.id)}">${ic("search", "sm")}Buscar na internet</button></div></div></div>`}</div>
+              ${aiOn() ? `<button type="button" class="btn sm" data-act="web-photo" data-id="${esc(it.id)}">${ic("search", "sm")}Buscar na internet</button>` : ""}</div></div></div>`}</div>
         <div class="ihead"><h1>${esc(it.name)}</h1>
           <div class="ival"><span class="big">${money(it.value)}</span>${n && n > 1 ? `<span class="unit">${int(n)} unidades, ${money((+it.value || 0) / n)} cada</span>` : qtyClean(it.qty) !== "1" ? `<span class="unit">${esc(qtyLabel(it.qty))}</span>` : ""}</div></div>
         ${it.details ? `<p class="idet">${esc(it.details)}</p>` : ""}
         ${it.flag ? `<p class="inote">${ic("info")}<span>${esc(it.flag)}</span></p>` : ""}
         <dl class="props">
           <dt>Cômodo</dt><dd><a href="#/c/${encodeURIComponent(room.id)}"><span class="mt soft">${esc(room.code)}</span><span class="rnm">${esc(room.name)}</span></a></dd>
-          <dt>Zona</dt><dd>${esc(it.zone || "Sem zona")}</dd>
+          ${zonesOn() ? `<dt>Zona</dt><dd>${esc(it.zone || "Sem zona")}</dd>` : ""}
           <dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
           <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>
           <dt>Origem</dt><dd>${esc(SOURCES[it.source] || "Cadastro manual")}</dd>
@@ -1261,23 +1283,29 @@
   }
 
   function moveItem(it) {
+    const zones = zonesOn();
     const zonesFor = (rid) => zonesOf(rid).map((z) => `<option value="${esc(z)}">`).join("");
     const entry = openDialog({
       cls: "modal narrow", label: "Mover item",
       html: `<div class="dlg"><div class="dlg-h"><h2>Mover item</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-mv><div class="form">
           <p class="muted" style="margin:0">${esc(it.name)}</p>
-          <div class="field"><label for="mv-room">Para o cômodo</label><select id="mv-room" class="select" name="room">${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === it.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
-          <div class="field"><label for="mv-zone">Zona</label><input id="mv-zone" class="input" name="zone" list="mv-zones" value="${esc(it.zone || "")}" autocomplete="off"><datalist id="mv-zones">${zonesFor(it.room)}</datalist>
-            <p class="help">Ao mudar de cômodo, o item ganha um código novo no fim da lista.</p></div>
+          <div class="field"><label for="mv-room">Para o cômodo</label><select id="mv-room" class="select" name="room">${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === it.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select>
+            ${zones ? "" : `<p class="help">Ao mudar de cômodo, o item ganha um código novo no fim da lista.</p>`}</div>
+          ${zones ? `<div class="field"><label for="mv-zone">Zona</label><input id="mv-zone" class="input" name="zone" list="mv-zones" value="${esc(it.zone || "")}" autocomplete="off"><datalist id="mv-zones">${zonesFor(it.room)}</datalist>
+            <p class="help">Ao mudar de cômodo, o item ganha um código novo no fim da lista.</p></div>` : ""}
         </div></form>
         <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok>${ic("move")}Mover</button></div></div>`,
     });
     const form = $("[data-mv]", entry.dlg);
-    form.room.addEventListener("change", () => { $("#mv-zones", entry.dlg).innerHTML = zonesFor(form.room.value); if (form.room.value !== it.room) form.zone.value = ""; });
+    if (zones) form.room.addEventListener("change", () => { $("#mv-zones", entry.dlg).innerHTML = zonesFor(form.room.value); if (form.room.value !== it.room) form.zone.value = ""; });
     const go = async () => {
+      const moved = form.room.value !== it.room;
+      if (!zones && !moved) { requestClose(entry, { force: true }); toast(`O item já está em ${D.roomById.get(it.room)?.name || "este cômodo"}.`); return; }
+      // sem zonas, a zona do cômodo antigo não vai junto (ela não faria sentido no cômodo novo)
+      const zone = zones ? form.zone.value : "";
       try {
-        const res = await API.put(`api/items/${encodeURIComponent(it.id)}`, { room: form.room.value, zone: form.zone.value, _base: it.updatedAt });
+        const res = await API.put(`api/items/${encodeURIComponent(it.id)}`, { room: form.room.value, zone, _base: it.updatedAt });
         setRev(res.rev); upsertItem(res.item); derive(); requestClose(entry, { force: true }); refreshAll();
         toast(res.item.room !== it.room ? `Movido para ${D.roomById.get(res.item.room)?.name}` : "Zona atualizada");
       } catch (e) { fail(e); }
@@ -1294,13 +1322,16 @@
     const F = {
       id: item ? item.id : null, base: item ? item.updatedAt : null,
       name: from.name || "", details: from.details || "", room: rid,
-      zone: from.zone != null ? from.zone : zone != null ? zone : LS.get("lastZone:" + rid, "") || "",
+      // sem zonas, item novo nasce sem zona; um item existente guarda a dele, escondida
+      zone: item ? item.zone || "" : !zonesOn() ? "" : from.zone != null ? from.zone : zone != null ? zone : LS.get("lastZone:" + rid, "") || "",
       cat: from.cat || "", qty: from.qty ? qtyClean(from.qty) : "1", value: from.value ? moneyInput(from.value) : "",
       flag: from.flag || "", photos: [...(from.photos || photos || [])], photoSrc: { ...(from.photoSrc || {}) },
       source: item ? item.source || "manual" : dup ? dup.source || "manual" : "manual",
       dirty: !!(dup || (photos && photos.length)), busy: false, uploading: 0, aiBusy: false, hint: "",
     };
     const title = item ? "Editar item" : dup ? "Duplicar item" : "Novo item";
+    const roomField = `<div class="field"><label for="f-room">Cômodo</label><select id="f-room" class="select" name="room">${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === F.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>`;
+    const zoneField = `<div class="field"><label for="f-zone">Zona</label><input id="f-zone" class="input" name="zone" list="f-zones" maxlength="120" value="${esc(F.zone)}" placeholder="Ex.: Estante, Bancada"><datalist id="f-zones"></datalist></div>`;
     const entry = openDialog({
       cls: "modal", label: title,
       html: `<div class="dlg">
@@ -1309,21 +1340,17 @@
           <div class="form">
             <div class="field"><span class="lbl">Fotos</span><div class="phs" data-slot="photos"></div>
               <p class="help">${ANDROID_APP ? "No app do Home Assistant as fotos vêm da galeria. Para fotografar na hora, tire a foto antes com a câmera do celular." : COARSE ? "Tire uma foto ou escolha da galeria." : "Arraste fotos para cá ou cole uma imagem com Ctrl+V."}</p></div>
-            <div class="aibox" data-slot="ai"></div>
+            ${aiOn() ? `<div class="aibox" data-slot="ai"></div>` : ""}
             <div class="field"><label for="f-name">Nome</label><input id="f-name" class="input" name="name" maxlength="200" value="${esc(F.name)}" placeholder="Ex.: Cafeteira Nespresso Inissia" enterkeyhint="next">
               <p class="err" data-err="name" hidden></p></div>
             <div class="field"><label for="f-details">Detalhes</label><textarea id="f-details" class="textarea" name="details" rows="3" maxlength="4000" placeholder="Marca, modelo, cor, tamanho e estado">${esc(F.details)}</textarea></div>
-            <div class="row2">
-              <div class="field"><label for="f-room">Cômodo</label><select id="f-room" class="select" name="room">${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === F.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
-              <div class="field"><label for="f-zone">Zona</label><input id="f-zone" class="input" name="zone" list="f-zones" maxlength="120" value="${esc(F.zone)}" placeholder="Ex.: Estante, Bancada"><datalist id="f-zones"></datalist></div>
-            </div>
+            ${zonesOn() ? `<div class="row2">${roomField}${zoneField}</div>` : roomField}
             <div class="field"><label for="f-cat">Categoria</label><select id="f-cat" class="select" name="cat"><option value="">Escolha a categoria</option>${CATS.map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>
             <div class="row3">
               <div class="field"><label for="f-qty">Quantidade</label><input id="f-qty" class="input" name="qty" maxlength="30" value="${esc(F.qty)}" inputmode="text"></div>
               <div class="field"><label for="f-value">Valor total</label><div class="money"><input id="f-value" class="input" name="value" inputmode="decimal" value="${esc(F.value)}" placeholder="0"></div>
                 <p class="unit-hint" data-slot="unit"></p><p class="err" data-err="value" hidden></p></div>
             </div>
-            <p class="help" style="margin-top:-8px">Valor de mercado de usado, somando todas as unidades.</p>
             <details class="more-fields"${F.flag ? " open" : ""}><summary>${ic("chev", "sm")}Observação</summary>
               <div class="form"><div class="field"><label for="f-flag" class="sr">Observação</label><input id="f-flag" class="input" name="flag" maxlength="200" value="${esc(F.flag)}" placeholder="Algo para lembrar sobre este item"></div></div></details>
             <div class="formerr" data-slot="formerr" hidden></div>
@@ -1342,7 +1369,7 @@
     const slot = (n) => $(`[data-slot="${n}"]`, dlg);
     entry.onSubmit = () => save(false);
 
-    const renderZones = () => { $("#f-zones", dlg).innerHTML = zonesOf(F.room).map((z) => `<option value="${esc(z)}">`).join(""); };
+    const renderZones = () => { const dl = $("#f-zones", dlg); if (dl) dl.innerHTML = zonesOf(F.room).map((z) => `<option value="${esc(z)}">`).join(""); };
     const renderUnit = () => {
       const n = qtyNum(F.qty), v = parseMoney(F.value);
       slot("unit").textContent = n && n > 1 && v > 0 ? `${money(v / n)} cada` : "";
@@ -1357,11 +1384,12 @@
         + (CAMERA_DIRECT ? `<button type="button" class="add" data-ed="camera">${ic("camera")}Tirar foto</button>` : "")
         + `<button type="button" class="add" data-ed="upload">${ic(COARSE ? "image" : "upload")}${ANDROID_APP ? "Escolher foto" : COARSE ? "Galeria" : "Enviar foto"}</button>`
         + (hasRoomPhotos ? `<button type="button" class="add" data-ed="roomphotos">${ic("images")}Fotos do cômodo</button>` : "")
-        + (F.photos.length < 12 ? `<button type="button" class="add" data-ed="web">${ic("search")}Buscar na internet</button>` : "");
+        + (F.photos.length < 12 && aiOn() ? `<button type="button" class="add" data-ed="web">${ic("search")}Buscar na internet</button>` : "");
       renderAi();
     };
     const renderAi = async () => {
       const box = slot("ai");
+      if (!box) return;
       if (F.aiBusy) {
         box.innerHTML = `<div class="aih"><p><b>Lendo a foto…</b> Pode levar até um minuto.</p><button type="button" class="btn" disabled><span class="spin"></span>Lendo</button></div>`;
         return;
@@ -1428,7 +1456,7 @@
         const r = (res.items || [])[0];
         if (!r) throw new Error("A IA não reconheceu um item nesta foto. Tente outra foto ou escreva uma dica.");
         const prev = { name: F.name, details: F.details, cat: F.cat, qty: F.qty, value: F.value, zone: F.zone, source: F.source };
-        Object.assign(F, { name: r.name, details: r.details || F.details, cat: r.cat || F.cat, qty: r.qty || F.qty, value: r.value ? moneyInput(r.value) : F.value, zone: F.zone || r.zone || "", source: "ia", dirty: true });
+        Object.assign(F, { name: r.name, details: r.details || F.details, cat: r.cat || F.cat, qty: r.qty || F.qty, value: r.value ? moneyInput(r.value) : F.value, zone: zonesOn() ? F.zone || r.zone || "" : F.zone, source: "ia", dirty: true });
         fill();
         toast(res.example ? "Exemplo simulado da prévia: no Home Assistant, a IA lê a foto de verdade." : "Campos preenchidos pela IA. Confira antes de salvar.", { action: "Desfazer", onAction: () => { Object.assign(F, prev); if (document.contains(dlg)) fill(); } });
       } catch (e) { fail(e); }
@@ -1436,7 +1464,8 @@
     }
     function fill() {
       form.name.value = F.name; form.details.value = F.details; form.cat.value = CAT[F.cat] ? F.cat : "";
-      form.qty.value = F.qty; form.value.value = F.value; form.zone.value = F.zone; form.flag.value = F.flag;
+      form.qty.value = F.qty; form.value.value = F.value; form.flag.value = F.flag;
+      if (form.zone) form.zone.value = F.zone;
       renderUnit(); fieldErr("name", ""); fieldErr("value", "");
     }
 
@@ -1450,14 +1479,16 @@
       if (!name) { fieldErr("name", "Dê um nome ao item."); bad = true; }
       if (Number.isNaN(value)) { fieldErr("value", "Use só números, como 1200 ou 1.200,50."); bad = true; }
       if (bad) { (name ? form.value : form.name).focus(); return; }
-      const body = { name, details: F.details.trim(), room: F.room, zone: F.zone.trim(), cat: F.cat || "outros", qty: F.qty.trim() || "1", value, photos: F.photos, photoSrc: F.photoSrc, flag: F.flag.trim(), source: F.source };
+      // sem zonas, a zona escondida só fica se o item continuar no mesmo cômodo
+      const zone = zonesOn() ? F.zone.trim() : item && F.room === item.room ? item.zone || "" : "";
+      const body = { name, details: F.details.trim(), room: F.room, zone, cat: F.cat || "outros", qty: F.qty.trim() || "1", value, photos: F.photos, photoSrc: F.photoSrc, flag: F.flag.trim(), source: F.source };
       setBusy(true);
       try {
         const res = F.id
           ? await API.put(`api/items/${encodeURIComponent(F.id)}`, { ...body, _base: F.base })
           : await API.post("api/items", body);
         setRev(res.rev); upsertItem(res.item); derive();
-        LS.set("lastRoom", res.item.room); LS.set("lastZone:" + res.item.room, res.item.zone || "");
+        LS.set("lastRoom", res.item.room); if (zonesOn()) LS.set("lastZone:" + res.item.room, res.item.zone || "");
         refreshAll();
         if (again) {
           Object.assign(F, { name: "", details: "", qty: "1", value: "", flag: "", photos: [], photoSrc: {}, source: "manual", hint: "", dirty: false });
@@ -1511,7 +1542,9 @@
   // ------------------------------------------------------------------ catalogar foto com IA (vários itens)
   async function openCatalog({ room = null, file = null } = {}) {
     if (!D.rooms.length) { toast("Crie um cômodo antes."); openRoomNew(); return; }
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return; }
     if (!(await needAi())) return;
+    const zonesUse = zonesOn();
     const C = { step: file ? "ready" : "photo", room: room && D.roomById.has(room) ? room : lastRoom(), zone: "", hint: "", file, uploading: false, results: [], keep: true, entity: "", error: null, raw: "", busy: false, token: 0 };
     const entry = openDialog({
       cls: "modal wide", label: "Catalogar foto com IA",
@@ -1527,7 +1560,7 @@
       if (C.step === "photo" || C.step === "ready") {
         const hasRoomPhotos = (D.roomById.get(C.room)?.photos || []).length > 0;
         body.innerHTML = `<div class="form">
-          <p class="muted" style="margin:0">A IA lista os objetos da foto com nome, categoria, quantidade e um valor estimado de usado. Você revisa tudo antes de adicionar.</p>
+          <p class="muted" style="margin:0">A IA lista os objetos da foto com nome, categoria, quantidade e uma sugestão de valor. Você revisa tudo antes de adicionar.</p>
           ${C.file ? `<div class="cat-photo"><img src="${esc(src(C.file, "photos"))}" alt="Foto escolhida"></div>
               <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-ct="change">${ic("image", "sm")}Trocar foto</button></div>`
             : `<div class="phs" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
@@ -1536,10 +1569,10 @@
                 <button type="button" class="add" style="aspect-ratio:4/3" data-ct="upload">${ic(COARSE ? "image" : "upload", "lg")}${ANDROID_APP ? "Escolher foto" : COARSE ? "Galeria" : "Enviar foto"}</button>
                 ${hasRoomPhotos ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="roomphoto">${ic("images", "lg")}Foto do cômodo</button>` : ""}`}
               </div>${ANDROID_APP ? `<p class="help" style="margin:0">No app do Home Assistant as fotos vêm da galeria. Tire a foto antes com a câmera do celular.</p>` : COARSE ? "" : `<p class="help" style="margin:0">Você também pode arrastar a foto para cá ou colar com Ctrl+V.</p>`}`}
-          <div class="row2">
+          <div class="${zonesUse ? "row2" : ""}">
             <div class="field"><label for="c-room">Cômodo</label><select id="c-room" class="select" data-ct-in="room">${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === C.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
-            <div class="field"><label for="c-zone">Zona (opcional)</label><input id="c-zone" class="input" data-ct-in="zone" list="c-zones" value="${esc(C.zone)}" placeholder="Deixe vazio para a IA sugerir" autocomplete="off">
-              <datalist id="c-zones">${zonesOf(C.room).map((z) => `<option value="${esc(z)}">`).join("")}</datalist></div>
+            ${zonesUse ? `<div class="field"><label for="c-zone">Zona (opcional)</label><input id="c-zone" class="input" data-ct-in="zone" list="c-zones" value="${esc(C.zone)}" placeholder="Deixe vazio para a IA sugerir" autocomplete="off">
+              <datalist id="c-zones">${zonesOf(C.room).map((z) => `<option value="${esc(z)}">`).join("")}</datalist></div>` : ""}
           </div>
           <div class="field"><label for="c-hint">Dica para a IA (opcional)</label><input id="c-hint" class="input" data-ct-in="hint" value="${esc(C.hint)}" maxlength="300" placeholder="Ex.: são taças de cristal; o vaso é de cerâmica" autocomplete="off"></div>
         </div>`;
@@ -1568,8 +1601,8 @@
               <div class="frow"><input class="input fname" data-ri="${i}" data-rf="name" value="${esc(r.name)}" aria-label="Nome">
                 <input class="input" data-ri="${i}" data-rf="qty" value="${esc(r.qty)}" aria-label="Quantidade">
                 <div class="money"><input class="input" data-ri="${i}" data-rf="value" value="${esc(moneyInput(r.value))}" inputmode="decimal" aria-label="Valor total"></div></div>
-              <div class="frow2"><select class="select" data-ri="${i}" data-rf="cat" aria-label="Categoria">${CATS.map(([k, v]) => `<option value="${k}"${k === r.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
-                <input class="input" data-ri="${i}" data-rf="zone" value="${esc(r.zone)}" list="cr-zones" placeholder="Zona" aria-label="Zona"></div>
+              <div class="frow2${zonesUse ? "" : " one"}"><select class="select" data-ri="${i}" data-rf="cat" aria-label="Categoria">${CATS.map(([k, v]) => `<option value="${k}"${k === r.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
+                ${zonesUse ? `<input class="input" data-ri="${i}" data-rf="zone" value="${esc(r.zone)}" list="cr-zones" placeholder="Zona" aria-label="Zona">` : ""}</div>
               ${r.details ? `<p class="fdet">${esc(r.details)}</p>` : ""}
               ${r.existing || r.confidence === "baixa" ? `<div class="fflag">${r.existing ? `<span class="pill warn">Parece já cadastrado: ${esc(r.existing)}</span>` : ""}${r.confidence === "baixa" ? `<span class="pill">IA pouco segura, confira</span>` : ""}</div>` : ""}
             </div></li>`).join("")}</ul>
@@ -1597,7 +1630,7 @@
         if (my !== C.token) return;
         C.entity = res.entity || "";
         C.example = !!res.example;
-        C.results = (res.items || []).map((r) => ({ ...r, zone: C.zone || r.zone || "", on: !r.existing }));
+        C.results = (res.items || []).map((r) => ({ ...r, zone: zonesUse ? C.zone || r.zone || "" : "", on: !r.existing }));
         C.step = "review";
       } catch (e) {
         if (my !== C.token) return;
@@ -1615,7 +1648,7 @@
       btn.disabled = true; btn.innerHTML = `<span class="spin"></span>Adicionando`;
       try {
         const res = await API.post("api/items/batch", {
-          items: chosen.map((r) => ({ room: C.room, zone: (r.zone || C.zone || "").trim(), name: String(r.name).trim(), details: r.details || "", cat: r.cat, qty: String(r.qty || "1").trim() || "1", value: parseMoney(r.value), photos: [C.file], source: "ia" })),
+          items: chosen.map((r) => ({ room: C.room, zone: zonesUse ? (r.zone || C.zone || "").trim() : "", name: String(r.name).trim(), details: r.details || "", cat: r.cat, qty: String(r.qty || "1").trim() || "1", value: parseMoney(r.value), photos: [C.file], source: "ia" })),
           roomPhoto: C.keep ? { room: C.room, file: C.file, label: (C.hint || chosen.slice(0, 3).map((r) => String(r.name).trim()).join(", ")).slice(0, 160) } : null,
         });
         setRev(res.rev);
@@ -1681,7 +1714,7 @@
             ${its.length ? `<ul class="vlist">${its.map((it) => `<li><a href="#/i/${encodeURIComponent(it.id)}" data-v="item"><span>${esc(it.name)}</span><span class="v">${money(it.value)}</span></a></li>`).join("")}</ul>` : ""}</div>
           ${room ? `<div class="vacts">
             <button type="button" class="btn primary" data-v="additem">${ic("plus")}Adicionar item com esta foto</button>
-            <button type="button" class="btn" data-v="catalog">${ic("scan")}Catalogar esta foto com IA</button>
+            ${aiOn() ? `<button type="button" class="btn" data-v="catalog">${ic("scan")}Catalogar esta foto com IA</button>` : ""}
             <button type="button" class="btn" data-v="cover"${isCover ? " disabled" : ""}>${ic("image")}${isCover ? "Capa do cômodo" : "Usar como capa do cômodo"}</button>
             <button type="button" class="btn" data-v="remove">${ic("trash")}Tirar do cômodo</button></div>` : ""}
         </div>`;
@@ -1888,7 +1921,7 @@
       html: `<div class="dlg"><div class="dlg-h"><h2>Adicionar</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b" style="padding:8px 12px 16px"><ul class="opts" style="border-top:0">
           <li style="padding:0;border:0"><button class="rrow nocode" data-go="item" style="grid-template-columns:auto 1fr;padding:14px 8px">${ic("plus", "lg")}<span class="rn">Adicionar item<small style="display:block;margin:2px 0 0">Com foto e valor, preenchendo os campos</small></span></button></li>
-          <li style="padding:0;border:0"><button class="rrow nocode" data-go="catalog" style="grid-template-columns:auto 1fr;padding:14px 8px">${ic("scan", "lg")}<span class="rn">Catalogar foto com IA<small style="display:block;margin:2px 0 0">A IA lista vários itens de uma foto</small></span></button></li>
+          ${aiOn() ? `<li style="padding:0;border:0"><button class="rrow nocode" data-go="catalog" style="grid-template-columns:auto 1fr;padding:14px 8px">${ic("scan", "lg")}<span class="rn">Catalogar foto com IA<small style="display:block;margin:2px 0 0">A IA lista vários itens de uma foto</small></span></button></li>` : ""}
           <li style="padding:0;border:0"><button class="rrow nocode" data-go="room" style="grid-template-columns:auto 1fr;padding:14px 8px;border-bottom:0">${ic("rooms", "lg")}<span class="rn">Novo cômodo<small style="display:block;margin:2px 0 0">Uma área nova da casa</small></span></button></li>
         </ul></div></div>`,
     });
@@ -2141,6 +2174,19 @@
     else if (k === "ai-search") {
       try { await API.put("api/settings", { ai_search: t.value }); S.settings.ai_search = t.value; aiCache.at = 0; toast("IA para buscar fotos atualizada"); }
       catch (er) { fail(er); }
+    }
+    else if (k === "ai-on" || k === "zones-on") {
+      const key = k === "ai-on" ? "ai" : "zones", on = t.checked;
+      t.disabled = true;
+      try {
+        await API.put("api/settings", { [key]: on });
+        S.settings[key] = on;
+        aiCache.at = 0;
+        renderView(false);
+        toast(key === "ai" ? (on ? "IA ligada" : "IA desligada: os botões de IA ficaram escondidos")
+          : on ? "Zonas ligadas" : "Zonas desligadas: as zonas gravadas continuam guardadas");
+      } catch (er) { t.checked = !on; fail(er); }
+      finally { t.disabled = false; }
     }
   });
   document.addEventListener("keydown", (e) => {

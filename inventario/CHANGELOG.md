@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.0
+
+- **Usar IA**, em Mais > Integrações: desligada, o app esconde tudo o que usa IA (Catalogar foto com IA, Preencher com IA e Buscar na internet). Vem ligada.
+- **Zonas** agora são opcionais e vêm desligadas. Ligue em Mais > Aparência para ter o campo Zona no cadastro, a zona na ficha, na busca e no relatório, e os itens de cada cômodo separados por zona. Desligadas, o cômodo mostra a lista na ordem dos códigos, e as zonas já gravadas continuam guardadas.
+- Aparência com ícones nos títulos (Tema, Cor do app e Zonas) e nos botões do tema (Automático, Claro e Escuro).
+- O valor do item é o que você quiser: saíram os textos de "valor de mercado de usado" do cadastro, do relatório e do Catalogar foto com IA.
+- Visualizador de fotos: a foto não cobre mais o nome e o valor dos itens logo abaixo, e uma foto grande não empurra mais os botões de baixar e fechar para fora da tela.
+
 ## 1.7.4
 
 - Ícones também nas quatro linhas abaixo da etiqueta do Início: Mais valioso, Maior cômodo, Último cadastro e Fotos, no mesmo quadradinho dos títulos.

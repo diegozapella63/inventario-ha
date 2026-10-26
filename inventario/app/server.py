@@ -43,7 +43,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.7.4"
+VERSION = "1.8.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -821,6 +821,20 @@ def ai_entities():
             sorted(agents, key=lambda e: e["name"].lower()))
 
 
+# Opções da casa (valem para todos os aparelhos): a IA vem ligada; as zonas, desligadas.
+def ai_enabled() -> bool:
+    return STORE.settings.get("ai") is not False
+
+
+def zones_enabled() -> bool:
+    return STORE.settings.get("zones") is True
+
+
+def need_ai_on():
+    if not ai_enabled():
+        raise ApiError(409, "A IA está desligada. Para usar, ligue em Mais > Integrações.")
+
+
 def ai_status():
     search = STORE.settings.get("ai_search") or ""
     if not SUPERVISOR_TOKEN and not AI_MOCK:
@@ -858,14 +872,18 @@ def ai_prompt(mode: str, room: dict | None, hint: str) -> str:
         parts.append("Liste cada objeto da foto que valha a pena catalogar, até 25. Ignore paredes, piso, tomadas, interruptores, "
                      "embalagens vazias, objetos cortados na borda que não dê para identificar e coisas sem valor de revenda. "
                      "Junte objetos iguais num item só, com a quantidade.")
-    parts.append(AI_RULES.format(cats=cats))
+    rules = AI_RULES.format(cats=cats)
+    use_zones = zones_enabled()
+    if not use_zones:  # zonas desligadas: a IA nem pergunta onde fica o item
+        rules = "\n".join(ln for ln in rules.splitlines() if not ln.startswith('- "zone"')).replace('"zone":"",', "")
+    parts.append(rules)
     if room:
         with STORE.lock:
             its = [i for i in STORE.data["items"] if i["room"] == room["id"]]
             zones = sorted({i.get("zone") for i in its if i.get("zone")})
             names = [i["name"] for i in sorted(its, key=lambda i: -(i.get("value") or 0))][:150]
         parts.append(f"Cômodo: {room['name']}.")
-        if zones:
+        if zones and use_zones:
             parts.append("Zonas já usadas neste cômodo (prefira uma delas): " + "; ".join(zones) + ".")
         if names and mode != "single":
             parts.append("Itens já cadastrados neste cômodo: " + "; ".join(names) + ".")
@@ -940,6 +958,7 @@ MOCK_RESULT = {"items": [
 
 
 def ai_identify(body: dict) -> dict:
+    need_ai_on()
     file = body.get("file") or ""
     if not photo_exists(file):
         raise ApiError(400, "Envie uma foto antes de pedir a leitura por IA.")
@@ -1408,6 +1427,7 @@ def _web_job_run(jid: str, name: str, details: str, entity: str):
 
 
 def web_job_start(body: dict) -> dict:
+    need_ai_on()
     name = text(body.get("name"), 200, "nome", required=True)
     details = " ".join(text(body.get("details"), 4000, "detalhes").split())[:300]
     if not SUPERVISOR_TOKEN and not AI_MOCK:
@@ -1620,7 +1640,8 @@ class Handler(BaseHTTPRequestHandler):
 def r_data(h, query):
     with STORE.lock:
         out = STORE.public()
-    out.update({"version": VERSION, "user": h.user(), "settings": {"ai_entity": STORE.settings.get("ai_entity") or ""},
+    out.update({"version": VERSION, "user": h.user(),
+                "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai": ai_enabled(), "zones": zones_enabled()},
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
     h.send_json(out)
 
@@ -1747,6 +1768,11 @@ def r_settings_put(h, query):
             if e and not re.fullmatch(r"(ai_task|conversation)\.[a-z0-9_]+", e):
                 raise ApiError(400, "Entidade de IA inválida.")
             STORE.settings["ai_search"] = e
+        for key in ("ai", "zones"):
+            if key in body:
+                if not isinstance(body[key], bool):
+                    raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
+                STORE.settings[key] = body[key]
         STORE.save_settings()
     h.send_json(STORE.settings)
 

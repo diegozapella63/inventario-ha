@@ -1,6 +1,6 @@
 # InventarIA
 
-O InventarIA é o inventário da casa dentro do Home Assistant: cômodos, zonas, itens com fotos e valores, busca, relatório para seguro e leitura de fotos por IA.
+O InventarIA é o inventário da casa dentro do Home Assistant: cômodos, itens com fotos e valores, busca, relatório para seguro e, se você quiser, leitura de fotos por IA e zonas dentro dos cômodos.
 
 O app abre pela barra lateral (Ingress). Quem já está logado no Home Assistant usa direto, sem outra senha.
 
@@ -17,16 +17,23 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 
 - **Início**: patrimônio total, cômodos (com a parte de cada um no total), categorias, itens mais valiosos e últimos cadastros.
 - **Cômodos** (aba ao lado de Adicionar): todos os cômodos com foto, número de itens e valor. Toque num cômodo para abrir. Em **Organizar**, as setas mudam a ordem (que vale para o app todo e para o relatório) e o lápis edita nome, código e fotos.
-- **Cômodo**: fotos do cômodo, itens agrupados por zona (estante, bancada, eletrônicos...) com subtotal de cada zona.
-- **Adicionar item**: nome, detalhes, cômodo, zona, categoria, quantidade e valor total. Dá para tirar foto pelo celular, enviar da galeria, arrastar uma foto ou colar com Ctrl+V. "Salvar e adicionar outro" mantém o cômodo e a zona para cadastrar em sequência.
-- **Catalogar foto com IA**: tire uma foto de uma prateleira ou de um canto da casa; a IA lista os objetos com nome, categoria, quantidade e valor estimado. Você confere, ajusta e escolhe o que entra.
+- **Cômodo**: fotos do cômodo e a lista dos itens, na ordem dos códigos. Com as zonas ligadas, os itens aparecem separados por zona, com o subtotal de cada uma.
+- **Adicionar item**: nome, detalhes, cômodo, categoria, quantidade e valor total (e a zona, se estiver ligada). Dá para tirar foto pelo celular, enviar da galeria, arrastar uma foto ou colar com Ctrl+V. "Salvar e adicionar outro" mantém o cômodo para cadastrar em sequência.
+- **Catalogar foto com IA**: tire uma foto de uma prateleira ou de um canto da casa; a IA lista os objetos com nome, categoria, quantidade e uma sugestão de valor. Você confere, ajusta e escolhe o que entra.
 - **Buscar na internet**: num item sem foto (ou no editor do item), a IA procura o produto no fabricante e nas lojas e o app mostra as fotos encontradas para você escolher. Veja [Fotos da internet](#fotos-da-internet).
-- **Buscar**: por nome, marca, detalhe ou zona, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome ou data.
+- **Buscar**: por nome, marca ou detalhe, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome ou data.
 - **Relatório**: lista por cômodo com fotos e valores, pronta para imprimir ou salvar em PDF (útil para seguro).
-- **Mais**, em abas como nos outros apps: **Dados** (exportar planilha, JSON, ZIP com fotos e o relatório; backup; importar; versões anteriores), **Integrações** (a IA do Home Assistant) e **Aparência** (tema claro, escuro ou automático e a cor do app: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza; cada aparelho guarda a sua escolha).
+- **Mais**, em abas como nos outros apps: **Dados** (exportar planilha, JSON, ZIP com fotos e o relatório; backup; importar; versões anteriores), **Integrações** (ligar ou desligar a IA e escolher qual IA do Home Assistant usar) e **Aparência** (tema claro, escuro ou automático; a cor do app: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza; e as zonas). O tema e a cor ficam em cada aparelho; a IA e as zonas valem para todos.
 - Atalhos no computador: `/` abre a busca, `N` cria um item, `Ctrl+Enter` salva o formulário.
 
-Os valores são de mercado de usados (o que o item vale hoje), somando todas as unidades.
+O valor de cada item é o que você quiser registrar, somando todas as unidades.
+
+## Opções da casa
+
+- **Usar IA** (Mais > Integrações), ligada de início: desligada, o app esconde tudo o que usa IA (Catalogar foto com IA, Preencher com IA, Buscar na internet) e não chama a IA.
+- **Usar zonas** (Mais > Aparência), desligada de início: as zonas dividem um cômodo em partes, como Estante, Bancada ou Rack da TV. Ligadas, aparecem o campo Zona no cadastro, a zona na ficha do item, na busca e no relatório, e os itens de cada cômodo ficam separados por zona.
+
+Desligar uma opção só esconde: nada do que já foi gravado se perde, e ligar de novo traz tudo de volta.
 
 ## Leitura de fotos por IA
 
@@ -47,7 +54,7 @@ Para configurar:
 
 Na hora da leitura, o app copia a foto por alguns segundos para `media/inventario/ia-temp`, chama a IA pelo Home Assistant e apaga a cópia em seguida. A IA não recebe número de série, IMEI ou dados pessoais: as instruções pedem só descrição do objeto.
 
-Sem IA configurada, todo o resto funciona normalmente.
+Sem IA configurada, todo o resto funciona normalmente. Se não for usar IA, desligue **Usar IA** em **Mais > Integrações** e os botões de IA somem.
 
 ## Fotos da internet
 
