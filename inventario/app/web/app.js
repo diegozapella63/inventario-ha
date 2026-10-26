@@ -578,10 +578,10 @@
         </div>
       </div>
       <dl class="facts">
-        ${top ? `<div><dt>Mais valioso</dt><dd><a href="#/i/${encodeURIComponent(top.id)}">${esc(top.name)}</a></dd><dd class="fv">${money(top.value)}</dd></div>` : ""}
-        ${bigRoom ? `<div><dt>Maior cômodo</dt><dd><a href="#/c/${encodeURIComponent(bigRoom.id)}">${esc(bigRoom.name)}</a></dd><dd class="fv">${pctFmt(pct(maxRoom, D.total))}</dd></div>` : ""}
-        ${last ? `<div><dt>Último cadastro</dt><dd><a href="#/i/${encodeURIComponent(last.id)}">${esc(last.name)}</a></dd><dd class="fv muted">${esc(ago(last.createdAt))}</dd></div>` : ""}
-        <div><dt>Fotos</dt><dd>${plural(D.photoCount, "foto guardada", "fotos guardadas")}</dd><dd class="fv"></dd></div>
+        ${top ? `<div><dt>${secIc("gem")}Mais valioso</dt><dd><a href="#/i/${encodeURIComponent(top.id)}">${esc(top.name)}</a></dd><dd class="fv">${money(top.value)}</dd></div>` : ""}
+        ${bigRoom ? `<div><dt>${secIc("pie")}Maior cômodo</dt><dd><a href="#/c/${encodeURIComponent(bigRoom.id)}">${esc(bigRoom.name)}</a></dd><dd class="fv">${pctFmt(pct(maxRoom, D.total))}</dd></div>` : ""}
+        ${last ? `<div><dt>${secIc("clock")}Último cadastro</dt><dd><a href="#/i/${encodeURIComponent(last.id)}">${esc(last.name)}</a></dd><dd class="fv muted">${esc(ago(last.createdAt))}</dd></div>` : ""}
+        <div><dt>${secIc("images")}Fotos</dt><dd>${plural(D.photoCount, "foto guardada", "fotos guardadas")}</dd><dd class="fv"></dd></div>
       </dl>
     </section>
     <form class="homesearch" data-form="homesearch" role="search">

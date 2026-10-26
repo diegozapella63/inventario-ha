@@ -352,14 +352,22 @@ html:has(dialog[open]) { overflow: hidden; }
 }
 
 .facts { margin: 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
-.facts > div { display: grid; grid-template-columns: 128px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 12px 2px; border-bottom: 1px solid var(--line); }
+.facts > div { position: relative; display: grid; grid-template-columns: 128px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 12px 2px 12px 52px; border-bottom: 1px solid var(--line); }
+/* o ícone fica dentro do dt, mas se apoia na linha inteira: centrado ao lado do rótulo e do valor */
+.facts .sec-ic { position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
 .facts dt { color: var(--muted); font-size: 14px; }
 .facts dd { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .facts dd a { text-decoration: none; }
 .facts dd a:hover { text-decoration: underline; }
 .facts .fv { font: 600 18px/1 var(--font-c); white-space: nowrap; }
+/* em telas largas cada linha tem uma linha só de texto: quadradinho menor para não encostar nas divisórias */
+@media (min-width: 561px) {
+  .facts > div { padding-left: 46px; }
+  .facts .sec-ic { width: 32px; height: 32px; border-radius: 9px; }
+  .facts .sec-ic .ic { width: 18px; height: 18px; }
+}
 @media (max-width: 560px) {
-  .facts > div { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; padding: 10px 2px; }
+  .facts > div { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; padding-top: 10px; padding-bottom: 10px; }
   .facts dt { grid-column: 1 / -1; font-size: 13px; }
 }
 
