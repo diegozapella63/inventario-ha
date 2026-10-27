@@ -476,8 +476,13 @@
       window.scrollTo(0, y);
       restoreFocus(focus);
     }
-    afterRender();
+    if (navigated) navCount++;
+    afterRender(navigated);
   }
+  // No computador, abrir pelo menu uma tela que tem busca já deixa o cursor nela, pronto para digitar
+  // (Buscar, a busca do Início e o filtro do cômodo). A primeira tela, ao abrir o app, não puxa o cursor.
+  let navCount = 0;
+  const focusFree = () => { const a = document.activeElement; return !a || a === document.body || !!a.closest("#side, #tabbar"); };
   function refreshAll() { if (S.loaded) renderView(false); if (sheet) { const it = D.itemById.get(parseHash().id); if (it) showItemSheet(it); } }
   function captureFocus() {
     const a = document.activeElement;
@@ -491,7 +496,7 @@
     el.focus({ preventScroll: true });
     try { el.setSelectionRange(f.start, f.end); } catch { /* select */ }
   }
-  function afterRender() {
+  function afterRender(navigated = false) {
     if (base.name === "home" && firstHome) {
       firstHome = false;
       const t = $(".tagswing");
@@ -502,11 +507,14 @@
     }
     if (base.name === "search") {
       const inp = $('#view [data-input="search-q"]');
-      if (inp && (focusSearch || (!COARSE && document.activeElement === document.body))) {
+      if (inp && (focusSearch || (!COARSE && focusFree()))) {
         inp.focus({ preventScroll: true });
         try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch { /* ok */ }
       }
       focusSearch = false;
+    } else if (navigated && navCount > 1 && !COARSE && focusFree() && !document.querySelector("dialog[open]")) {
+      const box = base.name === "home" ? $('#view [data-input="home-q"]') : base.name === "room" ? $('#view [data-input="room-filter"]') : null;
+      box?.focus({ preventScroll: true });
     }
     if (base.name === "data") loadDataPanels();
   }
@@ -2306,6 +2314,8 @@
       return;
     }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // a busca do Início pode estar com o cursor: "/" nela vazia continua sendo o atalho do Buscar
+    if (e.key === "/" && e.target.matches && e.target.matches('[data-input="home-q"]') && !e.target.value) { e.preventDefault(); focusSearch = true; nav("#/buscar"); return; }
     if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
     if (e.key === "/") {
       e.preventDefault();

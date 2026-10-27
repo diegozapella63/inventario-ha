@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.9.1
+
+- No computador, abrir pelo menu uma tela que tem busca já deixa o cursor nela, pronto para digitar: Buscar, a busca do Início e o filtro do cômodo. No Início, é só começar a digitar para buscar. Ao abrir o app e no celular, nada muda.
+- Com o cursor na busca vazia do Início, "/" continua abrindo o Buscar.
+
 ## 1.9.0
 
 - **Uso da IA**, em Mais > Integrações, como no EconomIA: chamadas de hoje, dos últimos 7 dias e do mês, com tokens estimados; gráfico dos 7 dias (toque numa barra para ver o dia); tipo de uso (Preencher com IA, Catalogar foto, Buscar foto na internet); erros e cota excedida; e as últimas chamadas, com a IA, o tempo e os tokens.
