@@ -11,7 +11,7 @@
     ["vestuario", "Roupas e calçados"], ["utilidades", "Utilidades"], ["outros", "Outros"],
   ];
   const CAT = Object.fromEntries(CATS);
-  const SOURCES = { foto: "Catalogado por foto", informado: "Valor informado", ia: "Leitura por IA", manual: "Cadastro manual" };
+  const SOURCES = { foto: "Catalogado por foto", informado: "Valor informado", ia: "Leitura por IA", voz: "Cadastro por voz", manual: "Cadastro manual" };
   const ORDERS = [["rel", "Mais relevantes"], ["val", "Maior valor"], ["valasc", "Menor valor"], ["az", "Nome, de A a Z"], ["new", "Mais recentes"], ["code", "Código"]];
   const PREVIEW = !!window.INV_PREVIEW;
   const COARSE = window.matchMedia("(pointer: coarse)").matches;
@@ -431,6 +431,7 @@
     el.innerHTML = `
       <div class="mh-row">
         <p class="eyebrow"><span class="brand-word">Inventar<span>IA</span></span>${first ? `<span class="hello"><span class="sep"> · </span>Olá, ${esc(first)}</span>` : ""}</p>
+        ${voiceReady() ? `<button type="button" class="mic-top" data-act="voice" aria-label="Falar: adicionar itens falando" title="Falar">${ic("mic")}</button>` : ""}
         ${r.name !== "room" ? `<div class="top-actions">
           ${aiOn() ? `<button type="button" class="btn wide" data-act="catalog">${ic("scan")}Catalogar foto com IA</button>` : ""}
           <button type="button" class="btn primary wide" data-act="item-new">${ic("plus")}Adicionar item</button></div>` : ""}
@@ -861,6 +862,11 @@
         <div class="oa">${switchHtml("ai-on", on, "ai-on-h")}</div></li></ul>
       ${on ? `<div data-slot="ai-panel"><p class="muted">Verificando…</p></div>` : ""}
     </section>
+    <section class="panel" id="p-voice">
+      <h2>${secIc("mic")}Falar</h2>
+      <p class="lead">O microfone no alto da tela: fale os itens e quanto valem. O Home Assistant transcreve e ${on ? "a IA separa os itens" : "o app separa os itens"}, para você conferir antes de adicionar.</p>
+      <div data-slot="voice-panel"><p class="muted">Verificando…</p></div>
+    </section>
     ${on ? `<section class="panel" id="p-usage">
       <h2>${secIc("bars")}Uso da IA</h2>
       <p class="lead">Cada leitura de foto, foto catalogada ou busca de foto na internet é uma chamada para a IA do Home Assistant. O Home Assistant não informa tokens nem custo, então o InventarIA conta as chamadas e estima os tokens pelo tamanho do texto.</p>
@@ -870,7 +876,7 @@
 
   // -- uso da IA (igual ao do EconomIA): hoje, 7 dias e o mês, gráfico por dia e as últimas chamadas
   let usageData = null, usageSel = null;
-  const USAGE_KIND = { foto: "Preencher com IA", catalogo: "Catalogar foto", busca: "Buscar foto na internet" };
+  const USAGE_KIND = { foto: "Preencher com IA", catalogo: "Catalogar foto", busca: "Buscar foto na internet", fala: "Falar" };
   const USAGE_RES = { ok: "", cota: "cota excedida", formato: "fora do formato", sem_busca: "sem busca na web", erro: "erro" };
   const WEEKDAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -962,8 +968,8 @@
     </section>
     <section class="panel" id="p-history">
       <h2>${secIc("history")}Versões anteriores</h2>
-      <p class="lead">O app guarda sozinho uma cópia do inventário a cada 10 minutos de uso e fica com as 3 mais recentes. Se algo sair errado, volte para uma delas.</p>
-      <div data-slot="history"><p class="muted">Carregando…</p></div>
+      <p class="lead">O app guarda sozinho uma cópia do inventário a cada 10 minutos de uso e antes de importar ou restaurar, e fica com as 3 mais recentes. Se algo sair errado, volte para uma delas.</p>
+      <ul class="opts"><li><div class="ot"><b>Versões guardadas</b><span>Veja a data e quantos itens cada uma tem, e restaure a que quiser.</span></div><div class="oa"><button class="btn" data-act="versions">${ic("history")}Ver versões</button></div></li></ul>
     </section>
     <section class="panel" id="p-where">
       <h2>${secIc("folder")}Onde ficam os dados</h2>
@@ -1014,7 +1020,6 @@
   async function loadDataPanels() {
     const tab = moreTab(base.tab);
     const bslot = tab === "dados" ? $('#view [data-slot="backups"]') : null;
-    const hslot = tab === "dados" ? $('#view [data-slot="history"]') : null;
     const aslot = tab === "integracoes" ? $('#view [data-slot="ai-panel"]') : null;
     if (bslot) try {
       const b = await API.get("api/backups");
@@ -1027,16 +1032,9 @@
         </ul>`;
       }
     } catch (e) { bslot.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
-    if (hslot) try {
-      const h = await API.get("api/history");
-      if (document.contains(hslot)) {
-        const list = h.history || [];
-        hslot.innerHTML = list.length ? `<ul class="opts">${list.slice(0, 3).map((x) => `<li><div class="ot"><b>${esc(dateTime(x.date))}</b><span>${esc(ago(x.date))}</span></div>
-          <div class="oa"><button class="btn sm" data-act="history-restore" data-name="${esc(x.name)}">${ic("history", "sm")}Voltar para esta versão</button></div></li>`).join("")}</ul>`
-          : `<p class="muted">Ainda não há versões anteriores. Elas aparecem depois das primeiras alterações.</p>`;
-      }
-    } catch (e) { hslot.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
     if (aslot) { const st = await aiStatus(true); if (document.contains(aslot)) renderAiPanel(aslot, st); }
+    const vslot = tab === "integracoes" ? $('#view [data-slot="voice-panel"]') : null;
+    if (vslot) { renderVoicePanel(vslot); }
     const uslot = tab === "integracoes" ? $('#view [data-slot="usage"]') : null;
     if (uslot) {
       try { usageData = PREVIEW ? usageExample() : await API.get("api/ai/usage"); if (document.contains(uslot)) renderUsage(uslot); }
@@ -1642,25 +1640,155 @@
     });
   }
 
-  // ------------------------------------------------------------------ catalogar foto com IA (vários itens)
-  async function openCatalog({ room = null, file = null } = {}) {
+  // ------------------------------------------------------------------ Falar (como no ResolvIA e no CronologIA)
+  // Grava o microfone como PCM cru, 16 kHz, 16 bits, mono (o que a fala para texto do Home Assistant recebe,
+  // igual ao Assist), com o volume para a tela. O servidor manda para a fala para texto e a IA separa os itens.
+  const VOICE_RATE = 16000, VOICE_MAX_S = 120;
+  class Recorder {
+    constructor(onLevel) { this.onLevel = onLevel; this.chunks = []; this.length = 0; this.rate = VOICE_RATE; }
+    async start() {
+      const md = navigator.mediaDevices;
+      if (!md || !md.getUserMedia) throw Object.assign(new Error("no_api"), { name: "NoApi" });
+      this.stream = await md.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      const AC = window.AudioContext || window.webkitAudioContext;
+      try { this.ctx = new AC({ sampleRate: VOICE_RATE }); } catch { this.ctx = new AC(); } // alguns só gravam na taxa deles: ajusta no fim
+      if (this.ctx.state === "suspended") await this.ctx.resume().catch(() => {});
+      this.rate = this.ctx.sampleRate;
+      this.src = this.ctx.createMediaStreamSource(this.stream);
+      this.node = this.ctx.createScriptProcessor(4096, 1, 1);
+      this.node.onaudioprocess = (e) => {
+        const data = e.inputBuffer.getChannelData(0);
+        this.chunks.push(new Float32Array(data));
+        this.length += data.length;
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 4) sum += data[i] * data[i];
+        if (this.onLevel) this.onLevel(Math.min(1, Math.sqrt(sum / (data.length / 4)) * 5));
+      };
+      this.src.connect(this.node);
+      this.node.connect(this.ctx.destination); // a saída fica muda; só mantém o nó rodando
+    }
+    seconds() { return this.length / this.rate; }
+    stop() { // para e devolve o áudio: PCM Int16 a 16 kHz
+      this.close();
+      const all = new Float32Array(this.length);
+      let o = 0;
+      for (const c of this.chunks) { all.set(c, o); o += c.length; }
+      this.chunks = [];
+      const ratio = this.rate / VOICE_RATE, n = Math.floor(all.length / ratio), out = new Int16Array(n);
+      for (let i = 0; i < n; i++) { // média de cada janela: um filtro simples quando o navegador gravou a 44,1/48 kHz
+        const a = Math.floor(i * ratio), b = Math.max(a + 1, Math.min(all.length, Math.floor((i + 1) * ratio)));
+        let sum = 0;
+        for (let j = a; j < b; j++) sum += all[j];
+        const v = Math.max(-1, Math.min(1, sum / (b - a)));
+        out[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+      }
+      return out;
+    }
+    cancel() { this.close(); this.chunks = []; this.length = 0; }
+    close() {
+      try { if (this.node) this.node.onaudioprocess = null; if (this.src) this.src.disconnect(); if (this.node) this.node.disconnect(); } catch { /* já fechado */ }
+      if (this.stream) for (const t of this.stream.getTracks()) t.stop();
+      if (this.ctx && this.ctx.state !== "closed") this.ctx.close().catch(() => {});
+      this.stream = null; this.node = null; this.src = null;
+    }
+  }
+  function micError(err) {
+    const n = (err && err.name) || "";
+    if (n === "NotAllowedError" || n === "SecurityError") return "O microfone está bloqueado. Permita o microfone para o Home Assistant (no navegador, no cadeado ao lado do endereço; no app do celular, nas permissões do app Home Assistant) e tente de novo.";
+    if (n === "NotFoundError" || n === "OverconstrainedError") return "Não achei um microfone neste aparelho.";
+    if (n === "NotReadableError") return "O microfone está sendo usado por outro app. Feche o outro e tente de novo.";
+    if (n === "NoApi") return "Este navegador não deixa usar o microfone aqui. Abra o Home Assistant pelo endereço com https (como o do Nabu Casa) ou pelo app.";
+    return `Não consegui abrir o microfone (${(err && err.message) || n || "erro"}).`;
+  }
+  async function loadVoice(fresh = false) {
+    if (PREVIEW) return;
+    try { S.voice = await API.get(`api/voice/status${fresh ? "?fresh=1" : ""}`); } catch (e) { S.voice = { ready: false, reason: e.message }; }
+    renderTop();
+  }
+  function renderVoicePanel(slot) {
+    const v = S.voice;
+    slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status ${v && v.ready ? "ok" : "bad"}"><i></i>${v && v.ready ? "Pronto para ouvir" : v ? "Sem fala para texto" : "Verificando…"}</span></b>
+        <span>${v && v.ready ? `Usando ${esc(v.name || v.engine)} (${esc(v.language || "pt-BR")}). O microfone aparece no alto de todas as telas.` : esc((v && v.reason) || "")}</span></div>
+      <div class="oa"><button class="btn sm" data-act="voice-refresh">${ic("refresh", "sm")}Verificar de novo</button></div></li></ul>`;
+  }
+  const voiceReady = () => !!(S.voice && S.voice.ready);
+  const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  // sem IA: separa o que foi dito pelas vírgulas, pontos e "e". Um pedaço que é só valor ("2.000 reais", "500")
+  // vira o valor do item anterior; "TV Samsung R$ 3.000" fica TV Samsung com 3.000. Valor por extenso
+  // ("dois mil reais") vai para os detalhes do item, para conferir.
+  const VALUE_WORDS = new Set(("uns umas um uma cerca de por vale valor custou paguei mais ou menos aproximadamente uns e r$ reais real mil centavos " +
+    "dois duas três tres quatro cinco seis sete oito nove dez onze doze treze quatorze catorze quinze dezesseis dezessete dezoito dezenove vinte trinta " +
+    "quarenta cinquenta sessenta setenta oitenta noventa cem cento duzentos duzentas trezentos trezentas quatrocentos quinhentos seiscentos setecentos oitocentos novecentos").split(" "));
+  const isValueBit = (x) => /\d|\b(?:reais|real|mil)\b/i.test(x) && x.toLowerCase().replace(/r\$/g, " r$ ").split(/\s+/).filter(Boolean).every((w) => /^[\d.,]+$/.test(w) || VALUE_WORDS.has(w));
+  const TAIL_VALUE = /\s*(?:r\$\s*\d[\d.]*(?:,\d+)?(?:\s*mil)?|\d[\d.]*(?:,\d+)?(?:\s*mil)?\s*(?:reais|real))\s*$/i;
+  const valueOf = (t) => {
+    const m = String(t).match(/\d[\d.]*(?:,\d+)?/);
+    if (!m) return 0;
+    let v = parseFloat(m[0].replace(/\.(?=\d{3}\b)/g, "").replace(",", ".")) || 0;
+    if (/\bmil\b/i.test(t) && v < 1000) v *= 1000;
+    return v;
+  };
+  function splitSpoken(t) {
+    const out = [];
+    for (const raw of String(t || "").split(/\s*(?:[;\n]|(?<!\d),|,(?!\d)|\.(?:\s|$)|\s+e\s+)\s*/i)) { // a vírgula do "2.499,90" fica
+      let x = raw.trim().replace(/\.$/, "").replace(/^e\s+/i, "").trim();
+      if (x.length < 2) continue;
+      const prev = out[out.length - 1];
+      if (prev && isValueBit(x)) {
+        const v = valueOf(x);
+        if (v) prev.value = v; else prev.details = prev.details ? `${prev.details}; ${x}` : x;
+        continue;
+      }
+      let value = 0;
+      const tail = x.match(TAIL_VALUE);
+      if (tail && tail.index > 0) { value = valueOf(tail[0]); x = x.slice(0, tail.index).trim(); }
+      if (out.length < 25) out.push({ name: x.charAt(0).toUpperCase() + x.slice(1), details: "", cat: "outros", qty: "1", value, zone: "", existing: "", confidence: "media", on: true });
+    }
+    return out;
+  }
+
+  // ------------------------------------------------------------------ catalogar foto com IA (vários itens); também a revisão do Falar
+  async function openCatalog({ room = null, file = null, voice = false } = {}) {
     if (!D.rooms.length) { toast("Crie um cômodo antes."); openRoomNew(); return; }
-    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return; }
-    if (!(await needAi())) return;
+    if (!voice && !aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return; }
+    if (!voice && !(await needAi())) return;
     const zonesUse = zonesOn();
-    const C = { step: file ? "ready" : "photo", room: room && D.roomById.has(room) ? room : lastRoom(), zone: "", hint: "", file, uploading: false, results: [], keep: true, entity: "", error: null, raw: "", busy: false, token: 0 };
+    const useAi = voice ? aiOn() && !!(await aiStatus()).ready : true;
+    const C = { step: voice ? "voice" : file ? "ready" : "photo", room: room && D.roomById.has(room) ? room : lastRoom(), zone: "", hint: "", file, uploading: false, results: [], keep: true, entity: "", error: null, raw: "", busy: false, token: 0,
+      voice, heard: "", rec: "off", secs: 0, level: 0, note: "" };
+    let rec = null, recTimer = null;
+    const stopRec = () => { clearInterval(recTimer); if (rec) rec.cancel(); rec = null; };
+    const title = voice ? "Falar" : "Catalogar foto com IA";
     const entry = openDialog({
-      cls: "modal wide", label: "Catalogar foto com IA",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Catalogar foto com IA</h2><button type="button" class="btn ghost icon" data-ct="cancel" aria-label="Fechar">${ic("close")}</button></div>
+      cls: "modal wide", label: title,
+      html: `<div class="dlg"><div class="dlg-h"><h2>${title}</h2><button type="button" class="btn ghost icon" data-ct="cancel" aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b drop" data-slot="body"></div><div class="dlg-f" data-slot="foot"></div></div>`,
-      guard: async () => C.step !== "review" || !C.results.some((r) => r.on) || confirmBox({ title: "Descartar os itens encontrados?", body: "Os itens lidos pela IA ainda não foram adicionados.", ok: "Descartar", cancel: "Voltar", danger: true }),
+      guard: async () => C.step !== "review" || !C.results.some((r) => r.on) || confirmBox({ title: "Descartar os itens encontrados?", body: voice ? "Os itens do que você falou ainda não foram adicionados." : "Os itens lidos pela IA ainda não foram adicionados.", ok: "Descartar", cancel: "Voltar", danger: true }),
+      onClose: () => { C.token++; stopRec(); },
     });
     const dlg = entry.dlg;
     const body = $('[data-slot="body"]', dlg), foot = $('[data-slot="foot"]', dlg);
     const roomName = () => D.roomById.get(C.room)?.name || "";
+    const roomSelect = (label) => `<div class="field"><label for="c-room">${label}</label><select id="c-room" class="select" data-ct-in="room">${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === C.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>`;
+    const heardBox = () => (C.heard ? `<p class="heard">${ic("mic", "sm")}<span>“${esc(C.heard)}”</span></p>` : "");
 
     function render() {
-      if (C.step === "photo" || C.step === "ready") {
+      if (C.step === "voice") {
+        const on = C.rec === "on";
+        body.innerHTML = `<div class="voice${on ? " on" : ""}">
+            <button type="button" class="voice-mic" data-ct="mic" style="--lvl:${on ? C.level.toFixed(2) : 0}" aria-label="${on ? "Pronto: enviar o que falei" : "Começar a falar"}"><span class="voice-ring"></span>${ic(on ? "check" : "mic")}</button>
+            <div class="voice-state" aria-live="polite">${on ? `<b>Ouvindo…</b> <span class="voice-time">${clock(C.secs)}</span>` : C.rec === "starting" ? "Abrindo o microfone…" : "Toque no microfone e fale"}</div>
+            <p class="voice-hint">${on ? "Toque de novo quando terminar." : "Por exemplo: “Sofá cinza de três lugares, uns dois mil reais. Televisão Samsung de 55 polegadas, três mil.”"}</p>
+          </div>
+          <div class="form" style="margin-top:8px">${roomSelect("Vai para o cômodo")}</div>
+          ${C.error ? `<div class="formerr" style="margin-top:14px">${esc(C.error)}</div>` : ""}
+          <p class="voice-note">O Home Assistant transcreve${S.voice && S.voice.name ? ` (${esc(S.voice.name)})` : ""} e ${useAi ? "a IA separa os itens, com categoria e valor" : "o app separa os itens pelas vírgulas e pelo “e”"}. Você revisa antes de adicionar. Até 2 minutos de cada vez.</p>`;
+        foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
+          <button type="button" class="btn primary" data-ct="done"${on ? "" : " disabled"}>${ic("check")}Pronto</button>`;
+      } else if (C.step === "transcribing") {
+        body.innerHTML = `<div class="ai-wait voice-wait"><span class="spin lg"></span><b>Transcrevendo o que você disse…</b><span>O Home Assistant está passando a fala para texto.</span></div>`;
+        foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="stop">Cancelar</button>`;
+      } else if (C.step === "photo" || C.step === "ready") {
         const hasRoomPhotos = (D.roomById.get(C.room)?.photos || []).length > 0;
         body.innerHTML = `<div class="form">
           <p class="muted" style="margin:0">A IA lista os objetos da foto com nome, categoria, quantidade e uma sugestão de valor. Você revisa tudo antes de adicionar.</p>
@@ -1673,7 +1801,7 @@
                 ${hasRoomPhotos ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="roomphoto">${ic("images", "lg")}Foto do cômodo</button>` : ""}`}
               </div>${ANDROID_APP ? `<p class="help" style="margin:0">No app do Home Assistant as fotos vêm da galeria. Tire a foto antes com a câmera do celular.</p>` : COARSE ? "" : `<p class="help" style="margin:0">Você também pode arrastar a foto para cá ou colar com Ctrl+V.</p>`}`}
           <div class="${zonesUse ? "row2" : ""}">
-            <div class="field"><label for="c-room">Cômodo</label><select id="c-room" class="select" data-ct-in="room">${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === C.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
+            ${roomSelect("Cômodo")}
             ${zonesUse ? `<div class="field"><label for="c-zone">Zona (opcional)</label><input id="c-zone" class="input" data-ct-in="zone" list="c-zones" value="${esc(C.zone)}" placeholder="Deixe vazio para a IA sugerir" autocomplete="off">
               <datalist id="c-zones">${zonesOf(C.room).map((z) => `<option value="${esc(z)}">`).join("")}</datalist></div>` : ""}
           </div>
@@ -1682,21 +1810,24 @@
         foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
           <button type="button" class="btn primary" data-ct="read"${C.file ? "" : " disabled"}>${ic("scan")}Ler foto</button>`;
       } else if (C.step === "reading") {
-        body.innerHTML = `<div class="cat-photo"><img src="${esc(src(C.file, "photos"))}" alt=""><div class="scan"></div></div>
+        body.innerHTML = C.voice ? `${heardBox()}<div class="ai-wait voice-wait"><span class="spin lg"></span><b>Separando os itens…</b><span>A IA está lendo o que você disse.</span></div>`
+          : `<div class="cat-photo"><img src="${esc(src(C.file, "photos"))}" alt=""><div class="scan"></div></div>
           <div class="ai-wait"><b>Lendo a foto…</b><span>A IA está listando os objetos. Pode levar até um minuto.</span></div>`;
-        foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="stop">Cancelar leitura</button>`;
+        foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="stop">${C.voice ? "Cancelar" : "Cancelar leitura"}</button>`;
       } else if (C.step === "error") {
-        body.innerHTML = `<div class="cat-photo"><img src="${esc(src(C.file, "thumbs"))}" alt="" style="max-height:220px"></div>
+        body.innerHTML = `${C.voice ? heardBox() : `<div class="cat-photo"><img src="${esc(src(C.file, "thumbs"))}" alt="" style="max-height:220px"></div>`}
           <div class="formerr" style="margin-top:14px">${esc(C.error)}</div>
           ${C.raw ? `<details style="margin-top:10px"><summary class="muted">Ver resposta da IA</summary><pre style="white-space:pre-wrap;font-size:13px">${esc(C.raw)}</pre></details>` : ""}`;
-        foot.innerHTML = `<button type="button" class="btn" data-ct="back">${ic("back", "sm")}Voltar</button><span class="grow"></span><button type="button" class="btn primary" data-ct="read">${ic("refresh")}Tentar de novo</button>`;
+        foot.innerHTML = `<button type="button" class="btn" data-ct="back">${ic(C.voice ? "mic" : "back", "sm")}${C.voice ? "Falar de novo" : "Voltar"}</button><span class="grow"></span><button type="button" class="btn primary" data-ct="read">${ic("refresh")}Tentar de novo</button>`;
       } else if (C.step === "review") {
         const on = C.results.filter((r) => r.on).length;
         const zones = zonesOf(C.room);
-        body.innerHTML = `<div style="display:flex;gap:14px;align-items:center;margin-bottom:16px">
-            <img src="${esc(src(C.file))}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:8px;flex:none">
+        body.innerHTML = `${C.voice ? heardBox() : ""}<div style="display:flex;gap:14px;align-items:center;margin-bottom:16px">
+            ${C.file ? `<img src="${esc(src(C.file))}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:8px;flex:none">` : ""}
             <div><b style="font:600 21px/1.2 var(--font-c)">${C.results.length ? plural(C.results.length, "item encontrado", "itens encontrados") : "Nenhum item encontrado"}</b>
             <div class="muted" style="font-size:14px">Em ${esc(roomName())}. Confira nomes e valores antes de adicionar.</div></div></div>
+          ${C.voice ? `<div class="form" style="margin:0 0 14px">${roomSelect("Cômodo")}</div>` : ""}
+          ${C.note ? `<p class="inote" style="margin:0 0 14px">${ic("info")}<span>${esc(C.note)}</span></p>` : ""}
           ${C.example ? `<p class="inote" style="margin:0 0 14px">${ic("info")}<span>Exemplo simulado da prévia: aqui a IA não lê a foto. No Home Assistant, a lista vem da sua integração de IA.</span></p>` : ""}
           ${C.results.length ? `<datalist id="cr-zones">${zones.map((z) => `<option value="${esc(z)}">`).join("")}</datalist><ul class="found">${C.results.map((r, i) => `<li class="${r.on ? "" : "off"}">
             <input type="checkbox" class="fcheck" data-ri="${i}" data-rf="on"${r.on ? " checked" : ""} aria-label="Adicionar ${esc(r.name)}">
@@ -1709,9 +1840,9 @@
               ${r.details ? `<p class="fdet">${esc(r.details)}</p>` : ""}
               ${r.existing || r.confidence === "baixa" ? `<div class="fflag">${r.existing ? `<span class="pill warn">Parece já cadastrado: ${esc(r.existing)}</span>` : ""}${r.confidence === "baixa" ? `<span class="pill">IA pouco segura, confira</span>` : ""}</div>` : ""}
             </div></li>`).join("")}</ul>
-          ${(D.roomById.get(C.room)?.photos || []).some((p) => p.file === C.file) ? "" : `<label class="check" style="margin-top:16px"><input type="checkbox" data-ct-in="keep"${C.keep ? " checked" : ""}> Guardar esta foto nas fotos de ${esc(roomName())}</label>`}`
-          : `<p class="muted">A IA não encontrou objetos para catalogar. Tente uma foto mais próxima ou escreva uma dica.</p>`}`;
-        foot.innerHTML = `<button type="button" class="btn" data-ct="back">${ic("back", "sm")}Outra foto</button><span class="grow"></span>
+          ${!C.file || (D.roomById.get(C.room)?.photos || []).some((p) => p.file === C.file) ? "" : `<label class="check" style="margin-top:16px"><input type="checkbox" data-ct-in="keep"${C.keep ? " checked" : ""}> Guardar esta foto nas fotos de ${esc(roomName())}</label>`}`
+          : `<p class="muted">${C.voice ? "Não achei itens no que você falou. Fale o nome de cada item, por exemplo “sofá cinza, televisão Samsung”." : "A IA não encontrou objetos para catalogar. Tente uma foto mais próxima ou escreva uma dica."}</p>`}`;
+        foot.innerHTML = `<button type="button" class="btn" data-ct="back">${ic(C.voice ? "mic" : "back", "sm")}${C.voice ? "Falar de novo" : "Outra foto"}</button><span class="grow"></span>
           <button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
           <button type="button" class="btn primary" data-ct="add"${on ? "" : " disabled"}>${ic("plus")}${on > 1 ? `Adicionar ${on} itens` : on === 1 ? "Adicionar 1 item" : "Adicionar"}</button>`;
       }
@@ -1723,8 +1854,69 @@
       try { C.file = await uploadPhoto(f); C.step = "ready"; } catch (e) { fail(e); }
       finally { C.uploading = false; if (document.contains(dlg)) render(); }
     };
-    wireDrop(entry, body, setFile);
+    if (!voice) wireDrop(entry, body, setFile);
+    async function startRec() {
+      if (rec) return;
+      C.error = null; C.rec = "starting"; C.secs = 0; C.level = 0; render();
+      const r = new Recorder((lvl) => { C.level = lvl; });
+      rec = r;
+      try { await r.start(); }
+      catch (err) { r.cancel(); if (rec === r) rec = null; C.rec = "off"; C.error = micError(err); if (document.contains(dlg)) render(); return; }
+      if (rec !== r || !document.contains(dlg) || C.step !== "voice") { r.cancel(); return; }
+      C.rec = "on"; render();
+      clearInterval(recTimer);
+      recTimer = setInterval(() => { // só o anel e o relógio mudam: a tela não é redesenhada a cada volta
+        if (rec !== r) { clearInterval(recTimer); return; }
+        C.secs = r.seconds();
+        $(".voice-mic", dlg)?.style.setProperty("--lvl", C.level.toFixed(2));
+        const t = $(".voice-time", dlg);
+        if (t) t.textContent = clock(C.secs);
+        if (C.secs >= VOICE_MAX_S) finishRec();
+      }, 120);
+    }
+    async function finishRec() {
+      const r = rec;
+      if (!r) return;
+      clearInterval(recTimer); rec = null;
+      const pcm = r.stop();
+      C.rec = "off";
+      if (pcm.length < VOICE_RATE * 0.4) { C.error = "Não ouvi nada. Toque no microfone e fale."; render(); return; }
+      const my = ++C.token;
+      C.step = "transcribing"; C.error = null; render();
+      try {
+        const res = await API.raw("POST", "api/voice", pcm);
+        if (my !== C.token) return;
+        C.heard = res.text || "";
+        await readSpoken(my);
+      } catch (e) {
+        if (my !== C.token) return;
+        C.step = "voice"; C.error = e.message;
+        if (document.contains(dlg)) render();
+      }
+    }
+    async function readSpoken(my = ++C.token) {
+      C.note = "";
+      if (!useAi) {
+        C.results = splitSpoken(C.heard);
+        C.note = "Sem IA, o app separou o que você falou pelas vírgulas e pelo “e”. Confira os nomes e coloque os valores.";
+        C.step = "review"; render();
+        return;
+      }
+      C.step = "reading"; C.error = null; C.raw = ""; render();
+      try {
+        const res = await API.post("api/ai/text", { text: C.heard, room: C.room });
+        if (my !== C.token) return;
+        if (res.room && D.roomById.has(res.room)) C.room = res.room;
+        C.results = (res.items || []).map((r) => ({ ...r, zone: zonesUse ? r.zone || "" : "", on: !r.existing }));
+        C.step = "review";
+      } catch (e) {
+        if (my !== C.token) return;
+        C.step = "error"; C.error = e.message; C.raw = (e.data && e.data.raw) || "";
+      }
+      if (document.contains(dlg)) render();
+    }
     async function read() {
+      if (C.voice) { if (C.heard) readSpoken(); return; }
       if (!C.file) return;
       const my = ++C.token;
       C.step = "reading"; C.error = null; C.raw = ""; render();
@@ -1751,8 +1943,8 @@
       btn.disabled = true; btn.innerHTML = `<span class="spin"></span>Adicionando`;
       try {
         const res = await API.post("api/items/batch", {
-          items: chosen.map((r) => ({ room: C.room, zone: zonesUse ? (r.zone || C.zone || "").trim() : "", name: String(r.name).trim(), details: r.details || "", cat: r.cat, qty: String(r.qty || "1").trim() || "1", value: parseMoney(r.value), photos: [C.file], source: "ia" })),
-          roomPhoto: C.keep ? { room: C.room, file: C.file, label: (C.hint || chosen.slice(0, 3).map((r) => String(r.name).trim()).join(", ")).slice(0, 160) } : null,
+          items: chosen.map((r) => ({ room: C.room, zone: zonesUse ? (r.zone || C.zone || "").trim() : "", name: String(r.name).trim(), details: r.details || "", cat: r.cat, qty: String(r.qty || "1").trim() || "1", value: parseMoney(r.value), photos: C.file ? [C.file] : [], source: C.voice ? "voz" : "ia" })),
+          roomPhoto: C.file && C.keep ? { room: C.room, file: C.file, label: (C.hint || chosen.slice(0, 3).map((r) => String(r.name).trim()).join(", ")).slice(0, 160) } : null,
         });
         setRev(res.rev);
         res.items.forEach(upsertItem);
@@ -1770,12 +1962,18 @@
       if (!b) return;
       const act = b.dataset.ct;
       if (act === "cancel") requestClose(entry);
+      else if (act === "mic") { if (C.rec === "on") finishRec(); else if (C.rec === "off") startRec(); }
+      else if (act === "done") finishRec();
       else if (act === "upload") pickFiles(setFile, { multiple: false });
       else if (act === "camera") pickFiles(setFile, { camera: true });
       else if (act === "change") { C.file = null; C.step = "photo"; render(); }
       else if (act === "roomphoto") { const [f] = await roomPhotoPicker(C.room); if (f) { C.file = f; C.keep = false; C.step = "ready"; render(); } }
       else if (act === "read") read();
-      else if (act === "stop" || act === "back") { C.token++; C.step = C.file ? "ready" : "photo"; render(); }
+      else if (act === "stop" || act === "back") {
+        C.token++;
+        if (C.voice) { stopRec(); C.step = "voice"; C.rec = "off"; C.results = []; C.error = null; render(); if (act === "back") startRec(); }
+        else { C.step = C.file ? "ready" : "photo"; render(); }
+      }
       else if (act === "add") add();
     });
     dlg.addEventListener("input", (e) => {
@@ -1786,13 +1984,14 @@
     });
     dlg.addEventListener("change", (e) => {
       const t = e.target;
-      if (t.dataset.ctIn === "room") { C.room = t.value; render(); }
+      if (t.dataset.ctIn === "room") { C.room = t.value; if (!(C.voice && C.step === "voice")) render(); }
       else if (t.dataset.ctIn === "keep") C.keep = t.checked;
       else if (t.dataset.rf === "on") { C.results[+t.dataset.ri].on = t.checked; render(); }
       else if (t.dataset.rf === "cat") C.results[+t.dataset.ri].cat = t.value;
     });
     dlg.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.dataset.ctIn === "hint" && C.file) { e.preventDefault(); read(); } });
     render();
+    if (voice) startRec();
   }
 
   // ------------------------------------------------------------------ visualizador de fotos
@@ -2019,13 +2218,17 @@
 
   function openAddMenu() {
     const rid = base.name === "room" ? base.id : null;
+    // Novo cômodo fica na aba Cômodos; aqui só o que entra no inventário
+    const opts = [
+      ["item", "plus", "Adicionar item", "Com foto e valor, preenchendo os campos"],
+      aiOn() && ["catalog", "scan", "Catalogar foto com IA", "A IA lista vários itens de uma foto"],
+      voiceReady() && ["voice", "mic", "Falar os itens", `Diga o que tem e quanto vale; ${aiOn() ? "a IA separa os itens" : "o app separa os itens"}`],
+    ].filter(Boolean);
     const entry = openDialog({
       cls: "modal narrow", label: "Adicionar",
       html: `<div class="dlg"><div class="dlg-h"><h2>Adicionar</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b" style="padding:8px 12px 16px"><ul class="opts" style="border-top:0">
-          <li style="padding:0;border:0"><button class="rrow nocode" data-go="item" style="grid-template-columns:auto 1fr;padding:14px 8px">${ic("plus", "lg")}<span class="rn">Adicionar item<small style="display:block;margin:2px 0 0">Com foto e valor, preenchendo os campos</small></span></button></li>
-          ${aiOn() ? `<li style="padding:0;border:0"><button class="rrow nocode" data-go="catalog" style="grid-template-columns:auto 1fr;padding:14px 8px">${ic("scan", "lg")}<span class="rn">Catalogar foto com IA<small style="display:block;margin:2px 0 0">A IA lista vários itens de uma foto</small></span></button></li>` : ""}
-          <li style="padding:0;border:0"><button class="rrow nocode" data-go="room" style="grid-template-columns:auto 1fr;padding:14px 8px;border-bottom:0">${ic("rooms", "lg")}<span class="rn">Novo cômodo<small style="display:block;margin:2px 0 0">Uma área nova da casa</small></span></button></li>
+          ${opts.map(([go, icon, title, sub], i) => `<li style="padding:0;border:0"><button class="rrow nocode" data-go="${go}" style="grid-template-columns:auto 1fr;padding:14px 8px${i === opts.length - 1 ? ";border-bottom:0" : ""}">${ic(icon, "lg")}<span class="rn">${title}<small style="display:block;margin:2px 0 0">${sub}</small></span></button></li>`).join("")}
         </ul></div></div>`,
     });
     entry.dlg.addEventListener("click", (e) => {
@@ -2033,7 +2236,7 @@
       const b = e.target.closest("[data-go]");
       if (!b) return;
       const go = b.dataset.go;
-      finalizeThen(entry, () => { if (go === "item") openEditor({ room: rid }); else if (go === "catalog") openCatalog({ room: rid }); else openRoomNew(); });
+      finalizeThen(entry, () => { if (go === "item") openEditor({ room: rid }); else if (go === "catalog") openCatalog({ room: rid }); else if (go === "voice") openCatalog({ room: rid, voice: true }); });
     });
   }
 
@@ -2059,11 +2262,35 @@
     try { await API.post("api/backups/restore", { name }); await loadData(); refreshAll(); toast("Backup restaurado"); }
     catch (e) { fail(e); }
   }
-  async function restoreHistory(name, label) {
-    const ok = await confirmBox({ title: "Voltar para esta versão?", body: `O inventário volta a ficar como estava em <b>${esc(label)}</b>. A versão atual também fica guardada nesta lista.`, ok: "Voltar para esta versão", danger: true });
-    if (!ok) return;
-    try { await API.post("api/history/restore", { name }); await loadData(); refreshAll(); toast("Versão restaurada"); }
-    catch (e) { fail(e); }
+  const VERSION_WHY = { auto: "automática", restore: "antes de restaurar", import: "antes de importar" };
+  async function restoreHistory(v) {
+    const ok = await confirmBox({ title: "Restaurar esta versão?", body: `O inventário volta a ser o de <b>${esc(dateTime(v.date))}</b>${v.items != null ? `, com ${esc(plural(v.items, "item", "itens"))} em ${esc(plural(v.rooms || 0, "cômodo", "cômodos"))}` : ""}. Antes, o app guarda uma cópia do que existe hoje.`, ok: "Restaurar", danger: true });
+    if (!ok) return false;
+    try { await API.post("api/history/restore", { name: v.name }); await loadData(); refreshAll(); toast("Versão restaurada"); return true; }
+    catch (e) { fail(e); return false; }
+  }
+  // Versões anteriores, como no ResolvIA: o botão abre a lista, e cada versão tem o Restaurar
+  async function openVersions() {
+    const entry = openDialog({
+      cls: "modal narrow", label: "Versões anteriores",
+      html: `<div class="dlg"><div class="dlg-h"><h2>Versões anteriores</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <div class="dlg-b" data-slot="versions"><p class="muted" style="margin:0">Carregando…</p></div></div>`,
+    });
+    const slot = $('[data-slot="versions"]', entry.dlg);
+    let list = [];
+    try {
+      list = (await API.get("api/history")).history || [];
+      slot.innerHTML = list.length ? `<ul class="opts versions">${list.map((v, i) => `<li><div class="ot"><b>${esc(dateTime(v.date))}</b>
+          <span>${esc(ago(v.date))}${v.items != null ? ` · ${esc(plural(v.items, "item", "itens"))}` : ""} · ${esc(VERSION_WHY[v.reason] || "automática")}</span></div>
+          <div class="oa"><button type="button" class="btn sm" data-ver="${i}">${ic("history", "sm")}Restaurar</button></div></li>`).join("")}</ul>
+        <p class="help" style="margin:12px 0 0">O app fica com as 3 cópias mais recentes. Restaurar também guarda uma cópia do que existe hoje.</p>`
+        : `<p class="muted" style="margin:0">Ainda não há versões anteriores. Elas aparecem depois das primeiras alterações.</p>`;
+    } catch (e) { slot.innerHTML = `<p class="muted" style="margin:0">${esc(e.message)}</p>`; }
+    entry.dlg.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
+      const b = e.target.closest("[data-ver]");
+      if (b && list[+b.dataset.ver] && (await restoreHistory(list[+b.dataset.ver]))) requestClose(entry, { force: true });
+    });
   }
   $("#pick-import").addEventListener("change", (e) => {
     const files = [...e.target.files];
@@ -2237,11 +2464,13 @@
       case "export": download(b.dataset.kind); break;
       case "backup-create": createBackup(b); break;
       case "backup-restore": restoreBackup(b.dataset.name); break;
-      case "history-restore": restoreHistory(b.dataset.name, b.closest("li")?.querySelector("b")?.textContent || ""); break;
+      case "versions": openVersions(); break;
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }
       case "ai-refresh": { const slot = $('#view [data-slot="ai-panel"]'); if (slot) { slot.innerHTML = `<p class="muted">Verificando…</p>`; renderAiPanel(slot, await aiStatus(true)); } break; }
       case "theme": setTheme(b.dataset.theme); break;
       case "more-tab": setMoreTab(b.dataset.tab); break;
+      case "voice": openCatalog({ room: base.name === "room" ? base.id : null, voice: true }); break;
+      case "voice-refresh": { const slot = $('#view [data-slot="voice-panel"]'); if (slot) slot.innerHTML = `<p class="muted">Verificando…</p>`; await loadVoice(true); if (slot && document.contains(slot)) renderVoicePanel(slot); break; }
       case "print": if (window.INV_PRINT) toast(window.INV_PRINT); else window.print(); break;
       case "retry": boot(); break;
       default: break;
@@ -2350,6 +2579,7 @@
       return;
     }
     onRoute();
+    loadVoice();
   }
   if (!PREVIEW || window.INV_BACKEND) boot();
   else window.INV_BOOT = boot;

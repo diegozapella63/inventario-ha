@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.0
+
+- **Falar**, como no ResolvIA e no CronologIA: o microfone no alto da tela, à direita (e em **Adicionar > Falar os itens**). Fale os itens e quanto valem; o Home Assistant transcreve com a fala para texto do Assist (Configurações > Assistentes de voz; com o Home Assistant Cloud já vem pronta) e a IA separa os itens com nome, categoria, quantidade e valor, para você conferir e adicionar. O valor que você falar vale mais que a estimativa. Dentro de um cômodo, os itens vão para ele. Sem IA, o app separa pelas vírgulas e pelo "e". Até 2 minutos por vez.
+- **Mais > Integrações > Falar** mostra se o microfone está pronto e qual fala para texto ele usa. O Uso da IA conta também o Falar.
+- **Versões anteriores**, como no ResolvIA: o botão **Ver versões** abre a lista, com a data, quantos itens cada versão tem e por que ela foi guardada (automática, antes de importar ou antes de restaurar), e o **Restaurar** de cada uma.
+- O **Adicionar** não tem mais **Novo cômodo**: ele fica na aba Cômodos.
+
 ## 1.9.1
 
 - No computador, abrir pelo menu uma tela que tem busca já deixa o cursor nela, pronto para digitar: Buscar, a busca do Início e o filtro do cômodo. No Início, é só começar a digitar para buscar. Ao abrir o app e no celular, nada muda.

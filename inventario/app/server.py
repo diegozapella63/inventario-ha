@@ -43,7 +43,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.9.1"
+VERSION = "1.10.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -79,6 +79,7 @@ SAFE_FILE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,150}\.(?:jpe?g|png|webp)")
 SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,80}")
 BACKUP_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,150}\.zip")
 HISTORY_NAME = re.compile(r"inventario-\d{8}-\d{6}\.json")
+HISTORY_REASONS = "motivos.json"  # dentro de history/: por que cada cópia foi feita (antes de importar, antes de restaurar)
 
 log = logging.getLogger("inventario")
 
@@ -243,32 +244,48 @@ class Store:
         write_json_atomic(SETTINGS_FILE, self.settings)
 
     # -- histórico local
-    def snapshot_if_due(self, force=False):
+    def snapshot_if_due(self, force=False, reason="auto"):
         if not os.path.exists(DATA_FILE):
             return
-        if not force and time.time() - self.last_snapshot < HISTORY_EVERY:
+        now = time.time()
+        if not force and now - self.last_snapshot < HISTORY_EVERY:
             return
+        if force and now - self.last_snapshot < 5 and os.path.getmtime(DATA_FILE) <= self.last_snapshot:
+            return  # a cópia de agora há pouco já tem tudo (ex.: o backup de segurança logo antes de importar)
         name = f"inventario-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
         shutil.copyfile(DATA_FILE, os.path.join(HISTORY_DIR, name))
-        self.last_snapshot = time.time()
+        self.last_snapshot = now
+        if reason != "auto":
+            reasons = read_json(os.path.join(HISTORY_DIR, HISTORY_REASONS), {}) or {}
+            reasons[name] = reason
+            write_json_atomic(os.path.join(HISTORY_DIR, HISTORY_REASONS), reasons)
         self.prune_history()
 
     def prune_history(self):
-        for old in self.history_list()[HISTORY_KEEP:]:
+        for old in self.history_list(details=False)[HISTORY_KEEP:]:
             try:
                 os.unlink(os.path.join(HISTORY_DIR, old["name"]))
             except OSError:
                 pass
+        path = os.path.join(HISTORY_DIR, HISTORY_REASONS)
+        reasons = read_json(path, {}) or {}
+        keep = {k: v for k, v in reasons.items() if os.path.exists(os.path.join(HISTORY_DIR, k))}
+        if keep != reasons:
+            write_json_atomic(path, keep)
 
-    def history_list(self):
+    def history_list(self, details=True):
         try:
             names = [n for n in os.listdir(HISTORY_DIR) if HISTORY_NAME.fullmatch(n)]
         except FileNotFoundError:
             return []
+        reasons = (read_json(os.path.join(HISTORY_DIR, HISTORY_REASONS), {}) or {}) if details else {}
         out = []
         for n in sorted(names, reverse=True):
             p = os.path.join(HISTORY_DIR, n)
             info = {"name": n, "size": os.path.getsize(p), "date": datetime.fromtimestamp(os.path.getmtime(p)).astimezone().isoformat(timespec="seconds")}
+            if details:  # só as 3 últimas existem: dá para abrir cada uma e contar
+                snap = read_json(p, {}) or {}
+                info.update(items=len(snap.get("items") or []), rooms=len(snap.get("rooms") or []), reason=reasons.get(n, "auto"))
             out.append(info)
         return out
 
@@ -541,10 +558,10 @@ class Store:
     def has_data(self):
         return bool(self.data.get("items") or self.data.get("rooms"))
 
-    def replace_all(self, data: dict):
+    def replace_all(self, data: dict, reason="restore"):
         data = self.check_inventory(data)
         with self.lock:
-            self.snapshot_if_due(force=True)
+            self.snapshot_if_due(force=True, reason=reason)
             rev = int(self.data.get("rev", 0))
             data["rev"] = max(rev, int(data.get("rev") or 0))
             data.setdefault("format", "inventario-casa")
@@ -645,7 +662,7 @@ def share_available() -> bool:
 def safety_backup(prefix):
     """Antes de trocar o inventário, guarda uma cópia do atual (se houver o que guardar)."""
     with STORE.lock:
-        STORE.snapshot_if_due(force=True)
+        STORE.snapshot_if_due(force=True, reason="import" if "importar" in prefix else "restore")
         has = STORE.has_data()
     if has and share_available():
         return create_backup(prefix)
@@ -729,7 +746,7 @@ def restore_zip(path: str, prefix: str):
             return None, _extract_media(z), False
         safety = safety_backup(prefix)
         added = _extract_media(z)
-    STORE.replace_all(data)
+    STORE.replace_all(data, "import" if "importar" in prefix else "restore")
     return safety, added, True
 
 
@@ -844,7 +861,7 @@ def need_ai_on():
 USAGE_LOCK = threading.Lock()
 USAGE_DAYS = 120
 USAGE_SENSOR = "sensor.inventaria_ia_hoje"
-USAGE_KINDS = ("foto", "catalogo", "busca")  # Preencher com IA, Catalogar foto, Buscar foto na internet
+USAGE_KINDS = ("foto", "catalogo", "busca", "fala")  # Preencher com IA, Catalogar foto, Buscar foto na internet, Falar
 _usage_sensor = {"day": None, "checked": 0.0}
 
 
@@ -1001,11 +1018,17 @@ Responda somente com JSON válido, sem markdown e sem texto antes ou depois, nes
 {{"items":[{{"name":"","details":"","cat":"","qty":"1","value":0,"zone":"","existing":"","confidence":"media"}}]}}"""
 
 
-def ai_prompt(mode: str, room: dict | None, hint: str) -> str:
+def ai_prompt(mode: str, room: dict | None, hint: str, spoken: str = "") -> str:
     cats = ", ".join(f"{k} ({v})" for k, v in CATS.items())
     parts = ["Você ajuda a catalogar o inventário de uma casa no Brasil, para controle de patrimônio e seguro."]
     if mode == "single":
         parts.append("A foto mostra um item para cadastrar. Identifique só o objeto principal (o mais em destaque) e devolva exatamente 1 item.")
+    elif mode == "voice":
+        parts.append("O texto no fim é o que a pessoa falou, transcrito automaticamente (pode ter palavras trocadas pelo reconhecimento de voz). "
+                     "Liste cada objeto que ela citou para cadastrar, até 25, na ordem em que falou. Junte objetos iguais num item só, com a quantidade. "
+                     "Corrija nomes, marcas e modelos que a transcrição claramente trocou.")
+        parts.append("Valor: se a pessoa disse quanto o item vale ou quanto pagou, use exatamente esse valor (somando as unidades). "
+                     "Só estime, como explicado abaixo, quando ela não disse.")
     else:
         parts.append("Liste cada objeto da foto que valha a pena catalogar, até 25. Ignore paredes, piso, tomadas, interruptores, "
                      "embalagens vazias, objetos cortados na borda que não dê para identificar e coisas sem valor de revenda. "
@@ -1015,6 +1038,12 @@ def ai_prompt(mode: str, room: dict | None, hint: str) -> str:
     if not use_zones:  # zonas desligadas: a IA nem pergunta onde fica o item
         rules = "\n".join(ln for ln in rules.splitlines() if not ln.startswith('- "zone"')).replace('"zone":"",', "")
     parts.append(rules)
+    if mode == "voice":
+        with STORE.lock:
+            rooms = [(r["id"], r["name"]) for r in STORE.data["rooms"]]
+        if rooms:
+            parts.append("Cômodos da casa (id = nome): " + "; ".join(f"{i} = {n}" for i, n in rooms) + ". Se a pessoa disse em que cômodo "
+                         'estão os itens, responda também "room" com o id desse cômodo, ao lado de "items"; se não disse, "room": "".')
     if room:
         with STORE.lock:
             its = [i for i in STORE.data["items"] if i["room"] == room["id"]]
@@ -1027,6 +1056,8 @@ def ai_prompt(mode: str, room: dict | None, hint: str) -> str:
             parts.append("Itens já cadastrados neste cômodo: " + "; ".join(names) + ".")
     if hint:
         parts.append(f"Dica de quem está cadastrando: {hint}")
+    if spoken:
+        parts.append(f"O que a pessoa falou:\n{spoken}")
     return "\n\n".join(parts)
 
 
@@ -1148,6 +1179,217 @@ def ai_identify(body: dict) -> dict:
             call.result = "formato"
             raise
     return {"items": clean_ai_items(parsed, room), "entity": entity or "padrão do Home Assistant"}
+
+
+# ---------------------------------------------------------------------------
+# Falar (como no ResolvIA e no CronologIA): o áudio do microfone vai para a fala para texto do Home
+# Assistant, a do assistente de voz preferido (Configurações > Assistentes de voz; com o Home Assistant
+# Cloud já vem pronta), no idioma dele; sem assistente, a primeira entidade stt.*. Depois a IA separa
+# os itens do que foi dito. O áudio chega do app como PCM cru, 16 kHz, 16 bits, mono (o mesmo do Assist).
+
+VOICE_RATE = 16000
+VOICE_MIN = int(VOICE_RATE * 2 * 0.4)  # menos de 0,4 s: não falou nada
+VOICE_MAX = VOICE_RATE * 2 * 125  # pouco mais de 2 minutos
+HA_WS = os.environ.get("INV_HA_WS") or re.sub(r"^http", "ws", HA_API).rsplit("/api", 1)[0] + "/websocket"
+VOICE_HOWTO = ("Para falar, o Home Assistant precisa de um assistente de voz com fala para texto "
+               "(Configurações > Assistentes de voz; com o Home Assistant Cloud ele já vem pronto).")
+_voice_cache = {"at": 0.0, "value": None}
+MOCK_SPEECH = "Sofá cinza de três lugares, uns dois mil reais. Televisão Samsung de 55 polegadas, três mil. E duas luminárias de chão."
+MOCK_VOICE_RESULT = {"room": "", "items": [
+    {"name": "Sofá cinza de três lugares", "details": "Sofá de tecido cinza, três lugares.", "cat": "moveis", "qty": "1", "value": 2000,
+     "zone": "", "existing": "", "confidence": "alta"},
+    {"name": "Televisão Samsung 55 polegadas", "details": "Smart TV Samsung de 55 polegadas.", "cat": "eletronicos", "qty": "1", "value": 3000,
+     "zone": "Eletrônicos", "existing": "", "confidence": "alta"},
+    {"name": "Luminária de chão", "details": "", "cat": "decoracao", "qty": "2", "value": 300, "zone": "", "existing": "", "confidence": "media"},
+]}
+
+
+def ha_ws(command: dict, timeout=10.0):
+    """Um comando pela API de WebSocket do Home Assistant (a lista dos assistentes de voz só existe por ela)."""
+    u = urllib.parse.urlsplit(HA_WS)
+    sock = socket.create_connection((u.hostname, u.port or (443 if u.scheme == "wss" else 80)), timeout=timeout)
+    try:
+        if u.scheme == "wss":
+            sock = ssl.create_default_context().wrap_socket(sock, server_hostname=u.hostname)
+        key = base64.b64encode(os.urandom(16)).decode()
+        sock.sendall((f"GET {u.path or '/'} HTTP/1.1\r\nHost: {u.netloc}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                      f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n").encode())
+        f = sock.makefile("rb")
+        if b" 101" not in f.readline():
+            raise ApiError(502, "O Home Assistant recusou a conexão de WebSocket.")
+        while f.readline() not in (b"\r\n", b"\n", b""):
+            pass
+
+        def send_frame(op: int, data: bytes):
+            n, head = len(data), bytearray([0x80 | op])
+            if n < 126:
+                head.append(0x80 | n)
+            elif n < 65536:
+                head += bytes([0x80 | 126]) + struct.pack(">H", n)
+            else:
+                head += bytes([0x80 | 127]) + struct.pack(">Q", n)
+            mask = os.urandom(4)
+            sock.sendall(bytes(head) + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(data)))
+
+        def read(n: int) -> bytes:
+            data = f.read(n)
+            if len(data) < n:
+                raise ApiError(502, "O Home Assistant fechou a conexão.")
+            return data
+
+        def recv():
+            buf = b""
+            while True:
+                h = read(2)
+                op, n = h[0] & 0x0F, h[1] & 0x7F
+                if n == 126:
+                    n = struct.unpack(">H", read(2))[0]
+                elif n == 127:
+                    n = struct.unpack(">Q", read(8))[0]
+                mask = read(4) if h[1] & 0x80 else None
+                data = read(n) if n else b""
+                if mask:
+                    data = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
+                if op == 8:
+                    raise ApiError(502, "O Home Assistant fechou a conexão.")
+                if op == 9:
+                    send_frame(10, data)
+                    continue
+                if op == 10:
+                    continue
+                buf += data
+                if h[0] & 0x80:
+                    return json.loads(buf.decode("utf-8"))
+
+        msg = recv()
+        if msg.get("type") == "auth_required":
+            send_frame(1, json.dumps({"type": "auth", "access_token": SUPERVISOR_TOKEN}).encode())
+            msg = recv()
+        if msg.get("type") != "auth_ok":
+            raise ApiError(502, "O Home Assistant não aceitou a conexão do app.")
+        send_frame(1, json.dumps({"id": 1, **command}).encode())
+        while True:
+            msg = recv()
+            if msg.get("id") == 1 and msg.get("type") == "result":
+                if not msg.get("success"):
+                    raise ApiError(502, ((msg.get("error") or {}).get("message")) or "O Home Assistant recusou o pedido.")
+                return msg.get("result")
+    finally:
+        try:
+            sock.close()
+        except OSError:
+            pass
+
+
+def voice_engine():
+    """{engine, language, name} da fala para texto a usar, ou None. Fica guardado por um minuto."""
+    now = time.time()
+    if now - _voice_cache["at"] < 60:
+        return _voice_cache["value"]
+    value = None
+    if AI_MOCK:
+        value = {"engine": "stt.simulado", "language": "pt-BR", "name": "Fala simulada (teste)"}
+    elif SUPERVISOR_TOKEN:
+        try:
+            r = ha_ws({"type": "assist_pipeline/pipeline/list"}) or {}
+            pipes = r.get("pipelines") or []
+            p = (next((x for x in pipes if x.get("id") == r.get("preferred_pipeline") and x.get("stt_engine")), None)
+                 or next((x for x in pipes if x.get("stt_engine")), None))
+            if p:
+                value = {"engine": p["stt_engine"], "language": p.get("stt_language") or p.get("language") or "pt-BR", "name": p.get("name") or ""}
+        except (ApiError, OSError, ValueError) as e:
+            log.info("assistentes de voz: %s", getattr(e, "msg", e))
+        if not value:
+            try:
+                for s in ha_request("GET", "/states") or []:
+                    if str(s.get("entity_id", "")).startswith("stt."):
+                        value = {"engine": s["entity_id"], "language": "pt-BR",
+                                 "name": (s.get("attributes") or {}).get("friendly_name") or s["entity_id"]}
+                        break
+            except ApiError as e:
+                log.info("fala para texto: %s", e.msg)
+    _voice_cache.update(at=now, value=value)
+    return value
+
+
+def voice_status() -> dict:
+    e = voice_engine()
+    if not e:
+        return {"ready": False, "reason": VOICE_HOWTO}
+    return {"ready": True, "engine": e["engine"], "language": e["language"], "name": e["name"]}
+
+
+def voice_text(pcm: bytes) -> dict:
+    """PCM cru (16 kHz, 16 bits, mono) para texto, pela fala para texto do Home Assistant."""
+    if len(pcm) < VOICE_MIN:
+        raise ApiError(422, "Não ouvi nada. Toque no microfone e fale.")
+    if len(pcm) > VOICE_MAX:
+        raise ApiError(413, "Fale até 2 minutos de cada vez.")
+    e = voice_engine()
+    if not e:
+        raise ApiError(409, VOICE_HOWTO)
+    if AI_MOCK:
+        time.sleep(0.6)
+        return {"text": MOCK_SPEECH, "engine": e["engine"], "name": e["name"]}
+    u = urllib.parse.urlsplit(HA_API)
+    conn = (http.client.HTTPSConnection if u.scheme == "https" else http.client.HTTPConnection)(u.hostname, u.port, timeout=90)
+    try:
+        # http.client manda o nome do cabeçalho do jeito que está escrito: o proxy do Supervisor só repassa
+        # "X-Speech-Content" assim (urllib e fetch() mudam as letras e o Home Assistant responde "Missing X-Speech-Content header")
+        conn.putrequest("POST", u.path.rstrip("/") + "/stt/" + urllib.parse.quote(e["engine"]))
+        conn.putheader("Authorization", f"Bearer {SUPERVISOR_TOKEN}")
+        conn.putheader("Content-Type", "application/octet-stream")
+        conn.putheader("X-Speech-Content", f"format=wav; codec=pcm; sample_rate={VOICE_RATE}; bit_rate=16; channel=1; language={e['language']}")
+        conn.putheader("Content-Length", str(len(pcm)))
+        conn.endheaders()
+        conn.send(pcm)
+        r = conn.getresponse()
+        status, raw = r.status, r.read().decode("utf-8", "replace")
+    except (OSError, http.client.HTTPException) as err:
+        raise ApiError(504, f"Sem resposta da fala para texto do Home Assistant ({err}).") from None
+    finally:
+        conn.close()
+    if not 200 <= status < 300:
+        _voice_cache["at"] = 0.0
+        detail = " ".join(raw.split())[:200]
+        log.info("fala para texto (%s): %s %s", e["engine"], status, detail)
+        raise ApiError(502, f"A fala para texto não aceitou o áudio ({detail or status})." if status in (400, 415)
+                       else f"A fala para texto do Home Assistant falhou ({status}{': ' + detail if detail else ''}).")
+    try:
+        j = json.loads(raw)
+    except ValueError:
+        j = {}
+    said = str(j.get("text") or "").strip()
+    if j.get("result") != "success" or not said:
+        raise ApiError(422, "Não entendi. Tente de novo, mais perto do microfone.")
+    return {"text": said, "engine": e["engine"], "name": e["name"]}
+
+
+def ai_from_speech(body: dict) -> dict:
+    """O que foi dito vira itens: a IA separa nome, detalhes, categoria, quantidade e valor (o dito vale mais que a estimativa)."""
+    need_ai_on()
+    spoken = text(body.get("text"), 4000, "texto", required=True)
+    room = STORE.room(body.get("room")) if body.get("room") else None
+    prompt = ai_prompt("voice", room, "", spoken)
+    entity = STORE.settings.get("ai_entity") or ""
+    with AiCall("fala", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
+        if AI_MOCK:
+            time.sleep(0.8)
+            res = MOCK_VOICE_RESULT
+        else:
+            res = ai_call_text("InventarIA: itens falados", prompt, entity, timeout=180)
+            if res is None:
+                call.result = "formato"
+                raise ApiError(502, "A IA não devolveu resposta.")
+        call.answer(res)
+        try:
+            parsed = extract_json(res)
+        except ApiError:
+            call.result = "formato"
+            raise
+    rid = str(parsed.get("room") or "") if isinstance(parsed, dict) else ""
+    rid = rid if STORE.room(rid) else ""
+    return {"items": clean_ai_items(parsed, room or STORE.room(rid)), "room": rid}
 
 
 # ---------------------------------------------------------------------------
@@ -1870,6 +2112,20 @@ def r_ai_status(h, query):
     h.send_json(ai_status())
 
 
+def r_voice_status(h, query):
+    if query.get("fresh"):
+        _voice_cache["at"] = 0.0
+    h.send_json(voice_status())
+
+
+def r_voice(h, query):
+    h.send_json(voice_text(h.read_raw(VOICE_MAX + 1024)))
+
+
+def r_ai_text(h, query):
+    h.send_json(ai_from_speech(h.read_body()))
+
+
 def r_ai_usage(h, query):
     h.send_json(usage_summary())
 
@@ -1983,7 +2239,7 @@ def r_import(h, query):
     body = h.read_body()
     data = STORE.check_inventory(body.get("data"))
     safety_backup("antes-de-importar")
-    STORE.replace_all(data)
+    STORE.replace_all(data, "import")
     h.send_json({"ok": True, "rev": STORE.data["rev"]})
 
 
@@ -2038,7 +2294,7 @@ def r_upload_restore(h, uid, query):
             except (UnicodeDecodeError, ValueError):
                 raise ApiError(400, "Use um backup .zip ou um .json exportado pelo app.")
             safety = safety_backup("antes-de-importar")
-            STORE.replace_all(data)
+            STORE.replace_all(data, "import")
     finally:
         drop_upload(uid)
     with STORE.lock:
@@ -2092,6 +2348,9 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/ai/status", r_ai_status),
     ("POST", r"/api/ai/identify", r_ai_identify),
     ("GET", r"/api/ai/usage", r_ai_usage),
+    ("POST", r"/api/ai/text", r_ai_text),
+    ("GET", r"/api/voice/status", r_voice_status),
+    ("POST", r"/api/voice", r_voice),
     ("POST", r"/api/web-photos", r_web_start),
     ("GET", r"/api/web-photos/([a-f0-9]{16})", r_web_status),
     ("GET", r"/api/web-photos/([a-f0-9]{16})/(\d)", r_web_image),

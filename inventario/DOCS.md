@@ -20,6 +20,7 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - **Cômodo**: fotos do cômodo e a lista dos itens, na ordem dos códigos. Com as zonas ligadas, os itens aparecem separados por zona, com o subtotal de cada uma.
 - **Adicionar item**: nome, detalhes, cômodo, categoria, quantidade e valor total (e a zona, se estiver ligada). Dá para tirar foto pelo celular, enviar da galeria, arrastar uma foto ou colar com Ctrl+V. "Salvar e adicionar outro" mantém o cômodo para cadastrar em sequência.
 - **Catalogar foto com IA**: tire uma foto de uma prateleira ou de um canto da casa; a IA lista os objetos com nome, categoria, quantidade e uma sugestão de valor. Você confere, ajusta e escolhe o que entra.
+- **Falar**: o microfone no alto da tela. Fale os itens e quanto valem, e o app separa cada um para você conferir. Veja [Falar](#falar).
 - **Buscar na internet**: num item sem foto (ou no editor do item), a IA procura o produto no fabricante e nas lojas e o app mostra as fotos encontradas para você escolher. Veja [Fotos da internet](#fotos-da-internet).
 - **Buscar**: por nome, marca ou detalhe, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome ou data.
 - **Relatório**: lista por cômodo com fotos e valores, pronta para imprimir ou salvar em PDF (útil para seguro).
@@ -55,6 +56,16 @@ Para configurar:
 Na hora da leitura, o app copia a foto por alguns segundos para `media/inventario/ia-temp`, chama a IA pelo Home Assistant e apaga a cópia em seguida. A IA não recebe número de série, IMEI ou dados pessoais: as instruções pedem só descrição do objeto.
 
 Sem IA configurada, todo o resto funciona normalmente. Se não for usar IA, desligue **Usar IA** em **Mais > Integrações** e os botões de IA somem.
+
+## Falar
+
+O **microfone** fica no alto da tela, à direita (e também em **Adicionar > Falar os itens**). Toque, fale os itens e toque de novo, por exemplo: "Sofá cinza de três lugares, 2 mil reais. Televisão Samsung de 55 polegadas, 3 mil". O Home Assistant transcreve com a **fala para texto do Assist** (Configurações > Assistentes de voz; com o Home Assistant Cloud ela já vem pronta, em português), e a IA separa os itens com nome, categoria, quantidade e valor. O valor que você falar vale mais que a estimativa da IA. Você confere, ajusta e escolhe o que entra.
+
+- Dentro de um cômodo, os itens vão para ele; dá para trocar o cômodo antes de adicionar. Se você falar o cômodo ("na sala"), a IA já escolhe.
+- Sem IA (Usar IA desligada ou sem integração de IA), o app separa o que foi dito pelas vírgulas e pelo "e", e um valor em número ("2.000 reais", "R$ 500") vai para o item anterior.
+- Até 2 minutos por vez. Na primeira vez, o navegador ou o app do celular pede permissão para o microfone.
+- O microfone só aparece quando o Home Assistant tem fala para texto. Em **Mais > Integrações > Falar** dá para ver qual ele usa.
+- O microfone precisa do Home Assistant aberto com https (como o endereço do Nabu Casa) ou pelo app do celular; pelo endereço http da rede de casa, o navegador não deixa usar.
 
 ## Uso da IA
 
@@ -92,7 +103,7 @@ Formas de guardar uma cópia:
 - **Mais > Dados > Backup na pasta share**: cria um `.zip` completo (JSON, CSV e fotos) em `share/inventario`, que você acessa pela rede (por exemplo `\\homeassistant.local\share\inventario` com o app Samba).
 - **Mais > Dados > Exportar**: CSV (abre no Excel), JSON ou ZIP com fotos, direto para o seu computador ou celular.
 
-Para restaurar, use **Mais > Dados**: escolha um backup da pasta share, volte para uma versão anterior ou importe um arquivo (`.zip` de backup ou `.json`) do computador ou do celular. Antes de restaurar ou importar, o app guarda uma cópia do que existe naquele momento.
+Para restaurar, use **Mais > Dados**: escolha um backup da pasta share, volte para uma versão anterior (**Versões anteriores > Ver versões**, com a data, quantos itens cada uma tem e por que foi guardada) ou importe um arquivo (`.zip` de backup ou `.json`) do computador ou do celular. Antes de restaurar ou importar, o app guarda uma cópia do que existe naquele momento.
 
 ## Atualizar o app
 
