@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.1
+
+- **Sensores no Home Assistant**, em Mais > Integrações, agora são uma opção e vêm **desligados**. Ligada, o app cria o `sensor.inventaria_ia_hoje` (chamadas de IA de hoje). Desligada, o app não cria sensores e tira na hora o que já existia, inclusive o que as versões 1.9 e 1.10 criaram sem perguntar.
+
 ## 1.10.0
 
 - **Falar**, como no ResolvIA e no CronologIA: o microfone no alto da tela, à direita (e em **Adicionar > Falar os itens**). Fale os itens e quanto valem; o Home Assistant transcreve com a fala para texto do Assist (Configurações > Assistentes de voz; com o Home Assistant Cloud já vem pronta) e a IA separa os itens com nome, categoria, quantidade e valor, para você conferir e adicionar. O valor que você falar vale mais que a estimativa. Dentro de um cômodo, os itens vão para ele. Sem IA, o app separa pelas vírgulas e pelo "e". Até 2 minutos por vez.

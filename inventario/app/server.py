@@ -43,7 +43,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.10.0"
+VERSION = "1.10.1"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -852,6 +852,11 @@ def zones_enabled() -> bool:
     return STORE.settings.get("zones") is True
 
 
+def sensors_enabled() -> bool:
+    """Sensores no Home Assistant: só com a opção ligada (Mais > Integrações); vem desligada."""
+    return STORE.settings.get("ha_sensors") is True
+
+
 def need_ai_on():
     if not ai_enabled():
         raise ApiError(409, "A IA está desligada. Para usar, ligue em Mais > Integrações.")
@@ -951,8 +956,8 @@ def usage_summary() -> dict:
 
 
 def publish_usage_sensor():
-    """Sensor no Home Assistant com as chamadas de hoje, para painel e automação."""
-    if not SUPERVISOR_TOKEN or AI_MOCK:
+    """Sensor no Home Assistant com as chamadas de hoje, para painel e automação (só com Sensores ligado)."""
+    if not SUPERVISOR_TOKEN or AI_MOCK or not sensors_enabled() or not ai_enabled():
         return
     try:
         r = usage_summary()
@@ -970,12 +975,31 @@ def publish_usage_sensor():
         _usage_sensor["day"] = usage_day()
 
 
+def remove_usage_sensor():
+    """Tira o sensor do Home Assistant (quando a opção é desligada, ou o que uma versão antiga deixou)."""
+    if not SUPERVISOR_TOKEN or AI_MOCK:
+        return
+    try:
+        ha_request("DELETE", "/states/" + USAGE_SENSOR, timeout=10)
+        log.info("sensor de uso da IA retirado do Home Assistant")
+    except ApiError:
+        pass  # já não existia
+    _usage_sensor["day"] = None
+
+
 def usage_sensor_loop():
     """Zera o sensor na virada do dia e o devolve quando o Home Assistant reinicia (estados da API não ficam salvos lá)."""
+    cleaned = False
     while True:
         time.sleep(60)
-        if not SUPERVISOR_TOKEN or AI_MOCK or not ai_enabled():
+        if not SUPERVISOR_TOKEN or AI_MOCK:
             continue
+        if not sensors_enabled() or not ai_enabled():
+            if not cleaned:  # as versões 1.9 e 1.10 criavam o sensor sem perguntar: tira uma vez
+                cleaned = True
+                remove_usage_sensor()
+            continue
+        cleaned = False
         try:
             if _usage_sensor["day"] != usage_day():
                 publish_usage_sensor()
@@ -2038,7 +2062,7 @@ def r_data(h, query):
     with STORE.lock:
         out = STORE.public()
     out.update({"version": VERSION, "user": h.user(),
-                "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai": ai_enabled(), "zones": zones_enabled()},
+                "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai": ai_enabled(), "zones": zones_enabled(), "ha_sensors": sensors_enabled()},
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
     h.send_json(out)
 
@@ -2183,12 +2207,14 @@ def r_settings_put(h, query):
             if e and not re.fullmatch(r"(ai_task|conversation)\.[a-z0-9_]+", e):
                 raise ApiError(400, "Entidade de IA inválida.")
             STORE.settings["ai_search"] = e
-        for key in ("ai", "zones"):
+        for key in ("ai", "zones", "ha_sensors"):
             if key in body:
                 if not isinstance(body[key], bool):
                     raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
                 STORE.settings[key] = body[key]
         STORE.save_settings()
+    if "ha_sensors" in body or "ai" in body:  # cria ou tira o sensor na hora
+        threading.Thread(target=publish_usage_sensor if sensors_enabled() and ai_enabled() else remove_usage_sensor, daemon=True).start()
     h.send_json(STORE.settings)
 
 

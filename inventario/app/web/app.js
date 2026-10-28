@@ -113,6 +113,7 @@
   // Desligar só esconde: nada do que já foi gravado se perde.
   const aiOn = () => S.settings.ai !== false;
   const zonesOn = () => S.settings.zones === true;
+  const sensorsOn = () => S.settings.ha_sensors === true; // sensores no Home Assistant: só com a opção ligada
   let D = null;
   const roomFilter = {};
   let searchLimit = 120;
@@ -871,6 +872,14 @@
       <h2>${secIc("bars")}Uso da IA</h2>
       <p class="lead">Cada leitura de foto, foto catalogada ou busca de foto na internet é uma chamada para a IA do Home Assistant. O Home Assistant não informa tokens nem custo, então o InventarIA conta as chamadas e estima os tokens pelo tamanho do texto.</p>
       <div data-slot="usage"><p class="muted">Carregando…</p></div>
+    </section>
+    <section class="panel" id="p-sensors">
+      <h2>${secIc("gauge")}Sensores no Home Assistant</h2>
+      <p class="lead">Para painéis e automações no Home Assistant: as chamadas de IA de hoje, com erros, cota excedida e tokens estimados.</p>
+      <ul class="opts"><li><div class="ot"><b id="sensors-h">Criar os sensores</b><span>${sensorsOn()
+        ? 'Ligado: <span class="codepath">sensor.inventaria_ia_hoje</span>. Atualiza a cada chamada de IA e na virada do dia; se o Home Assistant reiniciar, volta em alguns minutos.'
+        : "Desligado: o app não cria sensores no Home Assistant."}</span></div>
+        <div class="oa">${switchHtml("sensors-on", sensorsOn(), "sensors-h")}</div></li></ul>
     </section>` : ""}`;
   }
 
@@ -952,7 +961,8 @@
       ${kinds.length ? `<ul class="uso-tipos" aria-label="Nos últimos 7 dias">${kinds.map(([k, n]) => `<li>${esc(USAGE_KIND[k] || k)} <b>${int(n)}</b></li>`).join("")}</ul>` : ""}
       <details class="uso-ult"><summary>${ic("chev", "sm")}Últimas chamadas</summary><ul>${recent || "<li>Nenhuma chamada ainda.</li>"}</ul></details>
       <p class="help">${provTxt} A estimativa de tokens daqui conta só o texto; as imagens e a busca na web somam mais.</p>
-      <p class="help">No Home Assistant, o sensor <span class="codepath">${esc(u.sensor || "sensor.inventaria_ia_hoje")}</span> traz as chamadas de hoje, com erros, cota e tokens estimados, para pôr num painel ou numa automação (por exemplo, avisar quando passar de 50 no dia).</p>`;
+      <p class="help">${sensorsOn() ? `No Home Assistant, o sensor <span class="codepath">${esc(u.sensor || "sensor.inventaria_ia_hoje")}</span> traz as chamadas de hoje, com erros, cota e tokens estimados, para pôr num painel ou numa automação (por exemplo, avisar quando passar de 50 no dia).`
+        : "Para ter esses números num painel ou numa automação do Home Assistant, ligue Sensores no Home Assistant, logo abaixo."}</p>`;
   }
   function moreData() {
     return `
@@ -2514,8 +2524,8 @@
       try { await API.put("api/settings", { ai_search: t.value }); S.settings.ai_search = t.value; aiCache.at = 0; toast("IA para buscar fotos atualizada"); }
       catch (er) { fail(er); }
     }
-    else if (k === "ai-on" || k === "zones-on") {
-      const key = k === "ai-on" ? "ai" : "zones", on = t.checked;
+    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on") {
+      const key = k === "ai-on" ? "ai" : k === "zones-on" ? "zones" : "ha_sensors", on = t.checked;
       t.disabled = true;
       try {
         await API.put("api/settings", { [key]: on });
@@ -2523,6 +2533,7 @@
         aiCache.at = 0;
         renderView(false);
         toast(key === "ai" ? (on ? "IA ligada" : "IA desligada: os botões de IA ficaram escondidos")
+          : key === "ha_sensors" ? (on ? "Sensor criado no Home Assistant" : "Sensores desligados: o sensor saiu do Home Assistant")
           : on ? "Zonas ligadas" : "Zonas desligadas: as zonas gravadas continuam guardadas");
       } catch (er) { t.checked = !on; fail(er); }
       finally { t.disabled = false; }

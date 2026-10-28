@@ -73,7 +73,7 @@ Em **Mais > Integrações > Uso da IA** ficam as chamadas de hoje, dos últimos 
 
 O Home Assistant não informa tokens nem custo, então o app conta as chamadas e estima os tokens pelo tamanho do texto (uns 4 caracteres por token). As imagens e a busca na web gastam mais do que essa estimativa. O consumo exato e o custo ficam no painel do provedor: Google Cloud Console para o Gemini, platform.openai.com/usage para a OpenAI e Claude Console para a Anthropic.
 
-O app também cria no Home Assistant o sensor `sensor.inventaria_ia_hoje`, com as chamadas de hoje no estado e os detalhes nos atributos (`erros`, `cota_excedida`, `tokens_texto_estimados`, `imagens`, `por_tipo`, `ultimos_7_dias`, `este_mes` e `ultima_chamada`). Dá para pôr num painel ou numa automação, por exemplo para avisar quando passar de 50 chamadas no dia. O sensor zera na virada do dia; se o Home Assistant reiniciar, ele volta em alguns minutos.
+Com **Sensores no Home Assistant** ligado (em **Mais > Integrações**; vem desligado), o app cria no Home Assistant o sensor `sensor.inventaria_ia_hoje`, com as chamadas de hoje no estado e os detalhes nos atributos (`erros`, `cota_excedida`, `tokens_texto_estimados`, `imagens`, `por_tipo`, `ultimos_7_dias`, `este_mes` e `ultima_chamada`). Dá para pôr num painel ou numa automação, por exemplo para avisar quando passar de 50 chamadas no dia. O sensor zera na virada do dia; se o Home Assistant reiniciar, ele volta em alguns minutos. Desligando a opção, o sensor sai do Home Assistant na hora.
 
 ## Fotos da internet
 
