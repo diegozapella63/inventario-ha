@@ -522,6 +522,13 @@
       box?.focus({ preventScroll: true });
     }
     if (base.name === "data") loadDataPanels();
+    if (navigated && slideFrom) { // a tela nova entra pelo lado para onde o dedo foi
+      const dir = slideFrom;
+      slideFrom = 0;
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches && $("#view").animate) {
+        $("#view").animate([{ opacity: 0, transform: `translateX(${dir > 0 ? 40 : -40}px)` }, { opacity: 1, transform: "none" }], { duration: 280, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
+      }
+    }
   }
 
   // -- linhas reutilizáveis
@@ -2566,6 +2573,42 @@
       else { focusSearch = true; nav("#/buscar"); }
     } else if (e.key === "n" || e.key === "N") { e.preventDefault(); openEditor({ room: base.name === "room" ? base.id : null }); }
   });
+  // Arrastar para o lado troca de aba no celular, como no ResolvIA e no CronologIA: Início ⇄ Buscar ⇄ Cômodos ⇄ Mais.
+  // Dentro de um cômodo, arrastar para a direita volta para Cômodos; no relatório, para Mais. Não vale começando na
+  // borda da tela (é o Voltar do celular), num campo, numa fileira que rola para o lado ou com uma janela aberta.
+  const SWIPE_TABS = [["home", "#/"], ["search", "#/buscar"], ["rooms", "#/comodos"], ["data", "#/mais"]];
+  let swipe = null, slideFrom = 0;
+  document.addEventListener("touchstart", (e) => {
+    swipe = null;
+    if (!e.touches || e.touches.length !== 1 || window.matchMedia("(min-width: 1000px)").matches || document.querySelector("dialog[open]")) return;
+    const t = e.touches[0];
+    if (t.clientX < 24 || t.clientX > window.innerWidth - 24) return;
+    for (let el = e.target instanceof Element ? e.target : e.target.parentElement; el && el !== document.body; el = el.parentElement) {
+      if (el.matches("input, textarea, select, [contenteditable], [data-noswipe], .tabbar, .side")) return;
+      const st = getComputedStyle(el);
+      if ((st.overflowX === "auto" || st.overflowX === "scroll") && el.scrollWidth > el.clientWidth + 2) return;
+    }
+    swipe = { x: t.clientX, y: t.clientY, at: Date.now() };
+  }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    const s = swipe;
+    swipe = null;
+    if (!s || !e.changedTouches || !e.changedTouches.length || document.querySelector("dialog[open]")) return;
+    const t = e.changedTouches[0], dx = t.clientX - s.x, dy = t.clientY - s.y;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - s.at > 800) return;
+    const d = dx < 0 ? 1 : -1; // dedo para a esquerda: a próxima aba
+    let to = null;
+    if (base.name === "room") to = d < 0 ? "#/comodos" : null;
+    else if (base.name === "report") to = d < 0 ? "#/mais" : null;
+    else {
+      const i = SWIPE_TABS.findIndex(([n]) => n === base.name), j = i + d;
+      if (i >= 0 && j >= 0 && j < SWIPE_TABS.length) to = SWIPE_TABS[j][1];
+    }
+    if (!to) return;
+    slideFrom = d;
+    nav(to);
+  }, { passive: true });
+  document.addEventListener("touchcancel", () => { swipe = null; }, { passive: true });
   window.addEventListener("hashchange", () => { onRoute(); });
 
   // atualização quando outro aparelho mexer no inventário

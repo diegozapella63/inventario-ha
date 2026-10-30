@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.0
+
+- **Arrastar para o lado** troca de aba no celular, como no ResolvIA e no CronologIA: Início ⇄ Buscar ⇄ Cômodos ⇄ Mais, com a tela nova entrando pelo lado. Dentro de um cômodo, arrastar para a direita volta para Cômodos; no relatório, volta para Mais. Não vale começando na borda da tela (é o Voltar do celular), num campo, na fileira de fotos que rola para o lado ou com uma janela aberta.
+
 ## 1.10.2
 
 - O **ícone do app** ao lado do nome, no alto da tela e na barra lateral do computador, como no ResolvIA e no CronologIA: a etiqueta com R$ e o fio, na cor escolhida em Aparência.

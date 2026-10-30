@@ -25,6 +25,7 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - **Buscar**: por nome, marca ou detalhe, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome ou data.
 - **Relatório**: lista por cômodo com fotos e valores, pronta para imprimir ou salvar em PDF (útil para seguro).
 - **Mais**, em abas como nos outros apps: **Dados** (exportar planilha, JSON, ZIP com fotos e o relatório; backup; importar; versões anteriores), **Integrações** (ligar ou desligar a IA e escolher qual IA do Home Assistant usar), **Aparência** (tema claro, escuro ou automático e a cor do app: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza) e **Opções** (as zonas). O tema e a cor ficam em cada aparelho; a IA e as zonas valem para todos.
+- No celular, **arrastar para o lado** troca de aba (Início, Buscar, Cômodos e Mais); dentro de um cômodo, arrastar para a direita volta para Cômodos.
 - Atalhos no computador: `/` abre a busca, `N` cria um item, `Ctrl+Enter` salva o formulário.
 
 O valor de cada item é o que você quiser registrar, somando todas as unidades.
