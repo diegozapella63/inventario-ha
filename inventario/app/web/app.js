@@ -21,7 +21,10 @@
   const ANDROID_APP = /Android/i.test(UA) && (/Home ?Assistant\//i.test(UA) || /; wv\)/.test(UA));
   const CAMERA_DIRECT = COARSE && !ANDROID_APP;
   const MULTI_PICK = !ANDROID_APP;
-  const BRAND = '<svg class="brand-mark" viewBox="0 0 30 20" aria-hidden="true"><path d="M8 0h20a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8L0 13V7z" style="fill:var(--tag)"/><circle cx="7" cy="10" r="2.7" style="fill:var(--paper)"/></svg>';
+  // O ícone do app (o mesmo desenho do ícone do app no Home Assistant: a etiqueta com R$ e o fio), na cor
+  // escolhida em Mais > Aparência. O fio fica na cor do texto, para aparecer no tema escuro.
+  const APP_ICON = `<svg class="app-ic" viewBox="0 0 32 32" aria-hidden="true"><g transform="rotate(-12 17 19)"><path d="M10 10h18a2.5 2.5 0 0 1 2.5 2.5v13a2.5 2.5 0 0 1-2.5 2.5H10l-7-7v-4z" style="fill:var(--tag);stroke:var(--tag-edge)" stroke-width="1"/><path d="M12.6 12.6v12.8" style="stroke:var(--tag-ink)" stroke-opacity=".32" stroke-width="1.1" stroke-dasharray="1.7 1.5"/><circle cx="8" cy="19" r="2.3" style="fill:var(--paper);stroke:var(--tag-ring)" stroke-width="1.3"/><text x="21.8" y="23.3" text-anchor="middle" style="font:700 10.5px var(--font-c);fill:var(--tag-ink)">R$</text></g><path d="M8.2 20.9C6.6 15 5.7 8.6 7 2.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
+  const BRAND = APP_ICON;
 
   // ------------------------------------------------------------------ utilidades
   const $ = (s, el = document) => el.querySelector(s);
@@ -431,7 +434,7 @@
       : r.name === "data" ? `${plural(S.items.length, "item", "itens")} e ${plural(D.photoCount, "foto", "fotos")} no inventário` : "";
     el.innerHTML = `
       <div class="mh-row">
-        <p class="eyebrow"><span class="brand-word">Inventar<span>IA</span></span>${first ? `<span class="hello"><span class="sep"> · </span>Olá, ${esc(first)}</span>` : ""}</p>
+        <p class="eyebrow"><span class="brand-word">${APP_ICON}Inventar<span>IA</span></span>${first ? `<span class="hello"><span class="sep"> · </span>Olá, ${esc(first)}</span>` : ""}</p>
         ${voiceReady() ? `<button type="button" class="mic-top" data-act="voice" aria-label="Falar: adicionar itens falando" title="Falar">${ic("mic")}</button>` : ""}
         ${r.name !== "room" ? `<div class="top-actions">
           ${aiOn() ? `<button type="button" class="btn wide" data-act="catalog">${ic("scan")}Catalogar foto com IA</button>` : ""}

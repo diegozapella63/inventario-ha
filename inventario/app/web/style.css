@@ -174,7 +174,9 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-webki
   }
 }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px; text-decoration: none; }
-.brand-mark { width: 30px; height: 20px; flex: none; }
+/* o ícone do app antes do nome, no alto e na barra lateral (como no ResolvIA e no CronologIA) */
+.app-ic { display: inline-block; width: 1.15em; height: 1.15em; margin-right: 0.26em; vertical-align: -0.24em; color: var(--ink-2); overflow: visible; }
+.brand .app-ic { width: 32px; height: 32px; margin: -4px 0; flex: none; }
 .brand-name { font: 700 22px/1 var(--font-c); letter-spacing: 0.01em; }
 .nav { display: grid; gap: 2px; }
 .nav a, .side-room {
