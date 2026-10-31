@@ -43,7 +43,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.12.0"
+VERSION = "1.12.1"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -1891,6 +1891,7 @@ def web_job_start(body: dict) -> dict:
 
 
 def web_job(jid: str) -> dict:
+    need_ai_on()  # desligou a IA no meio da busca: o resultado (fotos e dados do produto) não chega
     job = WEB_JOBS.get(jid)
     if not job:
         raise ApiError(404, "Esta busca terminou. Busque de novo.")

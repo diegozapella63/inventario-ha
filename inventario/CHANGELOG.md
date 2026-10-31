@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.12.1
+
+- Com **Usar IA** desligada, nada do Buscar na internet passa: se a IA for desligada no meio de uma busca, as fotos e os dados do produto que ela achou não chegam ao item. O resto já respeitava a opção: sem IA, o botão Buscar na internet some da ficha e do editor, o app não chama a IA, e o Falar separa os itens pelas vírgulas.
+
 ## 1.12.0
 
 - **Buscar na internet** traz também os dados do produto, na mesma chamada da IA (sem gastar outra): nome com marca e modelo, detalhes, categoria e valor estimado. A janela mostra o que vai para o item, já marcado em **Preencher também**; dá para desmarcar e ficar só com a foto.
