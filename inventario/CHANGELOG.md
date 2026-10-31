@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.1
+
+- Os botões das seções de Mais têm todos a mesma largura: Baixar CSV, Baixar JSON, Baixar ZIP, Abrir relatório, Criar backup, Escolher arquivo e Ver versões.
+
 ## 1.13.0
 
 - **Falar** com escolha da fala para texto, como a escolha da IA para ler fotos: em Mais > Integrações > Falar, **Fala para texto** começa em **Padrão do Home Assistant** (a do assistente de voz preferido) e lista as que o Home Assistant tem (Home Assistant Cloud, Google AI, Whisper e outras). O app usa o português que cada uma aceita.
