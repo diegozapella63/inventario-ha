@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.13.4
+
+- Menos texto: saíram as explicações do óbvio e os porquês que sobravam pelo app, como "o microfone aparece no alto de todas as telas", "toque na que mais parece com o seu item" e "você confere antes de salvar". Ficou só o que ajuda a decidir ou a resolver um problema.
+- Os botões de Mais têm todos o mesmo tamanho, inclusive Verificar de novo, em Integrações, e Restaurar, nos backups.
+
 ## 1.13.3
 
 - A busca do Início subiu para cima de Mais valioso: no celular, logo abaixo da etiqueta; no computador, no alto da coluna ao lado da etiqueta, com a largura da lista.

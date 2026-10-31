@@ -572,10 +572,10 @@
         </div>
         <div class="welcome-text">
           <h1>Vamos começar</h1>
-          <p>Já tem um inventário salvo? Importe o arquivo de backup (.zip) e tudo volta, com fotos e valores. Se preferir, comece do zero criando o primeiro cômodo.</p>
+          <p>Importe um backup (.zip) ou comece do zero.</p>
           <div class="acts"><button type="button" class="btn primary" data-act="import-file">${ic("upload")}Importar backup</button>
             <button type="button" class="btn" data-act="room-new">${ic("plus")}Começar do zero</button></div>
-          <p class="muted" style="font-size:14px;margin:0">O backup é o arquivo .zip criado em Mais, Dados, ou o que você recebeu junto com o app. ${MULTI_PICK ? "Se ele veio em várias partes, escolha todas de uma vez." : "Se ele veio em várias partes, importe uma de cada vez, começando pela parte 1."}</p>
+          <p class="muted" style="font-size:14px;margin:0">${MULTI_PICK ? "Backup em partes: escolha todas de uma vez." : "Backup em partes: uma de cada vez, começando pela parte 1."}</p>
         </div>
       </section>`;
     }
@@ -673,13 +673,13 @@
   function zonesHtml(id) {
     const all = D.byRoom.get(id) || [];
     if (!all.length) {
-      return `<div class="empty">${emptyMark()}<h2>Nenhum item aqui ainda</h2><p>${aiOn() ? "Adicione o primeiro item ou tire uma foto e deixe a IA listar o que aparece nela." : "Adicione o primeiro item deste cômodo."}</p>
+      return `<div class="empty">${emptyMark()}<h2>Nenhum item aqui ainda</h2>
         <div class="acts"><button class="btn primary" data-act="item-new" data-room="${esc(id)}">${ic("plus")}Adicionar item</button>
         ${aiOn() ? `<button class="btn" data-act="catalog" data-room="${esc(id)}">${ic("scan")}Catalogar foto com IA</button>` : ""}</div></div>`;
     }
     const toks = tokens(roomFilter[id] || "");
     const list = toks.length ? all.filter((it) => matches(it, toks)) : all;
-    if (!list.length) return `<div class="empty"><h2>Nada com “${esc(roomFilter[id])}”</h2><p>Tente outra palavra ou limpe o filtro.</p></div>`;
+    if (!list.length) return `<div class="empty"><h2>Nada com “${esc(roomFilter[id])}”</h2></div>`;
     if (!zonesOn()) return `<section class="zone"><ul class="ilist">${list.map((it) => itemRow(it, { toks, mode: "room" })).join("")}</ul></section>`;
     const groups = new Map();
     for (const it of list) {
@@ -797,7 +797,7 @@
             ${zc ? `<td>${esc(it.zone || "")}</td>` : ""}<td class="r">${esc(qtyClean(it.qty))}</td><td class="r">${money(it.value)}</td></tr>`).join("")}
           </tbody><tfoot><tr>${withPhotos ? "<td></td>" : ""}<td colspan="${zc ? 4 : 3}">Subtotal</td><td class="r">${money(D.roomTotals.get(r.id) || 0)}</td></tr></tfoot></table></section>`;
       }).join("")}
-      <p class="rep-foot">Inventário mantido no InventarIA, app do Home Assistant. Dados em arquivos abertos (JSON e JPG).</p>
+      <p class="rep-foot">Feito com o InventarIA, no Home Assistant.</p>
     </article>`;
   }
 
@@ -810,7 +810,7 @@
   }
   function viewRooms() {
     if (!D.rooms.length) {
-      return `<div class="empty">${emptyMark()}<h2>Nenhum cômodo ainda</h2><p>Crie o primeiro cômodo para começar a cadastrar os itens da casa.</p>
+      return `<div class="empty">${emptyMark()}<h2>Nenhum cômodo ainda</h2>
         <div class="acts"><button type="button" class="btn primary" data-act="room-new">${ic("plus")}Novo cômodo</button></div></div>`;
     }
     const org = roomsOrganize, last = D.rooms.length - 1;
@@ -832,7 +832,7 @@
       <button type="button" class="btn primary" data-act="room-new">${ic("plus")}Novo cômodo</button>
       <button type="button" class="btn${org ? " dark" : ""}" data-act="rooms-organize">${ic(org ? "check" : "sort")}${org ? "Concluir" : "Organizar"}</button>
     </div>
-    ${org ? `<p class="rooms-hint">As setas mudam a ordem dos cômodos no app e no relatório. O lápis edita o nome, o código e as fotos.</p>` : ""}
+    ${org ? `<p class="rooms-hint">A ordem vale também para o relatório.</p>` : ""}
     <ul class="ilist rooms">${rows}</ul>`;
   }
 
@@ -854,12 +854,11 @@
     return `
     <section class="panel" id="p-export">
       <h2>${secIc("download")}Exportar</h2>
-      <p class="lead">Baixe o inventário para abrir no Excel, guardar ou levar para outro programa. Os arquivos são abertos e legíveis.</p>
       <ul class="opts">
-        <li><div class="ot"><b>Planilha (CSV)</b><span>Abre no Excel e no Google Planilhas, com um item por linha.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="csv">${ic("download")}Baixar CSV</button></div></li>
-        <li><div class="ot"><b>Dados completos (JSON)</b><span>Todos os campos, para backup ou para outro sistema.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="json">${ic("download")}Baixar JSON</button></div></li>
-        <li><div class="ot"><b>Tudo com fotos (ZIP)</b><span>JSON, CSV e todas as fotos num arquivo só.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="zip">${ic("download")}Baixar ZIP</button></div></li>
-        <li><div class="ot"><b>Relatório para seguro</b><span>Lista por cômodo com fotos, pronta para imprimir ou salvar em PDF.</span></div><div class="oa"><a class="btn" href="#/relatorio">${ic("report")}Abrir relatório</a></div></li>
+        <li><div class="ot"><b>Planilha (CSV)</b><span>Abre no Excel e no Google Planilhas.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="csv">${ic("download")}Baixar CSV</button></div></li>
+        <li><div class="ot"><b>Dados completos (JSON)</b><span>Todos os campos.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="json">${ic("download")}Baixar JSON</button></div></li>
+        <li><div class="ot"><b>Tudo com fotos (ZIP)</b><span>JSON, CSV e fotos.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="zip">${ic("download")}Baixar ZIP</button></div></li>
+        <li><div class="ot"><b>Relatório para seguro</b><span>Por cômodo, com fotos. Imprime ou salva em PDF.</span></div><div class="oa"><a class="btn" href="#/relatorio">${ic("report")}Abrir relatório</a></div></li>
       </ul>
     </section>`;
   }
@@ -870,27 +869,26 @@
     return `
     <section class="panel" id="p-ai">
       <h2>${secIc("scan")}IA do Home Assistant</h2>
-      <p class="lead">O app usa a integração de IA configurada no Home Assistant (Anthropic Claude, OpenAI, Google Gemini ou um modelo local pelo Ollama) para ler fotos e para buscar fotos de produtos na internet. Dá para trocar de IA quando quiser, sem mexer no inventário.</p>
-      <ul class="opts"><li><div class="ot"><b id="ai-on-h">Usar IA</b><span>${on ? "Ler fotos para preencher itens, catalogar uma foto inteira e buscar fotos na internet. Desligada, o app esconde esses botões, e o Falar continua sem IA." : "Desligada: o app esconde os botões de IA, e o Falar continua sem IA. Ligue para ler fotos, catalogar e buscar fotos na internet."} Vale para todos os aparelhos.</span></div>
+      <p class="lead">A IA configurada no Home Assistant: Claude, OpenAI, Gemini ou Ollama.</p>
+      <ul class="opts"><li><div class="ot"><b id="ai-on-h">Usar IA</b><span>${on ? "Ler fotos, catalogar e buscar na internet." : "Os botões de IA ficam escondidos. O Falar continua, sem IA."} Vale para todos os aparelhos.</span></div>
         <div class="oa">${switchHtml("ai-on", on, "ai-on-h")}</div></li></ul>
       ${on ? `<div data-slot="ai-panel"><p class="muted">Verificando…</p></div>` : ""}
     </section>
     <section class="panel" id="p-voice">
       <h2>${secIc("mic")}Falar</h2>
-      <p class="lead">O microfone no alto da tela: fale os itens e quanto valem. O Home Assistant transcreve e ${on ? "a IA separa os itens" : "o app separa os itens"}, para você conferir antes de adicionar.</p>
+      <p class="lead">Fale os itens e quanto valem. O Home Assistant transcreve e ${on ? "a IA" : "o app"} separa os itens.</p>
       <div data-slot="voice-panel"><p class="muted">Verificando…</p></div>
     </section>
     ${on ? `<section class="panel" id="p-usage">
       <h2>${secIc("bars")}Uso da IA</h2>
-      <p class="lead">Cada leitura de foto, foto catalogada ou busca de foto na internet é uma chamada para a IA do Home Assistant. O Home Assistant não informa tokens nem custo, então o InventarIA conta as chamadas e estima os tokens pelo tamanho do texto.</p>
+      <p class="lead">O Home Assistant não informa tokens nem custo: o app conta as chamadas e estima os tokens.</p>
       <div data-slot="usage"><p class="muted">Carregando…</p></div>
     </section>
     <section class="panel" id="p-sensors">
       <h2>${secIc("gauge")}Sensores no Home Assistant</h2>
-      <p class="lead">Para painéis e automações no Home Assistant: as chamadas de IA de hoje, com erros, cota excedida e tokens estimados.</p>
       <ul class="opts"><li><div class="ot"><b id="sensors-h">Criar os sensores</b><span>${sensorsOn()
-        ? 'Ligado: <span class="codepath">sensor.inventaria_ia_hoje</span>. Atualiza a cada chamada de IA e na virada do dia; se o Home Assistant reiniciar, volta em alguns minutos.'
-        : "Desligado: o app não cria sensores no Home Assistant."}</span></div>
+        ? '<span class="codepath">sensor.inventaria_ia_hoje</span>, com as chamadas de IA de hoje.'
+        : "As chamadas de IA de hoje, para painéis e automações."}</span></div>
         <div class="oa">${switchHtml("sensors-on", sensorsOn(), "sensors-h")}</div></li></ul>
     </section>` : ""}`;
   }
@@ -962,40 +960,38 @@
       if (ps.size === 1) prov = [...ps][0];
     }
     const link = (href, txt) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${txt}</a>`;
-    const provTxt = prov === "google" ? `Consumo exato do Gemini: no ${link("https://console.cloud.google.com/apis/dashboard", "Google Cloud Console")}, abra APIs e serviços ativados e depois Generative Language API; o gráfico de tráfego mostra os pedidos e os erros 429 de cota. Os limites do plano grátis estão no ${link("https://aistudio.google.com/", "Google AI Studio")}. A cota diária volta à meia-noite do horário do Pacífico, de madrugada no Brasil (4h ou 5h).`
+    const provTxt = prov === "google" ? `Consumo exato do Gemini: ${link("https://console.cloud.google.com/apis/dashboard", "Google Cloud Console")}, em Generative Language API. A cota grátis volta de madrugada (4h ou 5h).`
       : prov === "openai" ? `Consumo exato e custo da OpenAI: ${link("https://platform.openai.com/usage", "platform.openai.com/usage")}.`
       : prov === "anthropic" ? `Consumo exato e custo da Anthropic: ${link("https://platform.claude.com/usage", "Claude Console, Usage")}.`
-      : "O consumo exato e o custo ficam no painel do provedor da sua IA (Google, OpenAI, Anthropic...).";
+      : "Consumo exato e custo: no painel do provedor da sua IA.";
     slot.innerHTML = `<div class="uso-tiles">${tile("Hoje", u.today)}${tile("7 dias", u.week)}${tile("Este mês", u.month)}</div>
       <div class="uso-chart" role="group" aria-label="Chamadas de IA nos últimos 7 dias">${bars}</div>
       <div class="uso-dias" aria-hidden="true">${u.days.map((d) => `<span>${d.day === today ? "hoje" : weekday(d.day)}</span>`).join("")}</div>
       <p class="uso-cap" aria-live="polite">${dayLong(sel.day)}: <b>${plural(sel.calls || 0, "chamada", "chamadas")}</b>${sel.errors ? `, ${int(sel.errors)} com erro` : ""}${sel.quota ? `, ${int(sel.quota)} sem cota` : ""}.</p>
       ${kinds.length ? `<ul class="uso-tipos" aria-label="Nos últimos 7 dias">${kinds.map(([k, n]) => `<li>${esc(USAGE_KIND[k] || k)} <b>${int(n)}</b></li>`).join("")}</ul>` : ""}
       <details class="uso-ult"><summary>${ic("chev", "sm")}Últimas chamadas</summary><ul>${recent || "<li>Nenhuma chamada ainda.</li>"}</ul></details>
-      <p class="help">${provTxt} A estimativa de tokens daqui conta só o texto; as imagens e a busca na web somam mais.</p>
-      <p class="help">${sensorsOn() ? `No Home Assistant, o sensor <span class="codepath">${esc(u.sensor || "sensor.inventaria_ia_hoje")}</span> traz as chamadas de hoje, com erros, cota e tokens estimados, para pôr num painel ou numa automação (por exemplo, avisar quando passar de 50 no dia).`
-        : "Para ter esses números num painel ou numa automação do Home Assistant, ligue Sensores no Home Assistant, logo abaixo."}</p>`;
+      <p class="help">${provTxt} A estimativa conta só o texto.</p>`;
   }
   function moreData() {
     return `
     <section class="panel" id="p-backup">
       <h2>${secIc("archive")}Backup na pasta share</h2>
-      <p class="lead">Cria uma cópia completa (com fotos) em <span class="codepath">share/inventario</span>, que você acessa pela rede do Home Assistant. Os backups do próprio Home Assistant também incluem o inventário.</p>
+      <p class="lead">Cópia completa, com fotos, em <span class="codepath">share/inventario</span>. Os backups do Home Assistant também incluem o inventário.</p>
       <div data-slot="backups"><p class="muted">Carregando backups…</p></div>
     </section>
     <section class="panel" id="p-import">
       <h2>${secIc("upload")}Importar</h2>
-      <p class="lead">Traz um inventário de um arquivo: o backup .zip, com as fotos, ou um .json exportado pelo app. Antes de importar, o app guarda uma cópia do que existe hoje.</p>
-      <ul class="opts"><li><div class="ot"><b>Importar backup ou JSON</b><span>Funciona pelo celular: escolha o arquivo nos seus downloads. ${MULTI_PICK ? "Se o backup veio em partes, escolha todas de uma vez ou uma de cada vez" : "Se o backup veio em partes, importe uma de cada vez, começando pela parte 1"}; as partes só com fotos não mexem nos itens.</span></div><div class="oa"><button class="btn" data-act="import-file">${ic("upload")}Escolher arquivo</button></div></li></ul>
+      <p class="lead">Backup .zip, com fotos, ou .json do app. Antes, o app guarda uma cópia do atual.</p>
+      <ul class="opts"><li><div class="ot"><b>Importar backup ou JSON</b><span>${MULTI_PICK ? "Backup em partes: escolha todas de uma vez." : "Backup em partes: uma de cada vez, começando pela parte 1."}</span></div><div class="oa"><button class="btn" data-act="import-file">${ic("upload")}Escolher arquivo</button></div></li></ul>
     </section>
     <section class="panel" id="p-history">
       <h2>${secIc("history")}Versões anteriores</h2>
-      <p class="lead">O app guarda sozinho uma cópia do inventário a cada 10 minutos de uso e antes de importar ou restaurar, e fica com as 3 mais recentes. Se algo sair errado, volte para uma delas.</p>
-      <ul class="opts"><li><div class="ot"><b>Versões guardadas</b><span>Veja a data e quantos itens cada uma tem, e restaure a que quiser.</span></div><div class="oa"><button class="btn" data-act="versions">${ic("history")}Ver versões</button></div></li></ul>
+      <p class="lead">Uma cópia a cada 10 minutos de uso e antes de importar ou restaurar. Ficam as 3 mais recentes.</p>
+      <ul class="opts"><li><div class="ot"><b>Versões guardadas</b></div><div class="oa"><button class="btn" data-act="versions">${ic("history")}Ver versões</button></div></li></ul>
     </section>
     <section class="panel" id="p-where">
       <h2>${secIc("folder")}Onde ficam os dados</h2>
-      <p class="lead">Os itens ficam em <span class="codepath">inventario.json</span> e as fotos em JPG, dentro do app, e entram nos backups do Home Assistant. O app funciona sem internet: só a IA e a busca de fotos na internet precisam dela.</p>
+      <p class="lead">Itens em <span class="codepath">inventario.json</span> e fotos em JPG, dentro do app. Entram nos backups do Home Assistant.</p>
     </section>`;
   }
   function moreLook() {
@@ -1004,14 +1000,13 @@
     return `
     <section class="panel" id="p-look">
       <h2>${secIc("contrast")}Tema</h2>
-      <p class="lead">Automático segue o modo claro ou escuro do aparelho.</p>
       <div class="seg themes" role="group" aria-label="Tema">
         ${[["auto", "Automático", "phone"], ["light", "Claro", "sun"], ["dark", "Escuro", "moon"]].map(([k, v, i]) => `<button type="button" data-act="theme" data-theme="${k}" aria-pressed="${theme === k}">${ic(i)}<span>${v}</span></button>`).join("")}
       </div>
     </section>
     <section class="panel" id="p-accent">
       <h2 id="accent-h">${secIc("palette")}Cor do app</h2>
-      <p class="lead">Muda a etiqueta, os botões principais e os destaques. Cada aparelho guarda a sua escolha.</p>
+      <p class="lead">Tema e cor valem só para este aparelho.</p>
       <div class="swatches" role="radiogroup" aria-labelledby="accent-h">${ACCENTS.map(([k, v]) => `<label class="sw" data-accent="${k}"><input type="radio" name="accent" value="${k}" data-input="accent"${k === accent ? " checked" : ""}>${SWATCH}<span>${v}</span></label>`).join("")}</div>
     </section>`;
   }
@@ -1020,8 +1015,8 @@
     return `
     <section class="panel" id="p-zones">
       <h2>${secIc("pin")}Zonas</h2>
-      <p class="lead">Partes de um cômodo, como Estante, Bancada ou Rack da TV. Ligadas, o cadastro ganha o campo Zona e os itens de cada cômodo aparecem separados por zona.</p>
-      <ul class="opts"><li><div class="ot"><b id="zones-h">Usar zonas</b><span>Vale para todos os aparelhos. Desligar só esconde: as zonas já gravadas continuam guardadas.</span></div>
+      <p class="lead">Partes de um cômodo, como Estante ou Rack da TV.</p>
+      <ul class="opts"><li><div class="ot"><b id="zones-h">Usar zonas</b><span>Vale para todos os aparelhos. Desligar não apaga as zonas.</span></div>
         <div class="oa">${switchHtml("zones-on", zonesOn(), "zones-h")}</div></li></ul>
     </section>`;
   }
@@ -1050,7 +1045,7 @@
           <li><div class="ot"><b>Criar backup agora</b><span>${b.available === false ? "A pasta share não está disponível." : "Salva um arquivo .zip com dados e fotos."}</span></div>
             <div class="oa"><button class="btn primary" data-act="backup-create"${b.available === false ? " disabled" : ""}>${ic("archive")}Criar backup</button></div></li>
           ${(b.backups || []).slice(0, 12).map((x) => `<li><div class="ot"><b>${esc(x.name)}</b><span>${esc(dateTime(x.date))}, ${esc(fmtSize(x.size))}</span></div>
-            <div class="oa"><button class="btn sm" data-act="backup-restore" data-name="${esc(x.name)}">${ic("history", "sm")}Restaurar</button></div></li>`).join("")}
+            <div class="oa"><button class="btn" data-act="backup-restore" data-name="${esc(x.name)}">${ic("history")}Restaurar</button></div></li>`).join("")}
         </ul>`;
       }
     } catch (e) { bslot.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
@@ -1078,18 +1073,18 @@
       case "no_entity": return "Nenhuma integração de IA encontrada no Home Assistant.";
       case "no_vision": return st.selected ? "A IA escolhida não aceita fotos. Escolha outra." : "As IAs configuradas não aceitam fotos.";
       case "error": return st.message || "Não deu para consultar o Home Assistant.";
-      case "preview": return "Na prévia, a IA não lê as fotos de verdade. No Home Assistant, ela usa a integração de IA configurada lá.";
+      case "preview": return "Na prévia, a leitura é simulada.";
       default: { const e = (st.entities || []).find((x) => x.id === st.selected); return e ? `Usando ${e.name}.` : "Usando a IA preferida do Home Assistant."; }
     }
   }
   const AI_STEPS = `<ol class="steps">
     <li>No Home Assistant, abra Configurações, Dispositivos e serviços, Adicionar integração.</li>
-    <li>Escolha a IA: Anthropic (Claude), OpenAI, Google Gemini ou Ollama (modelo local, de graça). Cole a chave de API quando pedir.</li>
-    <li>Na integração, adicione uma tarefa de IA (AI Task) e use um modelo que entenda imagens.</li>
-    <li>Volte aqui em Mais, Integrações, e escolha essa IA na lista.</li></ol>`;
+    <li>Escolha Anthropic, OpenAI, Google Gemini ou Ollama (local, grátis) e cole a chave de API.</li>
+    <li>Na integração, adicione uma tarefa de IA (AI Task) com um modelo que leia imagens.</li>
+    <li>Escolha essa IA aqui, em Mais > Integrações.</li></ol>`;
   function renderAiPanel(slot, st) {
     if (st.preview) {
-      slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status warn"><i></i>Exemplo simulado na prévia</span></b><span>Aqui a IA não lê as fotos de verdade: os botões mostram como fica a revisão. No Home Assistant, a leitura usa a integração de IA que você configurar.</span></div></li></ul><div style="margin-top:12px"><b>Como configurar no Home Assistant</b>${AI_STEPS}</div>`;
+      slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status warn"><i></i>Exemplo simulado na prévia</span></b><span>Na prévia, a leitura é simulada.</span></div></li></ul><div style="margin-top:12px"><b>Como configurar no Home Assistant</b>${AI_STEPS}</div>`;
       return;
     }
     const ents = st.entities || [], agents = st.agents || [];
@@ -1097,13 +1092,13 @@
     const opt = (e, sel) => `<option value="${esc(e.id)}"${e.id === sel ? " selected" : ""}>${esc(e.name)}</option>`;
     slot.innerHTML = `<ul class="opts">
       <li><div class="ot"><b><span class="status ${cls}"><i></i>${st.ready ? "Pronta para ler fotos" : "Não configurada"}</span></b><span>${esc(aiReasonText(st))}</span></div>
-        <div class="oa"><button class="btn sm" data-act="ai-refresh">${ic("refresh", "sm")}Verificar de novo</button></div></li>
+        <div class="oa"><button class="btn" data-act="ai-refresh">${ic("refresh")}Verificar de novo</button></div></li>
       ${ents.length ? `<li><div class="ot"><b>IA para ler fotos</b><span>Padrão do Home Assistant usa a IA preferida definida lá.</span></div>
         <div class="oa"><select class="select" data-input="ai-entity" aria-label="IA para ler fotos" style="min-width:280px">
           <option value="">Padrão do Home Assistant</option>
           ${ents.map((e) => `<option value="${esc(e.id)}"${e.id === st.selected ? " selected" : ""}${e.attachments ? "" : " disabled"}>${esc(e.name)}${e.attachments ? "" : " (não lê fotos)"}</option>`).join("")}
         </select></div></li>` : ""}
-      ${ents.length || agents.length ? `<li><div class="ot"><b>IA para buscar fotos na internet</b><span>Padrão do Home Assistant usa a IA preferida definida lá. A IA precisa ter a busca na web ligada. Na Anthropic, ligue "Enable web search" na tarefa de IA. No Google Gemini, use um assistente de conversa com "Enable Google Search tool".</span></div>
+      ${ents.length || agents.length ? `<li><div class="ot"><b>IA para buscar fotos na internet</b><span>Padrão do Home Assistant usa a IA preferida definida lá. Precisa da busca na web: na Anthropic, "Enable web search"; no Gemini, um assistente de conversa com "Enable Google Search tool".</span></div>
         <div class="oa"><select class="select" data-input="ai-search" aria-label="IA para buscar fotos na internet" style="min-width:280px">
           <option value="">Padrão do Home Assistant</option>
           ${ents.length ? `<optgroup label="Tarefas de IA">${ents.map((e) => opt(e, st.search)).join("")}</optgroup>` : ""}
@@ -1118,8 +1113,7 @@
       cls: "modal narrow", label: "Leitura por IA",
       html: `<div class="dlg"><div class="dlg-h"><h2>Leitura por IA</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b"><p style="margin-top:0"><span class="status ${st.reason === "no_vision" ? "warn" : "bad"}"><i></i>${esc(aiReasonText(st))}</span></p>
-        <p>Para a IA ler as fotos, o Home Assistant precisa de uma integração de IA com tarefa de IA (AI Task):</p>${AI_STEPS}
-        <p class="muted" style="margin-bottom:0">Enquanto isso, você pode cadastrar os itens à mão normalmente.</p></div>
+        <p>Configure no Home Assistant:</p>${AI_STEPS}</div>
         <div class="dlg-f"><a class="btn" href="#/mais/integracoes" data-x>Abrir Integrações</a><button class="btn primary" data-x>Entendi</button></div></div>`,
     });
     entry.dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); });
@@ -1151,7 +1145,7 @@
       try { img = await loadImg(url); }
       catch (e) {
         if (/hei[cf]/i.test(file.type || "") || /\.hei[cf]$/i.test(file.name || "")) {
-          throw new Error("Esta foto está em HEIC, formato que o navegador não abre. Na câmera do celular, desligue a opção de salvar em HEIF (fica nas configurações da câmera) ou escolha outra foto.");
+          throw new Error("Foto em HEIC, que o navegador não abre. Escolha outra ou desligue o HEIF nas configurações da câmera.");
         }
         throw e;
       }
@@ -1254,7 +1248,7 @@
       });
       const dlg = entry.dlg, form = $("[data-wq]", dlg), slot = $('[data-slot="web"]', dlg), ok = $("[data-ok]", dlg);
       const show = (html) => { slot.innerHTML = html; };
-      const busy = (msg) => show(`<div class="wbusy"><span class="spin lg"></span><p><b>${esc(msg)}</b><span>A IA procura no fabricante e nas lojas. Pode levar até um minuto.</span></p></div>`);
+      const busy = (msg) => show(`<div class="wbusy"><span class="spin lg"></span><p><b>${esc(msg)}</b><span>Pode levar até um minuto.</span></p></div>`);
       async function start() {
         const q = form.q.value.trim();
         if (!q) { form.q.focus(); return; }
@@ -1283,10 +1277,10 @@
           return;
         }
         results = st.results || [];
-        show(`${prodCard(true)}<p class="wsum">${results.length === 1 ? "1 foto encontrada" : `${results.length} fotos encontradas`}. Toque na que mais parece com o seu item.</p>
+        show(`${prodCard(true)}<p class="wsum">${results.length === 1 ? "1 foto encontrada" : `${results.length} fotos encontradas`}.</p>
           <div class="wgrid" role="radiogroup" aria-label="Fotos encontradas">${results.map((x) => `<button type="button" class="wimg" role="radio" aria-checked="false" data-n="${x.n}">
             <img src="${esc(webImg(job, x.n))}" alt="Foto de ${esc(x.site)}" loading="lazy"><span>${esc(x.site)}</span></button>`).join("")}</div>
-          <p class="muted wtip">${st.example ? "Exemplo simulado da prévia: aqui as fotos e os dados vêm do próprio inventário. No Home Assistant, a IA procura no fabricante e nas lojas. " : ""}Fotos de lojas e fabricantes ficam marcadas como ilustrativas, com o site de onde vieram. Para o seguro, uma foto sua do item vale mais.</p>`);
+          <p class="muted wtip">${st.example ? "Exemplo simulado da prévia, com fotos do próprio inventário. " : ""}A foto fica marcada como ilustrativa, com o site de origem.</p>`);
       }
       // o que a IA achou do produto, com o que vai para o item; com foto, dá para desmarcar
       function prodCard(withPhotos) {
@@ -1451,9 +1445,9 @@
         <form class="dlg-b" data-mv><div class="form">
           <p class="muted" style="margin:0">${esc(it.name)}</p>
           <div class="field"><label for="mv-room">Para o cômodo</label><select id="mv-room" class="select" name="room">${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === it.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select>
-            ${zones ? "" : `<p class="help">Ao mudar de cômodo, o item ganha um código novo no fim da lista.</p>`}</div>
+            ${zones ? "" : `<p class="help">Em outro cômodo, o item ganha um código novo.</p>`}</div>
           ${zones ? `<div class="field"><label for="mv-zone">Zona</label><input id="mv-zone" class="input" name="zone" list="mv-zones" value="${esc(it.zone || "")}" autocomplete="off"><datalist id="mv-zones">${zonesFor(it.room)}</datalist>
-            <p class="help">Ao mudar de cômodo, o item ganha um código novo no fim da lista.</p></div>` : ""}
+            <p class="help">Em outro cômodo, o item ganha um código novo.</p></div>` : ""}
         </div></form>
         <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok>${ic("move")}Mover</button></div></div>`,
     });
@@ -1499,7 +1493,7 @@
         <form class="dlg-b drop" data-ed-form novalidate autocomplete="off">
           <div class="form">
             <div class="field"><span class="lbl">Fotos</span><div class="phs" data-slot="photos"></div>
-              <p class="help">${ANDROID_APP ? "No app do Home Assistant as fotos vêm da galeria. Para fotografar na hora, tire a foto antes com a câmera do celular." : COARSE ? "Tire uma foto ou escolha da galeria." : "Arraste fotos para cá ou cole uma imagem com Ctrl+V."}</p></div>
+              ${ANDROID_APP ? `<p class="help">As fotos vêm da galeria: tire antes com a câmera.</p>` : COARSE ? "" : `<p class="help">Também dá para arrastar ou colar (Ctrl+V).</p>`}</div>
             ${aiOn() ? `<div class="aibox" data-slot="ai"></div>` : ""}
             <div class="field"><label for="f-name">Nome</label><input id="f-name" class="input" name="name" maxlength="200" value="${esc(F.name)}" placeholder="Ex.: Cafeteira Nespresso Inissia" enterkeyhint="next">
               <p class="err" data-err="name" hidden></p></div>
@@ -1522,7 +1516,7 @@
           <button type="button" class="btn ghost hide-narrow" data-ed="cancel">Cancelar</button>
           <button type="button" class="btn primary" data-ed="save">${F.id ? "Salvar alterações" : "Salvar item"}</button>
         </div></div>`,
-      guard: async () => !F.dirty || confirmBox({ title: "Descartar o que foi preenchido?", body: "As alterações deste item ainda não foram salvas.", ok: "Descartar", cancel: "Continuar editando", danger: true }),
+      guard: async () => !F.dirty || confirmBox({ title: "Descartar o que foi preenchido?", ok: "Descartar", cancel: "Continuar editando", danger: true }),
     });
     const dlg = entry.dlg;
     const form = $("[data-ed-form]", dlg);
@@ -1555,10 +1549,10 @@
         return;
       }
       if (!F.photos.length) {
-        box.innerHTML = `<div class="aih"><p>${ic("scan", "sm")} Com uma foto, a IA preenche nome, detalhes, categoria e valor. Você confere antes de salvar.</p></div>`;
+        box.innerHTML = `<div class="aih"><p>${ic("scan", "sm")} Com uma foto, a IA preenche os campos.</p></div>`;
         return;
       }
-      box.innerHTML = `<div class="aih"><p>A IA lê a primeira foto e preenche os campos. Você confere antes de salvar.</p>
+      box.innerHTML = `<div class="aih"><p>A IA lê a primeira foto e preenche os campos.</p>
           <button type="button" class="btn" data-ed="ai">${ic("scan")}Preencher com IA</button></div>
         <input class="input" data-ed-hint placeholder="Dica para a IA (opcional), ex.: é uma cafeteira Oster" value="${esc(F.hint)}" maxlength="300" style="height:40px">`;
     };
@@ -1654,7 +1648,7 @@
           Object.assign(F, { name: "", details: "", qty: "1", value: "", flag: "", photos: [], photoSrc: {}, source: "manual", hint: "", dirty: false });
           fill(); renderPhotos();
           form.name.focus();
-          toast(`${res.item.name} adicionado. Pode cadastrar o próximo.`);
+          toast(`${res.item.name} adicionado`);
         } else {
           F.dirty = false;
           requestClose(entry, { force: true });
@@ -1777,13 +1771,13 @@
   function renderVoicePanel(slot) {
     const v = S.voice, engines = (v && v.engines) || [], sel = (v && v.selected) || "";
     // quem transcreve é a fala para texto; o assistente de voz só diz qual é o padrão (o nome dele não é quem transcreve)
-    const using = v && v.ready ? `Transcreve com ${esc(v.name || v.engine)} (${esc(v.language || "pt-BR")})${!sel && v.assistant ? `, a fala para texto do assistente de voz ${esc(v.assistant)}, o preferido do Home Assistant` : ""}.` : "";
+    const using = v && v.ready ? `Transcreve com ${esc(v.name || v.engine)} (${esc(v.language || "pt-BR")})${!sel && v.assistant ? `, do assistente ${esc(v.assistant)}` : ""}.` : "";
     // com Usar IA desligada o Falar continua: quem transcreve é a fala para texto, e o próprio app separa os itens
-    const split = aiOn() ? "" : " Com Usar IA desligada, o próprio app separa os itens pelas vírgulas, sem chamar a IA.";
+    const split = aiOn() ? "" : " Sem IA, o app separa os itens pelas vírgulas.";
     slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status ${v && v.ready ? "ok" : "bad"}"><i></i>${v && v.ready ? (aiOn() ? "Pronto para ouvir" : "Pronto para ouvir, sem IA") : v ? "Sem fala para texto" : "Verificando…"}</span></b>
-        <span>${v && v.ready ? `${using}${v.missing ? " A fala para texto escolhida não existe mais no Home Assistant, então o app usa o padrão." : ""}${split} O microfone aparece no alto de todas as telas.` : esc((v && v.reason) || "")}</span></div>
-      <div class="oa"><button class="btn sm" data-act="voice-refresh">${ic("refresh", "sm")}Verificar de novo</button></div></li>
-      ${engines.length ? `<li><div class="ot"><b id="voice-stt-l">Fala para texto</b><span>Quem transforma o que você fala em texto. Padrão do Home Assistant usa a do assistente de voz preferido (Configurações > Assistentes de voz). Ela não depende de Usar IA: separar os itens é que usa a IA.</span></div>
+        <span>${v && v.ready ? `${using}${v.missing ? " A escolhida saiu do Home Assistant: usando o padrão." : ""}${split}` : esc((v && v.reason) || "")}</span></div>
+      <div class="oa"><button class="btn" data-act="voice-refresh">${ic("refresh")}Verificar de novo</button></div></li>
+      ${engines.length ? `<li><div class="ot"><b id="voice-stt-l">Fala para texto</b><span>Padrão do Home Assistant usa a do assistente de voz preferido.</span></div>
         <div class="oa"><select class="select" data-input="voice-stt" aria-labelledby="voice-stt-l" style="min-width:280px">
           <option value="">Padrão do Home Assistant</option>
           ${engines.map((e) => `<option value="${esc(e.id)}"${e.id === sel ? " selected" : ""}>${esc(e.name)}</option>`).join("")}
@@ -1856,20 +1850,20 @@
         body.innerHTML = `<div class="voice${on ? " on" : ""}">
             <button type="button" class="voice-mic" data-ct="mic" style="--lvl:${on ? C.level.toFixed(2) : 0}" aria-label="${on ? "Pronto: enviar o que falei" : "Começar a falar"}"><span class="voice-ring"></span>${ic(on ? "check" : "mic")}</button>
             <div class="voice-state" aria-live="polite">${on ? `<b>Ouvindo…</b> <span class="voice-time">${clock(C.secs)}</span>` : C.rec === "starting" ? "Abrindo o microfone…" : "Toque no microfone e fale"}</div>
-            <p class="voice-hint">${on ? "Toque de novo quando terminar." : "Por exemplo: “Sofá cinza de três lugares, uns dois mil reais. Televisão Samsung de 55 polegadas, três mil.”"}</p>
+            <p class="voice-hint">${on ? "Toque de novo quando terminar." : "Ex.: “Sofá cinza, dois mil reais. TV Samsung de 55 polegadas, três mil.”"}</p>
           </div>
           <div class="form" style="margin-top:8px">${roomSelect("Vai para o cômodo")}</div>
           ${C.error ? `<div class="formerr" style="margin-top:14px">${esc(C.error)}</div>` : ""}
-          <p class="voice-note">O Home Assistant transcreve${S.voice && S.voice.name ? ` (${esc(S.voice.name)})` : ""} e ${useAi ? "a IA separa os itens, com categoria e valor" : "o app separa os itens pelas vírgulas e pelo “e”"}. Você revisa antes de adicionar. Até 2 minutos de cada vez.${PREVIEW ? " Na prévia o microfone não grava: ao terminar, entra um exemplo do que alguém falou." : ""}</p>`;
+          <p class="voice-note">${useAi ? "" : "Sem IA, o app separa pelas vírgulas. "}Até 2 minutos.${PREVIEW ? " Na prévia, o microfone não grava: entra um exemplo." : ""}</p>`;
         foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
           <button type="button" class="btn primary" data-ct="done"${on ? "" : " disabled"}>${ic("check")}Pronto</button>`;
       } else if (C.step === "transcribing") {
-        body.innerHTML = `<div class="ai-wait voice-wait"><span class="spin lg"></span><b>Transcrevendo o que você disse…</b><span>O Home Assistant está passando a fala para texto.</span></div>`;
+        body.innerHTML = `<div class="ai-wait voice-wait"><span class="spin lg"></span><b>Transcrevendo…</b></div>`;
         foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="stop">Cancelar</button>`;
       } else if (C.step === "photo" || C.step === "ready") {
         const hasRoomPhotos = (D.roomById.get(C.room)?.photos || []).length > 0;
         body.innerHTML = `<div class="form">
-          <p class="muted" style="margin:0">A IA lista os objetos da foto com nome, categoria, quantidade e uma sugestão de valor. Você revisa tudo antes de adicionar.</p>
+          <p class="muted" style="margin:0">A IA lista os objetos da foto.</p>
           ${C.file ? `<div class="cat-photo"><img src="${esc(src(C.file, "photos"))}" alt="Foto escolhida"></div>
               <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-ct="change">${ic("image", "sm")}Trocar foto</button></div>`
             : `<div class="phs" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
@@ -1877,7 +1871,7 @@
                 ${CAMERA_DIRECT ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="camera">${ic("camera", "lg")}Tirar foto</button>` : ""}
                 <button type="button" class="add" style="aspect-ratio:4/3" data-ct="upload">${ic(COARSE ? "image" : "upload", "lg")}${ANDROID_APP ? "Escolher foto" : COARSE ? "Galeria" : "Enviar foto"}</button>
                 ${hasRoomPhotos ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="roomphoto">${ic("images", "lg")}Foto do cômodo</button>` : ""}`}
-              </div>${ANDROID_APP ? `<p class="help" style="margin:0">No app do Home Assistant as fotos vêm da galeria. Tire a foto antes com a câmera do celular.</p>` : COARSE ? "" : `<p class="help" style="margin:0">Você também pode arrastar a foto para cá ou colar com Ctrl+V.</p>`}`}
+              </div>${ANDROID_APP ? `<p class="help" style="margin:0">As fotos vêm da galeria: tire antes com a câmera.</p>` : COARSE ? "" : `<p class="help" style="margin:0">Também dá para arrastar ou colar (Ctrl+V).</p>`}`}
           <div class="${zonesUse ? "row2" : ""}">
             ${roomSelect("Cômodo")}
             ${zonesUse ? `<div class="field"><label for="c-zone">Zona (opcional)</label><input id="c-zone" class="input" data-ct-in="zone" list="c-zones" value="${esc(C.zone)}" placeholder="Deixe vazio para a IA sugerir" autocomplete="off">
@@ -1888,9 +1882,9 @@
         foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
           <button type="button" class="btn primary" data-ct="read"${C.file ? "" : " disabled"}>${ic("scan")}Ler foto</button>`;
       } else if (C.step === "reading") {
-        body.innerHTML = C.voice ? `${heardBox()}<div class="ai-wait voice-wait"><span class="spin lg"></span><b>Separando os itens…</b><span>A IA está lendo o que você disse.</span></div>`
+        body.innerHTML = C.voice ? `${heardBox()}<div class="ai-wait voice-wait"><span class="spin lg"></span><b>Separando os itens…</b></div>`
           : `<div class="cat-photo"><img src="${esc(src(C.file, "photos"))}" alt=""><div class="scan"></div></div>
-          <div class="ai-wait"><b>Lendo a foto…</b><span>A IA está listando os objetos. Pode levar até um minuto.</span></div>`;
+          <div class="ai-wait"><b>Lendo a foto…</b><span>Pode levar até um minuto.</span></div>`;
         foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="stop">${C.voice ? "Cancelar" : "Cancelar leitura"}</button>`;
       } else if (C.step === "error") {
         body.innerHTML = `${C.voice ? heardBox() : `<div class="cat-photo"><img src="${esc(src(C.file, "thumbs"))}" alt="" style="max-height:220px"></div>`}
@@ -1903,10 +1897,10 @@
         body.innerHTML = `${C.voice ? heardBox() : ""}<div style="display:flex;gap:14px;align-items:center;margin-bottom:16px">
             ${C.file ? `<img src="${esc(src(C.file))}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:8px;flex:none">` : ""}
             <div><b style="font:600 21px/1.2 var(--font-c)">${C.results.length ? plural(C.results.length, "item encontrado", "itens encontrados") : "Nenhum item encontrado"}</b>
-            <div class="muted" style="font-size:14px">Em ${esc(roomName())}. Confira nomes e valores antes de adicionar.</div></div></div>
+            <div class="muted" style="font-size:14px">Em ${esc(roomName())}</div></div></div>
           ${C.voice ? `<div class="form" style="margin:0 0 14px">${roomSelect("Cômodo")}</div>` : ""}
           ${C.note ? `<p class="inote" style="margin:0 0 14px">${ic("info")}<span>${esc(C.note)}</span></p>` : ""}
-          ${C.example ? `<p class="inote" style="margin:0 0 14px">${ic("info")}<span>Exemplo simulado da prévia: aqui a IA não lê a foto. No Home Assistant, a lista vem da sua integração de IA.</span></p>` : ""}
+          ${C.example ? `<p class="inote" style="margin:0 0 14px">${ic("info")}<span>Exemplo simulado da prévia.</span></p>` : ""}
           ${C.results.length ? `<datalist id="cr-zones">${zones.map((z) => `<option value="${esc(z)}">`).join("")}</datalist><ul class="found">${C.results.map((r, i) => `<li class="${r.on ? "" : "off"}">
             <input type="checkbox" class="fcheck" data-ri="${i}" data-rf="on"${r.on ? " checked" : ""} aria-label="Adicionar ${esc(r.name)}">
             <div class="fbody">
@@ -1919,7 +1913,7 @@
               ${r.existing || r.confidence === "baixa" ? `<div class="fflag">${r.existing ? `<span class="pill warn">Parece já cadastrado: ${esc(r.existing)}</span>` : ""}${r.confidence === "baixa" ? `<span class="pill">IA pouco segura, confira</span>` : ""}</div>` : ""}
             </div></li>`).join("")}</ul>
           ${!C.file || (D.roomById.get(C.room)?.photos || []).some((p) => p.file === C.file) ? "" : `<label class="check" style="margin-top:16px"><input type="checkbox" data-ct-in="keep"${C.keep ? " checked" : ""}> Guardar esta foto nas fotos de ${esc(roomName())}</label>`}`
-          : `<p class="muted">${C.voice ? "Não achei itens no que você falou. Fale o nome de cada item, por exemplo “sofá cinza, televisão Samsung”." : "A IA não encontrou objetos para catalogar. Tente uma foto mais próxima ou escreva uma dica."}</p>`}`;
+          : `<p class="muted">${C.voice ? "Não achei itens no que você falou." : "Nenhum objeto encontrado. Tente uma foto mais próxima ou uma dica."}</p>`}`;
         foot.innerHTML = `<button type="button" class="btn" data-ct="back">${ic(C.voice ? "mic" : "back", "sm")}${C.voice ? "Falar de novo" : "Outra foto"}</button><span class="grow"></span>
           <button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
           <button type="button" class="btn primary" data-ct="add"${on ? "" : " disabled"}>${ic("plus")}${on > 1 ? `Adicionar ${on} itens` : on === 1 ? "Adicionar 1 item" : "Adicionar"}</button>`;
@@ -1976,7 +1970,7 @@
       C.note = "";
       if (!useAi) {
         C.results = splitSpoken(C.heard);
-        C.note = "Sem IA, o app separou o que você falou pelas vírgulas e pelo “e”. Confira os nomes e coloque os valores.";
+        C.note = "Sem IA: separado pelas vírgulas. Confira nomes e valores.";
         C.step = "review"; render();
         return;
       }
@@ -2117,7 +2111,7 @@
       else if (act === "catalog") finalizeThen(entry, () => openCatalog({ room: roomId, file: p.file }));
       else if (act === "cover") { const r = await saveRoomPhotos({ cover: i }); if (r) { render(); toast("Capa do cômodo atualizada"); } }
       else if (act === "remove") {
-        const ok = await confirmBox({ title: "Tirar a foto do cômodo?", body: "A foto sai da lista do cômodo. Os itens que usam esta foto continuam com ela.", ok: "Tirar do cômodo", danger: true });
+        const ok = await confirmBox({ title: "Tirar a foto do cômodo?", body: "Os itens que usam esta foto continuam com ela.", ok: "Tirar do cômodo", danger: true });
         if (!ok) return;
         const room = D.roomById.get(roomId);
         const list = (room.photos || []).filter((_, k) => k !== i);
@@ -2206,7 +2200,7 @@
         </div></form>
         <div class="dlg-f"><button type="button" class="btn danger" data-re="delete"${count ? ` title="Mova ou exclua os ${count} itens antes"` : ""}>${ic("trash")}<span class="lbl">Excluir cômodo</span></button><span class="grow"></span>
           <button type="button" class="btn ghost" data-re="cancel">Cancelar</button><button type="button" class="btn primary" data-re="save">Salvar</button></div></div>`,
-      guard: async () => !R.dirty || confirmBox({ title: "Descartar as alterações?", body: "As mudanças neste cômodo ainda não foram salvas.", ok: "Descartar", cancel: "Continuar editando", danger: true }),
+      guard: async () => !R.dirty || confirmBox({ title: "Descartar as alterações?", ok: "Descartar", cancel: "Continuar editando", danger: true }),
     });
     const dlg = entry.dlg;
     const form = $("[data-re-form]", dlg);
@@ -2261,7 +2255,7 @@
       else if (act === "rm") { R.photos.splice(i, 1); if (R.cover >= R.photos.length) R.cover = 0; else if (R.cover > i) R.cover -= 1; R.dirty = true; renderPhotos(); }
       else if (act === "delete") {
         if (count) { toast(`Mova ou exclua os ${count} itens de ${r.name} antes de excluir o cômodo.`, { error: true }); return; }
-        const ok = await confirmBox({ title: `Excluir ${r.name}?`, body: "O cômodo está vazio e sai da lista.", ok: "Excluir cômodo", danger: true });
+        const ok = await confirmBox({ title: `Excluir ${r.name}?`, ok: "Excluir cômodo", danger: true });
         if (!ok) return;
         try {
           const res = await API.del(`api/rooms/${encodeURIComponent(id)}`);
@@ -2335,14 +2329,14 @@
     catch (e) { fail(e); btn.disabled = false; btn.innerHTML = `${ic("archive")}Criar backup`; }
   }
   async function restoreBackup(name) {
-    const ok = await confirmBox({ title: "Restaurar este backup?", body: `O inventário atual vai ser trocado pelo conteúdo de <b>${esc(name)}</b>. Antes, o app salva uma cópia do que existe hoje na mesma pasta.`, ok: "Restaurar", danger: true });
+    const ok = await confirmBox({ title: "Restaurar este backup?", body: `O inventário atual vira o de <b>${esc(name)}</b>. Antes, o app guarda uma cópia do atual.`, ok: "Restaurar", danger: true });
     if (!ok) return;
     try { await API.post("api/backups/restore", { name }); await loadData(); refreshAll(); toast("Backup restaurado"); }
     catch (e) { fail(e); }
   }
   const VERSION_WHY = { auto: "automática", restore: "antes de restaurar", import: "antes de importar" };
   async function restoreHistory(v) {
-    const ok = await confirmBox({ title: "Restaurar esta versão?", body: `O inventário volta a ser o de <b>${esc(dateTime(v.date))}</b>${v.items != null ? `, com ${esc(plural(v.items, "item", "itens"))} em ${esc(plural(v.rooms || 0, "cômodo", "cômodos"))}` : ""}. Antes, o app guarda uma cópia do que existe hoje.`, ok: "Restaurar", danger: true });
+    const ok = await confirmBox({ title: "Restaurar esta versão?", body: `O inventário volta a ser o de <b>${esc(dateTime(v.date))}</b>${v.items != null ? `, com ${esc(plural(v.items, "item", "itens"))} em ${esc(plural(v.rooms || 0, "cômodo", "cômodos"))}` : ""}. Antes, o app guarda uma cópia do atual.`, ok: "Restaurar", danger: true });
     if (!ok) return false;
     try { await API.post("api/history/restore", { name: v.name }); await loadData(); refreshAll(); toast("Versão restaurada"); return true; }
     catch (e) { fail(e); return false; }
@@ -2360,9 +2354,8 @@
       list = (await API.get("api/history")).history || [];
       slot.innerHTML = list.length ? `<ul class="opts versions">${list.map((v, i) => `<li><div class="ot"><b>${esc(dateTime(v.date))}</b>
           <span>${esc(ago(v.date))}${v.items != null ? ` · ${esc(plural(v.items, "item", "itens"))}` : ""} · ${esc(VERSION_WHY[v.reason] || "automática")}</span></div>
-          <div class="oa"><button type="button" class="btn sm" data-ver="${i}">${ic("history", "sm")}Restaurar</button></div></li>`).join("")}</ul>
-        <p class="help" style="margin:12px 0 0">O app fica com as 3 cópias mais recentes. Restaurar também guarda uma cópia do que existe hoje.</p>`
-        : `<p class="muted" style="margin:0">Ainda não há versões anteriores. Elas aparecem depois das primeiras alterações.</p>`;
+          <div class="oa"><button type="button" class="btn sm" data-ver="${i}">${ic("history", "sm")}Restaurar</button></div></li>`).join("")}</ul>`
+        : `<p class="muted" style="margin:0">Ainda não há versões anteriores.</p>`;
     } catch (e) { slot.innerHTML = `<p class="muted" style="margin:0">${esc(e.message)}</p>`; }
     entry.dlg.addEventListener("click", async (e) => {
       if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
@@ -2442,7 +2435,7 @@
         if (info.hasData && !confirmed) {
           const ok = await confirmBox({
             title: "Trocar o inventário atual?",
-            body: `O inventário de agora (${plural(S.items.length, "item", "itens")}) vai ser trocado pelo de <b>${esc(file.name)}</b> (${plural(info.items, "item", "itens")} em ${plural(info.rooms, "cômodo", "cômodos")}). Antes, o app guarda uma cópia do que existe hoje.`,
+            body: `O inventário de agora (${plural(S.items.length, "item", "itens")}) vira o de <b>${esc(file.name)}</b> (${plural(info.items, "item", "itens")} em ${plural(info.rooms, "cômodo", "cômodos")}). Antes, o app guarda uma cópia do atual.`,
             ok: "Trocar inventário", cancel: "Cancelar", danger: true,
           });
           if (!ok) { cancelled = true; throw stop(); }
