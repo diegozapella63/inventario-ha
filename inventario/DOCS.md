@@ -65,7 +65,8 @@ O **microfone** fica no alto da tela, à direita (e também em **Adicionar > Fal
 - Dentro de um cômodo, os itens vão para ele; dá para trocar o cômodo antes de adicionar. Se você falar o cômodo ("na sala"), a IA já escolhe.
 - Sem IA (Usar IA desligada ou sem integração de IA), o app separa o que foi dito pelas vírgulas e pelo "e", e um valor em número ("2.000 reais", "R$ 500") vai para o item anterior.
 - Até 2 minutos por vez. Na primeira vez, o navegador ou o app do celular pede permissão para o microfone.
-- O microfone só aparece quando o Home Assistant tem fala para texto. Em **Mais > Integrações > Falar** dá para ver qual ele usa.
+- O microfone só aparece quando o Home Assistant tem fala para texto. Em **Mais > Integrações > Falar** você vê qual transcreve e escolhe outra em **Fala para texto**, como na escolha da IA: **Padrão do Home Assistant** usa a fala para texto do assistente de voz preferido (Configurações > Assistentes de voz), e embaixo vêm as que o Home Assistant tem, como Home Assistant Cloud, Google AI ou Whisper.
+- A fala para texto não depende de **Usar IA**: com a IA desligada, o Falar continua transcrevendo e o app separa os itens pelas vírgulas. Para não usar nada do Gemini, escolha uma fala para texto que não seja a do Google AI.
 - O microfone precisa do Home Assistant aberto com https (como o endereço do Nabu Casa) ou pelo app do celular; pelo endereço http da rede de casa, o navegador não deixa usar.
 
 ## Uso da IA

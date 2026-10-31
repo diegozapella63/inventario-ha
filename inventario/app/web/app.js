@@ -1774,10 +1774,17 @@
     renderTop();
   }
   function renderVoicePanel(slot) {
-    const v = S.voice;
+    const v = S.voice, engines = (v && v.engines) || [], sel = (v && v.selected) || "";
+    // quem transcreve é a fala para texto; o assistente de voz só diz qual é o padrão (o nome dele não é quem transcreve)
+    const using = v && v.ready ? `Transcreve com ${esc(v.name || v.engine)} (${esc(v.language || "pt-BR")})${!sel && v.assistant ? `, a fala para texto do assistente de voz ${esc(v.assistant)}, o preferido do Home Assistant` : ""}.` : "";
     slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status ${v && v.ready ? "ok" : "bad"}"><i></i>${v && v.ready ? "Pronto para ouvir" : v ? "Sem fala para texto" : "Verificando…"}</span></b>
-        <span>${v && v.ready ? `Usando ${esc(v.name || v.engine)} (${esc(v.language || "pt-BR")}). O microfone aparece no alto de todas as telas.` : esc((v && v.reason) || "")}</span></div>
-      <div class="oa"><button class="btn sm" data-act="voice-refresh">${ic("refresh", "sm")}Verificar de novo</button></div></li></ul>`;
+        <span>${v && v.ready ? `${using}${v.missing ? " A fala para texto escolhida não existe mais no Home Assistant, então o app usa o padrão." : ""} O microfone aparece no alto de todas as telas.` : esc((v && v.reason) || "")}</span></div>
+      <div class="oa"><button class="btn sm" data-act="voice-refresh">${ic("refresh", "sm")}Verificar de novo</button></div></li>
+      ${engines.length ? `<li><div class="ot"><b id="voice-stt-l">Fala para texto</b><span>Quem transforma o que você fala em texto. Padrão do Home Assistant usa a do assistente de voz preferido (Configurações > Assistentes de voz). Ela não depende de Usar IA: separar os itens é que usa a IA.</span></div>
+        <div class="oa"><select class="select" data-input="voice-stt" aria-labelledby="voice-stt-l" style="min-width:280px">
+          <option value="">Padrão do Home Assistant</option>
+          ${engines.map((e) => `<option value="${esc(e.id)}"${e.id === sel ? " selected" : ""}>${esc(e.name)}</option>`).join("")}
+        </select></div></li>` : ""}</ul>`;
   }
   const voiceReady = () => !!(S.voice && S.voice.ready);
   const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -2577,6 +2584,16 @@
     else if (k === "ai-entity") {
       try { await API.put("api/settings", { ai_entity: t.value }); S.settings.ai_entity = t.value; const slot = $('#view [data-slot="ai-panel"]'); if (slot) renderAiPanel(slot, await aiStatus(true)); toast("IA para ler fotos atualizada"); }
       catch (er) { fail(er); }
+    }
+    else if (k === "voice-stt") {
+      t.disabled = true;
+      try {
+        await API.put("api/settings", { voice_stt: t.value });
+        await loadVoice(true);
+        const slot = $('#view [data-slot="voice-panel"]');
+        if (slot) renderVoicePanel(slot);
+        toast(S.voice && S.voice.ready ? `Falar agora transcreve com ${S.voice.name || S.voice.engine}` : "Fala para texto atualizada");
+      } catch (er) { fail(er); t.disabled = false; }
     }
     else if (k === "ai-search") {
       try { await API.put("api/settings", { ai_search: t.value }); S.settings.ai_search = t.value; aiCache.at = 0; toast("IA para buscar fotos atualizada"); }

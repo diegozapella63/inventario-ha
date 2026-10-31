@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.0
+
+- **Falar** com escolha da fala para texto, como a escolha da IA para ler fotos: em Mais > Integrações > Falar, **Fala para texto** começa em **Padrão do Home Assistant** (a do assistente de voz preferido) e lista as que o Home Assistant tem (Home Assistant Cloud, Google AI, Whisper e outras). O app usa o português que cada uma aceita.
+- O painel do Falar agora diz quem transcreve de fato. Antes mostrava o nome do assistente de voz (por exemplo, "Gemini"), o que parecia que o Falar estava preso a ele.
+- Se a fala para texto escolhida sair do Home Assistant, o app volta para o padrão e avisa no painel.
+
 ## 1.12.1
 
 - Com **Usar IA** desligada, nada do Buscar na internet passa: se a IA for desligada no meio de uma busca, as fotos e os dados do produto que ela achou não chegam ao item. O resto já respeitava a opção: sem IA, o botão Buscar na internet some da ficha e do editor, o app não chama a IA, e o Falar separa os itens pelas vírgulas.

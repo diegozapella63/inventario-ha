@@ -43,7 +43,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.12.1"
+VERSION = "1.13.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -1305,14 +1305,45 @@ def ha_ws(command: dict, timeout=10.0):
             pass
 
 
+STT_LEGACY = {"cloud": "Home Assistant Cloud", "stt.home_assistant_cloud": "Home Assistant Cloud"}  # assistentes antigos guardam o provedor, não a entidade
+
+
+def stt_entities() -> list[dict]:
+    """As falas para texto do Home Assistant (entidades stt.*), para escolher em Mais > Integrações > Falar."""
+    out, states = [], ha_request("GET", "/states")
+    for st in states if isinstance(states, list) else []:
+        if not isinstance(st, dict):
+            continue
+        eid = str(st.get("entity_id", ""))
+        if eid.startswith("stt."):
+            out.append({"id": eid, "name": (st.get("attributes") or {}).get("friendly_name") or eid})
+    return sorted(out, key=lambda e: e["name"].lower())
+
+
+def stt_language(engine: str, fallback: str) -> str:
+    """O português que essa fala para texto aceita (pt-BR de preferência), pelo que ela informa ao Home Assistant."""
+    try:
+        meta = ha_request("GET", f"/stt/{engine}")
+        langs = [str(x) for x in (meta.get("languages") if isinstance(meta, dict) else None) or []]
+    except ApiError:
+        return fallback
+    for want in ("pt-BR", "pt_BR", "pt-br"):
+        if want in langs:
+            return want
+    return next((x for x in langs if x.lower().startswith("pt")), fallback)
+
+
 def voice_engine():
-    """{engine, language, name} da fala para texto a usar, ou None. Fica guardado por um minuto."""
+    """{engine, language, name, assistant} da fala para texto a usar, ou None. Fica guardado por um minuto.
+    Sem escolha (o padrão), é a do assistente de voz preferido do Home Assistant; com escolha, a entidade stt escolhida."""
     now = time.time()
     if now - _voice_cache["at"] < 60:
         return _voice_cache["value"]
-    value = None
+    sel = STORE.settings.get("voice_stt") or ""
+    pipe, engines = None, []
     if AI_MOCK:
-        value = {"engine": "stt.simulado", "language": "pt-BR", "name": "Fala simulada (teste)"}
+        pipe = {"engine": "stt.simulado", "language": "pt-BR", "assistant": "Assistente simulado"}
+        engines = [{"id": "stt.outra", "name": "Outra fala (teste)"}, {"id": "stt.simulado", "name": "Fala simulada (teste)"}]
     elif SUPERVISOR_TOKEN:
         try:
             r = ha_ws({"type": "assist_pipeline/pipeline/list"}) or {}
@@ -1320,27 +1351,35 @@ def voice_engine():
             p = (next((x for x in pipes if x.get("id") == r.get("preferred_pipeline") and x.get("stt_engine")), None)
                  or next((x for x in pipes if x.get("stt_engine")), None))
             if p:
-                value = {"engine": p["stt_engine"], "language": p.get("stt_language") or p.get("language") or "pt-BR", "name": p.get("name") or ""}
+                pipe = {"engine": p["stt_engine"], "language": p.get("stt_language") or p.get("language") or "pt-BR", "assistant": p.get("name") or ""}
         except (ApiError, OSError, ValueError) as e:
             log.info("assistentes de voz: %s", getattr(e, "msg", e))
-        if not value:
-            try:
-                for s in ha_request("GET", "/states") or []:
-                    if str(s.get("entity_id", "")).startswith("stt."):
-                        value = {"engine": s["entity_id"], "language": "pt-BR",
-                                 "name": (s.get("attributes") or {}).get("friendly_name") or s["entity_id"]}
-                        break
-            except ApiError as e:
-                log.info("fala para texto: %s", e.msg)
-    _voice_cache.update(at=now, value=value)
+        try:
+            engines = stt_entities()
+        except ApiError as e:
+            log.info("fala para texto: %s", e.msg)
+    names = {e["id"]: e["name"] for e in engines}
+    missing = bool(sel and engines and sel not in names)
+    value = None
+    if sel and not missing and (engines or pipe):
+        lang = pipe["language"] if pipe and pipe["engine"] == sel else stt_language(sel, (pipe or {}).get("language") or "pt-BR")
+        value = {"engine": sel, "language": lang, "name": names.get(sel, sel), "assistant": ""}
+    elif pipe:
+        value = {"engine": pipe["engine"], "language": pipe["language"], "assistant": pipe["assistant"],
+                 "name": names.get(pipe["engine"]) or STT_LEGACY.get(pipe["engine"]) or pipe["engine"]}
+    elif engines:
+        value = {"engine": engines[0]["id"], "language": stt_language(engines[0]["id"], "pt-BR"), "name": engines[0]["name"], "assistant": ""}
+    _voice_cache.update(at=now, value=value, engines=engines, missing=missing)
     return value
 
 
 def voice_status() -> dict:
     e = voice_engine()
+    extra = {"engines": _voice_cache.get("engines") or [], "selected": STORE.settings.get("voice_stt") or "",
+             "missing": bool(_voice_cache.get("missing"))}
     if not e:
-        return {"ready": False, "reason": VOICE_HOWTO}
-    return {"ready": True, "engine": e["engine"], "language": e["language"], "name": e["name"]}
+        return {"ready": False, "reason": VOICE_HOWTO, **extra}
+    return {"ready": True, "engine": e["engine"], "language": e["language"], "name": e["name"], "assistant": e.get("assistant") or "", **extra}
 
 
 def voice_text(pcm: bytes) -> dict:
@@ -2237,6 +2276,12 @@ def r_settings_put(h, query):
             if e and not re.fullmatch(r"(ai_task|conversation)\.[a-z0-9_]+", e):
                 raise ApiError(400, "Entidade de IA inválida.")
             STORE.settings["ai_search"] = e
+        if "voice_stt" in body:
+            e = str(body.get("voice_stt") or "")
+            if e and not re.fullmatch(r"stt\.[a-z0-9_]+", e):
+                raise ApiError(400, "Fala para texto inválida.")
+            STORE.settings["voice_stt"] = e
+            _voice_cache["at"] = 0.0
         for key in ("ai", "zones", "ha_sensors"):
             if key in body:
                 if not isinstance(body[key], bool):
