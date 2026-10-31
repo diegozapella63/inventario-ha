@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.14.0
+
+- **Cômodos para os outros apps da família**: o ResolvIA pode ligar uma pendência a um cômodo daqui. O InventarIA grava `share/inventario/integracao.json` com o endereço dele na rede interna dos apps e uma chave (como o GerencIA), e responde só a leitura dos cômodos em `/api/integracao/comodos`, com essa chave. Nada mais fica aberto: a tela continua só pelo Home Assistant.
+
 ## 1.13.5
 
 - Em Mais, os botões e as listas de escolha têm o mesmo tamanho e ficam alinhados: à esquerda no celular, à direita no computador.

@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import csv
 import hashlib
+import hmac
 import html
 import http.client
 import io
@@ -43,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.13.5"
+VERSION = "1.14.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -2060,10 +2061,14 @@ class Handler(BaseHTTPRequestHandler):
     def dispatch(self, method):
         self._body_read = False
         try:
-            if not DEV and self.client_address[0] not in ALLOWED_IPS:
-                raise ApiError(403, "Abra o InventarIA pelo Home Assistant.")
             url = urlparse(self.path)
             path = unquote(url.path)
+            if path.startswith("/api/integracao/"):
+                # outros apps do Home Assistant (ResolvIA) chegam pela rede interna, com a chave de share/inventario
+                if not CONEXAO.autorizado(self.headers):
+                    raise ApiError(401, "Chave inválida.")
+            elif not DEV and self.client_address[0] not in ALLOWED_IPS:
+                raise ApiError(403, "Abra o InventarIA pelo Home Assistant.")
             query = parse_qs(url.query)
             for m, rx, fn in ROUTES:
                 if m == method:
@@ -2432,10 +2437,95 @@ def r_history_restore(h, query):
     h.send_json({"ok": True, "rev": STORE.data["rev"]})
 
 
+# ---------------------------------------------------------------- outros apps
+
+class Conexao:
+    """Deixa os outros apps da família (ResolvIA) lerem os cômodos, como o GerencIA faz com as contas:
+    share/inventario/integracao.json tem o endereço deste app na rede interna dos apps e uma chave;
+    eles chamam /api/integracao/* com essa chave. Só leitura."""
+
+    def __init__(self):
+        self.arq_chave = os.path.join(DATA_DIR, "integracao.key")
+        self.arq_share = os.path.join(SHARE_DIR, "integracao.json")
+        self._chave = None
+        self.ultimo = None
+
+    def chave(self) -> str:
+        if self._chave:
+            return self._chave
+        try:
+            with open(self.arq_chave, encoding="utf-8") as f:
+                self._chave = f.read().strip()
+        except OSError:
+            self._chave = ""
+        if len(self._chave) < 32:
+            self._chave = secrets.token_urlsafe(32)
+            os.makedirs(DATA_DIR, exist_ok=True)
+            with open(self.arq_chave, "w", encoding="utf-8") as f:
+                f.write(self._chave)
+            os.chmod(self.arq_chave, 0o600)
+        return self._chave
+
+    def endereco(self):
+        url = os.environ.get("INV_URL_INTERNA")
+        if url:
+            return url.rstrip("/"), None
+        host = socket.gethostname()
+        try:
+            ip = socket.gethostbyname(host)
+        except OSError:
+            ip = None
+        return f"http://{host}:{PORT}", ip
+
+    def publicar(self):
+        try:
+            url, ip = self.endereco()
+            corpo = {"app": "InventarIA", "versao": VERSION, "url": url, "ip_url": f"http://{ip}:{PORT}" if ip else None,
+                     "chave": self.chave(), "gravado_em": datetime.now().isoformat(timespec="seconds")}
+            os.makedirs(SHARE_DIR, exist_ok=True)
+            tmp = self.arq_share + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(corpo, f, ensure_ascii=False, indent=1)
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, self.arq_share)
+        except OSError as e:
+            log.warning("Conexão com outros apps: não consegui gravar %s (%s)", self.arq_share, e)
+
+    def autorizado(self, headers) -> bool:
+        h = headers.get("Authorization") or ""
+        if not h.startswith("Bearer "):
+            return False
+        ok = hmac.compare_digest(h[7:].strip().encode(), self.chave().encode())
+        if ok:
+            self.ultimo = {"app": (headers.get("X-App") or "outro app")[:40], "em": now_iso()}
+        return ok
+
+
+CONEXAO = Conexao()
+
+
+def conexao_loop():
+    # regravado a cada 15 minutos: um arquivo velho quer dizer que o InventarIA parou ou saiu
+    while True:
+        CONEXAO.publicar()
+        time.sleep(15 * 60)
+
+
+def r_integracao_comodos(h, query):
+    with STORE.lock:
+        rooms = sorted(STORE.data.get("rooms") or [], key=lambda r: r.get("order", 0))
+        conta = {}
+        for it in STORE.data.get("items") or []:
+            conta[it.get("room")] = conta.get(it.get("room"), 0) + 1
+        out = [{"id": r["id"], "nome": r.get("name") or r["id"], "codigo": r.get("code") or "", "itens": conta.get(r["id"], 0)} for r in rooms]
+    h.send_json({"versao": VERSION, "comodos": out})
+
+
 ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/data", r_data),
     ("GET", r"/api/rev", r_rev),
     ("GET", r"/api/health", r_health),
+    ("GET", r"/api/integracao/comodos", r_integracao_comodos),
     ("POST", r"/api/items", r_item_create),
     ("POST", r"/api/items/batch", r_items_batch),
     ("PUT", r"/api/items/([A-Za-z0-9_-]+)", r_item_update),
@@ -2479,6 +2569,7 @@ def main():
     cleanup_uploads()
     web_jobs_cleanup(max_age=0)
     threading.Thread(target=usage_sensor_loop, daemon=True).start()
+    threading.Thread(target=conexao_loop, daemon=True).start()
     srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     srv.daemon_threads = True
     log.info("InventarIA %s ouvindo na porta %d%s", VERSION, PORT, " (modo dev)" if DEV else "")
