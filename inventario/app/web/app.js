@@ -1236,8 +1236,8 @@
     if (p.value > 0 && !(+cur.value > 0)) out.value = p.value;
     return out;
   }
+  const webImg = (job, n) => (window.INV_WEB_IMG ? window.INV_WEB_IMG(job, n) : `api/web-photos/${job}/${n}`);
   function webPhotoSearch({ name, details = "", qty = "1", fills = null }) {
-    if (PREVIEW) { toast("Na prévia não dá para buscar na internet. No Home Assistant, a IA busca as fotos de verdade."); return Promise.resolve(null); }
     if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return Promise.resolve(null); }
     return new Promise((resolve) => {
       let job = null, timer = null, chosen = null, results = [], got = null, gen = 0, product = null;
@@ -1285,8 +1285,8 @@
         results = st.results || [];
         show(`${prodCard(true)}<p class="wsum">${results.length === 1 ? "1 foto encontrada" : `${results.length} fotos encontradas`}. Toque na que mais parece com o seu item.</p>
           <div class="wgrid" role="radiogroup" aria-label="Fotos encontradas">${results.map((x) => `<button type="button" class="wimg" role="radio" aria-checked="false" data-n="${x.n}">
-            <img src="api/web-photos/${job}/${x.n}" alt="Foto de ${esc(x.site)}" loading="lazy"><span>${esc(x.site)}</span></button>`).join("")}</div>
-          <p class="muted wtip">Fotos de lojas e fabricantes ficam marcadas como ilustrativas, com o site de onde vieram. Para o seguro, uma foto sua do item vale mais.</p>`);
+            <img src="${esc(webImg(job, x.n))}" alt="Foto de ${esc(x.site)}" loading="lazy"><span>${esc(x.site)}</span></button>`).join("")}</div>
+          <p class="muted wtip">${st.example ? "Exemplo simulado da prévia: aqui as fotos e os dados vêm do próprio inventário. No Home Assistant, a IA procura no fabricante e nas lojas. " : ""}Fotos de lojas e fabricantes ficam marcadas como ilustrativas, com o site de onde vieram. Para o seguro, uma foto sua do item vale mais.</p>`);
       }
       // o que a IA achou do produto, com o que vai para o item; com foto, dá para desmarcar
       function prodCard(withPhotos) {
@@ -1306,7 +1306,7 @@
         if (!r || !job) return;
         ok.disabled = true; ok.innerHTML = `<span class="spin"></span>Salvando`;
         try {
-          const res = await fetch(`api/web-photos/${job}/${r.n}`, { cache: "no-store", credentials: "same-origin" });
+          const res = await fetch(webImg(job, r.n), { cache: "no-store", credentials: "same-origin" });
           if (!res.ok) throw new Error("Esta busca terminou. Busque de novo.");
           const blob = await res.blob();
           const file = await uploadPhoto(new File([blob], `internet.${(blob.type.split("/")[1] || "jpg")}`, { type: blob.type || "image/jpeg" }));
@@ -1771,7 +1771,6 @@
     return `Não consegui abrir o microfone (${(err && err.message) || n || "erro"}).`;
   }
   async function loadVoice(fresh = false) {
-    if (PREVIEW) return;
     try { S.voice = await API.get(`api/voice/status${fresh ? "?fresh=1" : ""}`); } catch (e) { S.voice = { ready: false, reason: e.message }; }
     renderTop();
   }
@@ -1861,7 +1860,7 @@
           </div>
           <div class="form" style="margin-top:8px">${roomSelect("Vai para o cômodo")}</div>
           ${C.error ? `<div class="formerr" style="margin-top:14px">${esc(C.error)}</div>` : ""}
-          <p class="voice-note">O Home Assistant transcreve${S.voice && S.voice.name ? ` (${esc(S.voice.name)})` : ""} e ${useAi ? "a IA separa os itens, com categoria e valor" : "o app separa os itens pelas vírgulas e pelo “e”"}. Você revisa antes de adicionar. Até 2 minutos de cada vez.</p>`;
+          <p class="voice-note">O Home Assistant transcreve${S.voice && S.voice.name ? ` (${esc(S.voice.name)})` : ""} e ${useAi ? "a IA separa os itens, com categoria e valor" : "o app separa os itens pelas vírgulas e pelo “e”"}. Você revisa antes de adicionar. Até 2 minutos de cada vez.${PREVIEW ? " Na prévia o microfone não grava: ao terminar, entra um exemplo do que alguém falou." : ""}</p>`;
         foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
           <button type="button" class="btn primary" data-ct="done"${on ? "" : " disabled"}>${ic("check")}Pronto</button>`;
       } else if (C.step === "transcribing") {
@@ -1937,7 +1936,7 @@
     async function startRec() {
       if (rec) return;
       C.error = null; C.rec = "starting"; C.secs = 0; C.level = 0; render();
-      const r = new Recorder((lvl) => { C.level = lvl; });
+      const r = new (window.INV_RECORDER || Recorder)((lvl) => { C.level = lvl; });
       rec = r;
       try { await r.start(); }
       catch (err) { r.cancel(); if (rec === r) rec = null; C.rec = "off"; C.error = micError(err); if (document.contains(dlg)) render(); return; }
