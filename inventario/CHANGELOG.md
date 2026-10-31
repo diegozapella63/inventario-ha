@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.15.0
+
+- **Itens para os outros apps**: além dos cômodos, o ResolvIA (2.29.0 ou mais novo) pode ligar uma tarefa a um item daqui (um equipamento, um móvel…). A leitura é só da lista de itens (nome, cômodo, zona e categoria), em `/api/integracao/itens`, com a mesma chave de `share/inventario`.
+
 ## 1.14.0
 
 - **Cômodos para os outros apps da família**: o ResolvIA pode ligar uma pendência a um cômodo daqui. O InventarIA grava `share/inventario/integracao.json` com o endereço dele na rede interna dos apps e uma chave (como o GerencIA), e responde só a leitura dos cômodos em `/api/integracao/comodos`, com essa chave. Nada mais fica aberto: a tela continua só pelo Home Assistant.

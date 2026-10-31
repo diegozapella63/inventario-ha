@@ -111,7 +111,7 @@ Para restaurar, use **Mais > Dados**: escolha um backup da pasta share, volte pa
 
 ## Cômodos nos outros apps
 
-O **ResolvIA** (2.28.0 ou mais novo) pode ligar uma tarefa a um cômodo daqui. Para isso, o InventarIA grava `share/inventario/integracao.json` com o endereço dele na rede interna dos apps e uma chave, e responde só a lista de cômodos para quem tem essa chave. A tela do InventarIA continua abrindo só pelo Home Assistant.
+O **ResolvIA** (2.28.0 ou mais novo) pode ligar uma tarefa a um cômodo daqui e, a partir da 2.29.0, a um item (um equipamento, um móvel…). Para isso, o InventarIA grava `share/inventario/integracao.json` com o endereço dele na rede interna dos apps e uma chave, e responde só a lista de cômodos e de itens (nome, cômodo, zona e categoria) para quem tem essa chave. A tela do InventarIA continua abrindo só pelo Home Assistant.
 
 ## Atualizar o app
 

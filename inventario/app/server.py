@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.14.0"
+VERSION = "1.15.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -2521,11 +2521,22 @@ def r_integracao_comodos(h, query):
     h.send_json({"versao": VERSION, "comodos": out})
 
 
+def r_integracao_itens(h, query):
+    """Os itens (equipamentos, móveis…), para os outros apps ligarem uma tarefa a um deles."""
+    with STORE.lock:
+        order = {r["id"]: r.get("order", 0) for r in STORE.data.get("rooms") or []}
+        items = sorted(STORE.data.get("items") or [], key=lambda it: (order.get(it.get("room"), 999), (it.get("name") or "").lower()))
+        out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "comodo": it.get("room") or "", "zona": (it.get("zone") or "")[:60],
+                "categoria": it.get("cat") or "outros"} for it in items if it.get("id")]
+    h.send_json({"versao": VERSION, "itens": out[:2000]})
+
+
 ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/data", r_data),
     ("GET", r"/api/rev", r_rev),
     ("GET", r"/api/health", r_health),
     ("GET", r"/api/integracao/comodos", r_integracao_comodos),
+    ("GET", r"/api/integracao/itens", r_integracao_itens),
     ("POST", r"/api/items", r_item_create),
     ("POST", r"/api/items/batch", r_items_batch),
     ("PUT", r"/api/items/([A-Za-z0-9_-]+)", r_item_update),
