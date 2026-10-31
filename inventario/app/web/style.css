@@ -924,5 +924,5 @@ dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; 
 .wprod .btn { justify-self: start; }
 .wprod + .wsum { margin-top: 14px; }
 
-/* Mais: todos os botões das seções com o mesmo tamanho (Baixar CSV, Verificar de novo, Restaurar…) */
-.more-panel .opts .oa > .btn { min-width: 184px; }
+/* Mais: botões e listas de escolha das seções com a mesma largura, alinhados entre si */
+.more-panel .opts .oa > .btn, .more-panel .opts .oa > .select { width: 280px; max-width: 100%; min-width: 0; height: 44px; }

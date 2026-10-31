@@ -1094,12 +1094,12 @@
       <li><div class="ot"><b><span class="status ${cls}"><i></i>${st.ready ? "Pronta para ler fotos" : "Não configurada"}</span></b><span>${esc(aiReasonText(st))}</span></div>
         <div class="oa"><button class="btn" data-act="ai-refresh">${ic("refresh")}Verificar de novo</button></div></li>
       ${ents.length ? `<li><div class="ot"><b>IA para ler fotos</b><span>Padrão do Home Assistant usa a IA preferida definida lá.</span></div>
-        <div class="oa"><select class="select" data-input="ai-entity" aria-label="IA para ler fotos" style="min-width:280px">
+        <div class="oa"><select class="select" data-input="ai-entity" aria-label="IA para ler fotos">
           <option value="">Padrão do Home Assistant</option>
           ${ents.map((e) => `<option value="${esc(e.id)}"${e.id === st.selected ? " selected" : ""}${e.attachments ? "" : " disabled"}>${esc(e.name)}${e.attachments ? "" : " (não lê fotos)"}</option>`).join("")}
         </select></div></li>` : ""}
       ${ents.length || agents.length ? `<li><div class="ot"><b>IA para buscar fotos na internet</b><span>Padrão do Home Assistant usa a IA preferida definida lá. Precisa da busca na web: na Anthropic, "Enable web search"; no Gemini, um assistente de conversa com "Enable Google Search tool".</span></div>
-        <div class="oa"><select class="select" data-input="ai-search" aria-label="IA para buscar fotos na internet" style="min-width:280px">
+        <div class="oa"><select class="select" data-input="ai-search" aria-label="IA para buscar fotos na internet">
           <option value="">Padrão do Home Assistant</option>
           ${ents.length ? `<optgroup label="Tarefas de IA">${ents.map((e) => opt(e, st.search)).join("")}</optgroup>` : ""}
           ${agents.length ? `<optgroup label="Assistentes de conversa">${agents.map((e) => opt(e, st.search)).join("")}</optgroup>` : ""}
@@ -1778,7 +1778,7 @@
         <span>${v && v.ready ? `${using}${v.missing ? " A escolhida saiu do Home Assistant: usando o padrão." : ""}${split}` : esc((v && v.reason) || "")}</span></div>
       <div class="oa"><button class="btn" data-act="voice-refresh">${ic("refresh")}Verificar de novo</button></div></li>
       ${engines.length ? `<li><div class="ot"><b id="voice-stt-l">Fala para texto</b><span>Padrão do Home Assistant usa a do assistente de voz preferido.</span></div>
-        <div class="oa"><select class="select" data-input="voice-stt" aria-labelledby="voice-stt-l" style="min-width:280px">
+        <div class="oa"><select class="select" data-input="voice-stt" aria-labelledby="voice-stt-l">
           <option value="">Padrão do Home Assistant</option>
           ${engines.map((e) => `<option value="${esc(e.id)}"${e.id === sel ? " selected" : ""}>${esc(e.name)}</option>`).join("")}
         </select></div></li>` : ""}</ul>`;

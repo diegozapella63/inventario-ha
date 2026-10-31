@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.5
+
+- Em Mais, os botões e as listas de escolha têm o mesmo tamanho e ficam alinhados: à esquerda no celular, à direita no computador.
+
 ## 1.13.4
 
 - Menos texto: saíram as explicações do óbvio e os porquês que sobravam pelo app, como "o microfone aparece no alto de todas as telas", "toque na que mais parece com o seu item" e "você confere antes de salvar". Ficou só o que ajuda a decidir ou a resolver um problema.
