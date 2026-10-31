@@ -869,7 +869,7 @@
     <section class="panel" id="p-ai">
       <h2>${secIc("scan")}IA do Home Assistant</h2>
       <p class="lead">O app usa a integração de IA configurada no Home Assistant (Anthropic Claude, OpenAI, Google Gemini ou um modelo local pelo Ollama) para ler fotos e para buscar fotos de produtos na internet. Dá para trocar de IA quando quiser, sem mexer no inventário.</p>
-      <ul class="opts"><li><div class="ot"><b id="ai-on-h">Usar IA</b><span>${on ? "Ler fotos para preencher itens, catalogar uma foto inteira e buscar fotos na internet. Desligada, o app esconde esses botões." : "Desligada: o app esconde os botões de IA. Ligue para ler fotos, catalogar e buscar fotos na internet."} Vale para todos os aparelhos.</span></div>
+      <ul class="opts"><li><div class="ot"><b id="ai-on-h">Usar IA</b><span>${on ? "Ler fotos para preencher itens, catalogar uma foto inteira e buscar fotos na internet. Desligada, o app esconde esses botões, e o Falar continua sem IA." : "Desligada: o app esconde os botões de IA, e o Falar continua sem IA. Ligue para ler fotos, catalogar e buscar fotos na internet."} Vale para todos os aparelhos.</span></div>
         <div class="oa">${switchHtml("ai-on", on, "ai-on-h")}</div></li></ul>
       ${on ? `<div data-slot="ai-panel"><p class="muted">Verificando…</p></div>` : ""}
     </section>
@@ -1777,8 +1777,10 @@
     const v = S.voice, engines = (v && v.engines) || [], sel = (v && v.selected) || "";
     // quem transcreve é a fala para texto; o assistente de voz só diz qual é o padrão (o nome dele não é quem transcreve)
     const using = v && v.ready ? `Transcreve com ${esc(v.name || v.engine)} (${esc(v.language || "pt-BR")})${!sel && v.assistant ? `, a fala para texto do assistente de voz ${esc(v.assistant)}, o preferido do Home Assistant` : ""}.` : "";
-    slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status ${v && v.ready ? "ok" : "bad"}"><i></i>${v && v.ready ? "Pronto para ouvir" : v ? "Sem fala para texto" : "Verificando…"}</span></b>
-        <span>${v && v.ready ? `${using}${v.missing ? " A fala para texto escolhida não existe mais no Home Assistant, então o app usa o padrão." : ""} O microfone aparece no alto de todas as telas.` : esc((v && v.reason) || "")}</span></div>
+    // com Usar IA desligada o Falar continua: quem transcreve é a fala para texto, e o próprio app separa os itens
+    const split = aiOn() ? "" : " Com Usar IA desligada, o próprio app separa os itens pelas vírgulas, sem chamar a IA.";
+    slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status ${v && v.ready ? "ok" : "bad"}"><i></i>${v && v.ready ? (aiOn() ? "Pronto para ouvir" : "Pronto para ouvir, sem IA") : v ? "Sem fala para texto" : "Verificando…"}</span></b>
+        <span>${v && v.ready ? `${using}${v.missing ? " A fala para texto escolhida não existe mais no Home Assistant, então o app usa o padrão." : ""}${split} O microfone aparece no alto de todas as telas.` : esc((v && v.reason) || "")}</span></div>
       <div class="oa"><button class="btn sm" data-act="voice-refresh">${ic("refresh", "sm")}Verificar de novo</button></div></li>
       ${engines.length ? `<li><div class="ot"><b id="voice-stt-l">Fala para texto</b><span>Quem transforma o que você fala em texto. Padrão do Home Assistant usa a do assistente de voz preferido (Configurações > Assistentes de voz). Ela não depende de Usar IA: separar os itens é que usa a IA.</span></div>
         <div class="oa"><select class="select" data-input="voice-stt" aria-labelledby="voice-stt-l" style="min-width:280px">

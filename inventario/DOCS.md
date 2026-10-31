@@ -32,7 +32,7 @@ O valor de cada item é o que você quiser registrar, somando todas as unidades.
 
 ## Opções da casa
 
-- **Usar IA** (Mais > Integrações), ligada de início: desligada, o app esconde tudo o que usa IA (Catalogar foto com IA, Preencher com IA, Buscar na internet) e não chama a IA.
+- **Usar IA** (Mais > Integrações), ligada de início: desligada, o app esconde tudo o que usa IA (Catalogar foto com IA, Preencher com IA, Buscar na internet) e não chama a IA. O **Falar** continua: quem transcreve é a fala para texto do Home Assistant, e o próprio app separa os itens pelas vírgulas.
 - **Usar zonas** (Mais > Opções), desligada de início: as zonas dividem um cômodo em partes, como Estante, Bancada ou Rack da TV. Ligadas, aparecem o campo Zona no cadastro, a zona na ficha do item, na busca e no relatório, e os itens de cada cômodo ficam separados por zona.
 
 Desligar uma opção só esconde: nada do que já foi gravado se perde, e ligar de novo traz tudo de volta.

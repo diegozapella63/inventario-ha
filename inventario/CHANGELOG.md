@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.2
+
+- Com **Usar IA** desligada, o painel do Falar mostra **Pronto para ouvir, sem IA** e explica que o próprio app separa os itens pelas vírgulas, sem chamar a IA. A descrição de Usar IA também diz que o Falar continua sem IA.
+
 ## 1.13.1
 
 - Os botões das seções de Mais têm todos a mesma largura: Baixar CSV, Baixar JSON, Baixar ZIP, Abrir relatório, Criar backup, Escolher arquivo e Ver versões.
