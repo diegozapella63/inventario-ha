@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.12.0
+
+- **Buscar na internet** traz também os dados do produto, na mesma chamada da IA (sem gastar outra): nome com marca e modelo, detalhes, categoria e valor estimado. A janela mostra o que vai para o item, já marcado em **Preencher também**; dá para desmarcar e ficar só com a foto.
+- Os dados só preenchem o que está vazio. Num item novo, o nome também vem da IA (com Desfazer no aviso); num item que já existe, o nome e um valor já dado não mudam.
+- **Usar só os dados, sem foto**, para quando nenhuma foto serve. Se a busca não acha fotos, os dados aparecem do mesmo jeito.
+- A busca considera a quantidade do item para o valor.
+
 ## 1.11.0
 
 - **Arrastar para o lado** troca de aba no celular, como no ResolvIA e no CronologIA: Início ⇄ Buscar ⇄ Cômodos ⇄ Mais, com a tela nova entrando pelo lado. Dentro de um cômodo, arrastar para a direita volta para Cômodos; no relatório, volta para Mais. Não vale começando na borda da tela (é o Voltar do celular), num campo, na fileira de fotos que rola para o lado ou com uma janela aberta.

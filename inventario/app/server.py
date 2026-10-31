@@ -43,7 +43,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.11.0"
+VERSION = "1.12.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -1708,25 +1708,52 @@ def ai_call_text(task_name: str, instructions: str, entity: str, timeout=300):
     return ((res or {}).get("service_response") or {}).get("data")
 
 
-def web_prompt(name: str, details: str) -> str:
+def web_prompt(name: str, details: str, qty: str = "1") -> str:
+    cats = ", ".join(f"{k} ({v})" for k, v in CATS.items())
     return "\n".join(filter(None, [
-        "Você ajuda a montar o inventário de uma casa no Brasil e precisa de fotos de produto para um item.",
+        "Você ajuda a montar o inventário de uma casa no Brasil e precisa de fotos e dos dados de um item.",
         f"Produto: {name}",
         f"Detalhes: {details}" if details else "",
+        f"Quantidade: {qty}" if qty and qty != "1" else "",
         "",
         "Use a busca na web agora. Procure este produto, de preferência o mesmo modelo, no site do fabricante e em lojas grandes "
         "do Brasil (como Mercado Livre, Amazon, Magazine Luiza, Kabum, Casas Bahia, Americanas, Fast Shop e Leroy Merlin). "
         "Se for um item comum, sem marca, procure um produto bem parecido.",
+        "Com o que você achou, descreva também o produto para o cadastro:",
+        '- "nome": nome curto em português, com marca e modelo (ex.: "Liquidificador Philips Walita 1400 W").',
+        '- "detalhes": 1 ou 2 frases objetivas sobre o que é, cor, material, tamanho ou capacidade. Sem preço. '
+        "Nunca inclua número de série, IMEI, telefone, nome de pessoa ou endereço.",
+        f'- "categoria": uma destas chaves: {cats}.',
+        '- "valor": valor TOTAL estimado em reais (número, sem símbolo), pensando no mercado de usados no Brasil (anúncios da OLX), '
+        "um pouco abaixo da mediana dos anúncios de usados. Se a quantidade for maior que 1, some todas as unidades.",
         "Responda somente com um objeto JSON, sem texto antes ou depois:",
-        '{"paginas": [{"url": "endereço da página do produto", "titulo": "título da página"}], '
+        '{"produto": {"nome": "", "detalhes": "", "categoria": "", "valor": 0}, '
+        '"paginas": [{"url": "endereço da página do produto", "titulo": "título da página"}], '
         '"imagens": ["endereço direto de uma foto do produto (.jpg, .png ou .webp), se você viu algum"]}',
         "Traga de 3 a 6 páginas, de sites diferentes. Use só endereços que apareceram na busca: não invente.",
         'Se não conseguir usar a busca na web, responda apenas {"erro": "sem_busca"}.',
     ]))
 
 
-def ai_find_pages(name: str, details: str, entity: str) -> dict:
-    prompt = web_prompt(name, details)
+def web_product(data: dict) -> dict | None:
+    """Os dados do produto que a IA achou na mesma busca das fotos (nome, detalhes, categoria e valor)."""
+    p = data.get("produto") or data.get("product")
+    if not isinstance(p, dict):
+        return None
+    name = " ".join(str(p.get("nome") or p.get("name") or "").split())[:200]
+    details = str(p.get("detalhes") or p.get("details") or "").strip()[:1000]
+    cat = p.get("categoria") or p.get("cat") or ""
+    try:
+        value = parse_value(p.get("valor", p.get("value")))
+    except ApiError:
+        value = 0
+    if not (name or details):
+        return None
+    return {"name": name, "details": details, "cat": cat if cat in CATS else "", "value": value}
+
+
+def ai_find_pages(name: str, details: str, entity: str, qty: str = "1") -> dict:
+    prompt = web_prompt(name, details, qty)
     with AiCall("busca", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
         if AI_MOCK:
             time.sleep(0.4)
@@ -1755,7 +1782,7 @@ def ai_find_pages(name: str, details: str, entity: str) -> dict:
         if data.get("erro") or not (pages or images):
             call.result = "sem_busca"
             raise ApiError(502, "A IA não usou a busca na web. " + SEARCH_HOWTO)
-    return {"pages": pages[:8], "images": images[:6]}
+    return {"pages": pages[:8], "images": images[:6], "product": web_product(data)}
 
 
 def search_entity() -> str:
@@ -1788,10 +1815,11 @@ def web_jobs_cleanup(max_age=WEB_JOB_TTL):
             pass
 
 
-def _web_job_run(jid: str, name: str, details: str, entity: str):
+def _web_job_run(jid: str, name: str, details: str, entity: str, qty: str = "1"):
     job = WEB_JOBS[jid]
     try:
-        found = ai_find_pages(name, details, entity)
+        found = ai_find_pages(name, details, entity, qty)
+        job["product"] = found.get("product")
         if job.get("cancelled"):
             return
         job["msg"] = "Conferindo as fotos das páginas…"
@@ -1851,13 +1879,14 @@ def web_job_start(body: dict) -> dict:
     need_ai_on()
     name = text(body.get("name"), 200, "nome", required=True)
     details = " ".join(text(body.get("details"), 4000, "detalhes").split())[:300]
+    qty = " ".join(str(body.get("qty") or "1").split())[:30] or "1"
     if not SUPERVISOR_TOKEN and not AI_MOCK:
         raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
     web_jobs_cleanup()
     jid = secrets.token_hex(8)
     with WEB_LOCK:
         WEB_JOBS[jid] = {"stage": "busy", "msg": "Procurando o produto na internet…", "results": [], "at": time.time()}
-    threading.Thread(target=_web_job_run, args=(jid, name, details, search_entity()), daemon=True).start()
+    threading.Thread(target=_web_job_run, args=(jid, name, details, search_entity(), qty), daemon=True).start()
     return {"id": jid}
 
 
@@ -2164,7 +2193,7 @@ def r_web_start(h, query):
 
 def r_web_status(h, jid, query):
     job = web_job(jid)
-    h.send_json({"stage": job["stage"], "msg": job["msg"], "results": job["results"]})
+    h.send_json({"stage": job["stage"], "msg": job["msg"], "results": job["results"], "product": job.get("product")})
 
 
 def r_web_image(h, jid, n, query):

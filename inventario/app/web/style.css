@@ -910,3 +910,14 @@ dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; 
 .welcome .tag-value { font-size: clamp(44px, 11vw, 68px); }
 .prog { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
 .prog i { display: block; height: 100%; width: 0; background: var(--tag); border-radius: 4px; transition: width 0.25s; }
+
+/* busca na internet: os dados do produto que vieram na mesma busca */
+.wprod { margin: 16px 0 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); display: grid; gap: 10px; }
+.wprod .check { font-weight: 600; }
+.wprod-h { margin: 0; font-weight: 600; }
+.wprod dl { margin: 0; display: grid; gap: 6px; font-size: 14px; }
+.wprod dl > div { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; }
+.wprod dt { color: var(--muted); }
+.wprod dd { margin: 0; overflow-wrap: anywhere; }
+.wprod .btn { justify-self: start; }
+.wprod + .wsum { margin-top: 14px; }

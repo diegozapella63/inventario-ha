@@ -21,7 +21,7 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - **Adicionar item**: nome, detalhes, cômodo, categoria, quantidade e valor total (e a zona, se estiver ligada). Dá para tirar foto pelo celular, enviar da galeria, arrastar uma foto ou colar com Ctrl+V. "Salvar e adicionar outro" mantém o cômodo para cadastrar em sequência.
 - **Catalogar foto com IA**: tire uma foto de uma prateleira ou de um canto da casa; a IA lista os objetos com nome, categoria, quantidade e uma sugestão de valor. Você confere, ajusta e escolhe o que entra.
 - **Falar**: o microfone no alto da tela. Fale os itens e quanto valem, e o app separa cada um para você conferir. Veja [Falar](#falar).
-- **Buscar na internet**: num item sem foto (ou no editor do item), a IA procura o produto no fabricante e nas lojas e o app mostra as fotos encontradas para você escolher. Veja [Fotos da internet](#fotos-da-internet).
+- **Buscar na internet**: num item sem foto (ou no editor do item), a IA procura o produto no fabricante e nas lojas e o app mostra as fotos encontradas para você escolher. Na mesma busca, a IA traz nome, detalhes, categoria e valor do produto para preencher o item. Veja [Fotos da internet](#fotos-da-internet).
 - **Buscar**: por nome, marca ou detalhe, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome ou data.
 - **Relatório**: lista por cômodo com fotos e valores, pronta para imprimir ou salvar em PDF (útil para seguro).
 - **Mais**, em abas como nos outros apps: **Dados** (exportar planilha, JSON, ZIP com fotos e o relatório; backup; importar; versões anteriores), **Integrações** (ligar ou desligar a IA e escolher qual IA do Home Assistant usar), **Aparência** (tema claro, escuro ou automático e a cor do app: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza) e **Opções** (as zonas). O tema e a cor ficam em cada aparelho; a IA e as zonas valem para todos.
@@ -80,6 +80,8 @@ Com **Sensores no Home Assistant** ligado (em **Mais > Integrações**; vem desl
 
 Para itens sem foto, **Buscar na internet** pede à IA do Home Assistant que procure o produto na web, no site do fabricante e em lojas grandes. O app abre as páginas que a IA encontrou, pega a foto principal de cada uma, descarta o que não é foto ou é pequeno demais e mostra as opções. A foto escolhida entra no item como **foto ilustrativa**, com o site de onde veio, na ficha do item e no relatório. Para o seguro, uma foto sua do item continua valendo mais.
 
+Na mesma chamada, a IA também descreve o produto que achou: nome com marca e modelo, detalhes, categoria e um valor estimado. A janela mostra o que vai para o item, já marcado em **Preencher também**, e dá para desmarcar. Os dados só preenchem o que está vazio: num item novo, o nome também vem da IA; num item que já existe, o nome e um valor já dado não mudam. **Usar só os dados, sem foto** preenche sem escolher foto, e serve também quando a busca não acha fotos. No editor, o aviso tem **Desfazer**.
+
 A IA precisa ter a **busca na web** ligada:
 
 - **Anthropic**: nas opções da tarefa de IA, ligue **Enable web search**.
@@ -88,7 +90,7 @@ A IA precisa ter a **busca na web** ligada:
 
 Escolha a IA em **Mais > Integrações > IA para buscar fotos na internet**. Como na leitura de fotos, "Padrão do Home Assistant" usa a tarefa de IA preferida definida no Home Assistant; para o Gemini, escolha o assistente de conversa na lista.
 
-A IA recebe só o nome e o começo dos detalhes do item. O app baixa as fotos apenas de endereços públicos da internet (nunca da rede da casa) e guarda só a foto que você escolher; as outras são apagadas em até 30 minutos. Cada busca usa a busca na web da sua IA, que pode ter custo à parte.
+A IA recebe só o nome, o começo dos detalhes e a quantidade do item. O app baixa as fotos apenas de endereços públicos da internet (nunca da rede da casa) e guarda só a foto que você escolher; as outras são apagadas em até 30 minutos. Cada busca usa a busca na web da sua IA, que pode ter custo à parte.
 
 ## Seus dados
 

@@ -1219,13 +1219,26 @@
 
   // ------------------------------------------------------------------ fotos da internet
   // A IA do Home Assistant (com a busca na web) acha páginas do produto e o servidor separa as fotos.
-  // Devolve { file, src } com a foto já enviada ao app, ou null se a pessoa desistir.
+  // Na mesma chamada, a IA devolve os dados do produto (nome, detalhes, categoria e valor): `fills(produto)` diz
+  // o que dá para preencher no item, e a janela mostra isso para a pessoa decidir, sem outra chamada de IA.
+  // Devolve { file, src, product } (product só se ela quiser preencher; file null se ela usar só os dados) ou null.
   const siteOf = (u) => { try { return new URL(u).hostname.replace(/^(www\d?|m)\./, ""); } catch { return ""; } };
-  function webPhotoSearch({ name, details = "" }) {
+  const WEB_FIELDS = { name: "Nome", details: "Detalhes", cat: "Categoria", value: "Valor" };
+  // o que os dados da IA preenchem: só campos vazios (e o nome, num item novo, que ainda é o que a pessoa buscou)
+  function webFills(cur, p, withName) {
+    const out = {};
+    if (!p) return out;
+    if (withName && p.name && p.name.trim().toLowerCase() !== String(cur.name || "").trim().toLowerCase()) out.name = p.name;
+    if (p.details && !String(cur.details || "").trim()) out.details = p.details;
+    if (p.cat && CAT[p.cat] && (!cur.cat || (cur.cat === "outros" && p.cat !== "outros"))) out.cat = p.cat;
+    if (p.value > 0 && !(+cur.value > 0)) out.value = p.value;
+    return out;
+  }
+  function webPhotoSearch({ name, details = "", qty = "1", fills = null }) {
     if (PREVIEW) { toast("Na prévia não dá para buscar na internet. No Home Assistant, a IA busca as fotos de verdade."); return Promise.resolve(null); }
     if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return Promise.resolve(null); }
     return new Promise((resolve) => {
-      let job = null, timer = null, chosen = null, results = [], got = null, gen = 0;
+      let job = null, timer = null, chosen = null, results = [], got = null, gen = 0, product = null;
       const entry = openDialog({
         cls: "modal", label: "Buscar foto na internet",
         html: `<div class="dlg"><div class="dlg-h"><h2>Buscar foto na internet</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
@@ -1246,10 +1259,10 @@
         const my = ++gen;
         clearTimeout(timer);
         if (job) { API.del(`api/web-photos/${job}`).catch(() => {}); job = null; }
-        chosen = null; results = []; ok.disabled = true;
+        chosen = null; results = []; product = null; ok.disabled = true;
         busy("Procurando o produto na internet…");
         try {
-          const r = await API.post("api/web-photos", { name: q, details: q === name ? details : "" });
+          const r = await API.post("api/web-photos", { name: q, details: q === name ? details : "", qty });
           if (my !== gen) return;
           job = r.id;
           poll(my);
@@ -1261,16 +1274,31 @@
         catch (e) { if (my === gen) show(`<p class="formerr">${esc(e.message)}</p>`); return; }
         if (my !== gen) return;
         if (st.stage === "busy") { busy(st.msg); timer = setTimeout(() => poll(my), 1200); return; }
+        product = st.product || null;
         if (st.stage === "error") {
-          show(`<p class="formerr">${esc(st.msg)}</p>${/busca na web/.test(st.msg) ? `<p class="muted wtip">A IA de busca fica em Mais, Integrações.</p>` : ""}`);
+          // sem fotos, os dados que a IA achou ainda servem
+          show(`<p class="formerr">${esc(st.msg)}</p>${/busca na web/.test(st.msg) ? `<p class="muted wtip">A IA de busca fica em Mais, Integrações.</p>` : ""}${prodCard(false)}`);
           return;
         }
         results = st.results || [];
-        show(`<p class="wsum">${results.length === 1 ? "1 foto encontrada" : `${results.length} fotos encontradas`}. Toque na que mais parece com o seu item.</p>
+        show(`${prodCard(true)}<p class="wsum">${results.length === 1 ? "1 foto encontrada" : `${results.length} fotos encontradas`}. Toque na que mais parece com o seu item.</p>
           <div class="wgrid" role="radiogroup" aria-label="Fotos encontradas">${results.map((x) => `<button type="button" class="wimg" role="radio" aria-checked="false" data-n="${x.n}">
             <img src="api/web-photos/${job}/${x.n}" alt="Foto de ${esc(x.site)}" loading="lazy"><span>${esc(x.site)}</span></button>`).join("")}</div>
           <p class="muted wtip">Fotos de lojas e fabricantes ficam marcadas como ilustrativas, com o site de onde vieram. Para o seguro, uma foto sua do item vale mais.</p>`);
       }
+      // o que a IA achou do produto, com o que vai para o item; com foto, dá para desmarcar
+      function prodCard(withPhotos) {
+        const f = fills ? fills(product) : {};
+        const keys = Object.keys(f);
+        if (!keys.length) return "";
+        const what = keys.map((k) => WEB_FIELDS[k].toLowerCase());
+        const list = what.length > 1 ? `${what.slice(0, -1).join(", ")} e ${what[what.length - 1]}` : what[0];
+        return `<div class="wprod">
+            ${withPhotos ? `<label class="check"><input type="checkbox" data-fill checked> Preencher também ${esc(list)}</label>` : `<p class="wprod-h">A IA achou estes dados do produto</p>`}
+            <dl>${keys.map((k) => `<div><dt>${WEB_FIELDS[k]}</dt><dd>${esc(k === "cat" ? CAT[f[k]] : k === "value" ? money(f[k]) : f[k])}</dd></div>`).join("")}</dl>
+            <button type="button" class="btn sm" data-only>${withPhotos ? "Usar só os dados, sem foto" : "Usar estes dados"}</button></div>`;
+      }
+      const wantsFill = () => { const c = $("[data-fill]", dlg); return !!product && (!c || c.checked); };
       async function use() {
         const r = results.find((x) => x.n === chosen);
         if (!r || !job) return;
@@ -1280,7 +1308,7 @@
           if (!res.ok) throw new Error("Esta busca terminou. Busque de novo.");
           const blob = await res.blob();
           const file = await uploadPhoto(new File([blob], `internet.${(blob.type.split("/")[1] || "jpg")}`, { type: blob.type || "image/jpeg" }));
-          got = { file, src: r.page || r.image };
+          got = { file, src: r.page || r.image, product: wantsFill() ? product : null };
           requestClose(entry, { force: true });
         } catch (e) { fail(e); ok.disabled = false; ok.textContent = "Usar foto"; }
       }
@@ -1288,6 +1316,7 @@
       dlg.addEventListener("click", (e) => {
         if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
         if (e.target.closest("[data-ok]")) { use(); return; }
+        if (e.target.closest("[data-only]") && product) { got = { file: null, src: null, product }; requestClose(entry, { force: true }); return; }
         const t = e.target.closest(".wimg");
         if (t) {
           chosen = +t.dataset.n;
@@ -1300,14 +1329,22 @@
     });
   }
   async function addWebPhoto(it) {
-    const got = await webPhotoSearch({ name: it.name, details: it.details });
+    // na ficha, o item já existe: os dados da IA só completam o que está vazio (nunca o nome nem um valor já dado)
+    const got = await webPhotoSearch({ name: it.name, details: it.details, qty: it.qty, fills: (p) => webFills(D.itemById.get(it.id) || it, p, false) });
     const cur = got && D.itemById.get(it.id);
     if (!cur) return;
+    const add = webFills(cur, got.product, false);
+    const keys = Object.keys(add);
+    if (!got.file && !keys.length) return;
     const before = { photos: [...(cur.photos || [])], photoSrc: { ...(cur.photoSrc || {}) } };
+    keys.forEach((k) => { before[k] = cur[k]; });
+    const body = { ...add };
+    if (got.file) Object.assign(body, { photos: [...before.photos, got.file], photoSrc: { ...before.photoSrc, [got.file]: got.src } });
     try {
-      const res = await API.put(`api/items/${encodeURIComponent(cur.id)}`, { photos: [...before.photos, got.file], photoSrc: { ...before.photoSrc, [got.file]: got.src }, _base: cur.updatedAt });
+      const res = await API.put(`api/items/${encodeURIComponent(cur.id)}`, { ...body, _base: cur.updatedAt });
       setRev(res.rev); upsertItem(res.item); derive(); refreshAll();
-      toast(`Foto de ${siteOf(got.src)} adicionada`, { action: "Desfazer", onAction: async () => {
+      const msg = got.file ? `Foto de ${siteOf(got.src)} adicionada${keys.length ? ", com os dados do produto" : ""}` : "Dados do produto preenchidos";
+      toast(msg, { action: "Desfazer", onAction: async () => {
         try {
           const now = D.itemById.get(cur.id);
           const back = await API.put(`api/items/${encodeURIComponent(cur.id)}`, { ...before, _base: now?.updatedAt });
@@ -1646,8 +1683,19 @@
       else if (act === "web") {
         const q = F.name.trim();
         if (!q) { fieldErr("name", "Escreva o nome do item para buscar a foto."); form.name.focus(); return; }
-        const got = await webPhotoSearch({ name: q, details: F.details.trim() });
-        if (got && document.contains(dlg) && F.photos.length < 12) { F.photos.push(got.file); F.photoSrc = { ...F.photoSrc, [got.file]: got.src }; F.dirty = true; renderPhotos(); }
+        // num item novo, o nome também vem da IA (com marca e modelo); o resto, só o que está vazio
+        const cur = () => ({ name: F.name, details: F.details, cat: F.cat, value: parseMoney(F.value) || 0 });
+        const got = await webPhotoSearch({ name: q, details: F.details.trim(), qty: F.qty.trim() || "1", fills: (p) => webFills(cur(), p, !F.id) });
+        if (!got || !document.contains(dlg)) return;
+        if (got.file && F.photos.length < 12) { F.photos.push(got.file); F.photoSrc = { ...F.photoSrc, [got.file]: got.src }; F.dirty = true; renderPhotos(); }
+        const add = webFills(cur(), got.product, !F.id);
+        if (Object.keys(add).length) {
+          const prev = { name: F.name, details: F.details, cat: F.cat, value: F.value, source: F.source };
+          Object.assign(F, add, add.value ? { value: moneyInput(add.value), source: "ia" } : {}, { dirty: true });
+          fill();
+          toast(got.file ? "Foto e dados do produto preenchidos. Confira antes de salvar." : "Dados do produto preenchidos. Confira antes de salvar.",
+            { action: "Desfazer", onAction: () => { Object.assign(F, prev); if (document.contains(dlg)) fill(); } });
+        }
       }
       else if (act === "rmphoto") { F.photos.splice(+b.dataset.i, 1); F.dirty = true; renderPhotos(); }
       else if (act === "cover") { const [p] = F.photos.splice(+b.dataset.i, 1); F.photos.unshift(p); F.dirty = true; renderPhotos(); }
