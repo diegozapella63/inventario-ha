@@ -109,6 +109,10 @@ Formas de guardar uma cópia:
 
 Para restaurar, use **Mais > Dados**: escolha um backup da pasta share, volte para uma versão anterior (**Versões anteriores > Ver versões**, com a data, quantos itens cada uma tem e por que foi guardada) ou importe um arquivo (`.zip` de backup ou `.json`) do computador ou do celular. Antes de restaurar ou importar, o app guarda uma cópia do que existe naquele momento.
 
+## Cômodos nos outros apps
+
+O **ResolvIA** (2.28.0 ou mais novo) pode ligar uma tarefa a um cômodo daqui. Para isso, o InventarIA grava `share/inventario/integracao.json` com o endereço dele na rede interna dos apps e uma chave, e responde só a lista de cômodos para quem tem essa chave. A tela do InventarIA continua abrindo só pelo Home Assistant.
+
 ## Atualizar o app
 
 Quando sai uma versão nova, o Home Assistant mostra **Atualizar** na página do app e em **Configurações > Atualizações**. Para procurar na hora, abra **Configurações > Apps > Loja de apps**, toque no menu e escolha **Verificar atualizações**. Os dados não são apagados.
