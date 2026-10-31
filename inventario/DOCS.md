@@ -15,7 +15,7 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 
 ## Como usar
 
-- **Início**: patrimônio total, cômodos (com a parte de cada um no total), categorias, itens mais valiosos e últimos cadastros.
+- **Início**: patrimônio total, a busca logo abaixo da etiqueta, cômodos (com a parte de cada um no total), categorias, itens mais valiosos e últimos cadastros.
 - **Cômodos** (aba ao lado de Adicionar): todos os cômodos com foto, número de itens e valor. Toque num cômodo para abrir. Em **Organizar**, as setas mudam a ordem (que vale para o app todo e para o relatório) e o lápis edita nome, código e fotos.
 - **Cômodo**: fotos do cômodo e a lista dos itens, na ordem dos códigos. Com as zonas ligadas, os itens aparecem separados por zona, com o subtotal de cada uma.
 - **Adicionar item**: nome, detalhes, cômodo, categoria, quantidade e valor total (e a zona, se estiver ligada). Dá para tirar foto pelo celular, enviar da galeria, arrastar uma foto ou colar com Ctrl+V. "Salvar e adicionar outro" mantém o cômodo para cadastrar em sequência.

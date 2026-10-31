@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.3
+
+- A busca do Início subiu para cima de Mais valioso: no celular, logo abaixo da etiqueta; no computador, no alto da coluna ao lado da etiqueta, com a largura da lista.
+
 ## 1.13.2
 
 - Com **Usar IA** desligada, o painel do Falar mostra **Pronto para ouvir, sem IA** e explica que o próprio app separa os itens pelas vírgulas, sem chamar a IA. A descrição de Usar IA também diz que o Falar continua sem IA.

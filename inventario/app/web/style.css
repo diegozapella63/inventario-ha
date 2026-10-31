@@ -461,7 +461,9 @@ html:has(dialog[open]) { overflow: hidden; }
 }
 
 /* busca da página inicial */
-.homesearch { position: relative; margin: 26px 0 0; }
+/* a busca do Início fica acima dos destaques (Mais valioso…): no celular logo abaixo da etiqueta, no computador no alto da coluna da direita */
+.hero-side { display: grid; gap: 20px; min-width: 0; }
+.homesearch { position: relative; margin: 0; }
 .homesearch .ic { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); }
 .homesearch .input { height: 50px; padding-left: 44px; font-size: 17px; border-radius: 10px; }
 .homesearch kbd { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }

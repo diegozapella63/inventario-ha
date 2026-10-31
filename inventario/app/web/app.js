@@ -601,16 +601,18 @@
           </div>
         </div>
       </div>
+      <div class="hero-side">
+      <form class="homesearch" data-form="homesearch" role="search">
+        ${ic("search")}<input class="input" type="search" name="q" data-input="home-q" placeholder="Buscar entre ${esc(plural(n, "item", "itens"))}" aria-label="Buscar itens" autocomplete="off" enterkeyhint="search"><kbd>/</kbd>
+      </form>
       <dl class="facts">
         ${top ? `<div><dt>${secIc("gem")}Mais valioso</dt><dd><a href="#/i/${encodeURIComponent(top.id)}">${esc(top.name)}</a></dd><dd class="fv">${money(top.value)}</dd></div>` : ""}
         ${bigRoom ? `<div><dt>${secIc("pie")}Maior cômodo</dt><dd><a href="#/c/${encodeURIComponent(bigRoom.id)}">${esc(bigRoom.name)}</a></dd><dd class="fv">${pctFmt(pct(maxRoom, D.total))}</dd></div>` : ""}
         ${last ? `<div><dt>${secIc("clock")}Último cadastro</dt><dd><a href="#/i/${encodeURIComponent(last.id)}">${esc(last.name)}</a></dd><dd class="fv muted">${esc(ago(last.createdAt))}</dd></div>` : ""}
         <div><dt>${secIc("images")}Fotos</dt><dd>${plural(D.photoCount, "foto guardada", "fotos guardadas")}</dd><dd class="fv"></dd></div>
       </dl>
+      </div>
     </section>
-    <form class="homesearch" data-form="homesearch" role="search">
-      ${ic("search")}<input class="input" type="search" name="q" data-input="home-q" placeholder="Buscar entre ${esc(plural(n, "item", "itens"))}" aria-label="Buscar itens" autocomplete="off" enterkeyhint="search"><kbd>/</kbd>
-    </form>
     <section class="sec">
       <div class="sec-h"><h2>${secIc("rooms")}Cômodos</h2><button type="button" class="btn ghost sm" data-act="room-new">${ic("plus", "sm")}Novo cômodo</button></div>
       <ul class="rows">${D.rooms.map((r) => roomRow(r, maxRoom)).join("")}</ul>
