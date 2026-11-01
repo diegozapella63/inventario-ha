@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.16.0
+
+- **Valores para o GerencIA**: a lista de itens para os outros apps (`/api/integracao/itens`, com a chave de `share/inventario`) agora traz também o valor de cada item e a data desse valor, e os nomes das categorias. O GerencIA soma os bens no patrimônio e deprecia por categoria a partir dessa data.
+- O app guarda quando o valor de um item mudou (antes, só quando o item mudou).
+
 ## 1.15.0
 
 - **Itens para os outros apps**: além dos cômodos, o ResolvIA (2.29.0 ou mais novo) pode ligar uma tarefa a um item daqui (um equipamento, um móvel…). A leitura é só da lista de itens (nome, cômodo, zona e categoria), em `/api/integracao/itens`, com a mesma chave de `share/inventario`.

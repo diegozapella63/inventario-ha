@@ -109,9 +109,11 @@ Formas de guardar uma cópia:
 
 Para restaurar, use **Mais > Dados**: escolha um backup da pasta share, volte para uma versão anterior (**Versões anteriores > Ver versões**, com a data, quantos itens cada uma tem e por que foi guardada) ou importe um arquivo (`.zip` de backup ou `.json`) do computador ou do celular. Antes de restaurar ou importar, o app guarda uma cópia do que existe naquele momento.
 
-## Cômodos nos outros apps
+## Cômodos e itens nos outros apps
 
 O **ResolvIA** (2.28.0 ou mais novo) pode ligar uma tarefa a um cômodo daqui e, a partir da 2.29.0, a um item (um equipamento, um móvel…). Para isso, o InventarIA grava `share/inventario/integracao.json` com o endereço dele na rede interna dos apps e uma chave, e responde só a lista de cômodos e de itens (nome, cômodo, zona e categoria) para quem tem essa chave. A tela do InventarIA continua abrindo só pelo Home Assistant.
+
+O **GerencIA** (1.19.0 ou mais novo) usa a mesma ligação para somar os valores dos itens no patrimônio, como bens: lê o valor e a data em que ele mudou e deprecia por categoria (eletrônicos perdem mais rápido que móveis, por exemplo). Nada é alterado aqui.
 
 ## Atualizar o app
 

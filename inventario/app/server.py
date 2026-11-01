@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.15.0"
+VERSION = "1.16.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -393,6 +393,8 @@ class Store:
                 new["qty"] = text(body["qty"] or "1", 30, "quantidade") or "1"
             if "value" in body:
                 new["value"] = parse_value(body["value"])
+                if new["value"] != it.get("value"):
+                    new["valueAt"] = now_iso()  # quando o valor mudou (o GerencIA deprecia a partir daqui)
             if "photos" in body:
                 new["photos"] = clean_photos(body["photos"])
             if "photos" in body or "photoSrc" in body:
@@ -2522,13 +2524,15 @@ def r_integracao_comodos(h, query):
 
 
 def r_integracao_itens(h, query):
-    """Os itens (equipamentos, móveis…), para os outros apps ligarem uma tarefa a um deles."""
+    """Os itens (equipamentos, móveis…), para os outros apps: o ResolvIA liga uma tarefa a um deles; o GerencIA soma os valores
+    no patrimônio (com a data do valor, para depreciar)."""
     with STORE.lock:
         order = {r["id"]: r.get("order", 0) for r in STORE.data.get("rooms") or []}
         items = sorted(STORE.data.get("items") or [], key=lambda it: (order.get(it.get("room"), 999), (it.get("name") or "").lower()))
         out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "comodo": it.get("room") or "", "zona": (it.get("zone") or "")[:60],
-                "categoria": it.get("cat") or "outros"} for it in items if it.get("id")]
-    h.send_json({"versao": VERSION, "itens": out[:2000]})
+                "categoria": it.get("cat") or "outros", "valor": round(float(it.get("value") or 0), 2),
+                "valor_em": str(it.get("valueAt") or it.get("updatedAt") or it.get("createdAt") or "")[:10]} for it in items if it.get("id")]
+    h.send_json({"versao": VERSION, "itens": out[:2000], "categorias": CATS})
 
 
 ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
