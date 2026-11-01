@@ -4,13 +4,18 @@
   "use strict";
 
   // ------------------------------------------------------------------ constantes
-  const CATS = [
+  // categorias: a lista padrão até a casa editar (Mais > Opções > Categorias); a lista da casa vem com os dados
+  const DEFAULT_CATS = [
     ["eletronicos", "Eletrônicos"], ["moveis", "Móveis"], ["decoracao", "Decoração e arte"],
     ["colecao", "Colecionáveis"], ["cozinha", "Cozinha e bar"], ["texteis", "Tapetes e têxteis"],
     ["plantas", "Plantas"], ["livros", "Livros e jogos"], ["pets", "Pets"], ["saude", "Saúde"],
     ["vestuario", "Roupas e calçados"], ["utilidades", "Utilidades"], ["outros", "Outros"],
   ];
-  const CAT = Object.fromEntries(CATS);
+  let CATS = DEFAULT_CATS, CAT = Object.fromEntries(CATS);
+  function applyCats(list) {
+    CATS = Array.isArray(list) && list.length ? list.map((c) => [c.id, c.name]) : DEFAULT_CATS;
+    CAT = Object.fromEntries(CATS);
+  }
   const SOURCES = { foto: "Catalogado por foto", informado: "Valor informado", ia: "Leitura por IA", voz: "Cadastro por voz", manual: "Cadastro manual" };
   const ORDERS = [["rel", "Mais relevantes"], ["val", "Maior valor"], ["valasc", "Menor valor"], ["az", "Nome, de A a Z"], ["new", "Mais recentes"], ["code", "Código"]];
   const PREVIEW = !!window.INV_PREVIEW;
@@ -208,6 +213,7 @@
       rooms: d.rooms || [], items: d.items || [], rev: d.rev || 0, updatedAt: d.updatedAt, user: d.user || null,
       version: d.version || "", features: d.features || {}, settings: d.settings || {}, loaded: true, error: null, stale: false,
     });
+    applyCats(d.cats);
     derive();
   }
 
@@ -1018,7 +1024,58 @@
       <p class="lead">Partes de um cômodo, como Estante ou Rack da TV.</p>
       <ul class="opts"><li><div class="ot"><b id="zones-h">Usar zonas</b><span>Vale para todos os aparelhos. Desligar não apaga as zonas.</span></div>
         <div class="oa">${switchHtml("zones-on", zonesOn(), "zones-h")}</div></li></ul>
+    </section>
+    <section class="panel" id="p-cats">
+      <h2>${secIc("grid")}Categorias</h2>
+      <ul class="opts cats">
+        <li><div class="ot"><b>${plural(CATS.length, "categoria", "categorias")}</b><span>Valem para todos os aparelhos.</span></div>
+          <div class="oa"><button type="button" class="btn" data-act="cat-new">${ic("plus")}Nova categoria</button></div></li>
+        ${CATS.map(([k, v]) => {
+          const n = D.catTotals.get(k)?.count || 0;
+          return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}</span></div>
+            <div class="oa"><button type="button" class="btn icon" data-act="cat-edit" data-cat="${esc(k)}" aria-label="Renomear ${esc(v)}">${ic("edit")}</button>
+              ${k === "outros" ? `<span class="cat-keep" aria-hidden="true"></span>` : `<button type="button" class="btn icon danger" data-act="cat-del" data-cat="${esc(k)}" aria-label="Excluir ${esc(v)}">${ic("trash")}</button>`}</div></li>`;
+        }).join("")}
+      </ul>
     </section>`;
+  }
+  // criar ou renomear uma categoria
+  function openCatName(id = null) {
+    const old = id ? CAT[id] : "";
+    const entry = openDialog({
+      cls: "modal narrow", label: id ? "Renomear categoria" : "Nova categoria",
+      html: `<div class="dlg"><div class="dlg-h"><h2>${id ? "Renomear categoria" : "Nova categoria"}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <form class="dlg-b" data-cn><div class="form">
+          <div class="field"><label for="cn-name">Nome</label><input id="cn-name" class="input" name="name" maxlength="60" value="${esc(old)}" placeholder="Ex.: Ferramentas" autocomplete="off"></div>
+          <div class="formerr" data-err hidden></div>
+        </div></form>
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok>${id ? "Salvar" : "Criar categoria"}</button></div></div>`,
+    });
+    const form = $("[data-cn]", entry.dlg), err = $("[data-err]", entry.dlg);
+    setTimeout(() => { form.name.focus(); form.name.select(); }, 50);
+    const go = async () => {
+      const name = form.name.value.trim();
+      if (!name) { err.hidden = false; err.textContent = "Dê um nome à categoria."; form.name.focus(); return; }
+      if (id && name === old) { requestClose(entry, { force: true }); return; }
+      try {
+        const res = id ? await API.put(`api/cats/${encodeURIComponent(id)}`, { name }) : await API.post("api/cats", { name });
+        setRev(res.rev); applyCats(res.cats); derive();
+        finalizeThen(entry, () => { refreshAll(); toast(id ? "Categoria renomeada" : `${res.cat.name} criada`); });
+      } catch (e) { err.hidden = false; err.textContent = e.message; }
+    };
+    form.addEventListener("submit", (e) => { e.preventDefault(); go(); });
+    entry.dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); if (e.target.closest("[data-ok]")) go(); });
+  }
+  async function deleteCat(id) {
+    const name = CAT[id], n = D.catTotals.get(id)?.count || 0;
+    if (!name) return;
+    const ok = await confirmBox({ title: `Excluir ${name}?`, body: n ? `${plural(n, "item vai", "itens vão")} para ${esc(CAT.outros || "Outros")}.` : "", ok: "Excluir categoria", danger: true });
+    if (!ok) return;
+    try {
+      await API.del(`api/cats/${encodeURIComponent(id)}`);
+      await loadData(); refreshAll();
+      toast(`${name} excluída`);
+    } catch (e) { fail(e); }
   }
   // Trocar de aba substitui o endereço (não enche o histórico: Voltar sai de Mais) e mantém as abas no alto.
   function setMoreTab(k) {
@@ -2501,6 +2558,9 @@
       case "item-new": openEditor({ room: b.dataset.room || (base.name === "room" ? base.id : null) }); break;
       case "catalog": openCatalog({ room: b.dataset.room || (base.name === "room" ? base.id : null) }); break;
       case "room-new": openRoomNew(); break;
+      case "cat-new": openCatName(); break;
+      case "cat-edit": openCatName(b.dataset.cat); break;
+      case "cat-del": deleteCat(b.dataset.cat); break;
       case "room-edit": openRoomEdit(b.dataset.room); break;
       case "room-up": moveRoom(b.dataset.room, -1); break;
       case "room-down": moveRoom(b.dataset.room, 1); break;

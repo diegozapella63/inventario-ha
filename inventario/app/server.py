@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.16.0"
+VERSION = "1.17.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -76,6 +76,7 @@ CATS = {
     "plantas": "Plantas", "livros": "Livros e jogos", "pets": "Pets", "saude": "Saúde",
     "vestuario": "Roupas e calçados", "utilidades": "Utilidades", "outros": "Outros",
 }
+SAFE_CAT = re.compile(r"[a-z0-9][a-z0-9_-]{0,40}")
 SAFE_FILE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,150}\.(?:jpe?g|png|webp)")
 SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,80}")
 BACKUP_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,150}\.zip")
@@ -128,6 +129,30 @@ def write_json_atomic(path: str, obj) -> None:
         except OSError:
             pass
         raise
+
+
+def default_cats() -> list[dict]:
+    return [{"id": k, "name": v} for k, v in CATS.items()]
+
+
+def clean_cats(raw) -> list[dict] | None:
+    """Categorias da casa (editáveis em Mais > Opções), na ordem. "outros" sempre existe: é para onde vão os itens."""
+    out, seen = [], set()
+    for c in raw if isinstance(raw, list) else []:
+        if isinstance(c, dict):
+            cid, name = str(c.get("id") or ""), " ".join(str(c.get("name") or "").split())[:60]
+            if SAFE_CAT.fullmatch(cid) and name and cid not in seen:
+                out.append({"id": cid, "name": name})
+                seen.add(cid)
+    if not out:
+        return None
+    if "outros" not in seen:
+        out.append({"id": "outros", "name": "Outros"})
+    return out
+
+
+def fold(t: str) -> str:
+    return unicodedata.normalize("NFKD", str(t)).encode("ascii", "ignore").decode().lower().strip()
 
 
 def parse_value(v) -> float | int:
@@ -311,8 +336,63 @@ class Store:
     def public(self):
         return {
             "rev": self.data["rev"], "updatedAt": self.data.get("updatedAt"),
-            "rooms": self.data["rooms"], "items": self.data["items"],
+            "rooms": self.data["rooms"], "items": self.data["items"], "cats": self.cats(),
         }
+
+    # -- categorias: a lista padrão até alguém editar; editada, fica no inventário (entra no backup e nas versões)
+    def cats(self) -> list[dict]:
+        return clean_cats(self.data.get("cats")) or default_cats()
+
+    def cat_map(self) -> dict:
+        return {c["id"]: c["name"] for c in self.cats()}
+
+    def _cat_name(self, body: dict, skip: str = "") -> str:
+        name = " ".join(text(body.get("name"), 60, "nome da categoria", required=True).split())
+        if any(fold(c["name"]) == fold(name) and c["id"] != skip for c in self.cats()):
+            raise ApiError(400, f"Já existe a categoria {name}.")
+        return name
+
+    def create_cat(self, body: dict) -> dict:
+        with self.lock:
+            name = self._cat_name(body)
+            cats = self.cats()
+            base = re.sub(r"[^a-z0-9]+", "-", fold(name)).strip("-")[:36] or "categoria"
+            cid, n = base, 2
+            while any(c["id"] == cid for c in cats):
+                cid, n = f"{base}-{n}", n + 1
+            cat = {"id": cid, "name": name}
+            cats.insert(next((i for i, c in enumerate(cats) if c["id"] == "outros"), len(cats)), cat)  # Outros fica no fim
+            self.data["cats"] = cats
+            self.save()
+            return cat
+
+    def update_cat(self, cid: str, body: dict) -> dict:
+        with self.lock:
+            cats = self.cats()
+            cat = next((c for c in cats if c["id"] == cid), None)
+            if not cat:
+                raise ApiError(404, "Esta categoria não existe mais.")
+            cat["name"] = self._cat_name(body, skip=cid)
+            self.data["cats"] = cats
+            self.save()
+            return cat
+
+    def delete_cat(self, cid: str) -> int:
+        """Exclui a categoria; os itens dela vão para Outros. Devolve quantos itens mudaram."""
+        with self.lock:
+            if cid == "outros":
+                raise ApiError(400, "A categoria Outros não pode ser excluída.")
+            cats = self.cats()
+            if not any(c["id"] == cid for c in cats):
+                raise ApiError(404, "Esta categoria não existe mais.")
+            moved, t = 0, now_iso()
+            for it in self.data["items"]:
+                if it.get("cat") == cid:
+                    it["cat"], it["updatedAt"] = "outros", t
+                    moved += 1
+            self.data["cats"] = [c for c in cats if c["id"] != cid]
+            self.save()
+            return moved
 
     # -- itens
     def build_item(self, body: dict, user: str | None, restore=False) -> dict:
@@ -325,7 +405,7 @@ class Store:
             "zone": text(body.get("zone"), 120, "zona"),
             "name": text(body.get("name"), 200, "nome", required=True),
             "details": text(body.get("details"), 4000, "detalhes"),
-            "cat": body.get("cat") if body.get("cat") in CATS else "outros",
+            "cat": body.get("cat") if body.get("cat") in self.cat_map() else "outros",
             "qty": text(body.get("qty") or "1", 30, "quantidade") or "1",
             "value": parse_value(body.get("value")),
             "photos": clean_photos(body.get("photos")),
@@ -388,7 +468,7 @@ class Store:
             if "details" in body:
                 new["details"] = text(body["details"], 4000, "detalhes")
             if "cat" in body:
-                new["cat"] = body["cat"] if body["cat"] in CATS else "outros"
+                new["cat"] = body["cat"] if body["cat"] in self.cat_map() else "outros"
             if "qty" in body:
                 new["qty"] = text(body["qty"] or "1", 30, "quantidade") or "1"
             if "value" in body:
@@ -556,6 +636,11 @@ class Store:
                 raise ApiError(400, "Arquivo inválido: item sem id ou com cômodo desconhecido.")
             i.setdefault("photos", [i["photo"]] if i.get("photo") else [])
             i.pop("photo", None)
+        cats = clean_cats(data.get("cats"))
+        if cats:
+            data["cats"] = cats
+        else:
+            data.pop("cats", None)
         return data
 
     def has_data(self):
@@ -586,12 +671,13 @@ def export_csv_bytes() -> bytes:
     w = csv.writer(out, delimiter=";", lineterminator="\r\n")
     w.writerow(["Código", "Cômodo", "Zona", "Item", "Detalhes", "Categoria", "Quantidade", "Valor (R$)", "Fotos", "Criado em", "Atualizado em"])
     with STORE.lock:
+        cats = STORE.cat_map()
         for it in STORE.sorted_items():
             room = STORE.room(it["room"]) or {}
             v = it.get("value") or 0
             w.writerow([
                 STORE.tag(it), room.get("name", it["room"]), it.get("zone", ""), it.get("name", ""),
-                it.get("details", ""), CATS.get(it.get("cat"), "Outros"), it.get("qty", "1"),
+                it.get("details", ""), cats.get(it.get("cat"), cats.get("outros", "Outros")), it.get("qty", "1"),
                 f"{float(v):.2f}".replace(".", ","), ", ".join(it.get("photos") or []),
                 it.get("createdAt") or "", it.get("updatedAt") or "",
             ])
@@ -1046,7 +1132,7 @@ Responda somente com JSON válido, sem markdown e sem texto antes ou depois, nes
 
 
 def ai_prompt(mode: str, room: dict | None, hint: str, spoken: str = "") -> str:
-    cats = ", ".join(f"{k} ({v})" for k, v in CATS.items())
+    cats = ", ".join(f"{k} ({v})" for k, v in STORE.cat_map().items())
     parts = ["Você ajuda a catalogar o inventário de uma casa no Brasil, para controle de patrimônio e seguro."]
     if mode == "single":
         parts.append("A foto mostra um item para cadastrar. Identifique só o objeto principal (o mais em destaque) e devolva exatamente 1 item.")
@@ -1134,7 +1220,7 @@ def clean_ai_items(parsed, room: dict | None) -> list[dict]:
         existing = str(raw.get("existing") or "").strip()
         out.append({
             "name": name, "details": str(raw.get("details") or "").strip()[:1000],
-            "cat": raw.get("cat") if raw.get("cat") in CATS else "outros",
+            "cat": raw.get("cat") if raw.get("cat") in STORE.cat_map() else "outros",
             "qty": str(raw.get("qty") or "1").strip()[:30] or "1", "value": value,
             "zone": str(raw.get("zone") or "").strip()[:120],
             "existing": existing if existing in names else "",
@@ -1751,7 +1837,7 @@ def ai_call_text(task_name: str, instructions: str, entity: str, timeout=300):
 
 
 def web_prompt(name: str, details: str, qty: str = "1") -> str:
-    cats = ", ".join(f"{k} ({v})" for k, v in CATS.items())
+    cats = ", ".join(f"{k} ({v})" for k, v in STORE.cat_map().items())
     return "\n".join(filter(None, [
         "Você ajuda a montar o inventário de uma casa no Brasil e precisa de fotos e dos dados de um item.",
         f"Produto: {name}",
@@ -1791,7 +1877,7 @@ def web_product(data: dict) -> dict | None:
         value = 0
     if not (name or details):
         return None
-    return {"name": name, "details": details, "cat": cat if cat in CATS else "", "value": value}
+    return {"name": name, "details": details, "cat": cat if cat in STORE.cat_map() else "", "value": value}
 
 
 def ai_find_pages(name: str, details: str, entity: str, qty: str = "1") -> dict:
@@ -2199,6 +2285,21 @@ def r_room_photo(h, rid, query):
     h.send_json({"room": room, "rev": STORE.data["rev"]})
 
 
+def r_cat_create(h, query):
+    cat = STORE.create_cat(h.read_body())
+    h.send_json({"cat": cat, "cats": STORE.cats(), "rev": STORE.data["rev"]}, 201)
+
+
+def r_cat_update(h, cid, query):
+    cat = STORE.update_cat(cid, h.read_body())
+    h.send_json({"cat": cat, "cats": STORE.cats(), "rev": STORE.data["rev"]})
+
+
+def r_cat_delete(h, cid, query):
+    moved = STORE.delete_cat(cid)
+    h.send_json({"moved": moved, "cats": STORE.cats(), "rev": STORE.data["rev"]})
+
+
 def r_rooms_order(h, query):
     rooms = STORE.reorder_rooms(h.read_body().get("ids") or [])
     h.send_json({"rooms": rooms, "rev": STORE.data["rev"]})
@@ -2532,7 +2633,8 @@ def r_integracao_itens(h, query):
         out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "comodo": it.get("room") or "", "zona": (it.get("zone") or "")[:60],
                 "categoria": it.get("cat") or "outros", "valor": round(float(it.get("value") or 0), 2),
                 "valor_em": str(it.get("valueAt") or it.get("updatedAt") or it.get("createdAt") or "")[:10]} for it in items if it.get("id")]
-    h.send_json({"versao": VERSION, "itens": out[:2000], "categorias": CATS})
+        cats = STORE.cat_map()  # as categorias da casa (editáveis em Mais > Opções)
+    h.send_json({"versao": VERSION, "itens": out[:2000], "categorias": cats})
 
 
 ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
@@ -2545,6 +2647,9 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/items/batch", r_items_batch),
     ("PUT", r"/api/items/([A-Za-z0-9_-]+)", r_item_update),
     ("DELETE", r"/api/items/([A-Za-z0-9_-]+)", r_item_delete),
+    ("POST", r"/api/cats", r_cat_create),
+    ("PUT", r"/api/cats/([a-z0-9_-]+)", r_cat_update),
+    ("DELETE", r"/api/cats/([a-z0-9_-]+)", r_cat_delete),
     ("POST", r"/api/rooms", r_room_create),
     ("POST", r"/api/rooms/order", r_rooms_order),
     ("PUT", r"/api/rooms/([A-Za-z0-9_-]+)", r_room_update),

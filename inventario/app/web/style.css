@@ -925,4 +925,12 @@ dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; 
 .wprod + .wsum { margin-top: 14px; }
 
 /* Mais: botões e listas de escolha das seções com a mesma largura, alinhados entre si */
-.more-panel .opts .oa > .btn, .more-panel .opts .oa > .select { width: 280px; max-width: 100%; min-width: 0; height: 44px; }
+.more-panel .opts .oa > .btn:not(.icon), .more-panel .opts .oa > .select { width: 280px; max-width: 100%; min-width: 0; height: 44px; }
+
+/* Opções > Categorias: uma linha por categoria, com renomear e excluir à direita */
+.opts.cats > li + li { flex-wrap: nowrap; padding-block: 8px; }
+.opts.cats > li + li .ot { min-width: 0; }
+.opts.cats > li + li .ot b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opts.cats .oa { flex-wrap: nowrap; gap: 6px; }
+.opts.cats .oa > .btn.icon { width: 44px; height: 44px; }
+.opts.cats .cat-keep { width: 44px; flex: none; }

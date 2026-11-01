@@ -24,7 +24,7 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - **Buscar na internet**: num item sem foto (ou no editor do item), a IA procura o produto no fabricante e nas lojas e o app mostra as fotos encontradas para você escolher. Na mesma busca, a IA traz nome, detalhes, categoria e valor do produto para preencher o item. Veja [Fotos da internet](#fotos-da-internet).
 - **Buscar**: por nome, marca ou detalhe, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome ou data.
 - **Relatório**: lista por cômodo com fotos e valores, pronta para imprimir ou salvar em PDF (útil para seguro).
-- **Mais**, em abas como nos outros apps: **Dados** (exportar planilha, JSON, ZIP com fotos e o relatório; backup; importar; versões anteriores), **Integrações** (ligar ou desligar a IA e escolher qual IA do Home Assistant usar), **Aparência** (tema claro, escuro ou automático e a cor do app: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza) e **Opções** (as zonas). O tema e a cor ficam em cada aparelho; a IA e as zonas valem para todos.
+- **Mais**, em abas como nos outros apps: **Dados** (exportar planilha, JSON, ZIP com fotos e o relatório; backup; importar; versões anteriores), **Integrações** (ligar ou desligar a IA e escolher qual IA do Home Assistant usar), **Aparência** (tema claro, escuro ou automático e a cor do app: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza) e **Opções** (as zonas e as categorias). O tema e a cor ficam em cada aparelho; a IA e as zonas valem para todos.
 - No celular, **arrastar para o lado** troca de aba (Início, Buscar, Cômodos e Mais); dentro de um cômodo, arrastar para a direita volta para Cômodos.
 - Atalhos no computador: `/` abre a busca, `N` cria um item, `Ctrl+Enter` salva o formulário.
 
@@ -34,6 +34,8 @@ O valor de cada item é o que você quiser registrar, somando todas as unidades.
 
 - **Usar IA** (Mais > Integrações), ligada de início: desligada, o app esconde tudo o que usa IA (Catalogar foto com IA, Preencher com IA, Buscar na internet) e não chama a IA. O **Falar** continua: quem transcreve é a fala para texto do Home Assistant, e o próprio app separa os itens pelas vírgulas.
 - **Usar zonas** (Mais > Opções), desligada de início: as zonas dividem um cômodo em partes, como Estante, Bancada ou Rack da TV. Ligadas, aparecem o campo Zona no cadastro, a zona na ficha do item, na busca e no relatório, e os itens de cada cômodo ficam separados por zona.
+
+- **Categorias** (Mais > Opções): renomeie, crie ou exclua categorias. Os itens de uma categoria excluída vão para Outros, que não pode ser excluída. As categorias ficam no inventário: entram no backup, na exportação e nas versões, e a IA passa a usar as novas.
 
 Desligar uma opção só esconde: nada do que já foi gravado se perde, e ligar de novo traz tudo de volta.
 
