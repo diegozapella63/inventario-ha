@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.19.0
+
+- **Falar sem IA** entende valor por extenso: "dois mil reais", "três mil", "mil e duzentos reais" viram o valor do item. Quantidade por extenso ("duas luminárias") continua no nome. "Cafeteira por 499 reais" e "abajur que custou 2 mil" ficam só Cafeteira e Abajur.
+- Valor digitado como "1.200" é mil e duzentos, como na tela (antes podia virar 1,2).
+- Celular estreito (320 px): no cômodo, os botões Adicionar, Catalogar e Editar cabem sem a página encolher; no Editar cômodo, os botões de cada foto descem para baixo da legenda.
+- Importar em Mais: ao terminar, abre o Início.
+- Mais > Integrações aberta direto: o Falar não fica mais em "Verificando…".
+- Adicionar vários itens de uma vez (Catalogar, Falar) e salvar Integrações: se algo está errado, nada fica pela metade.
+- Testes automáticos de tudo (servidor, integração com o Home Assistant e as telas), rodando a cada mudança no GitHub.
+
 ## 1.18.1
 
 - Catalogar foto com IA: o aviso "Parece já cadastrado" com um nome comprido quebra em duas linhas dentro do selo, em vez de passar por cima da borda.

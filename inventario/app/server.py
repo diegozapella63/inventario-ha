@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.18.1"
+VERSION = "1.19.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -167,6 +167,8 @@ def parse_value(v) -> float | int:
             s = str(v).strip().replace("R$", "").replace(" ", "").replace(" ", "")
             if "," in s:
                 s = s.replace(".", "").replace(",", ".")
+            elif re.fullmatch(r"\d{1,3}(\.\d{3})+", s):  # "1.200" é mil e duzentos, como na tela (não 1,2)
+                s = s.replace(".", "")
             x = float(s)
     except (TypeError, ValueError):
         raise ApiError(400, "Valor inválido. Use só números, como 1200 ou 1.200,50.")
@@ -437,10 +439,15 @@ class Store:
     def create_items(self, bodies: list[dict], user, restore=False, room_photo=None):
         with self.lock:
             created = []
-            for b in bodies:
-                it = self.build_item(b, user, restore=restore)
-                self.data["items"].append(it)
-                created.append(it)
+            try:
+                for b in bodies:
+                    it = self.build_item(b, user, restore=restore)
+                    self.data["items"].append(it)  # já na lista: o próximo do lote não repete o número
+                    created.append(it)
+            except ApiError:
+                for it in created:  # um item ruim desfaz o lote inteiro, também na memória
+                    self.data["items"].remove(it)
+                raise
             if room_photo:
                 self._add_room_photo(room_photo.get("room"), room_photo.get("file"), room_photo.get("label"))
             self.save()
@@ -2224,7 +2231,8 @@ def r_data(h, query):
     with STORE.lock:
         out = STORE.public()
     out.update({"version": VERSION, "user": h.user(),
-                "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai": ai_enabled(), "zones": zones_enabled(), "ha_sensors": sensors_enabled()},
+                "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai_search": STORE.settings.get("ai_search") or "",
+                             "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "ha_sensors": sensors_enabled()},
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
     h.send_json(out)
 
@@ -2373,30 +2381,28 @@ def r_settings_get(h, query):
 
 def r_settings_put(h, query):
     body = h.read_body()
+    if not isinstance(body, dict):
+        raise ApiError(400, "Pedido inválido.")
+    upd = {}  # confere tudo antes: um campo ruim não deixa os outros valendo pela metade
+    for key, rx, msg in (("ai_entity", r"ai_task\.[a-z0-9_]+", "Entidade de IA inválida."),
+                         ("ai_search", r"(ai_task|conversation)\.[a-z0-9_]+", "Entidade de IA inválida."),
+                         ("voice_stt", r"stt\.[a-z0-9_]+", "Fala para texto inválida.")):
+        if key in body:
+            e = str(body.get(key) or "")
+            if e and not re.fullmatch(rx, e):
+                raise ApiError(400, msg)
+            upd[key] = e
+    for key in ("ai", "zones", "ha_sensors"):
+        if key in body:
+            if not isinstance(body[key], bool):
+                raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
+            upd[key] = body[key]
     with STORE.lock:
-        if "ai_entity" in body:
-            e = str(body.get("ai_entity") or "")
-            if e and not re.fullmatch(r"ai_task\.[a-z0-9_]+", e):
-                raise ApiError(400, "Entidade de IA inválida.")
-            STORE.settings["ai_entity"] = e
-        if "ai_search" in body:
-            e = str(body.get("ai_search") or "")
-            if e and not re.fullmatch(r"(ai_task|conversation)\.[a-z0-9_]+", e):
-                raise ApiError(400, "Entidade de IA inválida.")
-            STORE.settings["ai_search"] = e
-        if "voice_stt" in body:
-            e = str(body.get("voice_stt") or "")
-            if e and not re.fullmatch(r"stt\.[a-z0-9_]+", e):
-                raise ApiError(400, "Fala para texto inválida.")
-            STORE.settings["voice_stt"] = e
-            _voice_cache["at"] = 0.0
-        for key in ("ai", "zones", "ha_sensors"):
-            if key in body:
-                if not isinstance(body[key], bool):
-                    raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
-                STORE.settings[key] = body[key]
+        STORE.settings.update(upd)
         STORE.save_settings()
-    if "ha_sensors" in body or "ai" in body:  # cria ou tira o sensor na hora
+    if "voice_stt" in upd:
+        _voice_cache["at"] = 0.0
+    if "ha_sensors" in upd or "ai" in upd:  # cria ou tira o sensor na hora
         threading.Thread(target=publish_usage_sensor if sensors_enabled() and ai_enabled() else remove_usage_sensor, daemon=True).start()
     h.send_json(STORE.settings)
 

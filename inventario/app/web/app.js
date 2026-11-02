@@ -661,7 +661,7 @@
         <div class="rhead-val"><div class="big">${moneyR(total)}</div><div class="small">${pctFmt(pct(total, D.total))} do patrimônio</div></div>
       </div>
       <div class="rhead-actions">
-        <button type="button" class="btn primary" data-act="item-new" data-room="${esc(id)}">${ic("plus")}Adicionar item</button>
+        <button type="button" class="btn primary" data-act="item-new" data-room="${esc(id)}" aria-label="Adicionar item">${ic("plus")}<span>Adicionar<span class="lbl-x"> item</span></span></button>
         ${aiOn() ? `<button type="button" class="btn" data-act="catalog" data-room="${esc(id)}" aria-label="Catalogar foto com IA">${ic("scan")}<span class="lbl">Catalogar foto com IA</span><span class="lbl-short">Catalogar</span></button>` : ""}
         <button type="button" class="btn ghost" data-act="room-edit" data-room="${esc(id)}" aria-label="Editar cômodo">${ic("edit")}<span class="lbl">Editar cômodo</span></button>
       </div>
@@ -1912,6 +1912,8 @@
   async function loadVoice(fresh = false) {
     try { S.voice = await API.get(`api/voice/status${fresh ? "?fresh=1" : ""}`); } catch (e) { S.voice = { ready: false, reason: e.message }; }
     renderTop();
+    const slot = $('#view [data-slot="voice-panel"]'); // Integrações aberta antes da resposta: não fica em "Verificando…"
+    if (slot) renderVoicePanel(slot);
   }
   function renderVoicePanel(slot) {
     const v = S.voice, engines = (v && v.engines) || [], sel = (v && v.selected) || "";
@@ -1932,12 +1934,29 @@
   const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   // sem IA: separa o que foi dito pelas vírgulas, pontos e "e". Um pedaço que é só valor ("2.000 reais", "500")
   // vira o valor do item anterior; "TV Samsung R$ 3.000" fica TV Samsung com 3.000. Valor por extenso
-  // ("dois mil reais") vai para os detalhes do item, para conferir.
+  // ("dois mil reais", "três mil", "mil e duzentos reais") vira número antes; "duas luminárias" fica como está.
   const VALUE_WORDS = new Set(("uns umas um uma cerca de por vale valor custou paguei mais ou menos aproximadamente uns e r$ reais real mil centavos " +
     "dois duas três tres quatro cinco seis sete oito nove dez onze doze treze quatorze catorze quinze dezesseis dezessete dezoito dezenove vinte trinta " +
     "quarenta cinquenta sessenta setenta oitenta noventa cem cento duzentos duzentas trezentos trezentas quatrocentos quinhentos seiscentos setecentos oitocentos novecentos").split(" "));
   const isValueBit = (x) => /\d|\b(?:reais|real|mil)\b/i.test(x) && x.toLowerCase().replace(/r\$/g, " r$ ").split(/\s+/).filter(Boolean).every((w) => /^[\d.,]+$/.test(w) || VALUE_WORDS.has(w));
   const TAIL_VALUE = /\s*(?:r\$\s*\d[\d.]*(?:,\d+)?(?:\s*mil)?|\d[\d.]*(?:,\d+)?(?:\s*mil)?\s*(?:reais|real))\s*$/i;
+  const NUM_WORDS = { um: 1, uma: 1, dois: 2, duas: 2, "três": 3, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12,
+    treze: 13, quatorze: 14, catorze: 14, quinze: 15, dezesseis: 16, dezessete: 17, dezoito: 18, dezenove: 19, vinte: 20, trinta: 30, quarenta: 40,
+    cinquenta: 50, sessenta: 60, setenta: 70, oitenta: 80, noventa: 90, cem: 100, cento: 100, duzentos: 200, duzentas: 200, trezentos: 300,
+    trezentas: 300, quatrocentos: 400, quatrocentas: 400, quinhentos: 500, quinhentas: 500, seiscentos: 600, seiscentas: 600, setecentos: 700,
+    setecentas: 700, oitocentos: 800, oitocentas: 800, novecentos: 900, novecentas: 900, mil: 1000 };
+  const NUM_W = Object.keys(NUM_WORDS).sort((a, b) => b.length - a.length).join("|");
+  const NUM_RUN = new RegExp(`(?<!\\p{L})(?<!\\d[.,]?\\s*)(?:${NUM_W})(?:\\s+(?:e\\s+)?(?:${NUM_W}))*(?!\\p{L})(?=(\\s*(?:reais|real)(?!\\p{L}))?)`, "giu");
+  const wordsToNumbers = (t) => String(t).replace(NUM_RUN, (run, money) => {
+    const toks = run.split(/\s+/);
+    let end = toks.length; // "três mil e duas luminárias": o "e duas" já é outro item
+    if (!money) for (let i = 1; i < toks.length - 1; i++) if (toks[i].toLowerCase() === "e" && NUM_WORDS[toks[i + 1].toLowerCase()] < 10) { end = i; break; }
+    const ws = toks.slice(0, end).map((w) => w.toLowerCase()).filter((w) => w !== "e");
+    if (!money && !ws.some((w) => NUM_WORDS[w] >= 100)) return run; // "duas luminárias", "um sofá": quantidade, não valor
+    let total = 0, cur = 0;
+    for (const w of ws) { if (w === "mil") { total += (cur || 1) * 1000; cur = 0; } else cur += NUM_WORDS[w]; }
+    return [String(total + cur), ...toks.slice(end)].join(" ");
+  });
   const valueOf = (t) => {
     const m = String(t).match(/\d[\d.]*(?:,\d+)?/);
     if (!m) return 0;
@@ -1947,7 +1966,7 @@
   };
   function splitSpoken(t) {
     const out = [];
-    for (const raw of String(t || "").split(/\s*(?:[;\n]|(?<!\d),|,(?!\d)|\.(?:\s|$)|\s+e\s+)\s*/i)) { // a vírgula do "2.499,90" fica
+    for (const raw of wordsToNumbers(t || "").split(/\s*(?:[;\n]|(?<!\d),|,(?!\d)|\.(?:\s|$)|\s+e\s+)\s*/i)) { // a vírgula do "2.499,90" fica
       let x = raw.trim().replace(/\.$/, "").replace(/^e\s+/i, "").trim();
       if (x.length < 2) continue;
       const prev = out[out.length - 1];
@@ -1958,7 +1977,11 @@
       }
       let value = 0;
       const tail = x.match(TAIL_VALUE);
-      if (tail && tail.index > 0) { value = valueOf(tail[0]); x = x.slice(0, tail.index).trim(); }
+      if (tail && tail.index > 0) {
+        value = valueOf(tail[0]);
+        // "cafeteira por 499 reais", "tapete de uns 300 reais": a ligação antes do valor não faz parte do nome
+        x = x.slice(0, tail.index).trim().replace(/(?:\s+(?:que|por|de|uns|umas|um|uma|cerca|vale|valor|custou|paguei|mais ou menos|aproximadamente))+$/i, "").trim();
+      }
       if (out.length < 25) out.push({ name: x.charAt(0).toUpperCase() + x.slice(1), details: "", cat: "outros", qty: "1", value, zone: "", existing: "", confidence: "media", on: true });
     }
     return out;
@@ -2350,9 +2373,9 @@
     const dlg = entry.dlg;
     const form = $("[data-re-form]", dlg);
     const renderPhotos = () => {
-      $('[data-slot="rphotos"]', dlg).innerHTML = `<ul class="opts">${R.photos.map((p, i) => `<li style="flex-wrap:nowrap">
-          <img src="${esc(src(p.file))}" alt="" style="width:64px;height:48px;object-fit:cover;border-radius:6px;flex:none">
-          <input class="input" data-re-label="${i}" value="${esc(p.label || "")}" placeholder="Legenda" style="height:38px;flex:1;min-width:0">
+      $('[data-slot="rphotos"]', dlg).innerHTML = `<ul class="opts">${R.photos.map((p, i) => `<li class="rph">
+          <img src="${esc(src(p.file))}" alt="">
+          <input class="input" data-re-label="${i}" value="${esc(p.label || "")}" placeholder="Legenda" aria-label="Legenda da foto">
           <button type="button" class="btn sm${R.cover === i ? " primary" : ""}" data-re="cover" data-i="${i}" aria-pressed="${R.cover === i}">${R.cover === i ? "Capa" : "Usar como capa"}</button>
           <button type="button" class="btn sm icon" data-re="up" data-i="${i}" aria-label="Subir foto"${i === 0 ? " disabled" : ""}>${ic("up", "sm")}</button>
           <button type="button" class="btn sm icon" data-re="rm" data-i="${i}" aria-label="Tirar foto">${ic("trash", "sm")}</button></li>`).join("")}</ul>
@@ -2598,8 +2621,8 @@
       }
       done = true;
       await loadData();
-      requestClose(entry, { force: true });
-      if (base.name !== "home") nav("#/"); else refreshAll();
+      // fecha e só depois vai para o Início: o voltar do histórico da janela desfazia a ida
+      finalizeThen(entry, () => { if (base.name !== "home") nav("#/"); else refreshAll(); });
       if (result.replaced) toast(`Inventário importado: ${plural(result.items, "item", "itens")} em ${plural(result.rooms, "cômodo", "cômodos")}${result.photos ? `, ${plural(result.photos, "foto", "fotos")}` : ""}`);
       else toast(result.photos ? `${plural(result.photos, "foto adicionada", "fotos adicionadas")} ao inventário` : "As fotos desse arquivo já estavam no inventário.");
     } catch (e) {
@@ -2846,6 +2869,11 @@
     }
     onRoute();
     loadVoice();
+  }
+  // os testes da tela (tests/e2e) pedem as funções puras para conferir as contas e as regras
+  if (typeof window.INV_TEST === "function") {
+    window.INV_TEST({ esc, norm, numTxt, money, moneyR, plural, pct, pctFmt, ago, parseMoney, moneyInput, qtyClean, qtyNum, qtyLabel, qtyShort,
+      splitSpoken, wordsToNumbers, webFills, siteOf, suggestCode, hl, applyCats, cats: () => CATS });
   }
   if (!PREVIEW || window.INV_BACKEND) boot();
   else window.INV_BOOT = boot;

@@ -1,0 +1,854 @@
+{
+ "format": "inventario-casa",
+ "schema": 1,
+ "rev": 1,
+ "updatedAt": "2026-10-18T18:00:00-03:00",
+ "rooms": [
+  {
+   "id": "sala",
+   "code": "SAL",
+   "name": "Sala de estar",
+   "order": 0,
+   "cover": 0,
+   "photos": [
+    {
+     "file": "sala-1.jpg",
+     "label": "Sofá, janela e luminária"
+    },
+    {
+     "file": "sala-2.jpg",
+     "label": "Rack com a TV"
+    },
+    {
+     "file": "sala-3.jpg",
+     "label": "Estante de livros"
+    }
+   ],
+   "updatedAt": "2026-10-18T18:00:00-03:00"
+  },
+  {
+   "id": "cozinha",
+   "code": "COZ",
+   "name": "Cozinha",
+   "order": 1,
+   "cover": 0,
+   "photos": [
+    {
+     "file": "cozinha-1.jpg",
+     "label": "Bancada e geladeira"
+    }
+   ],
+   "updatedAt": "2026-10-18T18:00:00-03:00"
+  },
+  {
+   "id": "quarto",
+   "code": "QUA",
+   "name": "Quarto",
+   "order": 2,
+   "cover": 0,
+   "photos": [
+    {
+     "file": "quarto-1.jpg",
+     "label": "Cama e criados-mudos"
+    }
+   ],
+   "updatedAt": "2026-10-18T18:00:00-03:00"
+  },
+  {
+   "id": "escritorio",
+   "code": "ESC",
+   "name": "Escritório",
+   "order": 3,
+   "cover": 0,
+   "photos": [
+    {
+     "file": "escritorio-1.jpg",
+     "label": "Mesa de trabalho"
+    },
+    {
+     "file": "escritorio-2.jpg",
+     "label": "Estante do escritório"
+    }
+   ],
+   "updatedAt": "2026-10-18T18:00:00-03:00"
+  },
+  {
+   "id": "lavanderia",
+   "code": "LAV",
+   "name": "Lavanderia",
+   "order": 4,
+   "cover": 0,
+   "photos": [
+    {
+     "file": "lavanderia-1.jpg",
+     "label": "Máquina e prateleira"
+    }
+   ],
+   "updatedAt": "2026-10-18T18:00:00-03:00"
+  },
+  {
+   "id": "varanda",
+   "code": "VAR",
+   "name": "Varanda",
+   "order": 5,
+   "cover": 0,
+   "photos": [
+    {
+     "file": "varanda-1.jpg",
+     "label": "Mesinha e bicicleta"
+    }
+   ],
+   "updatedAt": "2026-10-18T18:00:00-03:00"
+  }
+ ],
+ "items": [
+  {
+   "id": "sal-001",
+   "room": "sala",
+   "seq": 1,
+   "zone": "Sofá",
+   "name": "Sofá de 3 lugares cinza-azulado",
+   "details": "Tecido liso, almofadas de encosto soltas e pés de madeira.",
+   "cat": "moveis",
+   "qty": "1",
+   "value": 1800,
+   "photos": [
+    "sala-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-02T02:00:00-03:00",
+   "updatedAt": "2026-10-02T02:00:00-03:00"
+  },
+  {
+   "id": "sal-002",
+   "room": "sala",
+   "seq": 2,
+   "zone": "Sofá",
+   "name": "Almofadas decorativas",
+   "details": "Uma mostarda e uma terracota, com capa de linho.",
+   "cat": "texteis",
+   "qty": "2",
+   "value": 90,
+   "photos": [
+    "sala-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-02T02:00:00-03:00",
+   "updatedAt": "2026-10-02T02:00:00-03:00"
+  },
+  {
+   "id": "sal-003",
+   "room": "sala",
+   "seq": 3,
+   "zone": "Sofá",
+   "name": "Luminária de chão com cúpula de tecido",
+   "details": "Haste preta e cúpula creme, cerca de 1,6 m.",
+   "cat": "decoracao",
+   "qty": "1",
+   "value": 260,
+   "photos": [
+    "sala-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-02T03:00:00-03:00",
+   "updatedAt": "2026-10-02T03:00:00-03:00"
+  },
+  {
+   "id": "sal-004",
+   "room": "sala",
+   "seq": 4,
+   "zone": "Sofá",
+   "name": "Costela-de-adão em vaso de cerâmica",
+   "details": "Planta grande em vaso terracota.",
+   "cat": "plantas",
+   "qty": "1",
+   "value": 140,
+   "photos": [
+    "sala-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-02T03:00:00-03:00",
+   "updatedAt": "2026-10-02T03:00:00-03:00"
+  },
+  {
+   "id": "sal-005",
+   "room": "sala",
+   "seq": 5,
+   "zone": "Parede",
+   "name": "Quadro de paisagem com moldura preta",
+   "details": "Impressão com sol e colinas, 60 x 45 cm.",
+   "cat": "decoracao",
+   "qty": "1",
+   "value": 180,
+   "photos": [
+    "sala-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-02T04:00:00-03:00",
+   "updatedAt": "2026-10-02T04:00:00-03:00"
+  },
+  {
+   "id": "sal-006",
+   "room": "sala",
+   "seq": 6,
+   "zone": "Piso",
+   "name": "Tapete listrado",
+   "details": "Tapete bege com listras terracota, 2 x 1,4 m.",
+   "cat": "texteis",
+   "qty": "1",
+   "value": 350,
+   "photos": [
+    "sala-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-02T04:00:00-03:00",
+   "updatedAt": "2026-10-02T04:00:00-03:00"
+  },
+  {
+   "id": "sal-007",
+   "room": "sala",
+   "seq": 7,
+   "zone": "Rack",
+   "name": "Smart TV 55 polegadas",
+   "details": "TV 4K com controle remoto.",
+   "cat": "eletronicos",
+   "qty": "1",
+   "value": 2300,
+   "photos": [
+    "sala-2.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-02T22:00:00-03:00",
+   "updatedAt": "2026-10-02T22:00:00-03:00"
+  },
+  {
+   "id": "sal-008",
+   "room": "sala",
+   "seq": 8,
+   "zone": "Rack",
+   "name": "Rack de madeira com três portas",
+   "details": "Rack baixo com pés pretos, 1,8 m.",
+   "cat": "moveis",
+   "qty": "1",
+   "value": 480,
+   "photos": [
+    "sala-2.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-02T22:00:00-03:00",
+   "updatedAt": "2026-10-02T22:00:00-03:00"
+  },
+  {
+   "id": "sal-009",
+   "room": "sala",
+   "seq": 9,
+   "zone": "Rack",
+   "name": "Soundbar",
+   "details": "Barra de som preta com controle.",
+   "cat": "eletronicos",
+   "qty": "1",
+   "value": 650,
+   "photos": [
+    "sala-2.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-02T23:00:00-03:00",
+   "updatedAt": "2026-10-02T23:00:00-03:00"
+  },
+  {
+   "id": "sal-010",
+   "room": "sala",
+   "seq": 10,
+   "zone": "Rack",
+   "name": "Caixa de som de estante",
+   "details": "Caixa preta com alto-falante frontal.",
+   "cat": "eletronicos",
+   "qty": "1",
+   "value": 300,
+   "photos": [
+    "sala-2.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-02T23:00:00-03:00",
+   "updatedAt": "2026-10-02T23:00:00-03:00"
+  },
+  {
+   "id": "sal-011",
+   "room": "sala",
+   "seq": 11,
+   "zone": "Estante",
+   "name": "Estante de madeira com três prateleiras",
+   "details": "Madeira clara, 1,2 m de largura.",
+   "cat": "moveis",
+   "qty": "1",
+   "value": 520,
+   "photos": [
+    "sala-3.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-03T18:00:00-03:00",
+   "updatedAt": "2026-10-03T18:00:00-03:00"
+  },
+  {
+   "id": "sal-012",
+   "room": "sala",
+   "seq": 12,
+   "zone": "Estante",
+   "name": "Livros variados",
+   "details": "Romances, fotografia e culinária.",
+   "cat": "livros",
+   "qty": "28",
+   "value": 560,
+   "photos": [
+    "sala-3.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-03T18:00:00-03:00",
+   "updatedAt": "2026-10-03T18:00:00-03:00"
+  },
+  {
+   "id": "coz-001",
+   "room": "cozinha",
+   "seq": 1,
+   "zone": "Bancada",
+   "name": "Cafeteira espresso",
+   "details": "Cafeteira preta com reservatório de água.",
+   "cat": "cozinha",
+   "qty": "1",
+   "value": 650,
+   "photos": [
+    "cozinha-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-06T06:00:00-03:00",
+   "updatedAt": "2026-10-06T06:00:00-03:00"
+  },
+  {
+   "id": "coz-002",
+   "room": "cozinha",
+   "seq": 2,
+   "zone": "Bancada",
+   "name": "Chaleira elétrica de inox",
+   "details": "Chaleira de 1,7 L.",
+   "cat": "cozinha",
+   "qty": "1",
+   "value": 120,
+   "photos": [
+    "cozinha-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-06T06:00:00-03:00",
+   "updatedAt": "2026-10-06T06:00:00-03:00"
+  },
+  {
+   "id": "coz-003",
+   "room": "cozinha",
+   "seq": 3,
+   "zone": "Bancada",
+   "name": "Fruteira de madeira",
+   "details": "Fruteira redonda de madeira clara.",
+   "cat": "cozinha",
+   "qty": "1",
+   "value": 60,
+   "photos": [
+    "cozinha-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-06T07:00:00-03:00",
+   "updatedAt": "2026-10-06T07:00:00-03:00"
+  },
+  {
+   "id": "coz-004",
+   "room": "cozinha",
+   "seq": 4,
+   "zone": "Geladeira",
+   "name": "Geladeira frost free inox",
+   "details": "Duas portas, cerca de 450 L.",
+   "cat": "cozinha",
+   "qty": "1",
+   "value": 2600,
+   "photos": [
+    "cozinha-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-06T07:00:00-03:00",
+   "updatedAt": "2026-10-06T07:00:00-03:00"
+  },
+  {
+   "id": "coz-005",
+   "room": "cozinha",
+   "seq": 5,
+   "zone": "Armário",
+   "name": "Micro-ondas 30 L",
+   "details": "Micro-ondas branco.",
+   "cat": "cozinha",
+   "qty": "1",
+   "value": 380,
+   "photos": [],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "manual",
+   "createdAt": "2026-10-06T08:00:00-03:00",
+   "updatedAt": "2026-10-06T08:00:00-03:00"
+  },
+  {
+   "id": "coz-006",
+   "room": "cozinha",
+   "seq": 6,
+   "zone": "Armário",
+   "name": "Jogo de panelas antiaderentes (5 peças)",
+   "details": "Panelas com tampa de vidro.",
+   "cat": "cozinha",
+   "qty": "1",
+   "value": 420,
+   "photos": [],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "manual",
+   "createdAt": "2026-10-06T08:00:00-03:00",
+   "updatedAt": "2026-10-06T08:00:00-03:00"
+  },
+  {
+   "id": "coz-007",
+   "room": "cozinha",
+   "seq": 7,
+   "zone": "Mesa",
+   "name": "Mesa de jantar com 4 cadeiras",
+   "details": "Tampo de madeira e cadeiras estofadas.",
+   "cat": "moveis",
+   "qty": "1",
+   "value": 1200,
+   "photos": [],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "manual",
+   "createdAt": "2026-10-06T09:00:00-03:00",
+   "updatedAt": "2026-10-06T09:00:00-03:00"
+  },
+  {
+   "id": "qua-001",
+   "room": "quarto",
+   "seq": 1,
+   "zone": "Cama",
+   "name": "Cama queen com cabeceira estofada",
+   "details": "Cabeceira verde-acinzentada com gomos.",
+   "cat": "moveis",
+   "qty": "1",
+   "value": 1500,
+   "photos": [
+    "quarto-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-08T08:00:00-03:00",
+   "updatedAt": "2026-10-08T08:00:00-03:00"
+  },
+  {
+   "id": "qua-002",
+   "room": "quarto",
+   "seq": 2,
+   "zone": "Cama",
+   "name": "Jogo de cama e edredom",
+   "details": "Edredom branco e manta terracota.",
+   "cat": "texteis",
+   "qty": "1",
+   "value": 320,
+   "photos": [
+    "quarto-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-08T08:00:00-03:00",
+   "updatedAt": "2026-10-08T08:00:00-03:00"
+  },
+  {
+   "id": "qua-003",
+   "room": "quarto",
+   "seq": 3,
+   "zone": "Cabeceira",
+   "name": "Criado-mudo de madeira",
+   "details": "Duas gavetas, madeira clara.",
+   "cat": "moveis",
+   "qty": "2",
+   "value": 360,
+   "photos": [
+    "quarto-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-08T09:00:00-03:00",
+   "updatedAt": "2026-10-08T09:00:00-03:00"
+  },
+  {
+   "id": "qua-004",
+   "room": "quarto",
+   "seq": 4,
+   "zone": "Cabeceira",
+   "name": "Abajur com cúpula clara",
+   "details": "Base de cerâmica creme.",
+   "cat": "decoracao",
+   "qty": "2",
+   "value": 180,
+   "photos": [
+    "quarto-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-08T09:00:00-03:00",
+   "updatedAt": "2026-10-08T09:00:00-03:00"
+  },
+  {
+   "id": "qua-005",
+   "room": "quarto",
+   "seq": 5,
+   "zone": "Parede",
+   "name": "Ar-condicionado split 12.000 BTUs",
+   "details": "Inverter, com controle remoto.",
+   "cat": "eletronicos",
+   "qty": "1",
+   "value": 1900,
+   "photos": [],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "manual",
+   "createdAt": "2026-10-08T10:00:00-03:00",
+   "updatedAt": "2026-10-08T10:00:00-03:00"
+  },
+  {
+   "id": "qua-006",
+   "room": "quarto",
+   "seq": 6,
+   "zone": "Guarda-roupa",
+   "name": "Guarda-roupa de 6 portas",
+   "details": "Branco, com espelho.",
+   "cat": "moveis",
+   "qty": "1",
+   "value": 1100,
+   "photos": [],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "manual",
+   "createdAt": "2026-10-08T10:00:00-03:00",
+   "updatedAt": "2026-10-08T10:00:00-03:00"
+  },
+  {
+   "id": "esc-001",
+   "room": "escritorio",
+   "seq": 1,
+   "zone": "Mesa",
+   "name": "Notebook 14 polegadas",
+   "details": "Notebook prata com carregador.",
+   "cat": "eletronicos",
+   "qty": "1",
+   "value": 3800,
+   "photos": [
+    "escritorio-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-13T18:00:00-03:00",
+   "updatedAt": "2026-10-13T18:00:00-03:00"
+  },
+  {
+   "id": "esc-002",
+   "room": "escritorio",
+   "seq": 2,
+   "zone": "Mesa",
+   "name": "Monitor 27 polegadas",
+   "details": "Monitor com base ajustável.",
+   "cat": "eletronicos",
+   "qty": "1",
+   "value": 1100,
+   "photos": [
+    "escritorio-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-13T18:00:00-03:00",
+   "updatedAt": "2026-10-13T18:00:00-03:00"
+  },
+  {
+   "id": "esc-003",
+   "room": "escritorio",
+   "seq": 3,
+   "zone": "Mesa",
+   "name": "Cadeira de escritório ergonômica",
+   "details": "Encosto alto e rodízios.",
+   "cat": "moveis",
+   "qty": "1",
+   "value": 750,
+   "photos": [
+    "escritorio-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-13T19:00:00-03:00",
+   "updatedAt": "2026-10-13T19:00:00-03:00"
+  },
+  {
+   "id": "esc-004",
+   "room": "escritorio",
+   "seq": 4,
+   "zone": "Mesa",
+   "name": "Mesa de trabalho de madeira",
+   "details": "1,2 m com pés de metal preto.",
+   "cat": "moveis",
+   "qty": "1",
+   "value": 450,
+   "photos": [
+    "escritorio-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-13T19:00:00-03:00",
+   "updatedAt": "2026-10-13T19:00:00-03:00"
+  },
+  {
+   "id": "esc-005",
+   "room": "escritorio",
+   "seq": 5,
+   "zone": "Mesa",
+   "name": "Caneca de cerâmica",
+   "details": "Caneca creme.",
+   "cat": "cozinha",
+   "qty": "1",
+   "value": 35,
+   "photos": [
+    "escritorio-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-13T20:00:00-03:00",
+   "updatedAt": "2026-10-13T20:00:00-03:00"
+  },
+  {
+   "id": "lav-001",
+   "room": "lavanderia",
+   "seq": 1,
+   "zone": "Máquina",
+   "name": "Máquina de lavar 11 kg",
+   "details": "Abertura frontal, branca.",
+   "cat": "utilidades",
+   "qty": "1",
+   "value": 1600,
+   "photos": [
+    "lavanderia-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-16T06:00:00-03:00",
+   "updatedAt": "2026-10-16T06:00:00-03:00"
+  },
+  {
+   "id": "lav-002",
+   "room": "lavanderia",
+   "seq": 2,
+   "zone": "Máquina",
+   "name": "Cesto de roupas de vime",
+   "details": "Cesto com alças.",
+   "cat": "utilidades",
+   "qty": "1",
+   "value": 80,
+   "photos": [
+    "lavanderia-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-16T06:00:00-03:00",
+   "updatedAt": "2026-10-16T06:00:00-03:00"
+  },
+  {
+   "id": "lav-003",
+   "room": "lavanderia",
+   "seq": 3,
+   "zone": "Prateleira",
+   "name": "Prateleira de madeira",
+   "details": "Prateleira de parede com mãos-francesas.",
+   "cat": "moveis",
+   "qty": "1",
+   "value": 90,
+   "photos": [
+    "lavanderia-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-16T07:00:00-03:00",
+   "updatedAt": "2026-10-16T07:00:00-03:00"
+  },
+  {
+   "id": "lav-004",
+   "room": "lavanderia",
+   "seq": 4,
+   "zone": "Prateleira",
+   "name": "Toalhas de banho",
+   "details": "Azul, creme e terracota.",
+   "cat": "texteis",
+   "qty": "3",
+   "value": 120,
+   "photos": [
+    "lavanderia-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-16T07:00:00-03:00",
+   "updatedAt": "2026-10-16T07:00:00-03:00"
+  },
+  {
+   "id": "lav-005",
+   "room": "lavanderia",
+   "seq": 5,
+   "zone": "Armário",
+   "name": "Aspirador vertical sem fio",
+   "details": "Com base de carregamento.",
+   "cat": "utilidades",
+   "qty": "1",
+   "value": 480,
+   "photos": [],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "manual",
+   "createdAt": "2026-10-16T08:00:00-03:00",
+   "updatedAt": "2026-10-16T08:00:00-03:00"
+  },
+  {
+   "id": "var-001",
+   "room": "varanda",
+   "seq": 1,
+   "zone": "Mesa",
+   "name": "Mesa bistrô com 2 cadeiras",
+   "details": "Metal preto e tampo claro.",
+   "cat": "moveis",
+   "qty": "1",
+   "value": 420,
+   "photos": [
+    "varanda-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-18T12:00:00-03:00",
+   "updatedAt": "2026-10-18T12:00:00-03:00"
+  },
+  {
+   "id": "var-002",
+   "room": "varanda",
+   "seq": 2,
+   "zone": "Canto",
+   "name": "Bicicleta aro 29",
+   "details": "Quadro verde-petróleo.",
+   "cat": "outros",
+   "qty": "1",
+   "value": 1300,
+   "photos": [
+    "varanda-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-18T13:00:00-03:00",
+   "updatedAt": "2026-10-18T13:00:00-03:00"
+  },
+  {
+   "id": "var-003",
+   "room": "varanda",
+   "seq": 3,
+   "zone": "Floreira",
+   "name": "Vasos com plantas",
+   "details": "Vasos de cerâmica com folhagens.",
+   "cat": "plantas",
+   "qty": "3",
+   "value": 150,
+   "photos": [
+    "varanda-1.jpg"
+   ],
+   "checked": false,
+   "flag": null,
+   "approx": true,
+   "source": "foto",
+   "createdAt": "2026-10-18T16:00:00-03:00",
+   "updatedAt": "2026-10-18T16:00:00-03:00"
+  }
+ ]
+}

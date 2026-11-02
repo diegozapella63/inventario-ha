@@ -547,6 +547,16 @@ div.croom:hover { background: none; }
 .rhead-val { text-align: right; }
 .rhead-val .big { font: 700 clamp(30px, 5vw, 40px)/1 var(--font-c); white-space: nowrap; }
 .rhead-val .small { color: var(--muted); font-size: 14px; margin-top: 6px; }
+/* fotos do cômodo, no Editar cômodo: foto, legenda e botões; no celular estreito, os botões descem para baixo da legenda */
+.opts > li.rph { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto auto auto; grid-template-areas: "img lbl cov up rm"; align-items: center; gap: 8px; }
+.rph img { grid-area: img; width: 64px; height: 48px; object-fit: cover; border-radius: 6px; }
+.rph .input { grid-area: lbl; height: 38px; min-width: 0; }
+.rph [data-re="cover"] { grid-area: cov; justify-self: start; }
+.rph [data-re="up"] { grid-area: up; }
+.rph [data-re="rm"] { grid-area: rm; }
+@media (max-width: 480px) {
+  .opts > li.rph { grid-template-columns: 64px minmax(0, 1fr) auto auto; grid-template-areas: "img lbl lbl lbl" "cov cov up rm"; }
+}
 .rhead-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .rhead-actions .lbl-short { display: none; }
 @media (max-width: 560px) {
@@ -555,6 +565,11 @@ div.croom:hover { background: none; }
   .rhead-actions .btn.primary { flex: 1; }
   .rhead-actions .lbl { display: none; }
   .rhead-actions [data-act="catalog"] .lbl-short { display: inline; }
+  .rhead-actions .btn.primary { min-width: 0; }
+}
+@media (max-width: 360px) { /* celular de 320 px: os três cabem sem a tela encolher */
+  .rhead-actions .btn { padding: 0 10px; gap: 6px; }
+  .rhead-actions .lbl-x { display: none; }
 }
 @media (max-width: 560px) { .rhead-val { text-align: left; width: 100%; display: flex; align-items: baseline; gap: 12px; } .rhead-val .small { margin: 0; } .rhead h1 { margin-top: 8px; } .rhead-top { gap: 10px; } }
 

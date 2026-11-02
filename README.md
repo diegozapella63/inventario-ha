@@ -53,20 +53,22 @@ repository.yaml               repositório de apps
 inventario/                   o app (config, Dockerfile, ícone, documentação)
 inventario/app/server.py      servidor (só biblioteca padrão do Python)
 inventario/app/web/           interface (HTML, CSS e JavaScript, sem etapa de build)
+tests/                        testes unitários, de integração e visuais, com uma casa inventada
+dev/run.sh                    o app no computador, com a casa de teste
+preview/, tools/              prévia numa página só, imagens do README e ícone
 docs/                         imagens deste README
 ```
 
 ## Desenvolvimento
 
 ```bash
-cd inventario/app
-INV_DEV=1 INV_DATA=./.data INV_SEED=../seed INV_WEB=./web INV_SHARE=./.share INV_MEDIA=./.media \
-  python3 server.py                                  # abre em http://127.0.0.1:8099
+dev/run.sh                    # abre em http://127.0.0.1:8099, com a casa de teste e a IA simulada
+dev/run.sh --vazio            # como numa instalação nova
+tests/run.sh                  # testes unitários e de integração (só Python)
+tests/e2e/run.sh              # testes visuais (Playwright)
 ```
 
-O app começa vazio: importe um backup `.zip` pela tela de boas-vindas ou crie o primeiro cômodo. Fora do Home Assistant, `INV_AI_MOCK=1` simula a leitura por IA.
-
-Como trabalhar no projeto (checklist de cada mudança, versão e como os apps conversam): [AGENTS.md](AGENTS.md).
+Os testes rodam a cada mudança, na aba **Actions**. Como trabalhar no projeto (checklist de cada mudança, versão, testes e como os apps conversam): [AGENTS.md](AGENTS.md).
 
 ## Créditos
 
