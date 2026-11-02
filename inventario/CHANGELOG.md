@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.19.1
+
+- Relatório no celular estreito (320 px): a tabela cabe na tela, sem a página encolher.
+
 ## 1.19.0
 
 - **Falar sem IA** entende valor por extenso: "dois mil reais", "três mil", "mil e duzentos reais" viram o valor do item. Quantidade por extenso ("duas luminárias") continua no nome. "Cafeteira por 499 reais" e "abajur que custou 2 mil" ficam só Cafeteira e Abajur.

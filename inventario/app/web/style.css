@@ -894,6 +894,13 @@ dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; 
 .rtable .t img { width: 44px; height: 44px; object-fit: cover; border-radius: 4px; }
 .rtable tfoot td { font-weight: 600; border-bottom: 0; border-top: 1.5px solid var(--ink-2); }
 .rtable .d { color: var(--muted); font-size: 13px; display: block; margin-top: 2px; }
+.rtable td { overflow-wrap: anywhere; }
+@media (max-width: 480px) { /* celular estreito: a tabela do relatório cabe sem a página encolher */
+  .report { padding: 16px 12px; }
+  .rtable th, .rtable td { padding-left: 4px; padding-right: 4px; }
+  .rtable .t { width: 42px; }
+  .rtable .t img { width: 36px; height: 36px; }
+}
 .rep-room { margin-top: 36px; }
 .rep-room h2 { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 24px/1.2 var(--font-c); }
 .rep-room .rs { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
