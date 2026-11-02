@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.18.0
+
+- **Tirar foto** no app do Home Assistant para Android, como no ResolvIA: abre a câmera do próprio InventarIA, em tela cheia, com lanterna quando o celular tem. No cadastro do item e nas fotos do cômodo dá para tirar várias e tocar em Pronto; no Catalogar foto com IA, uma foto já volta para a leitura. No navegador do celular, continua a câmera do aparelho.
+- Saiu o aviso "As fotos vêm da galeria: tire antes com a câmera".
+
 ## 1.17.0
 
 - **Categorias** em Mais > Opções: renomeie, crie ou exclua as categorias da casa. Cada uma mostra quantos itens tem. Ao excluir, os itens vão para Outros, que não pode ser excluída.

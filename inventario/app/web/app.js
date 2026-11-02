@@ -25,6 +25,8 @@
   const UA = navigator.userAgent || "";
   const ANDROID_APP = /Android/i.test(UA) && (/Home ?Assistant\//i.test(UA) || /; wv\)/.test(UA));
   const CAMERA_DIRECT = COARSE && !ANDROID_APP;
+  // o app do Home Assistant no Android ignora o "capture" e abre a galeria: lá a câmera é a do próprio app (como no ResolvIA)
+  const CAMERA = CAMERA_DIRECT || ANDROID_APP;
   const MULTI_PICK = !ANDROID_APP;
   // O ícone do app (o mesmo desenho do ícone do app no Home Assistant: a etiqueta com R$ e o fio), na cor
   // escolhida em Mais > Aparência. O fio fica na cor do texto, para aparecer no tema escuro.
@@ -1223,6 +1225,92 @@
     inp.value = "";
     inp.click();
   }
+  // Tirar foto: no celular, a câmera do aparelho; no app do Home Assistant (Android), a câmera do próprio app
+  function camera(cb, { max = 1, title = "Tirar foto" } = {}) {
+    if (!ANDROID_APP) { pickFiles(cb, { camera: true }); return; }
+    takePhotos({ max, title }).then((r) => {
+      if (r === "pick") pickFiles(cb, { multiple: max > 1 });
+      else if (r.length) cb(r);
+    });
+  }
+  // Câmera em tela cheia: fotografa até `max` fotos e devolve os arquivos (ou "pick" para escolher da galeria)
+  function takePhotos({ max = 1, title = "Tirar foto" } = {}) {
+    return new Promise((resolve) => {
+      let stream = null, track = null, torch = false, out = [], shots = [];
+      const stop = () => { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; };
+      const entry = openDialog({
+        cls: "camera", label: title,
+        html: `<div class="cam">
+          <video playsinline muted autoplay></video>
+          <div class="cam-top"><button type="button" class="cam-btn" data-cam="close" aria-label="Fechar">${ic("close")}</button>
+            <span class="cam-title">${esc(title)}</span><button type="button" class="cam-btn" data-cam="torch" aria-label="Lanterna" aria-pressed="false" hidden>${ic("flash")}</button></div>
+          <div class="cam-mid"><p class="cam-hint" data-cam-hint>Abrindo a câmera…</p></div>
+          <div class="cam-bottom"><div class="cam-shots" data-cam-shots></div>
+            <button type="button" class="cam-shutter" data-cam="shoot" aria-label="Fotografar" disabled><span></span></button>
+            ${max > 1 ? `<button type="button" class="cam-done" data-cam="done" disabled>Pronto</button>` : `<span></span>`}</div>
+        </div>`,
+        onClose: () => { stop(); shots.forEach((u) => URL.revokeObjectURL(u)); resolve(out); },
+      });
+      const dlg = entry.dlg, video = $("video", dlg), hint = $("[data-cam-hint]", dlg), shoot = $('[data-cam="shoot"]', dlg), done = $('[data-cam="done"]', dlg);
+      const finish = (r) => { out = r; requestClose(entry, { force: true }); };
+      const fail = (msg) => {
+        stop();
+        $(".cam-mid", dlg).innerHTML = `<div class="cam-msg">${ic("camera", "lg")}<p>${esc(msg)}</p><button type="button" class="btn primary" data-cam="pick">${ic("image")}Escolher foto</button></div>`;
+        shoot.disabled = true;
+      };
+      const md = navigator.mediaDevices;
+      if (!md || !md.getUserMedia) {
+        fail(window.isSecureContext === false ? "A câmera só abre com o Home Assistant num endereço seguro (https), como o do Home Assistant Cloud." : "Este aparelho não deixa o app usar a câmera.");
+      } else {
+        md.getUserMedia({ audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1440 } } }).then((st) => {
+          if (!document.contains(dlg)) { st.getTracks().forEach((t) => t.stop()); return; }
+          stream = st; track = st.getVideoTracks()[0];
+          video.srcObject = st; video.play().catch(() => {});
+          const caps = track && track.getCapabilities ? track.getCapabilities() : {};
+          $('[data-cam="torch"]', dlg).hidden = !caps.torch;
+          hint.textContent = ""; shoot.disabled = false;
+        }).catch((err) => {
+          if (!document.contains(dlg)) return;
+          const n = (err && err.name) || "";
+          fail(n === "NotAllowedError" || n === "SecurityError" ? "Sem permissão para a câmera. Libere a câmera para o app do Home Assistant nas configurações do celular." : n === "NotReadableError" ? "A câmera está sendo usada por outro app." : "Não consegui abrir a câmera.");
+        });
+      }
+      async function snap() {
+        if (!video.videoWidth || shoot.disabled) return;
+        shoot.disabled = true;
+        const scale = Math.min(1, 2000 / Math.max(video.videoWidth, video.videoHeight));
+        const c = document.createElement("canvas");
+        c.width = Math.round(video.videoWidth * scale); c.height = Math.round(video.videoHeight * scale);
+        c.getContext("2d").drawImage(video, 0, 0, c.width, c.height);
+        const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.9));
+        if (!blob || !document.contains(dlg)) return;
+        try { navigator.vibrate && navigator.vibrate(12); } catch { /* sem vibração */ }
+        const file = new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" });
+        if (max <= 1) { finish([file]); return; }
+        out.push(file);
+        const url = URL.createObjectURL(blob); shots.push(url);
+        const flash = document.createElement("div"); flash.className = "cam-flash"; $(".cam", dlg).append(flash); setTimeout(() => flash.remove(), 400);
+        const n = out.length;
+        $("[data-cam-shots]", dlg).innerHTML = shots.slice(-3).map((u) => `<img src="${u}" alt="">`).join("") + (n > 3 ? `<span>+${n - 3}</span>` : "");
+        done.disabled = false; done.textContent = `Pronto (${n})`;
+        shoot.disabled = n >= max;
+        hint.textContent = n >= max ? "Limite de fotos deste item." : "";
+      }
+      dlg.addEventListener("click", async (e) => {
+        const b = e.target.closest("[data-cam]");
+        if (!b) return;
+        const a = b.dataset.cam;
+        if (a === "close") { out = []; requestClose(entry, { force: true }); }
+        else if (a === "shoot") snap();
+        else if (a === "done") finish(out);
+        else if (a === "pick") finish("pick");
+        else if (a === "torch" && track) {
+          try { await track.applyConstraints({ advanced: [{ torch: !torch }] }); torch = !torch; b.setAttribute("aria-pressed", String(torch)); }
+          catch { b.hidden = true; }
+        }
+      });
+    });
+  }
   ["#pick-files", "#pick-camera"].forEach((s) => $(s).addEventListener("change", (e) => {
     const files = [...e.target.files];
     e.target.value = "";
@@ -1550,7 +1638,7 @@
         <form class="dlg-b drop" data-ed-form novalidate autocomplete="off">
           <div class="form">
             <div class="field"><span class="lbl">Fotos</span><div class="phs" data-slot="photos"></div>
-              ${ANDROID_APP ? `<p class="help">As fotos vêm da galeria: tire antes com a câmera.</p>` : COARSE ? "" : `<p class="help">Também dá para arrastar ou colar (Ctrl+V).</p>`}</div>
+              ${COARSE ? "" : `<p class="help">Também dá para arrastar ou colar (Ctrl+V).</p>`}</div>
             ${aiOn() ? `<div class="aibox" data-slot="ai"></div>` : ""}
             <div class="field"><label for="f-name">Nome</label><input id="f-name" class="input" name="name" maxlength="200" value="${esc(F.name)}" placeholder="Ex.: Cafeteira Nespresso Inissia" enterkeyhint="next">
               <p class="err" data-err="name" hidden></p></div>
@@ -1592,7 +1680,7 @@
           ${i === 0 ? `<span class="cover">Capa</span>` : `<button type="button" class="mkcover" data-ed="cover" data-i="${i}">Usar como capa</button>`}
           <button type="button" class="x" data-ed="rmphoto" data-i="${i}" aria-label="Remover foto ${i + 1}">${ic("close")}</button></div>`).join("")
         + Array.from({ length: F.uploading }, () => `<div class="ph loading"><span class="spin lg"></span></div>`).join("")
-        + (CAMERA_DIRECT ? `<button type="button" class="add" data-ed="camera">${ic("camera")}Tirar foto</button>` : "")
+        + (CAMERA ? `<button type="button" class="add" data-ed="camera">${ic("camera")}Tirar foto</button>` : "")
         + `<button type="button" class="add" data-ed="upload">${ic(COARSE ? "image" : "upload")}${ANDROID_APP ? "Escolher foto" : COARSE ? "Galeria" : "Enviar foto"}</button>`
         + (hasRoomPhotos ? `<button type="button" class="add" data-ed="roomphotos">${ic("images")}Fotos do cômodo</button>` : "")
         + (F.photos.length < 12 && aiOn() ? `<button type="button" class="add" data-ed="web">${ic("search")}Buscar na internet</button>` : "");
@@ -1731,7 +1819,7 @@
       else if (act === "save") save(false);
       else if (act === "again") save(true);
       else if (act === "upload") pickFiles(addFiles);
-      else if (act === "camera") pickFiles(addFiles, { camera: true });
+      else if (act === "camera") camera(addFiles, { max: 12 - F.photos.length, title: "Fotos do item" });
       else if (act === "roomphotos") { const chosen = await roomPhotoPicker(F.room, F.photos); if (chosen.length) { F.photos.push(...chosen.slice(0, 12 - F.photos.length)); F.dirty = true; renderPhotos(); } }
       else if (act === "web") {
         const q = F.name.trim();
@@ -1925,10 +2013,10 @@
               <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-ct="change">${ic("image", "sm")}Trocar foto</button></div>`
             : `<div class="phs" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
                 ${C.uploading ? `<div class="ph loading" style="aspect-ratio:4/3"><span class="spin lg"></span></div>` : `
-                ${CAMERA_DIRECT ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="camera">${ic("camera", "lg")}Tirar foto</button>` : ""}
+                ${CAMERA ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="camera">${ic("camera", "lg")}Tirar foto</button>` : ""}
                 <button type="button" class="add" style="aspect-ratio:4/3" data-ct="upload">${ic(COARSE ? "image" : "upload", "lg")}${ANDROID_APP ? "Escolher foto" : COARSE ? "Galeria" : "Enviar foto"}</button>
                 ${hasRoomPhotos ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="roomphoto">${ic("images", "lg")}Foto do cômodo</button>` : ""}`}
-              </div>${ANDROID_APP ? `<p class="help" style="margin:0">As fotos vêm da galeria: tire antes com a câmera.</p>` : COARSE ? "" : `<p class="help" style="margin:0">Também dá para arrastar ou colar (Ctrl+V).</p>`}`}
+              </div>${COARSE ? "" : `<p class="help" style="margin:0">Também dá para arrastar ou colar (Ctrl+V).</p>`}`}
           <div class="${zonesUse ? "row2" : ""}">
             ${roomSelect("Cômodo")}
             ${zonesUse ? `<div class="field"><label for="c-zone">Zona (opcional)</label><input id="c-zone" class="input" data-ct-in="zone" list="c-zones" value="${esc(C.zone)}" placeholder="Deixe vazio para a IA sugerir" autocomplete="off">
@@ -2094,7 +2182,7 @@
       else if (act === "mic") { if (C.rec === "on") finishRec(); else if (C.rec === "off") startRec(); }
       else if (act === "done") finishRec();
       else if (act === "upload") pickFiles(setFile, { multiple: false });
-      else if (act === "camera") pickFiles(setFile, { camera: true });
+      else if (act === "camera") camera(setFile, { title: "Catalogar foto" });
       else if (act === "change") { C.file = null; C.step = "photo"; render(); }
       else if (act === "roomphoto") { const [f] = await roomPhotoPicker(C.room); if (f) { C.file = f; C.keep = false; C.step = "ready"; render(); } }
       else if (act === "read") read();
@@ -2270,7 +2358,7 @@
           <button type="button" class="btn sm icon" data-re="rm" data-i="${i}" aria-label="Tirar foto">${ic("trash", "sm")}</button></li>`).join("")}</ul>
         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
           ${R.uploading ? `<span class="muted"><span class="spin sm"></span> Enviando ${R.uploading} foto(s)…</span>` : ""}
-          ${CAMERA_DIRECT ? `<button type="button" class="btn sm" data-re="camera">${ic("camera", "sm")}Tirar foto</button>` : ""}
+          ${CAMERA ? `<button type="button" class="btn sm" data-re="camera">${ic("camera", "sm")}Tirar foto</button>` : ""}
           <button type="button" class="btn sm" data-re="upload">${ic("upload", "sm")}Enviar fotos</button></div>`;
     };
     const addFiles = async (files) => {
@@ -2306,7 +2394,7 @@
       if (act === "cancel") requestClose(entry);
       else if (act === "save") save();
       else if (act === "upload") pickFiles(addFiles);
-      else if (act === "camera") pickFiles(addFiles, { camera: true });
+      else if (act === "camera") camera(addFiles, { max: 12, title: "Fotos do cômodo" });
       else if (act === "cover") { R.cover = i; R.dirty = true; renderPhotos(); }
       else if (act === "up" && i > 0) { const [p] = R.photos.splice(i, 1); R.photos.splice(i - 1, 0, p); if (R.cover === i) R.cover = i - 1; else if (R.cover === i - 1) R.cover = i; R.dirty = true; renderPhotos(); }
       else if (act === "rm") { R.photos.splice(i, 1); if (R.cover >= R.photos.length) R.cover = 0; else if (R.cover > i) R.cover -= 1; R.dirty = true; renderPhotos(); }
