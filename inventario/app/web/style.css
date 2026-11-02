@@ -744,7 +744,7 @@ details.more-fields .form { margin-top: 14px; }
 .found .money::before { left: 10px; font-size: 14px; }
 .found .fdet { font-size: 14px; color: var(--muted); margin: 0; }
 .found .fflag { font-size: 13px; color: var(--ink-2); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.found .pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 11px; font-size: 12px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
+.found .pill { display: inline-block; max-width: 100%; min-height: 22px; padding: 3px 9px; border-radius: 11px; font-size: 12px; line-height: 1.35; font-weight: 600; overflow-wrap: anywhere; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
 .found .pill.warn { background: var(--warn-soft); border-color: var(--warn-edge); color: var(--ink); }
 @media (max-width: 560px) {
   .found .frow { grid-template-columns: 1fr 1fr; }

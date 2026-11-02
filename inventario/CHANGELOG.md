@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.18.1
+
+- Catalogar foto com IA: o aviso "Parece já cadastrado" com um nome comprido quebra em duas linhas dentro do selo, em vez de passar por cima da borda.
+
 ## 1.18.0
 
 - **Tirar foto** no app do Home Assistant para Android, como no ResolvIA: abre a câmera do próprio InventarIA, em tela cheia, com lanterna quando o celular tem. No cadastro do item e nas fotos do cômodo dá para tirar várias e tocar em Pronto; no Catalogar foto com IA, uma foto já volta para a leitura. No navegador do celular, continua a câmera do aparelho.
