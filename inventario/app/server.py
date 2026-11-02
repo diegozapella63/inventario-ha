@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.19.1"
+VERSION = "1.20.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -2034,6 +2034,127 @@ def web_job(jid: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Novidades do produto: a IA com busca na web procura atualizações, lançamentos, modelo novo, recalls e fim de
+# suporte de um item. Mesmo jeito da busca de fotos (um trabalho em segundo plano, com a mesma IA de busca).
+
+NEWS_KINDS = ("atualizacao", "lancamento", "sucessor", "recall", "suporte", "outro")
+NEWS_MAX = 10
+MOCK_NEWS = {"produto": "Produto de exemplo", "novidades": [
+    {"tipo": "atualizacao", "titulo": "Atualização de firmware com correções de conexão", "resumo": "O fabricante liberou uma versão nova "
+     "do firmware, que melhora a reconexão ao Wi-Fi.", "data": "2026-09-12", "fonte": "https://exemplo.com/firmware", "boato": False},
+    {"tipo": "sucessor", "titulo": "Modelo novo da mesma linha anunciado", "resumo": "A nova geração chega com mais brilho e menor consumo.",
+     "data": "2026-10", "fonte": "https://exemplo.com/lancamento", "boato": False},
+    {"tipo": "lancamento", "titulo": "Versão com Matter pode chegar no próximo ano", "resumo": "Sites de tecnologia falam de uma versão "
+     "compatível com Matter; o fabricante não confirmou.", "data": "", "fonte": "https://exemplo.com/rumor", "boato": True},
+]}
+
+
+def news_prompt(name: str, details: str) -> str:
+    return "\n".join(filter(None, [
+        "Você acompanha os equipamentos e objetos de uma casa no Brasil.",
+        f"Produto: {name}",
+        f"Detalhes: {details}" if details else "",
+        f"Hoje é {datetime.now().strftime('%Y-%m-%d')}.",
+        "",
+        "Use a busca na web agora. Procure, de preferência no site do fabricante e em sites de tecnologia e de notícias confiáveis, "
+        "o que saiu nos últimos 12 meses e o que já foi anunciado para os próximos meses sobre este produto:",
+        "- atualizações de firmware, software ou aplicativo;",
+        "- modelo novo ou sucessor;",
+        "- lançamentos anunciados da mesma linha;",
+        "- recalls ou avisos de segurança;",
+        "- fim de suporte ou de atualizações.",
+        "Cada novidade precisa de uma fonte que apareceu na busca. Não invente: sem fonte, deixe de fora. "
+        "Rumor ou vazamento só entra marcado como boato.",
+        "Responda somente com um objeto JSON, sem texto antes ou depois:",
+        '{"produto": "nome do produto que você identificou", "novidades": [{"tipo": "atualizacao, lancamento, sucessor, recall, suporte ou outro", '
+        '"titulo": "frase curta em português", "resumo": "uma ou duas frases em português", "data": "AAAA-MM-DD, AAAA-MM ou vazio", '
+        '"fonte": "endereço da página", "boato": false}]}',
+        f"No máximo {NEWS_MAX} novidades, das mais novas para as mais antigas.",
+        'Se não achar nada, responda {"produto": "...", "novidades": []}.',
+        'Se não conseguir usar a busca na web, responda apenas {"erro": "sem_busca"}.',
+    ]))
+
+
+def news_clean(data) -> dict:
+    """O que a IA achou, conferido: só com fonte (http ou https), tipo conhecido, data no formato certo, sem repetidas."""
+    if not isinstance(data, dict):
+        data = {}
+    raw = data.get("novidades") or data.get("news") or []
+    out, seen = [], set()
+    for n in raw if isinstance(raw, list) else []:
+        if not isinstance(n, dict):
+            continue
+        title = " ".join(str(n.get("titulo") or n.get("title") or "").split())[:160]
+        url = _fix_url(n.get("fonte") or n.get("url") or n.get("source"))
+        if not title or not url:
+            continue
+        key = (title.lower(), url)
+        if key in seen:
+            continue
+        seen.add(key)
+        kind = fold(str(n.get("tipo") or n.get("type") or "")).strip()
+        date = str(n.get("data") or n.get("date") or "").strip()[:10]
+        if not re.fullmatch(r"\d{4}(-\d{2}(-\d{2})?)?", date):
+            date = ""
+        out.append({"tipo": kind if kind in NEWS_KINDS else "outro", "titulo": title,
+                    "resumo": " ".join(str(n.get("resumo") or n.get("summary") or "").split())[:400],
+                    "data": date, "fonte": url, "site": site_of(url), "boato": n.get("boato") is True or n.get("rumor") is True})
+    out.sort(key=lambda x: x["data"] or "0000", reverse=True)
+    return {"produto": " ".join(str(data.get("produto") or data.get("product") or "").split())[:200], "novidades": out[:NEWS_MAX]}
+
+
+def ai_find_news(name: str, details: str, entity: str) -> dict:
+    prompt = news_prompt(name, details)
+    with AiCall("novidades", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
+        if AI_MOCK:
+            time.sleep(0.4)
+            data = read_json(os.environ.get("INV_MOCK_NEWS") or "", None) or MOCK_NEWS
+            call.answer(data)
+        else:
+            raw = ai_call_text("InventarIA: novidades", prompt, entity)
+            call.answer(str(raw or ""))
+            try:
+                data = extract_json(raw)
+            except ApiError:
+                call.result = "sem_busca"
+                log.info("novidades: resposta da IA fora do formato: %s", " ".join(str(raw or "").split())[:400])
+                raise ApiError(502, "A IA respondeu sem usar a busca na web. " + SEARCH_HOWTO) from None
+        if isinstance(data, dict) and data.get("erro"):
+            call.result = "sem_busca"
+            raise ApiError(502, "A IA não usou a busca na web. " + SEARCH_HOWTO)
+    return news_clean(data)
+
+
+def _news_job_run(jid: str, name: str, details: str, entity: str):
+    job = WEB_JOBS[jid]
+    try:
+        found = ai_find_news(name, details, entity)
+        if not job.get("cancelled"):
+            job.update(stage="done", msg="", news=found)
+    except ApiError as e:
+        job.update(stage="error", msg=e.msg)
+    except Exception:  # noqa: BLE001
+        log.exception("novidades")
+        job.update(stage="error", msg="Não deu para buscar agora. Tente de novo em instantes.")
+
+
+def news_job_start(body: dict) -> dict:
+    need_ai_on()
+    it = STORE.item(str(body.get("item") or ""))
+    if not it:
+        raise ApiError(404, "Item não encontrado.")
+    if not SUPERVISOR_TOKEN and not AI_MOCK:
+        raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
+    web_jobs_cleanup()
+    jid = secrets.token_hex(8)
+    details = " ".join(str(it.get("details") or "").split())[:300]
+    with WEB_LOCK:
+        WEB_JOBS[jid] = {"stage": "busy", "msg": "Procurando novidades…", "results": [], "news": None, "at": time.time(), "kind": "novidades"}
+    threading.Thread(target=_news_job_run, args=(jid, it["name"], details, search_entity()), daemon=True).start()
+    return {"id": jid}
+
+
+# ---------------------------------------------------------------------------
 # HTTP
 
 
@@ -2375,6 +2496,23 @@ def r_web_cancel(h, jid, query):
     h.send_json({"ok": True})
 
 
+def r_news_start(h, query):
+    h.send_json(news_job_start(h.read_body()), 202)
+
+
+def r_news_status(h, jid, query):
+    job = web_job(jid)
+    h.send_json({"stage": job["stage"], "msg": job["msg"], "news": job.get("news")})
+
+
+def r_news_cancel(h, jid, query):
+    job = WEB_JOBS.get(jid)
+    if job:
+        job["cancelled"] = True
+        WEB_JOBS.pop(jid, None)
+    h.send_json({"ok": True})
+
+
 def r_settings_get(h, query):
     h.send_json(STORE.settings)
 
@@ -2672,6 +2810,9 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/web-photos/([a-f0-9]{16})", r_web_status),
     ("GET", r"/api/web-photos/([a-f0-9]{16})/(\d)", r_web_image),
     ("DELETE", r"/api/web-photos/([a-f0-9]{16})", r_web_cancel),
+    ("POST", r"/api/news", r_news_start),
+    ("GET", r"/api/news/([a-f0-9]{16})", r_news_status),
+    ("DELETE", r"/api/news/([a-f0-9]{16})", r_news_cancel),
     ("GET", r"/api/settings", r_settings_get),
     ("PUT", r"/api/settings", r_settings_put),
     ("GET", r"/api/export\.(csv|json|zip)", r_export),

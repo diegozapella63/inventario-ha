@@ -712,6 +712,17 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .wimg:hover { border-color: var(--ink-2); }
 .wimg[aria-checked="true"] { border-color: var(--tag-edge); box-shadow: 0 0 0 3px var(--tag); color: var(--ink); font-weight: 600; }
 .wtip { font-size: 13px; margin: 12px 0 0; }
+/* novidades do produto */
+.inews { margin-top: 18px; }
+.news-of { margin: 0 0 4px; font-weight: 600; }
+.news { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.news li { display: grid; gap: 4px; padding: 14px 2px; border-bottom: 1px solid var(--line); min-width: 0; }
+.news-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.news-date { color: var(--muted); font-size: 13px; }
+.news b { font-weight: 600; line-height: 1.35; }
+.news p { margin: 0; color: var(--ink-2); font-size: 15px; line-height: 1.45; }
+.news a { justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); font-size: 14px; }
+.news-foot { margin: 14px 0 0; font-size: 13px; }
 .wq + div > .formerr { margin-top: 16px; }
 .phs .add {
   aspect-ratio: 1; border-radius: var(--r); border: 1.5px dashed var(--line-2); background: transparent; color: var(--ink-2);
@@ -759,8 +770,8 @@ details.more-fields .form { margin-top: 14px; }
 .found .money::before { left: 10px; font-size: 14px; }
 .found .fdet { font-size: 14px; color: var(--muted); margin: 0; }
 .found .fflag { font-size: 13px; color: var(--ink-2); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.found .pill { display: inline-block; max-width: 100%; min-height: 22px; padding: 3px 9px; border-radius: 11px; font-size: 12px; line-height: 1.35; font-weight: 600; overflow-wrap: anywhere; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
-.found .pill.warn { background: var(--warn-soft); border-color: var(--warn-edge); color: var(--ink); }
+.found .pill, .news .pill { display: inline-block; max-width: 100%; min-height: 22px; padding: 3px 9px; border-radius: 11px; font-size: 12px; line-height: 1.35; font-weight: 600; overflow-wrap: anywhere; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
+.found .pill.warn, .news .pill.warn { background: var(--warn-soft); border-color: var(--warn-edge); color: var(--ink); }
 @media (max-width: 560px) {
   .found .frow { grid-template-columns: 1fr 1fr; }
   .found .frow .fname { grid-column: span 2; }

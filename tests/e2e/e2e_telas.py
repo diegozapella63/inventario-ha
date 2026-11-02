@@ -20,6 +20,7 @@ DIALOGS = [
     ("categoria", "#/mais/opcoes", '[data-act="cat-new"]', "#cn-name"),
     ("foto-comodo", "#/c/sala", ".strip .ph", "dialog.viewer"),
     ("excluir-item", "#/i/var-001", 'dialog.sheet [data-act="item-delete"]', '[data-r="1"]'),
+    ("novidades", "#/i/sal-007", 'dialog.sheet [data-act="item-news"]', ".news li"),
 ]
 
 CHECK = """() => {

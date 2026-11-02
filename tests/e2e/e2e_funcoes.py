@@ -54,6 +54,9 @@ async def body(r, p):
     r.eq(await ev(wf, [{"name": "cafeteira", "details": "", "cat": "outros", "value": 0}, p, False]), {"details": "inox", "cat": "cozinha", "value": 450}, "item existente: nunca o nome")
     r.eq(await ev(wf, [{"name": "Cafeteira X", "details": "", "cat": "", "value": 0}, None, True]), {}, "sem dados, nada")
 
+    # data das novidades do produto
+    r.eq(await ev("() => ['2026-09-12', '2026-01', '2026', '', null].map(__f.newsDate)"), ["12 set. 2026", "jan. 2026", "2026", "", ""], "data das novidades")
+
     # categorias da casa
     r.eq(await ev("() => { __f.applyCats([{id: 'a', name: 'A'}, {id: 'outros', name: 'Outros'}]); const c = __f.cats(); __f.applyCats(null); return [c, __f.cats().length]; }"),
          [[["a", "A"], ["outros", "Outros"]], 13], "categorias da casa e volta para a padrão")

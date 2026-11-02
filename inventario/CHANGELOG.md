@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.20.0
+
+- **Novidades** na ficha do item: a IA de busca procura o que saiu nos últimos 12 meses e o que já foi anunciado sobre o produto (atualizações de firmware ou software, modelo novo, lançamentos, recalls e fim de suporte), cada um com a data e o site da fonte. Boato vem marcado; recall fica em destaque. Com a IA desligada, o botão some.
+
 ## 1.19.1
 
 - Relatório no celular estreito (320 px): a tabela cabe na tela, sem a página encolher.

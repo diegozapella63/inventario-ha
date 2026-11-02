@@ -903,7 +903,7 @@
 
   // -- uso da IA (igual ao do EconomIA): hoje, 7 dias e o mês, gráfico por dia e as últimas chamadas
   let usageData = null, usageSel = null;
-  const USAGE_KIND = { foto: "Preencher com IA", catalogo: "Catalogar foto", busca: "Buscar foto na internet", fala: "Falar" };
+  const USAGE_KIND = { foto: "Preencher com IA", catalogo: "Catalogar foto", busca: "Buscar foto na internet", fala: "Falar", novidades: "Novidades" };
   const USAGE_RES = { ok: "", cota: "cota excedida", formato: "fora do formato", sem_busca: "sem busca na web", erro: "erro" };
   const WEEKDAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1469,6 +1469,71 @@
       start();
     });
   }
+  // Novidades do produto: a IA com busca na web traz atualizações, lançamentos, modelo novo, recalls e fim de suporte,
+  // cada um com a fonte. O resultado fica guardado até fechar o app (abrir de novo não chama a IA outra vez).
+  const NEWS_KIND = { atualizacao: "Atualização", lancamento: "Lançamento", sucessor: "Modelo novo", recall: "Recall", suporte: "Fim de suporte", outro: "Novidade" };
+  const MES = ["jan.", "fev.", "mar.", "abr.", "maio", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."];
+  const newsDate = (d) => {
+    const [y, m, day] = String(d || "").split("-");
+    if (!y) return "";
+    return day ? `${+day} ${MES[+m - 1]} ${y}` : m ? `${MES[+m - 1]} ${y}` : y;
+  };
+  const newsCache = new Map();
+  function openNews(it) {
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return; }
+    let job = null, timer = null, gen = 0;
+    const entry = openDialog({
+      cls: "modal", label: "Novidades",
+      html: `<div class="dlg"><div class="dlg-h"><h2>Novidades</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <div class="dlg-b"><p class="news-of">${esc(it.name)}</p><div data-slot="news" aria-live="polite"></div></div>
+        <div class="dlg-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Buscar de novo</button><span class="grow"></span>
+          <button type="button" class="btn primary" data-x>Fechar</button></div></div>`,
+      onClose: () => { gen++; clearTimeout(timer); if (job) API.del(`api/news/${job}`).catch(() => {}); job = null; },
+    });
+    const dlg = entry.dlg, slot = $('[data-slot="news"]', dlg), again = $("[data-again]", dlg);
+    const show = (html, done) => { slot.innerHTML = html; again.hidden = !done; };
+    const error = (m) => show(`<p class="formerr">${esc(m)}</p>${/busca na web/.test(m) ? `<p class="muted wtip">A IA de busca fica em Mais, Integrações.</p>` : ""}`, true);
+    function render(r) {
+      const list = (r.news && r.news.novidades) || [], prod = (r.news && r.news.produto) || "";
+      show(`${list.length ? `<ul class="news">${list.map((x) => `<li>
+          <div class="news-meta"><span class="pill${x.tipo === "recall" ? " warn" : ""}">${esc(NEWS_KIND[x.tipo] || "Novidade")}</span>${x.boato ? `<span class="pill">Boato</span>` : ""}${x.data ? `<span class="news-date">${esc(newsDate(x.data))}</span>` : ""}</div>
+          <b>${esc(x.titulo)}</b>${x.resumo ? `<p>${esc(x.resumo)}</p>` : ""}
+          <a href="${esc(x.fonte)}" target="_blank" rel="noopener noreferrer">${esc(x.site || siteOf(x.fonte))}</a></li>`).join("")}</ul>`
+        : `<p class="muted">Nada novo nos últimos 12 meses.</p>`}
+        <p class="muted news-foot">${r.example ? "Exemplo simulado da prévia. " : ""}Buscado ${esc(whenShort(r.at))}${prod && norm(prod) !== norm(it.name) ? `, como ${esc(prod)}` : ""}.</p>`, true);
+    }
+    async function poll(my) {
+      let st;
+      try { st = await API.get(`api/news/${job}`); }
+      catch (e) { if (my === gen) error(e.message); return; }
+      if (my !== gen) return;
+      if (st.stage === "busy") { timer = setTimeout(() => poll(my), 1200); return; }
+      API.del(`api/news/${job}`).catch(() => {});
+      job = null;
+      if (st.stage === "error") { error(st.msg); return; }
+      const r = { news: st.news, at: new Date().toISOString(), example: !!st.example, name: it.name };
+      newsCache.set(it.id, r);
+      render(r);
+    }
+    async function start() {
+      const my = ++gen;
+      clearTimeout(timer);
+      if (job) { API.del(`api/news/${job}`).catch(() => {}); job = null; }
+      show(`<div class="wbusy"><span class="spin lg"></span><p><b>Procurando novidades…</b><span>Pode levar até um minuto.</span></p></div>`, false);
+      try {
+        const r = await API.post("api/news", { item: it.id });
+        if (my !== gen) return;
+        job = r.id;
+        poll(my);
+      } catch (e) { if (my === gen) error(e.message); }
+    }
+    dlg.addEventListener("click", (e) => {
+      if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
+      if (e.target.closest("[data-again]")) start();
+    });
+    const cached = newsCache.get(it.id);
+    if (cached && cached.name === it.name) render(cached); else start();
+  }
   async function addWebPhoto(it) {
     // na ficha, o item já existe: os dados da IA só completam o que está vazio (nunca o nome nem um valor já dado)
     const got = await webPhotoSearch({ name: it.name, details: it.details, qty: it.qty, fills: (p) => webFills(D.itemById.get(it.id) || it, p, false) });
@@ -1548,6 +1613,7 @@
           ${it.createdAt ? `<dt>Cadastrado</dt><dd>${esc(dateTime(it.createdAt))}${by(it.createdBy)}</dd>` : ""}
           ${it.updatedAt && it.updatedAt !== it.createdAt ? `<dt>Alterado</dt><dd>${esc(dateTime(it.updatedAt))}${by(it.updatedBy)}</dd>` : ""}
         </dl>
+        ${aiOn() ? `<div class="inews"><button type="button" class="btn" data-act="item-news" data-id="${esc(it.id)}">${ic("spark")}Novidades</button></div>` : ""}
       </div>
       <div class="dlg-f">
         <button type="button" class="btn danger" data-act="item-delete" data-id="${esc(it.id)}" aria-label="Excluir">${lbl("trash", "Excluir")}</button>
@@ -2696,6 +2762,7 @@
       case "gal": if (item) { const g = $('[data-slot="gallery"]', sheet ? sheet.dlg : document); if (g) g.innerHTML = galleryHtml(item, +b.dataset.i); } break;
       case "item-edit": if (item) openEditor({ item }); break;
       case "web-photo": if (item) addWebPhoto(item); break;
+      case "item-news": if (item) openNews(item); break;
       case "item-dup": if (item) openEditor({ dup: item }); break;
       case "item-move": if (item) moveItem(item); break;
       case "item-delete": if (item) deleteItem(item); break;
@@ -2873,7 +2940,7 @@
   // os testes da tela (tests/e2e) pedem as funções puras para conferir as contas e as regras
   if (typeof window.INV_TEST === "function") {
     window.INV_TEST({ esc, norm, numTxt, money, moneyR, plural, pct, pctFmt, ago, parseMoney, moneyInput, qtyClean, qtyNum, qtyLabel, qtyShort,
-      splitSpoken, wordsToNumbers, webFills, siteOf, suggestCode, hl, applyCats, cats: () => CATS });
+      splitSpoken, wordsToNumbers, newsDate, webFills, siteOf, suggestCode, hl, applyCats, cats: () => CATS });
   }
   if (!PREVIEW || window.INV_BACKEND) boot();
   else window.INV_BOOT = boot;

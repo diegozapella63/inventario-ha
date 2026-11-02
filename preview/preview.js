@@ -253,6 +253,27 @@
       if (!j.results.length) return { stage: "error", msg: "Não achei fotos desse produto nas páginas que a IA encontrou. Tente buscar só pela marca e o modelo.", results: [], product: j.product };
       return { stage: "done", msg: "", results: j.results.map(({ file, ...r }) => r), product: j.product, example: true };
     }
+    if (method === "POST" && path === "api/news") {
+      aiOff();
+      const it = d.items.find((i) => i.id === body.item);
+      if (!it) fail("Item não encontrado.", 404);
+      const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");
+      ST.jobs.set(id, { at: Date.now(), news: true, name: it.name });
+      return { id };
+    }
+    if ((m = path.match(/^api\/news\/([a-f0-9]+)$/))) {
+      const j = ST.jobs.get(m[1]);
+      if (method === "DELETE") { ST.jobs.delete(m[1]); return { ok: true }; }
+      if (!j) fail("Esta busca terminou. Busque de novo.", 404);
+      aiOff();
+      if (Date.now() - j.at < 1600) return { stage: "busy", msg: "Procurando novidades…" };
+      const y = new Date().getFullYear();
+      return { stage: "done", msg: "", example: true, news: { produto: j.name, novidades: [
+        { tipo: "atualizacao", titulo: "Atualização de software com correções", resumo: "O fabricante liberou uma versão nova, com correções de estabilidade.", data: `${y}-09`, fonte: "https://exemplo.com/atualizacao", site: "exemplo.com", boato: false },
+        { tipo: "sucessor", titulo: "Modelo novo da mesma linha anunciado", resumo: "A geração seguinte chega com melhorias de consumo e conexão.", data: `${y}-10`, fonte: "https://exemplo.com/lancamento", site: "exemplo.com", boato: false },
+        { tipo: "lancamento", titulo: "Versão nova pode chegar no próximo ano", resumo: "Sites de tecnologia falam de uma versão nova; o fabricante não confirmou.", data: "", fonte: "https://exemplo.com/rumor", site: "exemplo.com", boato: true },
+      ].sort((a, b) => (b.data || "0").localeCompare(a.data || "0")) } };
+    }
     if (method === "POST" && path === "api/ai/identify") {
       await wait(2400);
       const linked = d.items.filter((i) => (i.photos || []).includes(body.file));

@@ -21,6 +21,7 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - **Adicionar item**: nome, detalhes, cômodo, categoria, quantidade e valor total (e a zona, se estiver ligada). Dá para tirar foto pelo celular, enviar da galeria, arrastar uma foto ou colar com Ctrl+V. No app do Home Assistant para Android, **Tirar foto** abre a câmera do próprio InventarIA, como no ResolvIA (na primeira vez, o celular pede permissão). "Salvar e adicionar outro" mantém o cômodo para cadastrar em sequência.
 - **Catalogar foto com IA**: tire uma foto de uma prateleira ou de um canto da casa; a IA lista os objetos com nome, categoria, quantidade e uma sugestão de valor. Você confere, ajusta e escolhe o que entra.
 - **Falar**: o microfone no alto da tela. Fale os itens e quanto valem, e o app separa cada um para você conferir. Veja [Falar](#falar).
+- **Novidades**: na ficha do item, a IA procura na web atualizações, lançamentos, modelo novo, recalls e fim de suporte do produto. Veja [Novidades do produto](#novidades-do-produto).
 - **Buscar na internet**: num item sem foto (ou no editor do item), a IA procura o produto no fabricante e nas lojas e o app mostra as fotos encontradas para você escolher. Na mesma busca, a IA traz nome, detalhes, categoria e valor do produto para preencher o item. Veja [Fotos da internet](#fotos-da-internet).
 - **Buscar**: por nome, marca ou detalhe, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome ou data.
 - **Relatório**: lista por cômodo com fotos e valores, pronta para imprimir ou salvar em PDF (útil para seguro).
@@ -32,7 +33,7 @@ O valor de cada item é o que você quiser registrar, somando todas as unidades.
 
 ## Opções da casa
 
-- **Usar IA** (Mais > Integrações), ligada de início: desligada, o app esconde tudo o que usa IA (Catalogar foto com IA, Preencher com IA, Buscar na internet) e não chama a IA. O **Falar** continua: quem transcreve é a fala para texto do Home Assistant, e o próprio app separa os itens pelas vírgulas.
+- **Usar IA** (Mais > Integrações), ligada de início: desligada, o app esconde tudo o que usa IA (Catalogar foto com IA, Preencher com IA, Buscar na internet, Novidades) e não chama a IA. O **Falar** continua: quem transcreve é a fala para texto do Home Assistant, e o próprio app separa os itens pelas vírgulas.
 - **Usar zonas** (Mais > Opções), desligada de início: as zonas dividem um cômodo em partes, como Estante, Bancada ou Rack da TV. Ligadas, aparecem o campo Zona no cadastro, a zona na ficha do item, na busca e no relatório, e os itens de cada cômodo ficam separados por zona.
 
 - **Categorias** (Mais > Opções): renomeie, crie ou exclua categorias. Os itens de uma categoria excluída vão para Outros, que não pode ser excluída. As categorias ficam no inventário: entram no backup, na exportação e nas versões, e a IA passa a usar as novas.
@@ -94,6 +95,15 @@ A IA precisa ter a **busca na web** ligada:
 Escolha a IA em **Mais > Integrações > IA para buscar fotos na internet**. Como na leitura de fotos, "Padrão do Home Assistant" usa a tarefa de IA preferida definida no Home Assistant; para o Gemini, escolha o assistente de conversa na lista.
 
 A IA recebe só o nome, o começo dos detalhes e a quantidade do item. O app baixa as fotos apenas de endereços públicos da internet (nunca da rede da casa) e guarda só a foto que você escolher; as outras são apagadas em até 30 minutos. Cada busca usa a busca na web da sua IA, que pode ter custo à parte.
+
+## Novidades do produto
+
+Na ficha do item, **Novidades** pede à IA de busca (a mesma da busca de fotos, em Mais > Integrações) o que saiu nos últimos 12 meses e o que já foi anunciado para os próximos meses sobre o produto: atualizações de firmware ou software, modelo novo, lançamentos da mesma linha, recalls e fim de suporte.
+
+- Cada novidade vem com o tipo, a data quando se sabe e o site da fonte, que abre fora do app. Sem fonte, não entra. Rumor aparece marcado como **Boato**; recall fica em destaque.
+- A IA só acha o que já foi publicado: lançamento que ainda não foi anunciado não aparece.
+- O resultado fica guardado até fechar o app; **Buscar de novo** pergunta outra vez. Cada busca conta em Uso da IA.
+- Quanto mais o nome do item tiver marca e modelo (por exemplo "Lâmpada Wi-Fi Tapo L530E"), melhor a busca. O app mostra como a IA identificou o produto.
 
 ## Seus dados
 

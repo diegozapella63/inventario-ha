@@ -86,6 +86,14 @@ async def body(r, p):
     r.check(await pg.locator(".wgrid .wimg").count() >= 1, "Buscar na internet: fotos de exemplo")
     await pg.click("dialog [data-x]")
 
+    # Novidades: exemplo simulado
+    await pg.goto(r.base + "#/i/sal-007")
+    await pg.wait_for_selector('dialog.sheet [data-act="item-news"]', timeout=8000)
+    await pg.click('dialog.sheet [data-act="item-news"]')
+    await pg.wait_for_selector(".news li", timeout=10000)
+    r.check(await pg.locator(".news li").count() == 3 and "Exemplo simulado da prévia" in await pg.text_content(".news-foot"), "Novidades: exemplo marcado como simulado")
+    await pg.click("dialog.modal .dlg-h [data-x]")
+
     # Mais: as abas abrem; exportar explica que é prévia
     await pg.goto(r.base + "#/mais")
     await pg.wait_for_selector(".more-tabs")
