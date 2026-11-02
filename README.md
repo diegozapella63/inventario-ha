@@ -66,6 +66,8 @@ INV_DEV=1 INV_DATA=./.data INV_SEED=../seed INV_WEB=./web INV_SHARE=./.share INV
 
 O app começa vazio: importe um backup `.zip` pela tela de boas-vindas ou crie o primeiro cômodo. Fora do Home Assistant, `INV_AI_MOCK=1` simula a leitura por IA.
 
+Como trabalhar no projeto (checklist de cada mudança, versão e como os apps conversam): [AGENTS.md](AGENTS.md).
+
 ## Créditos
 
 Fontes [Barlow](https://fonts.google.com/specimen/Barlow) e [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) (SIL Open Font License). Ícones e ilustrações feitos para o app.
