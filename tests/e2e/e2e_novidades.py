@@ -1,4 +1,4 @@
-"""Novidades do produto na ficha do item: a lista com tipo, data, fonte e boato; guardada ao abrir de novo; Buscar de novo;
+"""Novidades do produto na ficha do item: só as 3 mais recentes, com tipo, data, fonte e boato; guardada ao abrir de novo; Buscar de novo;
 nada novo; erro da busca na web; IA desligada esconde o botão."""
 import json
 import os
@@ -10,7 +10,8 @@ NEWS = {"produto": "Smart TV 55 polegadas", "novidades": [
      "data": "2026-09-12", "fonte": "https://fabricante.exemplo/notas"},
     {"tipo": "recall", "titulo": "Troca da fonte de alimentação em um lote", "resumo": "Aparelhos de um lote podem esquentar.",
      "data": "2026-07", "fonte": "https://www.noticias.exemplo/recall"},
-    {"tipo": "sucessor", "titulo": "Modelo novo da mesma linha", "resumo": "", "data": "", "fonte": "https://blog.exemplo/rumor", "boato": True},
+    {"tipo": "sucessor", "titulo": "Modelo novo da mesma linha", "resumo": "", "data": "2026-10", "fonte": "https://blog.exemplo/rumor", "boato": True},
+    {"tipo": "atualizacao", "titulo": "Atualização antiga", "resumo": "", "data": "2025-12-01", "fonte": "https://fabricante.exemplo/antiga"},
 ]}
 
 
@@ -38,14 +39,14 @@ async def body(r, p):
         tipo: [...li.querySelectorAll('.pill')].map(p => p.textContent), data: li.querySelector('.news-date')?.textContent || '',
         titulo: li.querySelector('b').textContent, site: li.querySelector('a').textContent, href: li.querySelector('a').href,
         alvo: li.querySelector('a').target }))""")
-    r.eq([x["titulo"] for x in rows], ["Atualização de software melhora o Wi-Fi", "Troca da fonte de alimentação em um lote", "Modelo novo da mesma linha"],
-         "das mais novas para as mais antigas, sem data no fim")
-    r.eq(rows[0]["tipo"], ["Atualização"], "o tipo de cada uma")
-    r.eq(rows[0]["data"], "12 set. 2026", "data por extenso, curta")
-    r.eq(rows[1]["data"], "jul. 2026", "só mês e ano quando é o que se sabe")
-    r.eq(rows[2]["tipo"], ["Modelo novo", "Boato"], "boato vem marcado")
-    r.eq(rows[1]["site"], "noticias.exemplo", "a fonte aparece pelo site")
-    r.check(rows[0]["href"] == "https://fabricante.exemplo/notas" and rows[0]["alvo"] == "_blank", "e abre a página fora do app")
+    r.eq([x["titulo"] for x in rows], ["Modelo novo da mesma linha", "Atualização de software melhora o Wi-Fi", "Troca da fonte de alimentação em um lote"],
+         "só as 3 mais recentes, das mais novas para as mais antigas")
+    r.eq(rows[1]["tipo"], ["Atualização"], "o tipo de cada uma")
+    r.eq(rows[1]["data"], "12 set. 2026", "data por extenso, curta")
+    r.eq(rows[2]["data"], "jul. 2026", "só mês e ano quando é o que se sabe")
+    r.eq(rows[0]["tipo"], ["Modelo novo", "Boato"], "boato vem marcado")
+    r.eq(rows[2]["site"], "noticias.exemplo", "a fonte aparece pelo site")
+    r.check(rows[1]["href"] == "https://fabricante.exemplo/notas" and rows[1]["alvo"] == "_blank", "e abre a página fora do app")
     r.check(await pg.locator(".news .pill.warn", has_text="Recall").count() == 1, "recall em destaque")
     foot = await pg.text_content(".news-foot")
     r.check(foot.startswith("Buscado hoje"), f"quando foi buscado ({foot.strip()})")

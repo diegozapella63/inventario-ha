@@ -172,6 +172,23 @@ class Todos(ServerCase):
     def test_categoria_invalida_nas_configuracoes(self):
         self.assertEqual(self.app.request("PUT", "api/settings", {"news_cats": ["nao-existe"]})[0], 400)
 
+    def test_padrao_so_eletronicos(self):
+        app = self.fresh(mock_ai=True)
+        self.assertEqual(app.ok("GET", "api/news")["cats"], ["eletronicos"])
+
+    def test_limpar_novidades(self):
+        app = self.fresh(mock_ai=True)
+        app.ok("PUT", "api/settings", {"news_cats": ["eletronicos"]})
+        esperar(app, app.ok("POST", "api/news/all", {})["id"], timeout=30)
+        self.assertTrue(app.ok("GET", "api/news")["itens"])
+        rev = app.ok("GET", "api/rev")["rev"]
+        st, _, ov = app.request("DELETE", "api/news")
+        self.assertEqual(st, 200)
+        self.assertEqual((ov["itens"], ov["triagem"], ov["ultima"]), ({}, {}, None))
+        self.assertEqual(app.ok("GET", "api/news")["itens"], {}, "continua limpo")
+        self.assertEqual(app.ok("GET", "api/rev")["rev"], rev, "o inventário não muda")
+        self.assertEqual(app.ok("GET", "api/news")["cats"], ["eletronicos"], "as categorias ficam")
+
     def test_ia_desligada_recusa_conferir_todos(self):
         self.app.ok("PUT", "api/settings", {"ai": False})
         self.assertEqual(self.app.request("POST", "api/news/all", {})[0], 409)

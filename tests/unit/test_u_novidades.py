@@ -37,7 +37,7 @@ class Instrucoes(UnitBase):
 
     def test_pede_os_cinco_assuntos(self):
         p = server.news_prompt("Lâmpada", "")
-        for t in ("firmware", "modelo novo", "lançamentos anunciados", "recalls", "fim de suporte"):
+        for t in ("firmware", "modelo novo", "lançamentos anunciados", "recall ou aviso de segurança", "fim de suporte"):
             self.assertIn(t, p)
 
     def test_pede_fonte_e_nada_inventado(self):
@@ -53,8 +53,12 @@ class Instrucoes(UnitBase):
         self.assertIn('"novidades"', p)
         self.assertIn('{"erro": "sem_busca"}', p)
 
-    def test_limite_de_novidades(self):
-        self.assertIn(f"No máximo {server.NEWS_MAX} novidades", server.news_prompt("Lâmpada", ""))
+    def test_pede_so_as_3_mais_recentes(self):
+        self.assertEqual(server.NEWS_MAX, 3)
+        self.assertIn("Só as 3 novidades mais recentes", server.news_prompt("Lâmpada", ""))
+
+    def test_recall_so_o_oficial_deste_modelo(self):
+        self.assertIn("recall ou aviso de segurança oficial deste modelo", server.news_prompt("Lâmpada", ""))
 
 
 class Conferencia(UnitBase):
@@ -113,9 +117,13 @@ class Conferencia(UnitBase):
         self.assertEqual(server.news_clean(resposta(nova(data=2026)))["novidades"][0]["data"], "2026")
 
     def test_das_mais_novas_para_as_mais_antigas_sem_data_no_fim(self):
+        r = server.news_clean(resposta(nova(titulo="a", data="2025-01"), nova(titulo="b", data=""), nova(titulo="c", data="2026-10-01")))
+        self.assertEqual([n["titulo"] for n in r["novidades"]], ["c", "a", "b"])
+
+    def test_ficam_so_as_3_mais_recentes(self):
         r = server.news_clean(resposta(nova(titulo="a", data="2025-01"), nova(titulo="b", data=""), nova(titulo="c", data="2026-10-01"),
-                                       nova(titulo="d", data="2026")))
-        self.assertEqual([n["titulo"] for n in r["novidades"]], ["c", "d", "a", "b"])
+                                       nova(titulo="d", data="2026"), nova(titulo="e", data="2026-08")))
+        self.assertEqual([n["titulo"] for n in r["novidades"]], ["c", "e", "d"])
 
     def test_repetidas_saem(self):
         r = server.news_clean(resposta(nova(), nova(titulo="ATUALIZAÇÃO DE SOFTWARE".lower()), nova(fonte="https://outro.exemplo/x")))

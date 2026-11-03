@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.21.1"
+VERSION = "1.22.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -2156,7 +2156,7 @@ def web_job(jid: str) -> dict:
 # suporte de um item. Mesmo jeito da busca de fotos (um trabalho em segundo plano, com a mesma IA de busca).
 
 NEWS_KINDS = ("atualizacao", "lancamento", "sucessor", "recall", "suporte", "outro")
-NEWS_MAX = 10
+NEWS_MAX = 3  # só as mais recentes
 MOCK_NEWS = {"produto": "Produto de exemplo", "novidades": [
     {"tipo": "atualizacao", "titulo": "Atualização de firmware com correções de conexão", "resumo": "O fabricante liberou uma versão nova "
      "do firmware, que melhora a reconexão ao Wi-Fi.", "data": "2026-09-12", "fonte": "https://exemplo.com/firmware", "boato": False},
@@ -2179,7 +2179,7 @@ def news_prompt(name: str, details: str) -> str:
         "- atualizações de firmware, software ou aplicativo;",
         "- modelo novo ou sucessor;",
         "- lançamentos anunciados da mesma linha;",
-        "- recalls ou avisos de segurança;",
+        "- recall ou aviso de segurança oficial deste modelo (do fabricante ou de um órgão como o Procon ou a Anatel);",
         "- fim de suporte ou de atualizações.",
         "Cada novidade precisa de uma fonte que apareceu na busca. Não invente: sem fonte, deixe de fora. "
         "Rumor ou vazamento só entra marcado como boato.",
@@ -2187,7 +2187,7 @@ def news_prompt(name: str, details: str) -> str:
         '{"produto": "nome do produto que você identificou", "novidades": [{"tipo": "atualizacao, lancamento, sucessor, recall, suporte ou outro", '
         '"titulo": "frase curta em português", "resumo": "uma ou duas frases em português", "data": "AAAA-MM-DD, AAAA-MM ou vazio", '
         '"fonte": "endereço da página", "boato": false}]}',
-        f"No máximo {NEWS_MAX} novidades, das mais novas para as mais antigas.",
+        f"Só as {NEWS_MAX} novidades mais recentes, da mais nova para a mais antiga.",
         'Se não achar nada, responda {"produto": "...", "novidades": []}.',
         'Se não conseguir usar a busca na web, responda apenas {"erro": "sem_busca"}.',
     ]))
@@ -2278,7 +2278,7 @@ def news_job_start(body: dict) -> dict:
 # pergunta só, sem busca na web; fica guardado até o item mudar) e o app confere um por um, guardando cada resultado.
 NEWS_LOCK = threading.Lock()
 NEWS_FRESH_DAYS = 7  # conferido há menos que isso fica para a próxima
-NEWS_DEFAULT_CATS = ("eletronicos", "cozinha", "utilidades", "saude", "outros")
+NEWS_DEFAULT_CATS = ("eletronicos",)
 NEWS_CAT_WORDS = re.compile(r"eletr|inform|comput|celular|ferrament|clima|ar condicionado|automac|seguranc|camera|game|video|audio|veicul|carro|moto")
 TRIAGE_CHUNK = 60
 MOCK_TRIAGE = re.compile(r"\b(tv|televis|notebook|computador|celular|smartphone|tablet|geladeira|refrigerador|micro-?ondas|maquina|lavadora|"
@@ -2286,7 +2286,7 @@ MOCK_TRIAGE = re.compile(r"\b(tv|televis|notebook|computador|celular|smartphone|
 
 
 def news_cats() -> list[str]:
-    """Categorias em que a IA procura equipamentos: a escolha da casa, ou as que costumam ter (eletrônicos, cozinha…)."""
+    """Categorias em que a IA procura equipamentos: a escolha da casa, ou eletrônicos (e categorias criadas parecidas, como Informática)."""
     cats = STORE.cat_map()
     chosen = STORE.settings.get("news_cats")
     if isinstance(chosen, list):
@@ -2305,7 +2305,22 @@ def news_read() -> dict:
     for k in ("itens", "triagem"):
         if not isinstance(d.get(k), dict):
             d[k] = {}
+    for v in d["itens"].values():  # guardadas antes do limite: ficam só as mais recentes
+        news = v.get("news") if isinstance(v, dict) else None
+        if isinstance(news, dict) and isinstance(news.get("novidades"), list):
+            news["novidades"] = news["novidades"][:NEWS_MAX]
     return d
+
+
+def news_clear() -> dict:
+    """Apaga as novidades guardadas, as escolhas da IA e a última conferência; para a conferência em andamento."""
+    for jid, job in list(WEB_JOBS.items()):
+        if job.get("kind") == "lote":
+            job.update(cancelled=True, cleared=True)
+            WEB_JOBS.pop(jid, None)
+    with NEWS_LOCK:
+        write_json_atomic(NEWS_FILE, {"itens": {}, "triagem": {}})
+    return news_overview()
 
 
 def news_save_result(iid: str, found: dict):
@@ -2388,6 +2403,8 @@ def _news_batch_run(jid: str):
         if todo_tri:
             job["msg"] = "A IA está escolhendo os equipamentos…"
             chosen = ai_triage(todo_tri)
+            if job.get("cleared"):
+                return
             with NEWS_LOCK:
                 d = news_read()
                 for i in todo_tri:
@@ -2418,10 +2435,14 @@ def _news_batch_run(jid: str):
                     raise  # a cota acabou, a IA não busca na web ou a IA foi desligada: as próximas também não vão
                 errors += 1
                 continue
+            if job.get("cleared"):  # Limpar novidades no meio: nada mais é gravado
+                return
             news_save_result(it["id"], res)
             done += 1
             found += 1 if res["novidades"] else 0
         summary = {"selecionados": len(sel), "conferidos": done, "com_novidades": found, "em_dia": len(sel) - len(todo), "erros": errors}
+        if job.get("cleared"):
+            return
         with NEWS_LOCK:
             d = news_read()
             d["ultima"] = {"at": now_iso(), **summary}
@@ -2995,6 +3016,10 @@ def r_news_overview(h, query):
     h.send_json(news_overview())
 
 
+def r_news_clear(h, query):
+    h.send_json(news_clear())
+
+
 def r_news_all(h, query):
     h.read_body()
     h.send_json(news_batch_start(), 202)
@@ -3317,6 +3342,7 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/chat", r_chat),
     ("GET", r"/api/news", r_news_overview),
     ("POST", r"/api/news", r_news_start),
+    ("DELETE", r"/api/news", r_news_clear),
     ("POST", r"/api/news/all", r_news_all),
     ("GET", r"/api/news/([a-f0-9]{16})", r_news_status),
     ("DELETE", r"/api/news/([a-f0-9]{16})", r_news_cancel),

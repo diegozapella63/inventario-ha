@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.22.0
+
+- **Novidades**: vêm só as 3 mais recentes de cada equipamento. As já guardadas também passam a mostrar só as 3.
+- Recall só quando é oficial (do fabricante ou de um órgão como o Procon), para não marcar recall à toa.
+- **Mais > Novidades**: de início, só Eletrônicos. A lista mostra só os itens das categorias marcadas.
+- **Limpar novidades** (com confirmação): apaga o que foi encontrado e as escolhas da IA, para começar do zero.
+
 ## 1.21.1
 
 - Um pedido torto (de um programa que não é o navegador) recebe a resposta de erro completa.

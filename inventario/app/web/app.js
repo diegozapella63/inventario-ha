@@ -900,7 +900,9 @@
       <h2>${secIc("spark")}Novidades</h2>
       <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos equipamentos.</p>
       <ul class="opts"><li><div class="ot"><b>Conferir todos</b><span>A IA escolhe os equipamentos das categorias marcadas, sem móveis nem decoração.</span></div>
-        <div class="oa"><button type="button" class="btn primary" data-act="news-all">${ic("spark")}Conferir novidades</button></div></li></ul>
+        <div class="oa"><button type="button" class="btn primary" data-act="news-all">${ic("spark")}Conferir novidades</button></div></li>
+        <li><div class="ot"><b>Limpar</b><span>Apaga as novidades encontradas e as escolhas da IA.</span></div>
+        <div class="oa"><button type="button" class="btn" data-act="news-clear">${ic("trash")}Limpar novidades</button></div></li></ul>
       <div data-slot="news-job"></div>
     </section>
     <section class="panel" id="p-news-cats">
@@ -937,7 +939,7 @@
     const res = ov.itens || {}, tri = ov.triagem || {};
     const rank = (it) => { const r = res[it.id]; return newsRecall(r) ? 0 : newsCount(r) ? 1 : !r ? 2 : 3; };
     const sortIt = (a, b) => rank(a) - rank(b) || newsCount(res[b.id]) - newsCount(res[a.id]) || a.name.localeCompare(b.name, "pt-BR");
-    const chosen = S.items.filter((it) => tri[it.id] === true || (res[it.id] && tri[it.id] !== false)).sort(sortIt);
+    const chosen = S.items.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || (res[it.id] && tri[it.id] !== false))).sort(sortIt);
     const out = S.items.filter((it) => tri[it.id] === false && ov.cats.includes(it.cat)).sort(sortIt);
     ls.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map((it) => newsRow(it, res[it.id])).join("")}</ul>`
         : `<p class="muted">${ov.pendentes ? "Toque em Conferir novidades: a IA escolhe os equipamentos." : "Nenhum equipamento nas categorias marcadas."}</p>`}
@@ -981,6 +983,18 @@
     if (st.stage === "done") toast(sm.conferidos ? `Conferidos ${int(sm.conferidos)}: ${int(sm.com_novidades || 0)} com novidades.` : "Tudo conferido nos últimos 7 dias.");
     await loadNews();
     if (st.stage === "error") renderNewsJob(st);
+  }
+  async function clearNews() {
+    const ok = await confirmBox({ title: "Limpar as novidades?", body: "O inventário não muda.", ok: "Limpar", danger: true });
+    if (!ok) return;
+    try {
+      newsOv = await API.del("api/news");
+      newsJob = null;
+      clearTimeout(newsTimer);
+      renderNews();
+      renderNewsJob(null);
+      toast("Novidades limpas.");
+    } catch (e) { fail(e); }
   }
   async function cancelNewsAll() {
     if (!newsJob) return;
@@ -3038,6 +3052,7 @@
       case "versions": openVersions(); break;
       case "news-all": startNewsAll(); break;
       case "news-cancel": cancelNewsAll(); break;
+      case "news-clear": clearNews(); break;
       case "news-open": { const it = D.itemById.get(b.dataset.id); if (it) openNews(it); break; }
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }
       case "ai-refresh": { const slot = $('#view [data-slot="ai-panel"]'); if (slot) { slot.innerHTML = `<p class="muted">Verificando…</p>`; renderAiPanel(slot, await aiStatus(true)); } break; }

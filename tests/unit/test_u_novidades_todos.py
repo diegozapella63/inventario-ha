@@ -14,11 +14,11 @@ def novidade(titulo="Firmware novo", tipo="atualizacao"):
 
 
 class Categorias(UnitBase):
-    def test_padrao_sao_as_que_costumam_ter_equipamentos(self):
-        self.assertEqual(server.news_cats(), ["eletronicos", "cozinha", "saude", "utilidades", "outros"])
+    def test_padrao_so_eletronicos(self):
+        self.assertEqual(server.news_cats(), ["eletronicos"])
 
-    def test_padrao_nao_tem_moveis_nem_decoracao(self):
-        for c in ("moveis", "decoracao", "texteis", "plantas", "livros", "vestuario"):
+    def test_padrao_nao_tem_moveis_nem_cozinha(self):
+        for c in ("moveis", "decoracao", "texteis", "plantas", "livros", "vestuario", "cozinha", "utilidades", "outros"):
             self.assertNotIn(c, server.news_cats())
 
     def test_categoria_da_casa_com_nome_de_equipamento_entra_no_padrao(self):
@@ -111,6 +111,7 @@ class Lote(UnitBase):
         p2 = mock.patch.object(server.time, "sleep", lambda s: None)  # a IA simulada não espera
         p2.start()
         self.addCleanup(p2.stop)
+        self.store.settings["news_cats"] = ["eletronicos", "cozinha", "saude", "utilidades", "outros"]  # com cozinha: a IA tem o que deixar de fora
 
     def test_confere_so_o_que_a_ia_escolheu(self):
         job = self.run_batch()
@@ -273,6 +274,81 @@ class Lote(UnitBase):
         u = server.news_read()["ultima"]
         self.assertTrue(u["at"])
         self.assertEqual(u["com_novidades"], u["conferidos"])
+
+
+class Limite(UnitBase):
+    def test_guardadas_antes_do_limite_mostram_so_as_3_mais_recentes(self):
+        velhas = {"produto": "TV", "novidades": [{"tipo": "outro", "titulo": f"n{i}", "data": f"2026-{12 - i:02d}", "fonte": f"https://s.exemplo/{i}"}
+                                               for i in range(10)]}
+        server.write_json_atomic(server.NEWS_FILE, {"itens": {TV: {"at": "2026-11-01T10:00:00-03:00", "news": velhas}}, "triagem": {}})
+        got = server.news_overview()["itens"][TV]["news"]["novidades"]
+        self.assertEqual([n["titulo"] for n in got], ["n0", "n1", "n2"])
+
+    def test_guardada_estranha_nao_quebra(self):
+        server.write_json_atomic(server.NEWS_FILE, {"itens": {TV: {"at": "x", "news": {"novidades": "nada"}}, SOFA: "lixo"}, "triagem": {}})
+        self.assertIn(TV, server.news_overview()["itens"])
+
+
+class Limpar(UnitBase):
+    def guardar(self):
+        server.news_save_result(TV, server.news_clean(novidade()))
+        d = server.news_read()
+        d["triagem"][TV] = {"sig": server.item_sig(self.store.item(TV)), "conferir": True}
+        d["ultima"] = {"at": "2026-11-01T10:00:00-03:00", "conferidos": 1, "com_novidades": 1}
+        server.write_json_atomic(server.NEWS_FILE, d)
+
+    def test_apaga_novidades_escolhas_e_a_ultima(self):
+        self.guardar()
+        ov = server.news_clear()
+        self.assertEqual((ov["itens"], ov["triagem"], ov["ultima"]), ({}, {}, None))
+        self.assertEqual(server.news_overview()["itens"], {})
+
+    def test_nao_muda_o_inventario(self):
+        self.guardar()
+        antes = json.dumps(self.store.public(), sort_keys=True)
+        server.news_clear()
+        self.assertEqual(json.dumps(self.store.public(), sort_keys=True), antes)
+
+    def test_nem_as_categorias_escolhidas(self):
+        self.store.settings["news_cats"] = ["eletronicos", "saude"]
+        server.news_clear()
+        self.assertEqual(server.news_cats(), ["eletronicos", "saude"])
+
+    def test_para_a_conferencia_em_andamento(self):
+        job = {"stage": "busy", "msg": "", "kind": "lote", "at": time.time(), "results": []}
+        server.WEB_JOBS["0123456789abcdef"] = job
+        server.news_clear()
+        self.assertTrue(job["cancelled"])
+        self.assertNotIn("0123456789abcdef", server.WEB_JOBS)
+
+    def test_busca_de_um_item_continua(self):
+        job = {"stage": "busy", "msg": "", "kind": "novidades", "at": time.time(), "results": []}
+        server.WEB_JOBS["0123456789abcdef"] = job
+        server.news_clear()
+        self.assertIn("0123456789abcdef", server.WEB_JOBS)
+
+    def test_conferencia_limpa_no_meio_nao_grava_mais_nada(self):
+        with mock.patch.object(server, "AI_MOCK", True), mock.patch.object(server.time, "sleep", lambda s: None):
+            calls = []
+
+            def fake(name, details, entity):
+                calls.append(name)
+                if len(calls) == 2:
+                    server.news_clear()
+                return novidade()
+            with mock.patch.object(server, "ai_find_news", fake):
+                jid = server.news_batch_start()["id"]
+                job = server.WEB_JOBS[jid]
+                t0 = time.time()
+                while job["stage"] == "busy" and time.time() - t0 < 10:
+                    time.sleep(0.02)
+        self.assertEqual(len(calls), 2, "parou logo depois de limpar")
+        d = server.news_read()
+        self.assertEqual((d["itens"], d.get("ultima")), ({}, None), "nada gravado depois de limpar")
+
+    def test_limpar_sem_nada_guardado(self):
+        ov = server.news_clear()
+        self.assertEqual(ov["itens"], {})
 
 
 class Visao(UnitBase):

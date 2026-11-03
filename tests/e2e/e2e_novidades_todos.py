@@ -1,5 +1,6 @@
-"""Mais > Novidades: conferir todos (a IA escolhe os equipamentos das categorias marcadas, sem móveis), progresso e Parar,
-a lista com recall primeiro, abrir um item, os deixados de fora, categorias gravadas e a aba some com a IA desligada."""
+"""Mais > Novidades: de início só Eletrônicos; conferir todos (a IA escolhe os equipamentos das categorias marcadas, sem móveis),
+progresso e Parar, a lista com recall primeiro, abrir um item, os deixados de fora, categorias gravadas e que filtram a lista,
+Limpar novidades com confirmação e a aba some com a IA desligada."""
 from e2e_lib import OVERFLOW, main
 
 ROWS = "[...document.querySelectorAll('#p-news-list > div > .nlist .nrow')].map(b => [b.querySelector('b').textContent, b.querySelector('.nm').textContent, [...b.querySelectorAll('.pill')].map(p => p.textContent)])"
@@ -16,11 +17,15 @@ async def body(r, p):
     r.eq(await pg.get_attribute("#mt-novidades", "aria-selected"), "true", "abre pelo endereço")
     chips = await pg.evaluate("[...document.querySelectorAll('.chip')].map(c => [c.textContent.trim(), c.querySelector('input').checked])")
     marcadas = [n for n, on in chips if on]
-    r.eq(marcadas, ["Eletrônicos", "Cozinha e bar", "Saúde", "Utilidades", "Outros"], "de início, as categorias que costumam ter equipamentos")
+    r.eq(marcadas, ["Eletrônicos"], "de início, só Eletrônicos")
     r.check(("Móveis", False) in [tuple(c) for c in chips], "Móveis fica desmarcada")
     r.check("Toque em Conferir novidades" in await pg.text_content('[data-slot="news-list"]'), "antes da primeira vez, diz o que fazer")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "antes", full_page=True)
+    for nome in ("Cozinha e bar", "Utilidades"):  # com cozinha e utilidades, a IA tem o que deixar de fora
+        await pg.locator(".chip", has_text=nome).click()
+        await pg.wait_for_timeout(500)
+    r.eq(r.api("GET", "api/settings").get("news_cats"), ["eletronicos", "cozinha", "utilidades"], "marcar mais categorias grava")
 
     # conferir todos
     await pg.click('[data-act="news-all"]')
@@ -74,13 +79,45 @@ async def body(r, p):
     await pg.locator(".toast", has_text="Tudo conferido nos últimos 7 dias").wait_for(timeout=15000)
     r.check(True, "conferir de novo na mesma semana não gasta a IA")
 
-    # categorias gravadas
-    await pg.locator(".chip", has_text="Utilidades").click()
-    await pg.wait_for_timeout(600)
-    r.check("utilidades" not in r.data()["settings"].get("news_cats", ["x"]) if "news_cats" in r.data()["settings"] else True, "desmarcar grava")
+    # categorias gravadas; desmarcar tira os itens da categoria da lista
+    r.check("Geladeira frost free inox" in [x[0] for x in await pg.evaluate(ROWS)], "a geladeira (Cozinha e bar) está na lista")
+    await pg.locator(".chip", has_text="Cozinha e bar").click()
+    await pg.wait_for_timeout(800)
+    r.eq(r.api("GET", "api/settings").get("news_cats"), ["eletronicos", "utilidades"], "desmarcar grava")
+    nomes = [x[0] for x in await pg.evaluate(ROWS)]
+    r.check("Geladeira frost free inox" not in nomes and "Smart TV 55 polegadas" in nomes, "desmarcar Cozinha e bar tira a geladeira da lista; a TV fica")
+    fora = await pg.evaluate("[...document.querySelectorAll('.news-out .nrow b')].map(b => b.textContent)")
+    r.check("Fruteira de madeira" not in fora, "e dos deixados de fora")
     await r.open(pg, "#/mais/novidades", ".chips")
     on = await pg.evaluate("[...document.querySelectorAll('.chip')].filter(c => c.querySelector('input').checked).map(c => c.textContent.trim())")
-    r.check("Utilidades" not in on and "Eletrônicos" in on, f"a escolha fica ({on})")
+    r.eq(on, ["Eletrônicos", "Utilidades"], "a escolha fica")
+
+    # Limpar novidades, com confirmação
+    await pg.wait_for_selector("#p-news-list .nlist .nrow", timeout=8000)
+    clear = pg.locator('[data-act="news-clear"]')
+    r.eq((await clear.text_content()).strip(), "Limpar novidades", "o botão Limpar novidades")
+    w = await pg.evaluate("[...document.querySelectorAll('#p-news .oa .btn')].map(b => Math.round(b.getBoundingClientRect().width))")
+    r.check(len(set(w)) == 1, f"os dois botões com a mesma largura ({w})")
+    await clear.click()
+    await pg.wait_for_selector("dialog.modal [data-r]", timeout=4000)
+    r.eq((await pg.text_content("dialog.modal h2")).strip(), "Limpar as novidades?", "pede confirmação")
+    await r.shot(pg, "limpar")
+    await pg.click('dialog.modal [data-r="0"]')
+    await pg.wait_for_timeout(400)
+    r.check(len(r.api("GET", "api/news")["itens"]) > 0 and await pg.locator("#p-news-list .nlist .nrow").count() > 0, "Cancelar não apaga nada")
+    rev = r.api("GET", "api/rev")["rev"]
+    await clear.click()
+    await pg.wait_for_selector("dialog.modal [data-r]", timeout=4000)
+    await pg.click('dialog.modal [data-r="1"]')
+    await pg.locator(".toast", has_text="Novidades limpas").wait_for(timeout=5000)
+    ov = r.api("GET", "api/news")
+    r.check(ov["itens"] == {} and ov["triagem"] == {} and ov["ultima"] is None, "Limpar apaga as novidades e as escolhas da IA")
+    r.eq(r.api("GET", "api/rev")["rev"], rev, "o inventário não muda")
+    r.check("Toque em Conferir novidades" in await pg.text_content('[data-slot="news-list"]'), "a lista volta ao começo")
+    r.eq((await pg.text_content('[data-slot="news-job"]')).strip(), "", "sem o resumo da última conferência")
+    r.eq(r.api("GET", "api/settings").get("news_cats"), ["eletronicos", "utilidades"], "as categorias ficam")
+    r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
+    await r.shot(pg, "limpo", full_page=True)
     await ctx.close()
 
     # Parar no meio: o que já foi conferido fica

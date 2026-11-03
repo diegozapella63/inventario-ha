@@ -101,10 +101,11 @@ A IA recebe só o nome, o começo dos detalhes e a quantidade do item. O app bai
 
 Na ficha do item, **Novidades** pede à IA de busca (a mesma da busca de fotos, em Mais > Integrações) o que saiu nos últimos 12 meses e o que já foi anunciado para os próximos meses sobre o produto: atualizações de firmware ou software, modelo novo, lançamentos da mesma linha, recalls e fim de suporte.
 
-- Cada novidade vem com o tipo, a data quando se sabe e o site da fonte, que abre fora do app. Sem fonte, não entra. Rumor aparece marcado como **Boato**; recall fica em destaque.
+- Vêm só as 3 novidades mais recentes. Cada uma vem com o tipo, a data quando se sabe e o site da fonte, que abre fora do app. Sem fonte, não entra. Rumor aparece marcado como **Boato**; recall (só o oficial, do fabricante ou de um órgão como o Procon) fica em destaque.
 - A IA só acha o que já foi publicado: lançamento que ainda não foi anunciado não aparece.
-- O resultado fica guardado até fechar o app; **Buscar de novo** pergunta outra vez. Cada busca conta em Uso da IA.
-- **Mais > Novidades** confere todos de uma vez: marque as categorias (de início, as que costumam ter equipamentos, como Eletrônicos e Cozinha e bar) e toque em **Conferir novidades**. A IA escolhe, nessas categorias, os itens em que faz sentido procurar (deixa de fora móveis, panelas, cestos…) e o app confere um por um, mostrando o andamento; **Parar** guarda o que já foi conferido. O que foi conferido nos últimos 7 dias fica para a próxima. A lista mostra recall primeiro, depois os com novidades; tocar num item abre o que foi achado. Os que a IA deixou de fora ficam recolhidos embaixo, e dá para conferir cada um sozinho.
+- O resultado fica guardado; **Buscar de novo** pergunta outra vez. Cada busca conta em Uso da IA.
+- **Mais > Novidades** confere todos de uma vez: marque as categorias (de início, só Eletrônicos) e toque em **Conferir novidades**. A IA escolhe, nessas categorias, os itens em que faz sentido procurar (deixa de fora móveis, panelas, cestos…) e o app confere um por um, mostrando o andamento; **Parar** guarda o que já foi conferido. O que foi conferido nos últimos 7 dias fica para a próxima. A lista mostra recall primeiro, depois os com novidades; tocar num item abre o que foi achado. Os que a IA deixou de fora ficam recolhidos embaixo, e dá para conferir cada um sozinho. A lista mostra só os itens das categorias marcadas.
+- **Limpar novidades** (com confirmação) apaga o que foi encontrado e as escolhas da IA, e para a conferência em andamento. O inventário e as categorias marcadas não mudam.
 - Quanto mais o nome do item tiver marca e modelo, como na nota fiscal, melhor a busca. O app mostra como a IA identificou o produto.
 
 ## Conversar

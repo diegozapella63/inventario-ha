@@ -255,7 +255,7 @@
       return { stage: "done", msg: "", results: j.results.map(({ file, ...r }) => r), product: j.product, example: true };
     }
     // Novidades de todos: a "IA" da prévia escolhe os eletrônicos e aparelhos, e cada um ganha as novidades de exemplo
-    const NEWS_DEF = ["eletronicos", "cozinha", "utilidades", "saude", "outros"];
+    const NEWS_DEF = ["eletronicos"];
     const newsCats = () => (Array.isArray(ST.settings.news_cats) ? ST.settings.news_cats : NEWS_DEF).filter((c) => CATS.has(c));
     const PICK = /\b(tv|televis|notebook|computador|celular|tablet|geladeira|micro-?ondas|maquina|lavadora|lampada|fone|caixa de som|soundbar|cafeteira|ar.condicionado|aspirador|roteador|impressora|monitor|console|camera|forno)/i;
     const plain = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -265,7 +265,7 @@
         { tipo: "atualizacao", titulo: "Atualização de software com correções", resumo: "O fabricante liberou uma versão nova, com correções de estabilidade.", data: `${y}-09`, fonte: "https://exemplo.com/atualizacao", site: "exemplo.com", boato: false },
         { tipo: "sucessor", titulo: "Modelo novo da mesma linha anunciado", resumo: "A geração seguinte chega com melhorias de consumo e conexão.", data: `${y}-10`, fonte: "https://exemplo.com/lancamento", site: "exemplo.com", boato: false },
         { tipo: "lancamento", titulo: "Versão nova pode chegar no próximo ano", resumo: "Sites de tecnologia falam de uma versão nova; o fabricante não confirmou.", data: "", fonte: "https://exemplo.com/rumor", site: "exemplo.com", boato: true },
-      ].sort((a, b) => (b.data || "0").localeCompare(a.data || "0")) };
+      ].sort((a, b) => (b.data || "0").localeCompare(a.data || "0")).slice(0, 3) }; // só as 3 mais recentes, como o servidor
     };
     const newsJobOf = () => [...ST.jobs.entries()].find(([, j]) => j.lote && !j.done);
     const newsTick = (j) => { // a conferência anda com o relógio: um item a cada 0,7 s
@@ -283,6 +283,11 @@
       const lj = newsJobOf();
       return { cats, triagem: { ...tri }, pendentes: d.items.filter((i) => cats.includes(i.cat) && !(i.id in tri)).length,
         itens: { ...ST.news.itens }, ultima: ST.news.ultima, job: lj ? { id: lj[0], stage: "busy", msg: "Conferindo…", progress: null, summary: null } : null };
+    }
+    if (method === "DELETE" && path === "api/news") {
+      for (const [id, j] of ST.jobs) if (j.lote) { j.done = true; ST.jobs.delete(id); }
+      ST.news = { itens: {}, triagem: {}, ultima: null };
+      return handle("GET", "api/news", {});
     }
     if (method === "POST" && path === "api/news/all") {
       aiOff();
@@ -325,13 +330,9 @@
       if (!j) fail("Esta busca terminou. Busque de novo.", 404);
       aiOff();
       if (Date.now() - j.at < 1600) return { stage: "busy", msg: "Procurando novidades…" };
-      ST.news.itens[j.item] = { at: new Date().toISOString(), news: exampleNews(j.name) };
-      const y = new Date().getFullYear();
-      return { stage: "done", msg: "", example: true, news: { produto: j.name, novidades: [
-        { tipo: "atualizacao", titulo: "Atualização de software com correções", resumo: "O fabricante liberou uma versão nova, com correções de estabilidade.", data: `${y}-09`, fonte: "https://exemplo.com/atualizacao", site: "exemplo.com", boato: false },
-        { tipo: "sucessor", titulo: "Modelo novo da mesma linha anunciado", resumo: "A geração seguinte chega com melhorias de consumo e conexão.", data: `${y}-10`, fonte: "https://exemplo.com/lancamento", site: "exemplo.com", boato: false },
-        { tipo: "lancamento", titulo: "Versão nova pode chegar no próximo ano", resumo: "Sites de tecnologia falam de uma versão nova; o fabricante não confirmou.", data: "", fonte: "https://exemplo.com/rumor", site: "exemplo.com", boato: true },
-      ].sort((a, b) => (b.data || "0").localeCompare(a.data || "0")) } };
+      const news = exampleNews(j.name);
+      ST.news.itens[j.item] = { at: new Date().toISOString(), news };
+      return { stage: "done", msg: "", example: true, news };
     }
     if (method === "POST" && path === "api/ai/identify") {
       await wait(2400);
