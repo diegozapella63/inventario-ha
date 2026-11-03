@@ -106,6 +106,77 @@ class Simulado(ServerCase):
         self.assertEqual(self.app.ok("GET", "api/rev")["rev"], rev)
 
 
+class Todos(ServerCase):
+    server_kw = {"mock_ai": True}
+
+    def setUp(self):
+        self.app.ok("PUT", "api/settings", {"ai": True, "news_cats": ["eletronicos", "cozinha"]})
+
+    def test_visao_da_aba(self):
+        ov = self.app.ok("GET", "api/news")
+        self.assertEqual(ov["cats"], ["eletronicos", "cozinha"])
+        self.assertIn("pendentes", ov)
+        self.assertIn("itens", ov)
+
+    def test_visao_com_ia_desligada_recusa(self):
+        self.app.ok("PUT", "api/settings", {"ai": False})
+        self.assertEqual(self.app.request("GET", "api/news")[0], 409)
+
+    def test_conferir_todos_do_comeco_ao_fim(self):
+        app = self.fresh(mock_ai=True)
+        app.ok("PUT", "api/settings", {"news_cats": ["eletronicos"]})
+        st, _, body = app.request("POST", "api/news/all", {})
+        self.assertEqual(st, 202)
+        fim = esperar(app, body["id"], timeout=30)
+        self.assertEqual(fim["stage"], "done")
+        n = sum(1 for i in app.data()["items"] if i["cat"] == "eletronicos")
+        self.assertEqual(fim["summary"]["conferidos"], n, "a IA simulada escolhe todos os eletrônicos")
+        ov = app.ok("GET", "api/news")
+        self.assertEqual(len(ov["itens"]), n)
+        self.assertEqual(ov["ultima"]["conferidos"], n)
+        self.assertEqual(ov["pendentes"], 0)
+
+    def test_corpo_vazio_nao_atrapalha_o_proximo_pedido(self):
+        # o pedido de conferir todos chega com "{}": o corpo não pode sobrar na conexão
+        import http.client
+        conn = http.client.HTTPConnection("127.0.0.1", self.app.port, timeout=10)
+        try:
+            conn.request("POST", "/api/news/all", body=b"{}", headers={"Content-Type": "application/json"})
+            r = conn.getresponse()
+            jid = json.loads(r.read())["id"]
+            conn.request("GET", f"/api/news/{jid}")
+            r2 = conn.getresponse()
+            self.assertEqual(r2.status, 200)
+            r2.read()
+            conn.request("DELETE", f"/api/news/{jid}")
+            conn.getresponse().read()
+        finally:
+            conn.close()
+
+    def test_uma_conferencia_por_vez(self):
+        a = self.app.ok("POST", "api/news/all", {})["id"]
+        b = self.app.ok("POST", "api/news/all", {})["id"]
+        self.assertEqual(a, b)
+        self.app.ok("DELETE", f"api/news/{a}")
+
+    def test_parar_responde_ok(self):
+        jid = self.app.ok("POST", "api/news/all", {})["id"]
+        self.assertEqual(self.app.ok("DELETE", f"api/news/{jid}"), {"ok": True})
+
+    def test_sem_categoria_recusa(self):
+        self.app.ok("PUT", "api/settings", {"news_cats": []})
+        st, _, body = self.app.request("POST", "api/news/all", {})
+        self.assertEqual(st, 400)
+        self.assertIn("categoria", body["error"])
+
+    def test_categoria_invalida_nas_configuracoes(self):
+        self.assertEqual(self.app.request("PUT", "api/settings", {"news_cats": ["nao-existe"]})[0], 400)
+
+    def test_ia_desligada_recusa_conferir_todos(self):
+        self.app.ok("PUT", "api/settings", {"ai": False})
+        self.assertEqual(self.app.request("POST", "api/news/all", {})[0], 409)
+
+
 class SemHomeAssistant(ServerCase):
     def test_sem_acesso_ao_home_assistant_503(self):
         st, _, body = self.app.request("POST", "api/news", {"item": ITEM})

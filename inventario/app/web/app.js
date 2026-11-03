@@ -88,8 +88,9 @@
     ["azul", "Azul"], ["turquesa", "Turquesa"], ["verde", "Verde"], ["kraft", "Kraft"], ["cinza", "Cinza"]];
   const accentOf = () => { const a = LS.get("accent", "amarelo"); return ACCENTS.some(([k]) => k === a) ? a : "amarelo"; };
   // Mais em abas, como no CronologIA e no ResolvIA: #/mais (Dados, com Exportar no alto), #/mais/integracoes e #/mais/aparencia.
-  const MORE_TABS = [["dados", "Dados", "archive"], ["integracoes", "Integrações", "plug"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
-  const moreTab = (t) => (MORE_TABS.some(([k]) => k === t) ? t : MORE_TABS[0][0]);
+  const ALL_TABS = [["dados", "Dados", "archive"], ["novidades", "Novidades", "spark"], ["integracoes", "Integrações", "plug"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
+  const moreTabs = () => ALL_TABS.filter(([k]) => k !== "novidades" || aiOn()); // Novidades usa a IA: com ela desligada, a aba some
+  const moreTab = (t) => (moreTabs().some(([k]) => k === t) ? t : ALL_TABS[0][0]);
   function applyAccent(a) {
     if (a === "amarelo") delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = a;
@@ -278,8 +279,26 @@
     });
     dlg.addEventListener("pointerdown", (e) => { entry.downOnBackdrop = e.target === dlg; });
     dlg.addEventListener("click", (e) => { if (e.target === dlg && entry.downOnBackdrop) requestClose(entry); });
+    entry.opener = document.activeElement && document.activeElement !== document.body ? document.activeElement : null; // antes de abrir: depois, o foco já está na janela
+    entry.openerKey = openerKey(entry.opener);
     dlg.showModal();
+    showToasts(); // os avisos (com o Desfazer) vão para a janela nova, à mão
     return entry;
+  }
+  // a janela fecha depois de a tela ser redesenhada: o foco volta para o botão equivalente, não para o começo da página
+  function openerKey(el) {
+    if (!el || !el.dataset || !el.dataset.act) return "";
+    const q = (k) => (el.dataset[k] ? `[data-${k}="${CSS.escape(el.dataset[k])}"]` : "");
+    return `[data-act="${CSS.escape(el.dataset.act)}"]${q("room")}${q("id")}`;
+  }
+  function focusBack(entry) {
+    setTimeout(() => {
+      if (stack.length) return;
+      const a = document.activeElement;
+      if (a && a !== document.body && a.isConnected) return;
+      const el = entry.opener && entry.opener.isConnected ? entry.opener : entry.openerKey ? $(entry.openerKey) : null;
+      if (el) try { el.focus({ preventScroll: true }); } catch { /* ok */ }
+    }, 0);
   }
   async function requestClose(entry, { force = false } = {}) {
     if (entry.closing || !stack.includes(entry)) return;
@@ -306,6 +325,7 @@
     try { entry.dlg.close(); } catch { /* já fechado */ }
     entry.dlg.remove();
     entry.onClose && entry.onClose();
+    focusBack(entry);
   }
   let ignorePops = 0;
   window.addEventListener("popstate", () => {
@@ -366,7 +386,7 @@
       }
       case "report": return "#/relatorio";
       case "rooms": return "#/comodos";
-      case "data": { const t = moreTab(r.tab); return t === MORE_TABS[0][0] ? "#/mais" : `#/mais/${t}`; }
+      case "data": { const t = moreTab(r.tab); return t === ALL_TABS[0][0] ? "#/mais" : `#/mais/${t}`; }
       default: return "#/";
     }
   }
@@ -443,6 +463,7 @@
     el.innerHTML = `
       <div class="mh-row">
         <p class="eyebrow"><span class="brand-word">${APP_ICON}Inventar<span>IA</span></span>${first ? `<span class="hello"><span class="sep"> · </span>Olá, ${esc(first)}</span>` : ""}</p>
+        ${aiOn() ? `<button type="button" class="chat-top" data-act="chat" aria-label="Conversar com a IA" title="Conversar">${ic("chat")}</button>` : ""}
         ${voiceReady() ? `<button type="button" class="mic-top" data-act="voice" aria-label="Falar: adicionar itens falando" title="Falar">${ic("mic")}</button>` : ""}
         ${r.name !== "room" ? `<div class="top-actions">
           ${aiOn() ? `<button type="button" class="btn wide" data-act="catalog">${ic("scan")}Catalogar foto com IA</button>` : ""}
@@ -669,10 +690,10 @@
     <div class="strip" role="list" aria-label="Fotos do cômodo">
       ${photos.map((p, i) => {
         const n = (D.photoItems.get(p.file) || []).length;
-        return `<button type="button" class="ph" role="listitem" data-act="viewer-room" data-room="${esc(id)}" data-i="${i}" aria-label="${esc(p.label || `Foto ${i + 1}`)}">
-          <img src="${esc(src(p.file))}" alt="" loading="lazy" decoding="async">${n ? `<span class="cnt">${plural(n, "item", "itens")}</span>` : ""}</button>`;
+        return `<div class="phi" role="listitem" aria-label="${esc(p.label || `Foto ${i + 1}`)}"><button type="button" class="ph" data-act="viewer-room" data-room="${esc(id)}" data-i="${i}" aria-label="${esc(p.label || `Foto ${i + 1}`)}">
+          <img src="${esc(src(p.file))}" alt="" loading="lazy" decoding="async">${n ? `<span class="cnt">${plural(n, "item", "itens")}</span>` : ""}</button></div>`;
       }).join("")}
-      <button type="button" class="ph add" data-act="room-photo-add" data-room="${esc(id)}">${ic("plus")}Foto do cômodo</button>
+      <div class="phi" role="listitem"><button type="button" class="ph add" data-act="room-photo-add" data-room="${esc(id)}">${ic("plus")}Foto do cômodo</button></div>
     </div>
     ${list.length > 6 ? `<div class="filterbar"><label class="search">${ic("search")}<span class="sr">Filtrar itens deste cômodo</span>
       <input class="input" type="search" data-input="room-filter" data-room="${esc(id)}" placeholder="Filtrar neste cômodo" value="${esc(roomFilter[id] || "")}" autocomplete="off"></label></div>` : ""}
@@ -729,8 +750,8 @@
   function searchItems(q) {
     const toks = tokens(q.q || "");
     let list = S.items;
-    if (q.room) list = list.filter((i) => i.room === q.room);
-    if (q.cat) list = list.filter((i) => (CAT[i.cat] ? i.cat : "outros") === q.cat);
+    if (q.room && D.roomById.has(q.room)) list = list.filter((i) => i.room === q.room); // cômodo de um link antigo: vale Todos, como diz a seleção
+    if (q.cat && CAT[q.cat]) list = list.filter((i) => (CAT[i.cat] ? i.cat : "outros") === q.cat);
     if (toks.length) list = list.filter((i) => matches(i, toks));
     const ord = q.ord || (toks.length ? "rel" : "val");
     const score = (it) => {
@@ -770,6 +791,8 @@
     rendered = hashOf(base);
     searchLimit = 120;
     $("#results").innerHTML = resultsHtml(base.q);
+    const ordSel = $('#view [data-input="search-ord"]');
+    if (ordSel) ordSel.value = base.q.ord || (base.q.q ? "rel" : "val"); // digitar passa para Mais relevantes: a seleção diz o mesmo
     const clear = $('#view [data-act="search-clear"]');
     if (clear) clear.hidden = !base.q.q;
   }
@@ -849,11 +872,11 @@
   const SWATCH = `<svg viewBox="-5 -5 40 30" aria-hidden="true"><path class="sw-ring" d="${SW_TAG}"/><path class="sw-gap" d="${SW_TAG}"/><path class="sw-fill" d="${SW_TAG}M9.7 10a2.7 2.7 0 1 0-5.4 0a2.7 2.7 0 1 0 5.4 0z"/><path class="sw-check" d="m14.6 10.3 3.2 3.2 6.5-6.9"/></svg>`;
   function viewData() {
     const tab = moreTab(base.tab);
-    const label = MORE_TABS.find(([k]) => k === tab)[1];
-    const bodies = { dados: () => moreExport() + moreData(), integracoes: moreIntegrations, aparencia: moreLook, opcoes: moreOptions };
+    const label = ALL_TABS.find(([k]) => k === tab)[1];
+    const bodies = { dados: () => moreExport() + moreData(), novidades: moreNews, integracoes: moreIntegrations, aparencia: moreLook, opcoes: moreOptions };
     return `<div class="more-anchor" aria-hidden="true"></div>
     <div class="more-tabs" role="tablist" aria-label="Seções de Mais">
-      ${MORE_TABS.map(([k, l, i]) => `<button type="button" role="tab" id="mt-${k}" aria-controls="mp" aria-selected="${k === tab}" tabindex="${k === tab ? 0 : -1}" data-act="more-tab" data-tab="${k}">${ic(i, "sm")}<span>${l}</span></button>`).join("")}
+      ${moreTabs().map(([k, l, i]) => `<button type="button" role="tab" id="mt-${k}" aria-controls="mp" aria-selected="${k === tab}" tabindex="${k === tab ? 0 : -1}" data-act="more-tab" data-tab="${k}">${ic(i, "sm")}<span>${l}</span></button>`).join("")}
     </div>
     <div class="more-panel" id="mp" role="tabpanel" aria-labelledby="mt-${tab}" aria-label="${label}">${bodies[tab]()}</div>
     <p class="foot"><b>InventarIA</b><br>${PREVIEW ? "Prévia do app do Home Assistant: as alterações ficam só nesta tela." : `v${esc(S.version)}, com os dados em arquivos abertos (JSON e JPG) dentro do Home Assistant.`}</p>`;
@@ -870,6 +893,105 @@
       </ul>
     </section>`;
   }
+  // -- novidades de todos os equipamentos: a IA escolhe, nas categorias marcadas, o que faz sentido conferir
+  function moreNews() {
+    return `
+    <section class="panel" id="p-news">
+      <h2>${secIc("spark")}Novidades</h2>
+      <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos equipamentos.</p>
+      <ul class="opts"><li><div class="ot"><b>Conferir todos</b><span>A IA escolhe os equipamentos das categorias marcadas, sem móveis nem decoração.</span></div>
+        <div class="oa"><button type="button" class="btn primary" data-act="news-all">${ic("spark")}Conferir novidades</button></div></li></ul>
+      <div data-slot="news-job"></div>
+    </section>
+    <section class="panel" id="p-news-cats">
+      <h2>${secIc("grid")}Categorias</h2>
+      <div data-slot="news-cats"><p class="muted">Carregando…</p></div>
+    </section>
+    <section class="panel" id="p-news-list">
+      <h2>${secIc("tag")}Equipamentos</h2>
+      <div data-slot="news-list"><p class="muted">Carregando…</p></div>
+    </section>`;
+  }
+  let newsOv = null, newsJob = null, newsTimer = null;
+  async function loadNews() {
+    try { newsOv = await API.get("api/news"); }
+    catch (e) { const sl = $('#view [data-slot="news-list"]'); if (sl) sl.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+    renderNews();
+    if (newsOv.job && !newsJob) { newsJob = newsOv.job.id; pollNewsAll(); }
+  }
+  const newsCount = (r) => ((r && r.news && r.news.novidades) || []).length;
+  const newsRecall = (r) => ((r && r.news && r.news.novidades) || []).some((x) => x.tipo === "recall");
+  function newsRow(it, r) {
+    const room = D.roomById.get(it.room);
+    const n = newsCount(r);
+    const st = !r ? "Ainda não conferido" : `${n ? plural(n, "novidade", "novidades") : "Nada novo"} · ${whenShort(r.at)}`;
+    return `<li><button type="button" class="nrow" data-act="news-open" data-id="${esc(it.id)}">
+        <span class="nb"><b>${esc(it.name)}</b><span class="nm">${esc(room ? room.name : "")} · ${esc(st)}</span></span>
+        ${newsRecall(r) ? `<span class="pill warn">Recall</span>` : n ? `<span class="pill">${int(n)}</span>` : ""}${ic("chev", "sm")}</button></li>`;
+  }
+  function renderNews() {
+    const ov = newsOv;
+    const cs = $('#view [data-slot="news-cats"]'), ls = $('#view [data-slot="news-list"]');
+    if (!ov || !cs || !ls) return;
+    cs.innerHTML = `<div class="chips" role="group" aria-label="Categorias para conferir">${CATS.map(([k, v]) => `<label class="chip"><input type="checkbox" value="${esc(k)}" data-input="news-cat"${ov.cats.includes(k) ? " checked" : ""}><span>${esc(v)}</span></label>`).join("")}</div>`;
+    const res = ov.itens || {}, tri = ov.triagem || {};
+    const rank = (it) => { const r = res[it.id]; return newsRecall(r) ? 0 : newsCount(r) ? 1 : !r ? 2 : 3; };
+    const sortIt = (a, b) => rank(a) - rank(b) || newsCount(res[b.id]) - newsCount(res[a.id]) || a.name.localeCompare(b.name, "pt-BR");
+    const chosen = S.items.filter((it) => tri[it.id] === true || (res[it.id] && tri[it.id] !== false)).sort(sortIt);
+    const out = S.items.filter((it) => tri[it.id] === false && ov.cats.includes(it.cat)).sort(sortIt);
+    ls.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map((it) => newsRow(it, res[it.id])).join("")}</ul>`
+        : `<p class="muted">${ov.pendentes ? "Toque em Conferir novidades: a IA escolhe os equipamentos." : "Nenhum equipamento nas categorias marcadas."}</p>`}
+      ${out.length ? `<details class="news-out"><summary>${ic("chev", "sm")}Deixados de fora pela IA (${int(out.length)})</summary><ul class="nlist">${out.map((it) => newsRow(it, res[it.id])).join("")}</ul></details>` : ""}`;
+    if (!newsJob) renderNewsJob(null);
+  }
+  function renderNewsJob(st) {
+    const js = $('#view [data-slot="news-job"]');
+    if (!js) return;
+    const btn = $('#view [data-act="news-all"]');
+    if (btn) btn.disabled = !!(st && st.stage === "busy");
+    if (st && st.stage === "busy") {
+      const p = st.progress || {}, pct = p.total ? Math.round((p.feitos / p.total) * 100) : 0;
+      js.innerHTML = `<div class="njob" aria-live="polite"><p><span class="spin"></span><span>${esc(st.msg || "Conferindo…")}</span></p>
+        <div class="prog" role="progressbar" aria-label="Progresso" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>
+        <button type="button" class="btn sm" data-act="news-cancel">Parar</button></div>`;
+      return;
+    }
+    if (st && st.stage === "error") { js.innerHTML = `<p class="formerr njob">${esc(st.msg)}</p>`; return; }
+    const u = newsOv && newsOv.ultima;
+    js.innerHTML = u ? `<p class="muted njob">Conferido ${esc(whenShort(u.at))}: ${u.conferidos ? `${int(u.com_novidades)} de ${int(u.conferidos)} com novidades` : "nada para conferir agora"}.</p>` : "";
+  }
+  async function startNewsAll() {
+    try { const r = await API.post("api/news/all", {}); newsJob = r.id; renderNewsJob({ stage: "busy", msg: "Começando…" }); pollNewsAll(); }
+    catch (e) { fail(e); }
+  }
+  async function pollNewsAll() {
+    clearTimeout(newsTimer);
+    if (!newsJob) return;
+    let st;
+    try { st = await API.get(`api/news/${newsJob}`); }
+    catch (e) { newsJob = null; renderNewsJob({ stage: "error", msg: e.message }); return; }
+    if (st.stage === "busy") {
+      renderNewsJob(st);
+      if ($('#view [data-slot="news-job"]')) newsTimer = setTimeout(pollNewsAll, 1500); else newsJob = null; // saiu da aba: segue no servidor
+      return;
+    }
+    API.del(`api/news/${newsJob}`).catch(() => {});
+    newsJob = null;
+    const sm = st.summary || {};
+    if (st.stage === "done") toast(sm.conferidos ? `Conferidos ${int(sm.conferidos)}: ${int(sm.com_novidades || 0)} com novidades.` : "Tudo conferido nos últimos 7 dias.");
+    await loadNews();
+    if (st.stage === "error") renderNewsJob(st);
+  }
+  async function cancelNewsAll() {
+    if (!newsJob) return;
+    const j = newsJob;
+    newsJob = null;
+    clearTimeout(newsTimer);
+    await API.del(`api/news/${j}`).catch(() => {});
+    toast("Conferência parada. O que já foi conferido ficou salvo.");
+    loadNews();
+  }
+
   // chave liga/desliga (um checkbox com papel de switch), rotulada pelo título da linha
   const switchHtml = (key, on, labelledby) => `<label class="switch"><input type="checkbox" role="switch" data-input="${key}" aria-labelledby="${labelledby}"${on ? " checked" : ""}><span class="track" aria-hidden="true"></span></label>`;
   function moreIntegrations() {
@@ -903,7 +1025,7 @@
 
   // -- uso da IA (igual ao do EconomIA): hoje, 7 dias e o mês, gráfico por dia e as últimas chamadas
   let usageData = null, usageSel = null;
-  const USAGE_KIND = { foto: "Preencher com IA", catalogo: "Catalogar foto", busca: "Buscar foto na internet", fala: "Falar", novidades: "Novidades" };
+  const USAGE_KIND = { foto: "Preencher com IA", catalogo: "Catalogar foto", busca: "Buscar foto na internet", fala: "Falar", novidades: "Novidades", triagem: "Escolher equipamentos", chat: "Conversar" };
   const USAGE_RES = { ok: "", cota: "cota excedida", formato: "fora do formato", sem_busca: "sem busca na web", erro: "erro" };
   const WEEKDAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1091,6 +1213,15 @@
     renderView(false);
     window.scrollTo(0, Math.min(y, natural));
     $(`#mt-${k}`)?.focus({ preventScroll: true });
+    showMoreTab();
+  }
+  // a barra de abas rola para o lado no celular estreito: a aba escolhida fica à vista
+  function showMoreTab() {
+    const bar = $("#view .more-tabs"), on = bar && $('[aria-selected="true"]', bar);
+    if (!on) return;
+    const l = on.offsetLeft, r = l + on.offsetWidth;
+    if (l < bar.scrollLeft) bar.scrollLeft = l - 8;
+    else if (r > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = r - bar.clientWidth + 8;
   }
 
   async function loadDataPanels() {
@@ -1109,6 +1240,8 @@
       }
     } catch (e) { bslot.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
     if (aslot) { const st = await aiStatus(true); if (document.contains(aslot)) renderAiPanel(aslot, st); }
+    showMoreTab();
+    if (tab === "novidades") loadNews();
     const vslot = tab === "integracoes" ? $('#view [data-slot="voice-panel"]') : null;
     if (vslot) { renderVoicePanel(vslot); }
     const uslot = tab === "integracoes" ? $('#view [data-slot="usage"]') : null;
@@ -1133,7 +1266,7 @@
       case "no_vision": return st.selected ? "A IA escolhida não aceita fotos. Escolha outra." : "As IAs configuradas não aceitam fotos.";
       case "error": return st.message || "Não deu para consultar o Home Assistant.";
       case "preview": return "Na prévia, a leitura é simulada.";
-      default: { const e = (st.entities || []).find((x) => x.id === st.selected); return e ? `Usando ${e.name}.` : "Usando a IA preferida do Home Assistant."; }
+      default: { const e = (st.entities || []).find((x) => x.id === st.selected); return (e ? `Usando ${e.name}.` : "Usando a IA preferida do Home Assistant.") + (st.missing ? " A escolhida saiu do Home Assistant." : ""); }
     }
   }
   const AI_STEPS = `<ol class="steps">
@@ -1168,6 +1301,7 @@
   async function needAi() {
     const st = await aiStatus();
     if (st.ready) return true;
+    if (st.reason === "error") { toast(aiReasonText(st), { error: true }); return false; } // a IA está configurada, o Home Assistant só não respondeu
     const entry = openDialog({
       cls: "modal narrow", label: "Leitura por IA",
       html: `<div class="dlg"><div class="dlg-h"><h2>Leitura por IA</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
@@ -1323,7 +1457,7 @@
     entry.onFiles = onFiles;
     el.addEventListener("dragover", (e) => { if ([...e.dataTransfer.types].includes("Files")) { e.preventDefault(); el.classList.add("over"); } });
     el.addEventListener("dragleave", (e) => { if (!el.contains(e.relatedTarget)) el.classList.remove("over"); });
-    el.addEventListener("drop", (e) => { e.preventDefault(); el.classList.remove("over"); const f = imageFiles(e.dataTransfer.files); if (f.length) onFiles(f); });
+    el.addEventListener("drop", (e) => { e.preventDefault(); el.classList.remove("over"); const f = [...(e.dataTransfer.files || [])]; if (f.length) onFiles(f); });
   }
   document.addEventListener("paste", (e) => {
     const top = topEntry();
@@ -1340,7 +1474,7 @@
       const entry = openDialog({
         cls: "modal wide", label: "Fotos do cômodo",
         html: `<div class="dlg"><div class="dlg-h"><h2>Fotos de ${esc(r?.name || "cômodo")}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
-          <div class="dlg-b">${photos.length ? `<div class="pick">${photos.map((p) => `<label><input type="checkbox" value="${esc(p.file)}"><img src="${esc(src(p.file))}" alt="" loading="lazy">${p.label ? `<span>${esc(p.label)}</span>` : ""}</label>`).join("")}</div>`
+          <div class="dlg-b">${photos.length ? `<div class="pick">${photos.map((p, k) => `<label><input type="checkbox" value="${esc(p.file)}" aria-label="${esc(p.label || `Foto ${k + 1}`)}"><img src="${esc(src(p.file))}" alt="" loading="lazy">${p.label ? `<span>${esc(p.label)}</span>` : ""}</label>`).join("")}</div>`
             : `<p class="muted" style="margin:0">Este cômodo ainda não tem outras fotos.</p>`}</div>
           <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok disabled>Usar fotos</button></div></div>`,
         onClose: () => resolve(chosen),
@@ -1418,7 +1552,7 @@
         product = st.product || null;
         if (st.stage === "error") {
           // sem fotos, os dados que a IA achou ainda servem
-          show(`<p class="formerr">${esc(st.msg)}</p>${/busca na web/.test(st.msg) ? `<p class="muted wtip">A IA de busca fica em Mais, Integrações.</p>` : ""}${prodCard(false)}`);
+          show(`<p class="formerr">${esc(st.msg)}</p>${prodCard(false)}`);
           return;
         }
         results = st.results || [];
@@ -1478,7 +1612,6 @@
     if (!y) return "";
     return day ? `${+day} ${MES[+m - 1]} ${y}` : m ? `${MES[+m - 1]} ${y}` : y;
   };
-  const newsCache = new Map();
   function openNews(it) {
     if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return; }
     let job = null, timer = null, gen = 0;
@@ -1492,7 +1625,7 @@
     });
     const dlg = entry.dlg, slot = $('[data-slot="news"]', dlg), again = $("[data-again]", dlg);
     const show = (html, done) => { slot.innerHTML = html; again.hidden = !done; };
-    const error = (m) => show(`<p class="formerr">${esc(m)}</p>${/busca na web/.test(m) ? `<p class="muted wtip">A IA de busca fica em Mais, Integrações.</p>` : ""}`, true);
+    const error = (m) => show(`<p class="formerr">${esc(m)}</p>`, true);
     function render(r) {
       const list = (r.news && r.news.novidades) || [], prod = (r.news && r.news.produto) || "";
       show(`${list.length ? `<ul class="news">${list.map((x) => `<li>
@@ -1511,8 +1644,8 @@
       API.del(`api/news/${job}`).catch(() => {});
       job = null;
       if (st.stage === "error") { error(st.msg); return; }
-      const r = { news: st.news, at: new Date().toISOString(), example: !!st.example, name: it.name };
-      newsCache.set(it.id, r);
+      const r = { news: st.news, at: new Date().toISOString(), example: !!st.example };
+      if (newsOv) { newsOv.itens = { ...(newsOv.itens || {}), [it.id]: r }; renderNews(); }
       render(r);
     }
     async function start() {
@@ -1531,8 +1664,11 @@
       if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
       if (e.target.closest("[data-again]")) start();
     });
-    const cached = newsCache.get(it.id);
-    if (cached && cached.name === it.name) render(cached); else start();
+    const my0 = gen;
+    // o que já foi conferido fica guardado no servidor: abre na hora, sem chamar a IA
+    const saved = newsOv && newsOv.itens && newsOv.itens[it.id];
+    if (saved) render(saved);
+    else API.get("api/news").then((ov) => { newsOv = ov; const r = (ov.itens || {})[it.id]; if (my0 === gen) { if (r) render(r); else start(); } }).catch(() => { if (my0 === gen) start(); });
   }
   async function addWebPhoto(it) {
     // na ficha, o item já existe: os dados da IA só completam o que está vazio (nunca o nome nem um valor já dado)
@@ -1594,6 +1730,7 @@
     const lbl = (icon, text) => `${ic(icon)}<span class="lbl">${text}</span>`;
     return `<div class="dlg">
       <div class="dlg-h"><span class="mt">${esc(tagOf(it))}</span><h2 class="sr">${esc(it.name)}</h2><span style="flex:1"></span>
+        ${aiOn() ? `<button type="button" class="btn ghost icon" data-act="chat" aria-label="Conversar sobre este item" title="Conversar">${ic("chat")}</button>` : ""}
         <button type="button" class="btn ghost icon" data-act="sheet-close" aria-label="Fechar">${ic("close")}</button></div>
       <div class="dlg-b">
         <div data-slot="gallery">${(it.photos || []).length ? galleryHtml(it, 0)
@@ -1672,7 +1809,13 @@
       try {
         const res = await API.put(`api/items/${encodeURIComponent(it.id)}`, { room: form.room.value, zone, _base: it.updatedAt });
         setRev(res.rev); upsertItem(res.item); derive(); requestClose(entry, { force: true }); refreshAll();
-        toast(res.item.room !== it.room ? `Movido para ${D.roomById.get(res.item.room)?.name}` : "Zona atualizada");
+        const before = { room: it.room, zone: it.zone || "", seq: it.seq };
+        toast(res.item.room !== it.room ? `Movido para ${D.roomById.get(res.item.room)?.name}` : "Zona atualizada", { action: "Desfazer", onAction: async () => {
+          try {
+            const back = await API.put(`api/items/${encodeURIComponent(it.id)}`, { ...before, _base: res.item.updatedAt });
+            setRev(back.rev); upsertItem(back.item); derive(); refreshAll();
+          } catch (er) { fail(er); }
+        } });
       } catch (e) { fail(e); }
     };
     form.addEventListener("submit", (e) => { e.preventDefault(); go(); });
@@ -1794,14 +1937,22 @@
       if (t.name === "value") fieldErr("value", "");
     });
     form.addEventListener("change", (e) => {
-      if (e.target.name === "room") { F.room = e.target.value; renderZones(); renderPhotos(); }
+      if (e.target.name === "room") {
+        F.room = e.target.value;
+        if (form.zone && !item) { F.zone = LS.get("lastZone:" + F.room, "") || ""; form.zone.value = F.zone; } // a zona lembrada é a deste cômodo
+        renderZones(); renderPhotos();
+      }
       if (e.target.name === "value" && !Number.isNaN(parseMoney(F.value))) { F.value = moneyInput(parseMoney(F.value)); e.target.value = F.value; }
     });
     form.addEventListener("submit", (e) => { e.preventDefault(); save(false); });
     form.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("[data-ed-hint]")) { e.preventDefault(); runAi(); } });
 
     const addFiles = async (files) => {
-      files = imageFiles(files).slice(0, 12 - F.photos.length);
+      const all = [...(files || [])], imgs = imageFiles(all);
+      if (imgs.length < all.length) toast(all.length - imgs.length === 1 && all.length === 1 ? "Escolha um arquivo de imagem (JPG ou PNG)." : `${plural(all.length - imgs.length, "arquivo não é imagem e ficou", "arquivos não são imagens e ficaram")} de fora.`, { error: true });
+      const room = 12 - F.photos.length - F.uploading;
+      if (imgs.length > room) toast(room > 0 ? `Até 12 fotos por item: ${plural(imgs.length - room, "ficou de fora", "ficaram de fora")}.` : "O item já tem 12 fotos, o máximo.", { error: true });
+      files = imgs.slice(0, Math.max(0, room));
       if (!files.length) return;
       F.uploading += files.length; F.dirty = true; renderPhotos();
       for (const file of files) {
@@ -1821,7 +1972,9 @@
         const r = (res.items || [])[0];
         if (!r) throw new Error("A IA não reconheceu um item nesta foto. Tente outra foto ou escreva uma dica.");
         const prev = { name: F.name, details: F.details, cat: F.cat, qty: F.qty, value: F.value, zone: F.zone, source: F.source };
-        Object.assign(F, { name: r.name, details: r.details || F.details, cat: r.cat || F.cat, qty: r.qty || F.qty, value: r.value ? moneyInput(r.value) : F.value, zone: zonesOn() ? F.zone || r.zone || "" : F.zone, source: "ia", dirty: true });
+        const emptyVal = !String(F.value || "").trim() || parseMoney(F.value) === 0;
+        Object.assign(F, { name: r.name || F.name, details: F.details.trim() ? F.details : r.details || "", cat: F.cat && F.cat !== "outros" ? F.cat : r.cat || F.cat,
+          qty: qtyClean(F.qty) !== "1" ? F.qty : r.qty || F.qty, value: emptyVal && r.value ? moneyInput(r.value) : F.value, zone: zonesOn() ? F.zone || r.zone || "" : F.zone, source: "ia", dirty: true });
         fill();
         toast(res.example ? "Exemplo simulado da prévia: no Home Assistant, a IA lê a foto de verdade." : "Campos preenchidos pela IA. Confira antes de salvar.", { action: "Desfazer", onAction: () => { Object.assign(F, prev); if (document.contains(dlg)) fill(); } });
       } catch (e) { fail(e); }
@@ -2053,6 +2206,110 @@
     return out;
   }
 
+  // ------------------------------------------------------------------ conversar com a IA (ao lado do microfone, em qualquer tela)
+  // A conversa fica até fechar o app. Cada pergunta leva onde a pessoa está (o item, o cômodo, a busca) e o servidor junta os dados.
+  const CHAT = { msgs: [], busy: false };
+  function chatScreen() {
+    const sc = { view: base.name };
+    if (sheet && sheet.itemId && D.itemById.has(sheet.itemId)) { sc.view = "item"; sc.item = sheet.itemId; }
+    else if (base.name === "room") sc.room = base.id;
+    else if (base.name === "search") sc.q = (base.q && base.q.q) || "";
+    else if (base.name === "data") sc.tab = moreTab(base.tab);
+    return sc;
+  }
+  function chatAbout(sc) {
+    if (sc.item) return D.itemById.get(sc.item)?.name || "este item";
+    if (sc.room) return D.roomById.get(sc.room)?.name || "este cômodo";
+    if (sc.view === "search") return sc.q ? `a busca “${sc.q}”` : "a busca";
+    if (sc.view === "data" && sc.tab === "novidades") return "as novidades dos equipamentos";
+    return { home: "o inventário", rooms: "os cômodos", report: "o relatório", data: "o inventário" }[sc.view] || "o inventário";
+  }
+  function chatIdeas(sc) {
+    if (sc.item) return ["Vale a pena pôr no seguro?", "Como conservar melhor?", "Quanto vale hoje, mais ou menos?"];
+    if (sc.room) return ["Qual o item mais caro daqui?", "O que falta cadastrar num cômodo assim?"];
+    if (sc.view === "data" && sc.tab === "novidades") return ["Alguma novidade importante?", "Tem algum recall?"];
+    return ["Quais cômodos valem mais?", "O que eu devia pôr no seguro?", "Quantos eletrônicos eu tenho?"];
+  }
+  function chatHtml(t) { // texto simples da IA: negrito, listas, links e quebras de linha
+    return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(https?:\/\/[^\s<]+[^\s<.,;:)!?])/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
+      .split(/\n/).map((l) => (/^\s*[-*•]\s+/.test(l) ? `<span class="li">${l.replace(/^\s*[-*•]\s+/, "")}</span>` : l)).join("<br>").replace(/<br>(<span class="li">)/g, "$1").replace(/(<\/span>)<br>/g, "$1");
+  }
+  function openChat() {
+    if (!aiOn()) return;
+    const sc = chatScreen();
+    let rec = null;
+    const entry = openDialog({
+      cls: "sheet chat", label: "Conversar",
+      html: `<div class="dlg"><div class="dlg-h"><h2>Conversar</h2>
+          <button type="button" class="btn ghost sm" data-new${CHAT.msgs.length ? "" : " hidden"}>Nova conversa</button>
+          <button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <div class="dlg-b chat-b" data-slot="msgs" aria-live="polite"></div>
+        <form class="chat-f" data-chat>
+          <p class="chat-ctx">Sobre ${esc(chatAbout(sc))}</p>
+          <div class="chat-in"><textarea class="input" name="t" rows="1" maxlength="2000" placeholder="Pergunte o que quiser" aria-label="Mensagem" enterkeyhint="send"></textarea>
+            ${voiceReady() ? `<button type="button" class="btn icon" data-mic aria-label="Falar a pergunta">${ic("mic")}</button>` : ""}
+            <button type="submit" class="btn primary icon" aria-label="Enviar">${ic("send")}</button></div>
+        </form></div>`,
+      onClose: () => { if (rec) { rec.cancel(); rec = null; } },
+    });
+    const dlg = entry.dlg, box = $('[data-slot="msgs"]', dlg), form = $("[data-chat]", dlg), ta = form.t, mic = $("[data-mic]", dlg);
+    const render = () => {
+      box.innerHTML = CHAT.msgs.length ? CHAT.msgs.map((m) => `<div class="msg ${m.role === "user" ? "me" : m.error ? "ai err" : "ai"}">${m.role === "user" ? esc(m.text) : chatHtml(m.text)}${m.error ? `<button type="button" class="btn sm" data-retry>${ic("refresh", "sm")}Tentar de novo</button>` : ""}</div>`).join("")
+          + (CHAT.busy ? `<div class="msg ai typing" aria-label="A IA está escrevendo"><i></i><i></i><i></i></div>` : "")
+        : `<div class="chat-empty"><div class="chat-ideas">${chatIdeas(sc).map((t) => `<button type="button" class="chip" data-idea>${esc(t)}</button>`).join("")}</div></div>`;
+      $("[data-new]", dlg).hidden = !CHAT.msgs.length;
+      box.scrollTop = box.scrollHeight;
+    };
+    const grow = () => { ta.style.height = "auto"; ta.style.height = `${Math.min(140, ta.scrollHeight + 2)}px`; };
+    async function ask() {
+      CHAT.busy = true; render();
+      try {
+        const res = await API.post("api/chat", { messages: CHAT.msgs.filter((m) => !m.error).slice(-12).map(({ role, text }) => ({ role, text })), screen: sc });
+        CHAT.msgs.push({ role: "assistant", text: res.reply || "" });
+      } catch (e) { CHAT.msgs.push({ role: "assistant", text: e.message, error: true }); }
+      CHAT.busy = false;
+      if (document.contains(dlg)) { render(); ta.focus(); }
+    }
+    function send(text) {
+      const t = String(text || "").trim();
+      if (!t || CHAT.busy) return;
+      CHAT.msgs = CHAT.msgs.filter((m) => !m.error);
+      CHAT.msgs.push({ role: "user", text: t });
+      ta.value = ""; grow();
+      ask();
+    }
+    async function dictate() {
+      if (rec) { // segunda vez: para, transcreve e manda
+        const r = rec; rec = null;
+        const pcm = r.stop();
+        mic.classList.remove("on"); mic.innerHTML = ic("mic");
+        if (pcm.length < VOICE_RATE * 0.4) { toast("Não ouvi nada. Toque no microfone e fale."); return; }
+        mic.disabled = true;
+        try { const res = await API.raw("POST", "api/voice", pcm); send(res.text || ""); }
+        catch (e) { fail(e); }
+        finally { mic.disabled = false; }
+        return;
+      }
+      const r = new (window.INV_RECORDER || Recorder)(() => {});
+      try { await r.start(); } catch (err) { r.cancel(); toast(micError(err), { error: true }); return; }
+      rec = r;
+      mic.classList.add("on"); mic.innerHTML = ic("check"); mic.setAttribute("aria-label", "Pronto: enviar o que falei");
+    }
+    form.addEventListener("submit", (e) => { e.preventDefault(); send(ta.value); });
+    ta.addEventListener("input", grow);
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(ta.value); } });
+    dlg.addEventListener("click", (e) => {
+      if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
+      if (e.target.closest("[data-new]")) { CHAT.msgs = []; render(); ta.focus(); return; }
+      const idea = e.target.closest("[data-idea]");
+      if (idea) { send(idea.textContent); return; }
+      if (e.target.closest("[data-retry]")) { CHAT.msgs = CHAT.msgs.filter((m) => !m.error); render(); ask(); return; }
+      if (e.target.closest("[data-mic]")) dictate();
+    });
+    render();
+    if (!COARSE) setTimeout(() => ta.focus(), 60);
+  }
+
   // ------------------------------------------------------------------ catalogar foto com IA (vários itens); também a revisão do Falar
   async function openCatalog({ room = null, file = null, voice = false } = {}) {
     if (!D.rooms.length) { toast("Crie um cômodo antes."); openRoomNew(); return; }
@@ -2155,7 +2412,7 @@
     }
     const setFile = async (files) => {
       const f = imageFiles(files)[0];
-      if (!f) return;
+      if (!f) { if ((files || []).length) toast("Escolha um arquivo de imagem (JPG ou PNG).", { error: true }); return; }
       C.uploading = true; C.file = null; C.step = "photo"; render();
       try { C.file = await uploadPhoto(f); C.step = "ready"; } catch (e) { fail(e); }
       finally { C.uploading = false; if (document.contains(dlg)) render(); }
@@ -2349,7 +2606,8 @@
         if (!ok) return;
         const room = D.roomById.get(roomId);
         const list = (room.photos || []).filter((_, k) => k !== i);
-        const r = await saveRoomPhotos({ photos: list, cover: Math.min(room.cover || 0, Math.max(0, list.length - 1)) });
+        const cover = room.cover || 0;
+        const r = await saveRoomPhotos({ photos: list, cover: Math.min(i < cover ? cover - 1 : i === cover ? 0 : cover, Math.max(0, list.length - 1)) });
         if (r) { photos = r.photos; if (!photos.length) { requestClose(entry, { force: true }); return; } i = Math.min(i, photos.length - 1); render(); toast("Foto retirada do cômodo"); }
       }
     });
@@ -2401,6 +2659,7 @@
     let touched = false;
     form.name.addEventListener("input", () => { if (!touched) form.code.value = suggestCode(form.name.value); });
     form.code.addEventListener("input", () => { touched = true; });
+    form.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("input") && !e.isComposing) { e.preventDefault(); go(); } }); // Enter cria, em qualquer campo
     setTimeout(() => form.name.focus(), 50);
     const go = async () => {
       const name = form.name.value.trim();
@@ -2451,7 +2710,10 @@
           <button type="button" class="btn sm" data-re="upload">${ic("upload", "sm")}Enviar fotos</button></div>`;
     };
     const addFiles = async (files) => {
-      files = imageFiles(files);
+      const all = [...(files || [])];
+      files = imageFiles(all);
+      if (files.length < all.length) toast(all.length === 1 ? "Escolha um arquivo de imagem (JPG ou PNG)." : `${plural(all.length - files.length, "arquivo não é imagem e ficou", "arquivos não são imagens e ficaram")} de fora.`, { error: true });
+      if (!files.length) return;
       R.uploading += files.length; R.dirty = true; renderPhotos();
       for (const f of files) {
         try { R.photos.push({ file: await uploadPhoto(f), label: "" }); } catch (e) { fail(e); }
@@ -2774,11 +3036,15 @@
       case "backup-create": createBackup(b); break;
       case "backup-restore": restoreBackup(b.dataset.name); break;
       case "versions": openVersions(); break;
+      case "news-all": startNewsAll(); break;
+      case "news-cancel": cancelNewsAll(); break;
+      case "news-open": { const it = D.itemById.get(b.dataset.id); if (it) openNews(it); break; }
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }
       case "ai-refresh": { const slot = $('#view [data-slot="ai-panel"]'); if (slot) { slot.innerHTML = `<p class="muted">Verificando…</p>`; renderAiPanel(slot, await aiStatus(true)); } break; }
       case "theme": setTheme(b.dataset.theme); break;
       case "more-tab": setMoreTab(b.dataset.tab); break;
       case "voice": openCatalog({ room: base.name === "room" ? base.id : null, voice: true }); break;
+      case "chat": openChat(); break;
       case "voice-refresh": { const slot = $('#view [data-slot="voice-panel"]'); if (slot) slot.innerHTML = `<p class="muted">Verificando…</p>`; await loadVoice(true); if (slot && document.contains(slot)) renderVoicePanel(slot); break; }
       case "print": if (window.INV_PRINT) toast(window.INV_PRINT); else window.print(); break;
       case "retry": boot(); break;
@@ -2829,6 +3095,11 @@
         toast(S.voice && S.voice.ready ? `Falar agora transcreve com ${S.voice.name || S.voice.engine}` : "Fala para texto atualizada");
       } catch (er) { fail(er); t.disabled = false; }
     }
+    else if (k === "news-cat") {
+      const cats = $$('[data-input="news-cat"]:checked').map((x) => x.value);
+      try { await API.put("api/settings", { news_cats: cats }); S.settings.news_cats = cats; loadNews(); }
+      catch (er) { t.checked = !t.checked; fail(er); }
+    }
     else if (k === "ai-search") {
       try { await API.put("api/settings", { ai_search: t.value }); S.settings.ai_search = t.value; aiCache.at = 0; toast("IA para buscar fotos atualizada"); }
       catch (er) { fail(er); }
@@ -2852,7 +3123,7 @@
     const tabBtn = e.target.closest && e.target.closest('.more-tabs [role="tab"]');
     if (tabBtn && ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
       e.preventDefault();
-      const keys = MORE_TABS.map(([k]) => k), i = keys.indexOf(tabBtn.dataset.tab);
+      const keys = moreTabs().map(([k]) => k), i = keys.indexOf(tabBtn.dataset.tab);
       const j = e.key === "Home" ? 0 : e.key === "End" ? keys.length - 1 : (i + (e.key === "ArrowRight" ? 1 : -1) + keys.length) % keys.length;
       setMoreTab(keys[j]);
       return;
@@ -2940,7 +3211,7 @@
   // os testes da tela (tests/e2e) pedem as funções puras para conferir as contas e as regras
   if (typeof window.INV_TEST === "function") {
     window.INV_TEST({ esc, norm, numTxt, money, moneyR, plural, pct, pctFmt, ago, parseMoney, moneyInput, qtyClean, qtyNum, qtyLabel, qtyShort,
-      splitSpoken, wordsToNumbers, newsDate, webFills, siteOf, suggestCode, hl, applyCats, cats: () => CATS });
+      splitSpoken, wordsToNumbers, newsDate, chatHtml, webFills, siteOf, suggestCode, hl, applyCats, cats: () => CATS });
   }
   if (!PREVIEW || window.INV_BACKEND) boot();
   else window.INV_BOOT = boot;

@@ -94,6 +94,16 @@ async def body(r, p):
     r.check(await pg.locator(".news li").count() == 3 and "Exemplo simulado da prévia" in await pg.text_content(".news-foot"), "Novidades: exemplo marcado como simulado")
     await pg.click("dialog.modal .dlg-h [data-x]")
 
+    # Conversar: resposta de exemplo
+    await pg.goto(r.base + "#/")
+    await pg.wait_for_selector(".chat-top", timeout=8000)
+    await pg.click(".chat-top")
+    await pg.fill("dialog.chat textarea", "quanto vale a sala?")
+    await pg.press("dialog.chat textarea", "Enter")
+    await pg.wait_for_selector("dialog.chat .msg.ai:not(.typing)", timeout=10000)
+    r.check("Exemplo da prévia" in await pg.text_content("dialog.chat .msg.ai"), "Conversar: resposta de exemplo")
+    await pg.click("dialog.chat [data-x]")
+
     # Mais: as abas abrem; exportar explica que é prévia
     await pg.goto(r.base + "#/mais")
     await pg.wait_for_selector(".more-tabs")

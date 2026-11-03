@@ -276,7 +276,8 @@ button.side-room:hover { color: var(--ink); }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 480px) { .dlg-f .btn .lbl { display: none; } .dlg-f .btn:has(.lbl) { padding: 0 12px; } .hide-narrow { display: none; } }
 html { scrollbar-gutter: stable; }
-html:has(dialog[open]) { overflow: hidden; }
+/* com uma janela aberta, a página não rola e a barra de rolagem sai: a ficha encosta na borda e o fundo escurece inteiro */
+html:has(dialog[open]) { overflow: hidden; scrollbar-gutter: auto; }
 
 .field { display: grid; gap: 6px; min-width: 0; align-content: start; }
 .field > label, .field > .lbl { font-size: 14px; font-weight: 500; color: var(--ink-2); }
@@ -324,15 +325,44 @@ html:has(dialog[open]) { overflow: hidden; }
 [data-slot="ai-panel"] > .opts:first-child { border-top: 0; }
 
 /* Falar (como no ResolvIA e no CronologIA): o microfone no alto da tela, à direita */
-.mic-top {
+.mic-top, .chat-top {
   flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -8px -4px -8px 0; padding: 0;
   border: 0; border-radius: 50%; background: var(--tag-soft); color: var(--tag-text); cursor: pointer;
 }
-.mic-top .ic { width: 22px; height: 22px; }
-.mic-top:hover { filter: brightness(1.04); }
-.mic-top:active { transform: scale(0.94); }
-.mic-top:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-@media (min-width: 700px) { .mic-top { margin: 0; } }
+.mic-top .ic, .chat-top .ic { width: 22px; height: 22px; }
+.mic-top:hover, .chat-top:hover { filter: brightness(1.04); }
+.mic-top:active, .chat-top:active { transform: scale(0.94); }
+.mic-top:focus-visible, .chat-top:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (min-width: 700px) { .mic-top, .chat-top { margin: 0; } }
+.chat-top + .mic-top { margin-left: -4px; }
+/* Conversar: a janela da conversa (à direita no computador, a tela toda no celular) */
+dialog.sheet.chat { width: min(480px, 100vw); }
+.chat .dlg-h h2 { flex: 1; }
+.chat-b { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.msg { max-width: 86%; padding: 10px 13px; border-radius: 14px; font-size: 15.5px; line-height: 1.45; overflow-wrap: anywhere; }
+.msg.me { align-self: flex-end; background: var(--tag); color: var(--tag-ink); border-bottom-right-radius: 4px; white-space: pre-wrap; }
+.msg.ai { align-self: flex-start; background: var(--surface-2); color: var(--ink); border-bottom-left-radius: 4px; }
+.msg.ai .li { display: block; padding-left: 14px; position: relative; }
+.msg.ai .li::before { content: ""; position: absolute; left: 3px; top: 0.6em; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.6; }
+.msg.ai a { color: var(--ink-2); }
+.msg.err { background: var(--danger-soft); color: var(--ink); display: grid; gap: 8px; }
+.msg.err .btn { justify-self: start; }
+.msg.typing { display: flex; gap: 4px; padding: 14px; }
+.msg.typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: typing 1s infinite ease-in-out; }
+.msg.typing i:nth-child(2) { animation-delay: 0.15s; }
+.msg.typing i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing { 0%, 60%, 100% { opacity: 0.3; transform: none; } 30% { opacity: 1; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .msg.typing i { animation: none; } }
+.chat-empty { margin: auto 0 0; display: grid; gap: 12px; color: var(--muted); }
+.chat-empty p { margin: 0; }
+.chat-ideas { display: flex; flex-wrap: wrap; gap: 8px; }
+button.chip { font: inherit; font-size: 14.5px; text-align: left; }
+.chat-f { flex: none; display: grid; gap: 6px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
+.chat-ctx { margin: 0 4px; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-in { display: flex; align-items: flex-end; gap: 8px; }
+.chat-in .input { flex: 1; min-width: 0; height: 44px; min-height: 44px; max-height: 140px; padding: 10px 12px; resize: none; line-height: 1.4; }
+.chat-in .btn.icon { flex: none; width: 44px; height: 44px; }
+.chat-in [data-mic].on { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
 /* o microfone grande, com um anel que acompanha a voz */
 .voice { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 8px 8px; text-align: center; }
 /* o disco na cor do app fica por cima do anel (o anel é opaco no tema escuro) */
@@ -548,14 +578,15 @@ div.croom:hover { background: none; }
 .rhead-val .big { font: 700 clamp(30px, 5vw, 40px)/1 var(--font-c); white-space: nowrap; }
 .rhead-val .small { color: var(--muted); font-size: 14px; margin-top: 6px; }
 /* fotos do cômodo, no Editar cômodo: foto, legenda e botões; no celular estreito, os botões descem para baixo da legenda */
-.opts > li.rph { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto auto auto; grid-template-areas: "img lbl cov up rm"; align-items: center; gap: 8px; }
+.opts > li.rph { display: grid; grid-template-columns: 64px minmax(0, 1fr) 9.5em auto auto; grid-template-areas: "img lbl cov up rm"; align-items: center; gap: 8px; }
 .rph img { grid-area: img; width: 64px; height: 48px; object-fit: cover; border-radius: 6px; }
 .rph .input { grid-area: lbl; height: 38px; min-width: 0; }
-.rph [data-re="cover"] { grid-area: cov; justify-self: start; }
+.rph [data-re="cover"] { grid-area: cov; justify-self: stretch; } /* Capa e Usar como capa do mesmo tamanho: as legendas ficam alinhadas */
 .rph [data-re="up"] { grid-area: up; }
 .rph [data-re="rm"] { grid-area: rm; }
 @media (max-width: 480px) {
   .opts > li.rph { grid-template-columns: 64px minmax(0, 1fr) auto auto; grid-template-areas: "img lbl lbl lbl" "cov cov up rm"; }
+  .rph [data-re="cover"] { justify-self: start; width: 9.5em; }
 }
 .rhead-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .rhead-actions .lbl-short { display: none; }
@@ -573,6 +604,7 @@ div.croom:hover { background: none; }
 }
 @media (max-width: 560px) { .rhead-val { text-align: left; width: 100%; display: flex; align-items: baseline; gap: 12px; } .rhead-val .small { margin: 0; } .rhead h1 { margin-top: 8px; } .rhead-top { gap: 10px; } }
 
+.strip .phi { display: flex; flex: 0 0 auto; scroll-snap-align: start; }
 .strip { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 10px; scroll-snap-type: x proximity; scrollbar-width: thin; margin: 0 -2px; }
 .strip .ph {
   position: relative; flex: 0 0 auto; width: 150px; aspect-ratio: 4 / 3; padding: 0; border: 0; border-radius: var(--r-sm);
@@ -670,7 +702,7 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .ival { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 .ival .big { font: 700 40px/1 var(--font-c); }
 .ival .unit { color: var(--muted); font-size: 15px; }
-.idet { margin: 16px 0 0; font-size: 16px; line-height: 1.55; color: var(--ink-2); white-space: pre-wrap; }
+.idet { margin: 16px 0 0; font-size: 16px; line-height: 1.55; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
 .inote { margin: 14px 0 0; padding: 10px 12px; border-radius: var(--r); background: var(--tag-soft); color: var(--ink); font-size: 15px; display: flex; gap: 10px; }
 .props { margin: 22px 0 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); border-top: 1px solid var(--line); }
 .props dt, .props dd { padding: 11px 0; border-bottom: 1px solid var(--line); margin: 0; }
@@ -713,6 +745,26 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .wimg[aria-checked="true"] { border-color: var(--tag-edge); box-shadow: 0 0 0 3px var(--tag); color: var(--ink); font-weight: 600; }
 .wtip { font-size: 13px; margin: 12px 0 0; }
 /* novidades do produto */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { position: relative; display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border: 1px solid var(--line-2); border-radius: 20px; background: var(--surface); color: var(--ink-2); font-size: 15px; cursor: pointer; }
+.chip input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.chip:has(input:checked) { background: var(--tag-soft); border-color: var(--tag-edge); color: var(--ink); font-weight: 600; }
+.chip:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.njob { display: grid; gap: 10px; margin: 14px 0 0; }
+.njob p { display: flex; align-items: center; gap: 10px; margin: 0; }
+.njob .btn { justify-self: start; }
+.nlist { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.nrow { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 64px; padding: 10px 4px; border: 0; border-bottom: 1px solid var(--line); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.nrow:hover { background: var(--surface-2); }
+.nrow .nb { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.nrow b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrow .nm { color: var(--muted); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrow .ic { color: var(--muted); flex: none; }
+.news-out { margin-top: 18px; }
+.news-out summary { display: inline-flex; align-items: center; gap: 6px; padding: 6px 0; color: var(--ink-2); font-weight: 600; cursor: pointer; list-style: none; }
+.news-out summary::-webkit-details-marker { display: none; }
+.news-out[open] summary .ic { transform: rotate(90deg); }
+.news-out .nlist { margin-top: 8px; }
 .inews { margin-top: 18px; }
 .news-of { margin: 0 0 4px; font-weight: 600; }
 .news { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
@@ -770,8 +822,8 @@ details.more-fields .form { margin-top: 14px; }
 .found .money::before { left: 10px; font-size: 14px; }
 .found .fdet { font-size: 14px; color: var(--muted); margin: 0; }
 .found .fflag { font-size: 13px; color: var(--ink-2); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.found .pill, .news .pill { display: inline-block; max-width: 100%; min-height: 22px; padding: 3px 9px; border-radius: 11px; font-size: 12px; line-height: 1.35; font-weight: 600; overflow-wrap: anywhere; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
-.found .pill.warn, .news .pill.warn { background: var(--warn-soft); border-color: var(--warn-edge); color: var(--ink); }
+.found .pill, .news .pill, .nrow .pill { display: inline-block; max-width: 100%; min-height: 22px; padding: 3px 9px; border-radius: 11px; font-size: 12px; line-height: 1.35; font-weight: 600; overflow-wrap: anywhere; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
+.found .pill.warn, .news .pill.warn, .nrow .pill.warn { background: var(--warn-soft); border-color: var(--warn-edge); color: var(--ink); }
 @media (max-width: 560px) {
   .found .frow { grid-template-columns: 1fr 1fr; }
   .found .frow .fname { grid-column: span 2; }
@@ -819,18 +871,18 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
   position: sticky; top: 0; z-index: 15; display: flex; gap: 4px; padding: 4px; margin: 20px 0 4px;
   border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); box-shadow: 0 0 0 8px var(--paper);
 }
+/* cinco abas: cada uma com o nome inteiro; em celular estreito a barra rola para o lado (como no ResolvIA) */
+.more-tabs { overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+.more-tabs::-webkit-scrollbar { display: none; }
 .more-tabs button {
-  flex: 1 1 auto; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 6px;
+  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 6px;
   border: 0; border-radius: 10px; background: none; color: var(--muted); font: 500 15px/1 var(--font); white-space: nowrap;
 }
-.more-tabs button span { overflow: hidden; text-overflow: ellipsis; }
 .more-tabs button:hover { color: var(--ink); }
 .more-tabs button[aria-selected="true"] { background: var(--seg-on); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14); }
 .more-tabs .ic { width: 17px; height: 17px; }
 @media (max-width: 600px) { .more-tabs .ic { display: none; } }
-/* quatro abas: a largura acompanha o nome, e em celular estreito a letra diminui um pouco para nenhuma cortar */
-@media (max-width: 400px) { .more-tabs button { font-size: 14px; padding: 0 3px; } }
-@media (max-width: 370px) { .more-tabs { gap: 2px; } .more-tabs button { font-size: 13px; padding: 0 2px; } }
+@media (max-width: 440px) { .more-tabs { gap: 1px; } .more-tabs button { font-size: 13px; padding: 0 4px; } } /* como no ResolvIA: as cinco cabem a partir de uns 360 px */
 /* o conteúdo da aba ocupa ao menos a tela: trocar de aba com a página rolada mantém as abas no alto, sem pular */
 .more-panel { min-height: calc(100vh - 120px); min-height: calc(100dvh - 120px); }
 .more-panel > .panel:first-child { margin-top: 22px; }

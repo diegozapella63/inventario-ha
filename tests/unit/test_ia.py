@@ -148,7 +148,7 @@ class LerFoto(UnitBase):
         e = self.assertApiError(502, S.ai_identify, {"file": "sala-1.jpg"})
         self.assertIn("raw", e.extra)
         ha.ai_error = (500, "429 RESOURCE_EXHAUSTED quota")
-        self.assertApiError(502, S.ai_identify, {"file": "sala-1.jpg"}, msg_part="recusou")
+        self.assertApiError(502, S.ai_identify, {"file": "sala-1.jpg"}, msg_part="cota da IA acabou")
         ha.ai_reply = lambda k, p: None
         ha.ai_error = None
         self.assertApiError(502, S.ai_identify, {"file": "sala-1.jpg"}, msg_part="não devolveu")

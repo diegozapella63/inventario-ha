@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.21.0
+
+- **Conversar**: o balão ao lado do microfone abre uma conversa com a IA, em qualquer tela, sobre o que está nela ou outro assunto. A IA vê o item, o cômodo, a busca ou as novidades da tela e o resumo da casa, mas não muda o inventário. Dá para falar a pergunta.
+- **Mais > Novidades**: confere as novidades de todos os equipamentos de uma vez. A IA escolhe, nas categorias marcadas, o que faz sentido (sem móveis, panelas, cestos), e o app confere um por um, com o andamento e Parar. O resultado fica guardado; o que já foi conferido na semana fica para a próxima.
+- Cota da IA acabada e Home Assistant sem resposta: avisos em português, sem mandar configurar a IA de novo.
+- Preencher com IA não troca mais os detalhes, o valor e a quantidade que você já escreveu.
+- Tirar uma foto do cômodo que vem antes da capa não troca mais a capa.
+- No Editar cômodo, as legendas das fotos ficam alinhadas.
+- Abas de Mais com o nome inteiro; no celular estreito, a barra rola para o lado.
+- Com uma janela aberta no computador, o fundo escurece inteiro, sem a faixa clara da barra de rolagem.
+- Desfazer depois de excluir volta o item com as datas de antes (o GerencIA não recomeça a depreciação). Renomear ou mover um item também não muda a data do valor.
+- O número de um item excluído não volta para outro item (o ResolvIA liga tarefas pelo número).
+- O app abre mesmo com o inventário, uma versão anterior ou as configurações corrompidos (volta à última versão boa e guarda o arquivo estragado).
+- Backups com espaço ou parênteses no nome (como "inventario (1).zip") aparecem na lista; backup com foto estragada dá aviso claro.
+- Nome de usuário com acento aparece certo.
+- **Mover** agora tem Desfazer: volta o cômodo, a zona e o código.
+- Arquivo que não é foto e a 13ª foto de um item avisam, em vez de sumir calados.
+- Busca: ao digitar, a ordem mostrada passa para Mais relevantes, como a lista; um link com cômodo que não existe mostra todos.
+- Cadastro: trocar o cômodo não leva a zona do cômodo anterior.
+- Detalhes compridos (um endereço, por exemplo) quebram a linha na ficha.
+- Teclado: Enter cria o cômodo; depois de salvar, o foco volta para Adicionar item. Melhor leitura de tela nas fotos do cômodo.
+- Vários erros raros que davam "Erro interno" agora dão um aviso claro.
+
 ## 1.20.0
 
 - **Novidades** na ficha do item: a IA de busca procura o que saiu nos últimos 12 meses e o que já foi anunciado sobre o produto (atualizações de firmware ou software, modelo novo, lançamentos, recalls e fim de suporte), cada um com a data e o site da fonte. Boato vem marcado; recall fica em destaque. Com a IA desligada, o botão some.

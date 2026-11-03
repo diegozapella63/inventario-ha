@@ -1,6 +1,6 @@
 # Instruções para quem for mexer neste repositório (pessoas ou IAs)
 
-InventarIA é um app (add-on) do Home Assistant para o inventário da casa: cômodos (com zonas), itens com fotos, valores e categorias, relatório para seguro, leitura de fotos por IA, fotos da internet, novidades dos produtos e Falar. Faz parte de uma família de apps do mesmo dono, que conversam entre si pelo Home Assistant:
+InventarIA é um app (add-on) do Home Assistant para o inventário da casa: cômodos (com zonas), itens com fotos, valores e categorias, relatório para seguro, leitura de fotos por IA, fotos da internet, novidades dos produtos, Conversar (chat com a IA) e Falar. Faz parte de uma família de apps do mesmo dono, que conversam entre si pelo Home Assistant:
 
 | App | Repositório | O que é |
 |---|---|---|

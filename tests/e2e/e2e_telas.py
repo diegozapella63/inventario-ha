@@ -3,7 +3,7 @@ nada passa da largura (o Chrome do celular encolheria a página), as janelas cab
 de baixo visíveis, e nenhum texto de botão fica cortado."""
 from e2e_lib import main
 
-PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/mais/integracoes", "#/mais/aparencia", "#/mais/opcoes"]
+PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/mais/novidades", "#/mais/integracoes", "#/mais/aparencia", "#/mais/opcoes"]
 
 # (nome, endereço, como abrir, seletor que aparece)
 DIALOGS = [
@@ -21,6 +21,7 @@ DIALOGS = [
     ("foto-comodo", "#/c/sala", ".strip .ph", "dialog.viewer"),
     ("excluir-item", "#/i/var-001", 'dialog.sheet [data-act="item-delete"]', '[data-r="1"]'),
     ("novidades", "#/i/sal-007", 'dialog.sheet [data-act="item-news"]', ".news li"),
+    ("conversar", "#/c/sala", ".chat-top", "dialog.chat .chat-ideas"),
 ]
 
 CHECK = """() => {

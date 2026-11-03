@@ -24,11 +24,11 @@ async def body(r, p):
     ctx, pg = await r.page(b, "cel", "dark", accent="azul")
     await r.open(pg, "#/mais", ".more-tabs")
     tabs = await pg.evaluate("[...document.querySelectorAll('.more-tabs [role=tab]')].map(t => t.textContent.trim())")
-    r.eq(tabs, ["Dados", "Integrações", "Aparência", "Opções"], "as quatro abas")
+    r.eq(tabs, ["Dados", "Novidades", "Integrações", "Aparência", "Opções"], "as cinco abas")
     r.eq((await pg.text_content(".page-sub")).replace("\xa0", " "), "38 itens e 9 fotos no inventário", "resumo no alto")
     foot = await pg.text_content(".foot")
     r.check(f"v{r.data()['version']}" in foot, f"rodapé com a versão ({foot.strip()[:40]})")
-    for k in ("integracoes", "aparencia", "opcoes", "dados"):
+    for k in ("novidades", "integracoes", "aparencia", "opcoes", "dados"):
         await tab(pg, k)
         r.check(pg.url.endswith("#/mais" if k == "dados" else f"#/mais/{k}"), f"aba {k} no endereço")
         sizes = await pg.evaluate(BUTTONS)
@@ -42,14 +42,14 @@ async def body(r, p):
     await pg.focus("#mt-dados")
     await pg.keyboard.press("ArrowRight")
     await pg.wait_for_timeout(400)
-    r.check(pg.url.endswith("#/mais/integracoes"), "seta para a direita troca de aba")
+    r.check(pg.url.endswith("#/mais/novidades"), "seta para a direita troca de aba")
     await tab(pg, "dados")
     await ctx.close()
 
     # celular estreito: tudo cabe
     ctx, pg = await r.page(b, "estreito", "light")
     await r.open(pg, "#/mais", ".more-tabs")
-    for k in ("dados", "integracoes", "aparencia", "opcoes"):
+    for k in ("dados", "novidades", "integracoes", "aparencia", "opcoes"):
         await tab(pg, k)
         sizes = await pg.evaluate(BUTTONS)
         r.check(all(h == 44 for _, h, _ in sizes) and len({w for w, _, _ in sizes}) <= 1, f"[estreito {k}] botões iguais ({sorted({(w, h) for w, h, _ in sizes})})")

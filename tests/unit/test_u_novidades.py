@@ -22,8 +22,8 @@ def nova(**kw):
 
 class Instrucoes(UnitBase):
     def test_traz_o_nome_e_os_detalhes(self):
-        p = server.news_prompt("Lâmpada Wi-Fi L530", "Colorida, rosca E27")
-        self.assertIn("Produto: Lâmpada Wi-Fi L530", p)
+        p = server.news_prompt("Lâmpada Wi-Fi Exemplo LX-10", "Colorida, rosca E27")
+        self.assertIn("Produto: Lâmpada Wi-Fi Exemplo LX-10", p)
         self.assertIn("Detalhes: Colorida, rosca E27", p)
 
     def test_sem_detalhes_nao_tem_a_linha(self):
@@ -64,7 +64,7 @@ class Conferencia(UnitBase):
                                            "data": "2026-09-12", "fonte": "https://fabricante.exemplo/notas", "site": "fabricante.exemplo", "boato": False}])
 
     def test_produto_identificado(self):
-        self.assertEqual(server.news_clean(resposta(produto="  Tapo   L530E ")).get("produto"), "Tapo L530E")
+        self.assertEqual(server.news_clean(resposta(produto="  Exemplo   LX-10 ")).get("produto"), "Exemplo LX-10")
 
     def test_sem_fonte_sai(self):
         self.assertEqual(server.news_clean(resposta(nova(fonte="")))["novidades"], [])

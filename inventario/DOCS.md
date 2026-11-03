@@ -21,7 +21,8 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - **Adicionar item**: nome, detalhes, cômodo, categoria, quantidade e valor total (e a zona, se estiver ligada). Dá para tirar foto pelo celular, enviar da galeria, arrastar uma foto ou colar com Ctrl+V. No app do Home Assistant para Android, **Tirar foto** abre a câmera do próprio InventarIA, como no ResolvIA (na primeira vez, o celular pede permissão). "Salvar e adicionar outro" mantém o cômodo para cadastrar em sequência.
 - **Catalogar foto com IA**: tire uma foto de uma prateleira ou de um canto da casa; a IA lista os objetos com nome, categoria, quantidade e uma sugestão de valor. Você confere, ajusta e escolhe o que entra.
 - **Falar**: o microfone no alto da tela. Fale os itens e quanto valem, e o app separa cada um para você conferir. Veja [Falar](#falar).
-- **Novidades**: na ficha do item, a IA procura na web atualizações, lançamentos, modelo novo, recalls e fim de suporte do produto. Veja [Novidades do produto](#novidades-do-produto).
+- **Novidades**: na ficha do item, a IA procura na web atualizações, lançamentos, modelo novo, recalls e fim de suporte do produto; em **Mais > Novidades**, de todos os equipamentos de uma vez. Veja [Novidades do produto](#novidades-do-produto).
+- **Conversar**: o balão ao lado do microfone abre uma conversa com a IA, a qualquer momento, sobre o que está na tela ou qualquer outro assunto. Veja [Conversar](#conversar).
 - **Buscar na internet**: num item sem foto (ou no editor do item), a IA procura o produto no fabricante e nas lojas e o app mostra as fotos encontradas para você escolher. Na mesma busca, a IA traz nome, detalhes, categoria e valor do produto para preencher o item. Veja [Fotos da internet](#fotos-da-internet).
 - **Buscar**: por nome, marca ou detalhe, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome ou data.
 - **Relatório**: lista por cômodo com fotos e valores, pronta para imprimir ou salvar em PDF (útil para seguro).
@@ -33,7 +34,7 @@ O valor de cada item é o que você quiser registrar, somando todas as unidades.
 
 ## Opções da casa
 
-- **Usar IA** (Mais > Integrações), ligada de início: desligada, o app esconde tudo o que usa IA (Catalogar foto com IA, Preencher com IA, Buscar na internet, Novidades) e não chama a IA. O **Falar** continua: quem transcreve é a fala para texto do Home Assistant, e o próprio app separa os itens pelas vírgulas.
+- **Usar IA** (Mais > Integrações), ligada de início: desligada, o app esconde tudo o que usa IA (Catalogar foto com IA, Preencher com IA, Buscar na internet, Novidades, Conversar) e não chama a IA. O **Falar** continua: quem transcreve é a fala para texto do Home Assistant, e o próprio app separa os itens pelas vírgulas.
 - **Usar zonas** (Mais > Opções), desligada de início: as zonas dividem um cômodo em partes, como Estante, Bancada ou Rack da TV. Ligadas, aparecem o campo Zona no cadastro, a zona na ficha do item, na busca e no relatório, e os itens de cada cômodo ficam separados por zona.
 
 - **Categorias** (Mais > Opções): renomeie, crie ou exclua categorias. Os itens de uma categoria excluída vão para Outros, que não pode ser excluída. As categorias ficam no inventário: entram no backup, na exportação e nas versões, e a IA passa a usar as novas.
@@ -103,7 +104,16 @@ Na ficha do item, **Novidades** pede à IA de busca (a mesma da busca de fotos, 
 - Cada novidade vem com o tipo, a data quando se sabe e o site da fonte, que abre fora do app. Sem fonte, não entra. Rumor aparece marcado como **Boato**; recall fica em destaque.
 - A IA só acha o que já foi publicado: lançamento que ainda não foi anunciado não aparece.
 - O resultado fica guardado até fechar o app; **Buscar de novo** pergunta outra vez. Cada busca conta em Uso da IA.
-- Quanto mais o nome do item tiver marca e modelo (por exemplo "Lâmpada Wi-Fi Tapo L530E"), melhor a busca. O app mostra como a IA identificou o produto.
+- **Mais > Novidades** confere todos de uma vez: marque as categorias (de início, as que costumam ter equipamentos, como Eletrônicos e Cozinha e bar) e toque em **Conferir novidades**. A IA escolhe, nessas categorias, os itens em que faz sentido procurar (deixa de fora móveis, panelas, cestos…) e o app confere um por um, mostrando o andamento; **Parar** guarda o que já foi conferido. O que foi conferido nos últimos 7 dias fica para a próxima. A lista mostra recall primeiro, depois os com novidades; tocar num item abre o que foi achado. Os que a IA deixou de fora ficam recolhidos embaixo, e dá para conferir cada um sozinho.
+- Quanto mais o nome do item tiver marca e modelo, como na nota fiscal, melhor a busca. O app mostra como a IA identificou o produto.
+
+## Conversar
+
+O balão ao lado do microfone, no alto da tela (e na ficha do item), abre uma conversa com a IA. Pergunte sobre o que está na tela ("qual o item mais caro daqui?", "vale pôr no seguro?") ou sobre qualquer outro assunto. A IA recebe o resumo da casa e o que está na tela: o item, o cômodo com os itens, a busca ou as novidades. Ela responde, mas não muda o inventário.
+
+- Responde a IA de buscar fotos na internet (Mais > Integrações); sem ela, a de ler fotos. Um assistente de conversa com a Pesquisa Google ligada responde também o que é de fora da casa.
+- Com o microfone da conversa, dá para falar a pergunta.
+- A conversa fica até fechar o app; **Nova conversa** começa outra. Cada pergunta conta em Uso da IA.
 
 ## Seus dados
 

@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.20.0"
+VERSION = "1.21.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -60,6 +60,7 @@ AI_MOCK = os.environ.get("INV_AI_MOCK") == "1"
 DATA_FILE = os.path.join(DATA_DIR, "inventario.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 USAGE_FILE = os.path.join(DATA_DIR, "uso_ia.json")
+NEWS_FILE = os.path.join(DATA_DIR, "novidades.json")  # novidades conferidas e a escolha da IA (não entra no inventário)
 PHOTOS_DIR = os.path.join(DATA_DIR, "photos")
 THUMBS_DIR = os.path.join(DATA_DIR, "thumbs")
 HISTORY_DIR = os.path.join(DATA_DIR, "history")
@@ -79,7 +80,7 @@ CATS = {
 SAFE_CAT = re.compile(r"[a-z0-9][a-z0-9_-]{0,40}")
 SAFE_FILE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,150}\.(?:jpe?g|png|webp)")
 SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,80}")
-BACKUP_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,150}\.zip")
+BACKUP_NAME = re.compile(r"[^/\\\x00-\x1f.][^/\\\x00-\x1f]{0,150}\.zip", re.I)  # "inventario (1).zip", "- Cópia.zip"; sem barra nem ponto no começo
 HISTORY_NAME = re.compile(r"inventario-\d{8}-\d{6}\.json")
 HISTORY_REASONS = "motivos.json"  # dentro de history/: por que cada cópia foi feita (antes de importar, antes de restaurar)
 
@@ -106,11 +107,36 @@ def slug(text: str) -> str:
     return t[:40] or "comodo"
 
 
+def room_code(wanted) -> str:
+    """Código do cômodo: letras sem acento e números, de 1 a 4."""
+    return re.sub(r"[^A-Z0-9]", "", unicodedata.normalize("NFKD", str(wanted or "")).encode("ascii", "ignore").decode().upper())[:4]
+
+
+def free_code(wanted, used: set) -> str:
+    """Um código que ainda não é usado, nunca maior que 4: SAL, SAL2… SA10."""
+    base = room_code(wanted) or "CMD"
+    if base not in used:
+        return base
+    for n in range(2, 1000):
+        c = f"{base[:4 - len(str(n))]}{n}"
+        if c not in used:
+            return c
+    return secrets.token_hex(2).upper()
+
+
 def read_json(path, default=None):
     try:
         with open(path, encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
+        return default
+
+
+def read_json_ok(path, default=None):
+    """Como read_json, mas um arquivo ilegível vale o padrão (para arquivos de apoio, que se refazem sozinhos)."""
+    try:
+        return read_json(path, default)
+    except (ValueError, OSError):
         return default
 
 
@@ -170,6 +196,8 @@ def parse_value(v) -> float | int:
             elif re.fullmatch(r"\d{1,3}(\.\d{3})+", s):  # "1.200" é mil e duzentos, como na tela (não 1,2)
                 s = s.replace(".", "")
             x = float(s)
+    except OverflowError:
+        raise ApiError(400, "Valor fora do intervalo permitido.")
     except (TypeError, ValueError):
         raise ApiError(400, "Valor inválido. Use só números, como 1200 ou 1.200,50.")
     if x != x or x < 0 or x > 1e9:
@@ -232,18 +260,48 @@ class Store:
             os.makedirs(d, exist_ok=True)
         if not os.path.exists(DATA_FILE):
             self.seed()
-        self.data = read_json(DATA_FILE) or {}
+        try:
+            self.data = read_json(DATA_FILE) or {}
+            if not isinstance(self.data, dict):
+                raise ValueError("não é um inventário")
+        except (ValueError, OSError) as e:
+            self.data = self.recover(e)
         self.data.setdefault("format", "inventario-casa")
         self.data.setdefault("schema", 1)
         self.data.setdefault("rev", 1)
         self.data.setdefault("rooms", [])
         self.data.setdefault("items", [])
-        self.settings = read_json(SETTINGS_FILE, {}) or {}
+        try:
+            self.settings = read_json(SETTINGS_FILE, {}) or {}
+            if not isinstance(self.settings, dict):
+                raise ValueError
+        except (ValueError, OSError):
+            log.warning("settings.json ilegível: valem as opções padrão")
+            self.settings = {}
         self.prune_history()  # quem vinha de uma versão que guardava mais cópias fica só com as últimas
         snaps = self.history_list()
         if snaps:
             self.last_snapshot = os.path.getmtime(os.path.join(HISTORY_DIR, snaps[0]["name"]))
         log.info("InventarIA: inventário carregado com %d cômodos e %d itens", len(self.data["rooms"]), len(self.data["items"]))
+
+    def recover(self, err) -> dict:
+        """inventario.json ilegível (disco cheio, desligou no meio): guarda o arquivo e volta para a última versão anterior boa."""
+        keep = f"{DATA_FILE}.corrompido-{stamp()}"
+        try:
+            os.replace(DATA_FILE, keep)
+        except OSError:
+            keep = ""
+        log.error("inventario.json ilegível (%s); guardado em %s", err, keep or "(não deu para guardar)")
+        for snap in self.history_list(details=False):
+            try:
+                data = read_json(os.path.join(HISTORY_DIR, snap["name"]))
+            except (ValueError, OSError):
+                continue
+            if isinstance(data, dict) and isinstance(data.get("rooms"), list) and isinstance(data.get("items"), list):
+                log.warning("inventário de volta à versão %s", snap["name"])
+                write_json_atomic(DATA_FILE, data)
+                return data
+        return {}
 
     def seed(self):
         src = os.path.join(SEED_DIR, "inventario.json")
@@ -281,7 +339,9 @@ class Store:
         if force and now - self.last_snapshot < 5 and os.path.getmtime(DATA_FILE) <= self.last_snapshot:
             return  # a cópia de agora há pouco já tem tudo (ex.: o backup de segurança logo antes de importar)
         name = f"inventario-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
-        shutil.copyfile(DATA_FILE, os.path.join(HISTORY_DIR, name))
+        tmp = os.path.join(HISTORY_DIR, f".{name}.tmp")
+        shutil.copyfile(DATA_FILE, tmp)  # copia e só depois dá o nome: desligar no meio não deixa uma versão cortada
+        os.replace(tmp, os.path.join(HISTORY_DIR, name))
         self.last_snapshot = now
         if reason != "auto":
             reasons = read_json(os.path.join(HISTORY_DIR, HISTORY_REASONS), {}) or {}
@@ -296,7 +356,7 @@ class Store:
             except OSError:
                 pass
         path = os.path.join(HISTORY_DIR, HISTORY_REASONS)
-        reasons = read_json(path, {}) or {}
+        reasons = read_json_ok(path, {}) or {}
         keep = {k: v for k, v in reasons.items() if os.path.exists(os.path.join(HISTORY_DIR, k))}
         if keep != reasons:
             write_json_atomic(path, keep)
@@ -306,14 +366,19 @@ class Store:
             names = [n for n in os.listdir(HISTORY_DIR) if HISTORY_NAME.fullmatch(n)]
         except FileNotFoundError:
             return []
-        reasons = (read_json(os.path.join(HISTORY_DIR, HISTORY_REASONS), {}) or {}) if details else {}
+        reasons = (read_json_ok(os.path.join(HISTORY_DIR, HISTORY_REASONS), {}) or {}) if details else {}
         out = []
         for n in sorted(names, reverse=True):
             p = os.path.join(HISTORY_DIR, n)
             info = {"name": n, "size": os.path.getsize(p), "date": datetime.fromtimestamp(os.path.getmtime(p)).astimezone().isoformat(timespec="seconds")}
             if details:  # só as 3 últimas existem: dá para abrir cada uma e contar
-                snap = read_json(p, {}) or {}
-                info.update(items=len(snap.get("items") or []), rooms=len(snap.get("rooms") or []), reason=reasons.get(n, "auto"))
+                try:
+                    snap = read_json(p, {}) or {}
+                except (ValueError, OSError):
+                    snap = None  # cópia cortada: aparece na lista, sem a contagem
+                ok = isinstance(snap, dict)
+                info.update(items=len(snap.get("items") or []) if ok else None, rooms=len(snap.get("rooms") or []) if ok else None,
+                            reason=reasons.get(n, "auto"))
             out.append(info)
         return out
 
@@ -325,7 +390,14 @@ class Store:
         return next((i for i in self.data["items"] if i["id"] == iid), None)
 
     def next_seq(self, rid):
-        return max([i.get("seq") or 0 for i in self.data["items"] if i["room"] == rid] or [0]) + 1
+        """O próximo número do cômodo. Um número que já foi usado não volta (o ResolvIA liga tarefas pelo id do item)."""
+        room = self.room(rid) or {}
+        return max([i.get("seq") or 0 for i in self.data["items"] if i["room"] == rid] + [int(room.get("lastSeq") or 0)]) + 1
+
+    def _retire_seq(self, it):
+        room = self.room(it.get("room"))
+        if room and isinstance(it.get("seq"), int):
+            room["lastSeq"] = max(int(room.get("lastSeq") or 0), it["seq"])
 
     def sorted_items(self):
         order = {r["id"]: r.get("order", 99) for r in self.data["rooms"]}
@@ -413,7 +485,7 @@ class Store:
             "photos": clean_photos(body.get("photos")),
             "checked": bool(body.get("checked")), "flag": text(body.get("flag"), 200, "observação") or None,
             "approx": True, "source": text(body.get("source") or "manual", 40, "origem"),
-            "createdAt": ts, "updatedAt": ts,
+            "createdAt": ts, "updatedAt": ts, "valueAt": ts,
         }
         src = clean_photo_src(body.get("photoSrc"), it["photos"])
         if src:
@@ -423,9 +495,11 @@ class Store:
         want_id = body.get("id") if restore else None
         want_seq = body.get("seq") if restore else None
         if restore:
-            for k in ("createdAt", "createdBy", "approx", "checkedAt"):
+            for k in ("createdAt", "createdBy", "updatedAt", "updatedBy", "valueAt", "approx", "checkedAt"):  # Desfazer volta o item como era
                 if body.get(k) is not None:
                     it[k] = body[k]
+            if not body.get("valueAt"):
+                it["valueAt"] = it["createdAt"]  # item de antes da data do valor: vale a de criação, como para os outros apps
         seqs = {i.get("seq") for i in self.data["items"] if i["room"] == room["id"]}
         it["seq"] = want_seq if isinstance(want_seq, int) and want_seq > 0 and want_seq not in seqs else self.next_seq(room["id"])
         ids = {i["id"] for i in self.data["items"]}
@@ -441,15 +515,17 @@ class Store:
             created = []
             try:
                 for b in bodies:
+                    if not isinstance(b, dict):
+                        raise ApiError(400, "Item inválido.")
                     it = self.build_item(b, user, restore=restore)
                     self.data["items"].append(it)  # já na lista: o próximo do lote não repete o número
                     created.append(it)
-            except ApiError:
-                for it in created:  # um item ruim desfaz o lote inteiro, também na memória
+                if room_photo:
+                    self._add_room_photo(room_photo.get("room"), room_photo.get("file"), room_photo.get("label"))
+            except Exception:
+                for it in created:  # um item ruim (ou a foto do cômodo) desfaz o lote inteiro, também na memória
                     self.data["items"].remove(it)
                 raise
-            if room_photo:
-                self._add_room_photo(room_photo.get("room"), room_photo.get("file"), room_photo.get("label"))
             self.save()
             return created
 
@@ -467,7 +543,9 @@ class Store:
                 if not room:
                     raise ApiError(400, "Escolha um cômodo que exista.")
                 new["room"] = room["id"]
-                new["seq"] = self.next_seq(room["id"])
+                want = body.get("seq")  # Desfazer o Mover: volta com o número de antes, se ninguém o usa
+                used = {i.get("seq") for i in self.data["items"] if i["room"] == room["id"]}
+                new["seq"] = want if isinstance(want, int) and not isinstance(want, bool) and want > 0 and want not in used else self.next_seq(room["id"])
             if "zone" in body:
                 new["zone"] = text(body["zone"], 120, "zona")
             if "name" in body:
@@ -501,6 +579,8 @@ class Store:
             new["updatedAt"] = now_iso()
             if user:
                 new["updatedBy"] = user
+            if new["room"] != it["room"]:
+                self._retire_seq(it)
             it.clear()
             it.update(new)
             self.save()
@@ -512,20 +592,13 @@ class Store:
             if not it:
                 raise ApiError(404, "Este item não existe mais.")
             self.data["items"].remove(it)
+            self._retire_seq(it)
             self.save()
             return it
 
     # -- cômodos
     def _unique_code(self, wanted: str, skip_id=None) -> str:
-        codes = {r["code"] for r in self.data["rooms"] if r["id"] != skip_id}
-        base = re.sub(r"[^A-Z0-9]", "", unicodedata.normalize("NFKD", wanted).encode("ascii", "ignore").decode().upper())[:4] or "CMD"
-        if base not in codes:
-            return base
-        for n in range(2, 100):
-            c = f"{base[:3]}{n}"
-            if c not in codes:
-                return c
-        return secrets.token_hex(2).upper()
+        return free_code(wanted, {r["code"] for r in self.data["rooms"] if r["id"] != skip_id})
 
     def create_room(self, body: dict) -> dict:
         with self.lock:
@@ -554,26 +627,27 @@ class Store:
             room = self.room(rid)
             if not room:
                 raise ApiError(404, "Este cômodo não existe mais.")
+            upd = {}  # confere tudo antes: um pedido recusado não muda nada
             if "name" in body:
-                room["name"] = text(body["name"], 60, "nome do cômodo", required=True)
+                upd["name"] = text(body["name"], 60, "nome do cômodo", required=True)
             if "code" in body:
-                code = re.sub(r"[^A-Z0-9]", "", str(body["code"]).upper())[:4]
+                code = room_code(body["code"])
                 if not code:
                     raise ApiError(400, "O código precisa ter de 1 a 4 letras ou números.")
-                if code != room["code"]:
-                    if any(r["code"] == code for r in self.data["rooms"] if r["id"] != rid):
-                        raise ApiError(400, f"O código {code} já é usado por outro cômodo.")
-                    room["code"] = code
+                if code != room["code"] and any(r["code"] == code for r in self.data["rooms"] if r["id"] != rid):
+                    raise ApiError(400, f"O código {code} já é usado por outro cômodo.")
+                upd["code"] = code
             if "photos" in body:
                 photos = []
                 for p in body["photos"] or []:
                     if not isinstance(p, dict) or not photo_exists(p.get("file", "")):
                         raise ApiError(400, "Uma das fotos do cômodo não foi encontrada.")
                     photos.append({"file": p["file"], "label": text(p.get("label"), 160, "legenda")})
-                room["photos"] = photos
+                upd["photos"] = photos
+            room.update(upd)
             if "cover" in body:
                 c = body["cover"]
-                room["cover"] = c if isinstance(c, int) and 0 <= c < max(1, len(room["photos"])) else 0
+                room["cover"] = c if isinstance(c, int) and not isinstance(c, bool) and 0 <= c < max(1, len(room["photos"])) else 0
             if room.get("cover", 0) >= max(1, len(room["photos"])):
                 room["cover"] = 0
             room["updatedAt"] = now_iso()
@@ -633,7 +707,8 @@ class Store:
         for r in data["rooms"]:
             if not isinstance(r, dict) or not r.get("id") or not r.get("name"):
                 raise ApiError(400, "Arquivo inválido: cômodo sem id ou nome.")
-            r.setdefault("code", str(r["id"])[:3].upper())
+            if not r.get("code"):
+                r["code"] = free_code(str(r["id"])[:3], {x.get("code") for x in data["rooms"] if isinstance(x, dict) and x.get("code")})
             r.setdefault("photos", [])
             r.setdefault("cover", 0)
             r["photos"] = [p if isinstance(p, dict) else {"file": p, "label": ""} for p in r["photos"]]
@@ -643,6 +718,10 @@ class Store:
                 raise ApiError(400, "Arquivo inválido: item sem id ou com cômodo desconhecido.")
             i.setdefault("photos", [i["photo"]] if i.get("photo") else [])
             i.pop("photo", None)
+            try:
+                i["value"] = parse_value(i.get("value"))  # "1.200,50" num .json feito à mão vira número (planilha e backup contam)
+            except ApiError:
+                i["value"] = 0
         cats = clean_cats(data.get("cats"))
         if cats:
             data["cats"] = cats
@@ -681,11 +760,14 @@ def export_csv_bytes() -> bytes:
         cats = STORE.cat_map()
         for it in STORE.sorted_items():
             room = STORE.room(it["room"]) or {}
-            v = it.get("value") or 0
+            try:
+                v = float(it.get("value") or 0)
+            except (TypeError, ValueError):
+                v = 0.0
             w.writerow([
                 STORE.tag(it), room.get("name", it["room"]), it.get("zone", ""), it.get("name", ""),
                 it.get("details", ""), cats.get(it.get("cat"), cats.get("outros", "Outros")), it.get("qty", "1"),
-                f"{float(v):.2f}".replace(".", ","), ", ".join(it.get("photos") or []),
+                f"{v:.2f}".replace(".", ","), ", ".join(it.get("photos") or []),
                 it.get("createdAt") or "", it.get("updatedAt") or "",
             ])
     return ("﻿" + out.getvalue()).encode("utf-8")
@@ -708,8 +790,9 @@ e use Dados e backup > Restaurar.
 def write_zip(fileobj) -> None:
     with STORE.lock:
         data = json.dumps(STORE.data, ensure_ascii=False, indent=1).encode("utf-8")
-        used = sorted({p for i in STORE.data["items"] for p in i.get("photos") or []} |
-                      {p["file"] for r in STORE.data["rooms"] for p in r.get("photos") or []})
+        used = sorted(p for p in {p for i in STORE.data["items"] for p in i.get("photos") or []} |
+                      {p.get("file") for r in STORE.data["rooms"] for p in r.get("photos") or [] if isinstance(p, dict)}
+                      if isinstance(p, str) and SAFE_FILE.fullmatch(p))  # nada de fora de photos/ (nome vindo de um .json importado)
     csv_bytes = export_csv_bytes()
     with zipfile.ZipFile(fileobj, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("inventario.json", data)
@@ -724,8 +807,8 @@ def write_zip(fileobj) -> None:
 
 def backups_list():
     try:
-        names = [n for n in os.listdir(SHARE_DIR) if BACKUP_NAME.fullmatch(n)]
-    except FileNotFoundError:
+        names = [n for n in os.listdir(SHARE_DIR) if BACKUP_NAME.fullmatch(n) and os.path.isfile(os.path.join(SHARE_DIR, n))]
+    except OSError:  # não existe, ou o caminho é um arquivo: sem backups
         return []
     out = []
     for n in names:
@@ -745,14 +828,21 @@ def create_backup(prefix="inventario") -> dict:
         name = f"{prefix}-{stamp()}-{n}.zip"
         n += 1
     tmp = os.path.join(SHARE_DIR, f".{name}.tmp")
-    with open(tmp, "wb") as f:
-        write_zip(f)
-    os.replace(tmp, os.path.join(SHARE_DIR, name))
+    try:
+        with open(tmp, "wb") as f:
+            write_zip(f)
+        os.replace(tmp, os.path.join(SHARE_DIR, name))
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
     return next(b for b in backups_list() if b["name"] == name)
 
 
 def share_available() -> bool:
-    return os.path.isdir(os.path.dirname(SHARE_DIR.rstrip("/")))
+    return os.path.isdir(os.path.dirname(SHARE_DIR.rstrip("/"))) and (not os.path.lexists(SHARE_DIR) or os.path.isdir(SHARE_DIR))
 
 
 def safety_backup(prefix):
@@ -781,7 +871,7 @@ def _zip_inventory(z: zipfile.ZipFile):
     if not cands:
         return None
     try:
-        return STORE.check_inventory(json.loads(z.read(cands[0]).decode("utf-8")))
+        return STORE.check_inventory(json.loads(z.read(cands[0]).decode("utf-8-sig")))
     except (UnicodeDecodeError, ValueError):
         raise ApiError(400, "O inventario.json de dentro do .zip está corrompido.")
 
@@ -796,8 +886,15 @@ def _extract_media(z: zipfile.ZipFile) -> int:
             raise ApiError(400, "O .zip é grande demais para restaurar.")
         dst = os.path.join(DATA_DIR, kind, name)
         if not os.path.exists(dst):
-            with z.open(info) as src, open(dst + ".tmp", "wb") as out:
-                shutil.copyfileobj(src, out)
+            try:
+                with z.open(info) as src, open(dst + ".tmp", "wb") as out:
+                    shutil.copyfileobj(src, out)
+            except (zipfile.BadZipFile, zlib.error, EOFError):
+                try:
+                    os.unlink(dst + ".tmp")
+                except OSError:
+                    pass
+                raise ApiError(400, f"O backup está corrompido: a foto {name} não abre.") from None
             os.replace(dst + ".tmp", dst)
             if kind == "photos":
                 added += 1
@@ -914,9 +1011,13 @@ def ha_request(method: str, path: str, body=None, timeout=20):
             detail = json.loads(detail).get("message", detail)
         except (ValueError, AttributeError):
             pass
+        if e.code == 429 or is_quota(detail):
+            log.info("cota da IA: %s", " ".join(str(detail).split())[:300])
+            raise ApiError(502, QUOTA_MSG)
         raise ApiError(502, f"O Home Assistant recusou o pedido: {detail}")
-    except (urllib.error.URLError, TimeoutError) as e:
-        raise ApiError(504, f"Sem resposta do Home Assistant ({e}).")
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        log.info("sem resposta do Home Assistant: %s", e)
+        raise ApiError(504, "O Home Assistant não respondeu. Tente de novo em instantes.")
 
 
 def ai_entities():
@@ -973,9 +1074,12 @@ def usage_day(ts=None) -> str:
     return time.strftime("%Y-%m-%d", time.gmtime(t - 3 * 3600))  # sem fuso no ambiente: horário de Brasília
 
 
+QUOTA_MSG = "A cota da IA acabou por agora. Tente de novo mais tarde (a cota grátis do Gemini volta de madrugada)."
+
+
 def is_quota(msg) -> bool:
     t = str(msg or "").lower()
-    return "429" in t or "quota" in t or "resource_exhausted" in t or "rate limit" in t
+    return "429" in t or "quota" in t or "resource_exhausted" in t or "rate limit" in t or "cota da ia acabou" in t
 
 
 def record_usage(kind: str, entity: str, chars_in: int, chars_out: int, images: int, seconds: float, result: str):
@@ -1118,11 +1222,25 @@ def ai_status():
         ents, agents = ai_entities()
     except ApiError as e:
         return {"ready": False, "reason": "error", "message": e.msg, "entities": [], "agents": [], "selected": "", "search": search}
-    sel = STORE.settings.get("ai_entity") or ""
+    sel, missing = STORE.settings.get("ai_entity") or "", ""
+    if sel and not any(e["id"] == sel for e in ents):
+        missing, sel = sel, ""  # a escolhida saiu do Home Assistant: vale a preferida de lá, como no Falar
     usable = [e for e in ents if e["attachments"]]
     ready = bool(usable) if not sel else any(e["id"] == sel and e["attachments"] for e in ents)
     return {"ready": ready, "reason": None if ready else ("no_entity" if not ents else "no_vision"),
-            "entities": ents, "agents": agents, "selected": sel, "search": search}
+            "entities": ents, "agents": agents, "selected": sel, "missing": missing, "search": search}
+
+
+def photo_entity() -> str:
+    """A IA escolhida para ler fotos e textos; se ela saiu do Home Assistant, vazio (a preferida de lá)."""
+    sel = STORE.settings.get("ai_entity") or ""
+    if not sel or AI_MOCK or not SUPERVISOR_TOKEN:
+        return sel
+    try:
+        ents, agents = ai_entities()
+    except ApiError:
+        return sel
+    return sel if any(e["id"] == sel for e in ents + agents) else ""
 
 
 AI_RULES = """Para cada item, devolva:
@@ -1227,7 +1345,7 @@ def clean_ai_items(parsed, room: dict | None) -> list[dict]:
         existing = str(raw.get("existing") or "").strip()
         out.append({
             "name": name, "details": str(raw.get("details") or "").strip()[:1000],
-            "cat": raw.get("cat") if raw.get("cat") in STORE.cat_map() else "outros",
+            "cat": raw.get("cat") if isinstance(raw.get("cat"), str) and raw.get("cat") in STORE.cat_map() else "outros",
             "qty": str(raw.get("qty") or "1").strip()[:30] or "1", "value": value,
             "zone": str(raw.get("zone") or "").strip()[:120],
             "existing": existing if existing in names else "",
@@ -1255,7 +1373,7 @@ def ai_identify(body: dict) -> dict:
     room = STORE.room(body.get("room")) if body.get("room") else None
     hint = text(body.get("hint"), 300, "dica")
     prompt = ai_prompt(mode, room, hint)
-    entity = STORE.settings.get("ai_entity") or ""
+    entity = photo_entity()
     kind = "foto" if mode == "single" else "catalogo"
     if AI_MOCK:
         with AiCall(kind, "ai_task.simulado", prompt, images=1) as call:
@@ -1530,7 +1648,7 @@ def ai_from_speech(body: dict) -> dict:
     spoken = text(body.get("text"), 4000, "texto", required=True)
     room = STORE.room(body.get("room")) if body.get("room") else None
     prompt = ai_prompt("voice", room, "", spoken)
-    entity = STORE.settings.get("ai_entity") or ""
+    entity = photo_entity()
     with AiCall("fala", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
         if AI_MOCK:
             time.sleep(0.8)
@@ -1884,7 +2002,7 @@ def web_product(data: dict) -> dict | None:
         value = 0
     if not (name or details):
         return None
-    return {"name": name, "details": details, "cat": cat if cat in STORE.cat_map() else "", "value": value}
+    return {"name": name, "details": details, "cat": cat if isinstance(cat, str) and cat in STORE.cat_map() else "", "value": value}
 
 
 def ai_find_pages(name: str, details: str, entity: str, qty: str = "1") -> dict:
@@ -2125,11 +2243,13 @@ def ai_find_news(name: str, details: str, entity: str) -> dict:
     return news_clean(data)
 
 
-def _news_job_run(jid: str, name: str, details: str, entity: str):
+def _news_job_run(jid: str, name: str, details: str, entity: str, iid: str = ""):
     job = WEB_JOBS[jid]
     try:
         found = ai_find_news(name, details, entity)
         if not job.get("cancelled"):
+            if iid:
+                news_save_result(iid, found)
             job.update(stage="done", msg="", news=found)
     except ApiError as e:
         job.update(stage="error", msg=e.msg)
@@ -2150,8 +2270,328 @@ def news_job_start(body: dict) -> dict:
     details = " ".join(str(it.get("details") or "").split())[:300]
     with WEB_LOCK:
         WEB_JOBS[jid] = {"stage": "busy", "msg": "Procurando novidades…", "results": [], "news": None, "at": time.time(), "kind": "novidades"}
-    threading.Thread(target=_news_job_run, args=(jid, it["name"], details, search_entity()), daemon=True).start()
+    threading.Thread(target=_news_job_run, args=(jid, it["name"], details, search_entity(), it["id"]), daemon=True).start()
     return {"id": jid}
+
+
+# Novidades de todos: a IA escolhe, nas categorias marcadas, os itens em que faz sentido procurar novidades (uma
+# pergunta só, sem busca na web; fica guardado até o item mudar) e o app confere um por um, guardando cada resultado.
+NEWS_LOCK = threading.Lock()
+NEWS_FRESH_DAYS = 7  # conferido há menos que isso fica para a próxima
+NEWS_DEFAULT_CATS = ("eletronicos", "cozinha", "utilidades", "saude", "outros")
+NEWS_CAT_WORDS = re.compile(r"eletr|inform|comput|celular|ferrament|clima|ar condicionado|automac|seguranc|camera|game|video|audio|veicul|carro|moto")
+TRIAGE_CHUNK = 60
+MOCK_TRIAGE = re.compile(r"\b(tv|televis|notebook|computador|celular|smartphone|tablet|geladeira|refrigerador|micro-?ondas|maquina|lavadora|"
+                         r"lampada|fone|caixa de som|soundbar|cafeteira|ar condicionado|aspirador|roteador|impressora|monitor|console|camera|forno)", re.I)
+
+
+def news_cats() -> list[str]:
+    """Categorias em que a IA procura equipamentos: a escolha da casa, ou as que costumam ter (eletrônicos, cozinha…)."""
+    cats = STORE.cat_map()
+    chosen = STORE.settings.get("news_cats")
+    if isinstance(chosen, list):
+        return [c for c in chosen if c in cats]
+    return [c for c, name in cats.items() if c in NEWS_DEFAULT_CATS or NEWS_CAT_WORDS.search(fold(name))]
+
+
+def item_sig(it: dict) -> str:
+    return fold(f"{it.get('name') or ''} | {' '.join(str(it.get('details') or '').split())[:200]}")
+
+
+def news_read() -> dict:
+    d = read_json_ok(NEWS_FILE, {}) or {}
+    if not isinstance(d, dict):
+        d = {}
+    for k in ("itens", "triagem"):
+        if not isinstance(d.get(k), dict):
+            d[k] = {}
+    return d
+
+
+def news_save_result(iid: str, found: dict):
+    with NEWS_LOCK:
+        d = news_read()
+        it = STORE.item(iid)
+        d["itens"][iid] = {"at": now_iso(), "sig": item_sig(it) if it else "", "news": found}
+        write_json_atomic(NEWS_FILE, d)
+
+
+def news_overview() -> dict:
+    """O que a aba Novidades mostra: as categorias, quem a IA escolheu, o que já foi conferido e a conferência em andamento."""
+    d = news_read()
+    ids = {i["id"]: i for i in STORE.data["items"]}
+    cats = news_cats()
+    tri = {k: v for k, v in d["triagem"].items() if k in ids and isinstance(v, dict) and v.get("sig") == item_sig(ids[k])}
+    job = next((dict(id=j, stage=v["stage"], msg=v["msg"], progress=v.get("progress"), summary=v.get("summary"))
+                for j, v in WEB_JOBS.items() if v.get("kind") == "lote" and v["stage"] == "busy"), None)
+    return {"cats": cats, "triagem": {k: bool(v.get("conferir")) for k, v in tri.items()},
+            "pendentes": sum(1 for i in STORE.data["items"] if i.get("cat") in cats and i["id"] not in tri),
+            "itens": {k: {"at": v.get("at"), "news": v.get("news")} for k, v in d["itens"].items() if k in ids and isinstance(v, dict)},
+            "ultima": d.get("ultima"), "job": job}
+
+
+def triage_prompt(items: list[dict]) -> str:
+    cats = STORE.cat_map()
+    lines = [f"{i['id']}: {i['name']}" + (f" — {' '.join(str(i.get('details') or '').split())[:160]}" if i.get("details") else "")
+             + f" [{cats.get(i.get('cat'), 'Outros')}]" for i in items]
+    return "\n".join([
+        "Você ajuda a acompanhar as novidades dos equipamentos de uma casa no Brasil.",
+        "Para cada item abaixo, diga se vale procurar novidades na internet: atualizações de firmware ou software, modelo novo, "
+        "lançamentos, recalls ou fim de suporte.",
+        "Vale para eletrônicos, eletrodomésticos, aparelhos conectados, ferramentas elétricas, veículos e equipamentos com marca ou modelo.",
+        "Não vale para móveis (cama, mesa, cadeira, sofá, armário, estante), decoração, quadros, tapetes, roupa de cama, toalhas, "
+        "utensílios simples (panelas, pratos, talheres), plantas, livros, roupas e coisas sem marca nem modelo.",
+        "",
+        "Itens (id: nome — detalhes [categoria]):",
+        *lines,
+        "",
+        'Responda somente com um objeto JSON, sem texto antes ou depois: {"conferir": ["id", "id"]}, só com os ids em que vale procurar.',
+    ])
+
+
+def ai_triage(items: list[dict]) -> set[str]:
+    """Os ids em que vale procurar novidades, numa pergunta à IA (sem busca na web) para cada bloco de itens."""
+    chosen: set[str] = set()
+    entity = photo_entity()
+    for k in range(0, len(items), TRIAGE_CHUNK):
+        part = items[k:k + TRIAGE_CHUNK]
+        prompt = triage_prompt(part)
+        with AiCall("triagem", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
+            if AI_MOCK:
+                data = {"conferir": [i["id"] for i in part if i.get("cat") == "eletronicos" or MOCK_TRIAGE.search(fold(i["name"]))]}
+                call.answer(data)
+            else:
+                raw = ai_call_text("InventarIA: escolher equipamentos", prompt, entity, timeout=180)
+                if raw is None:
+                    call.result = "formato"
+                    raise ApiError(502, "A IA não devolveu resposta.")
+                call.answer(raw)
+                try:
+                    data = extract_json(raw)
+                except ApiError:
+                    call.result = "formato"
+                    raise
+        got = data.get("conferir") if isinstance(data, dict) else data
+        ids = {i["id"] for i in part}
+        chosen |= {str(x) for x in (got if isinstance(got, list) else []) if str(x) in ids}
+    return chosen
+
+
+def _news_batch_run(jid: str):
+    job = WEB_JOBS[jid]
+    done = found = errors = 0
+    try:
+        cats = news_cats()
+        cands = [i for i in STORE.sorted_items() if i.get("cat") in cats]
+        d = news_read()
+        todo_tri = [i for i in cands if (d["triagem"].get(i["id"]) or {}).get("sig") != item_sig(i)]
+        if todo_tri:
+            job["msg"] = "A IA está escolhendo os equipamentos…"
+            chosen = ai_triage(todo_tri)
+            with NEWS_LOCK:
+                d = news_read()
+                for i in todo_tri:
+                    d["triagem"][i["id"]] = {"sig": item_sig(i), "conferir": i["id"] in chosen}
+                write_json_atomic(NEWS_FILE, d)
+        fresh = time.time() - NEWS_FRESH_DAYS * 86400
+        sel = [i for i in cands if (d["triagem"].get(i["id"]) or {}).get("conferir")]
+
+        def checked_at(i):
+            at = (d["itens"].get(i["id"]) or {}).get("at")
+            try:
+                return datetime.fromisoformat(at).timestamp() if at else 0.0
+            except (TypeError, ValueError):
+                return 0.0
+        todo = sorted([i for i in sel if checked_at(i) < fresh], key=checked_at)
+        job["progress"] = {"feitos": 0, "total": len(todo), "atual": ""}
+        entity = search_entity()
+        for n, it in enumerate(todo):
+            if job.get("cancelled"):
+                break
+            need_ai_on()
+            job["progress"] = {"feitos": n, "total": len(todo), "atual": it["name"]}
+            job["msg"] = f"Conferindo {n + 1} de {len(todo)}: {it['name']}"
+            try:
+                res = ai_find_news(it["name"], " ".join(str(it.get("details") or "").split())[:300], entity)
+            except ApiError as e:
+                if is_quota(e.msg) or "busca na web" in e.msg or e.status == 409:
+                    raise  # a cota acabou, a IA não busca na web ou a IA foi desligada: as próximas também não vão
+                errors += 1
+                continue
+            news_save_result(it["id"], res)
+            done += 1
+            found += 1 if res["novidades"] else 0
+        summary = {"selecionados": len(sel), "conferidos": done, "com_novidades": found, "em_dia": len(sel) - len(todo), "erros": errors}
+        with NEWS_LOCK:
+            d = news_read()
+            d["ultima"] = {"at": now_iso(), **summary}
+            write_json_atomic(NEWS_FILE, d)
+        job.update(stage="done", msg="", summary=summary, progress={"feitos": done, "total": len(todo), "atual": ""})
+    except ApiError as e:
+        msg = e.msg
+        if done:
+            msg += f" O que já foi conferido ({done}) ficou salvo."
+        job.update(stage="error", msg=msg, summary={"conferidos": done, "com_novidades": found})
+    except Exception:  # noqa: BLE001
+        log.exception("novidades de todos")
+        job.update(stage="error", msg="Não deu para conferir agora. Tente de novo em instantes.")
+
+
+def news_batch_start() -> dict:
+    need_ai_on()
+    if not SUPERVISOR_TOKEN and not AI_MOCK:
+        raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
+    with WEB_LOCK:
+        for j, v in WEB_JOBS.items():
+            if v.get("kind") == "lote" and v["stage"] == "busy" and not v.get("cancelled"):
+                return {"id": j}  # já tem uma conferência andando: acompanha a mesma
+    web_jobs_cleanup()
+    if not news_cats():
+        raise ApiError(400, "Marque ao menos uma categoria.")
+    jid = secrets.token_hex(8)
+    with WEB_LOCK:
+        WEB_JOBS[jid] = {"stage": "busy", "msg": "Começando…", "results": [], "at": time.time(), "kind": "lote",
+                         "progress": {"feitos": 0, "total": 0, "atual": ""}}
+    threading.Thread(target=_news_batch_run, args=(jid,), daemon=True).start()
+    return {"id": jid}
+
+
+# ---------------------------------------------------------------------------
+# Conversar: um chat com a IA do Home Assistant a qualquer momento, sobre o que está na tela ou outro assunto.
+# Sem memória no servidor: a tela manda as últimas mensagens e onde a pessoa está; o app junta os dados do inventário.
+
+CHAT_TURNS = 12
+CHAT_MAX_CHARS = 2000
+MOCK_CHAT = "Exemplo da IA simulada: no Home Assistant, a IA responde de verdade, com os dados desta tela."
+
+
+def _money(v) -> str:
+    try:
+        x = float(v or 0)
+    except (TypeError, ValueError):
+        x = 0.0
+    s = f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return "R$ " + (s[:-3] if s.endswith(",00") else s)
+
+
+def _item_line(it: dict, cats: dict) -> str:
+    room = STORE.room(it.get("room")) or {}
+    bits = [f"{STORE.tag(it)} {it.get('name', '')}", room.get("name", ""), cats.get(it.get("cat"), "Outros"),
+            f"qtd {it.get('qty') or '1'}", _money(it.get("value"))]
+    if it.get("zone") and zones_enabled():
+        bits.insert(2, f"zona {it['zone']}")
+    return " | ".join(b for b in bits if b)
+
+
+def chat_context(screen: dict) -> str:
+    """O que a IA precisa saber: o resumo da casa e o que está na tela (um item, um cômodo, uma busca, Novidades…)."""
+    screen = screen if isinstance(screen, dict) else {}
+    cats = STORE.cat_map()
+    items = STORE.data["items"]
+    total = sum(float(i.get("value") or 0) for i in items)
+    lines = [f"Inventário: {len(items)} itens em {len(STORE.data['rooms'])} cômodos, total {_money(total)}."]
+    by_room = []
+    for r in sorted(STORE.data["rooms"], key=lambda r: r.get("order", 0)):
+        its = [i for i in items if i["room"] == r["id"]]
+        by_room.append(f"{r['code']} {r['name']}: {len(its)} itens, {_money(sum(float(i.get('value') or 0) for i in its))}")
+    lines.append("Cômodos: " + "; ".join(by_room) + ".")
+    top = sorted(items, key=lambda i: -float(i.get("value") or 0))[:10]
+    if top:
+        lines.append("Mais valiosos: " + "; ".join(f"{i.get('name')} ({_money(i.get('value'))})" for i in top) + ".")
+    view = str(screen.get("view") or "")
+    where = {"home": "Início", "search": "Buscar", "rooms": "Cômodos", "room": "um cômodo", "item": "a ficha de um item",
+             "report": "Relatório para seguro", "data": "Mais"}.get(view, "o app")
+    lines.append(f"A pessoa está em: {where}.")
+    it = STORE.item(str(screen.get("item") or "")) if screen.get("item") else None
+    room = STORE.room(str(screen.get("room") or "")) if screen.get("room") else None
+    if it:
+        lines.append("Item na tela: " + _item_line(it, cats) + ".")
+        if it.get("details"):
+            lines.append("Detalhes: " + " ".join(str(it["details"]).split())[:600])
+        lines.append(f"Fotos: {len(it.get('photos') or [])}. Cadastrado em {str(it.get('createdAt') or '')[:10]}.")
+        saved = (news_read()["itens"].get(it["id"]) or {}).get("news") or {}
+        for n in (saved.get("novidades") or [])[:5]:
+            lines.append(f"Novidade conferida: [{n.get('tipo')}] {n.get('titulo')} ({n.get('data') or 'sem data'}, {n.get('site') or ''}).")
+    elif room:
+        its = [i for i in STORE.sorted_items() if i["room"] == room["id"]]
+        lines.append(f"Cômodo na tela: {room['code']} {room['name']}, {len(its)} itens:")
+        lines += ["- " + _item_line(i, cats) for i in its[:80]]
+    elif view == "search":
+        q = " ".join(str(screen.get("q") or "").split())[:100]
+        if q:
+            lines.append(f"Busca na tela: \"{q}\".")
+            words = [fold(w) for w in q.split()]
+            hits = [i for i in items if all(w in fold(f"{i.get('name')} {i.get('details')} {i.get('zone')}") for w in words)][:40]
+            lines += ["- " + _item_line(i, cats) for i in hits] or ["(nenhum item encontrado)"]
+    elif view == "data" and screen.get("tab") == "novidades":
+        d = news_read()
+        com = [(STORE.item(k), v) for k, v in d["itens"].items() if STORE.item(k) and ((v.get("news") or {}).get("novidades"))]
+        lines.append(f"Aba Novidades: {len(com)} equipamentos com novidades conferidas.")
+        for i, v in com[:20]:
+            ns = v["news"]["novidades"]
+            lines.append(f"- {i['name']}: " + "; ".join(f"[{n.get('tipo')}] {n.get('titulo')}" for n in ns[:3]))
+    return "\n".join(lines)
+
+
+def chat_prompt(messages: list[dict], screen: dict, user: str | None) -> str:
+    conv = []
+    for m in messages[-CHAT_TURNS:]:
+        who = "Pessoa" if m["role"] == "user" else "Assistente"
+        conv.append(f"{who}: {m['text']}")
+    return "\n".join([
+        f"Você é o assistente do InventarIA, o app de inventário da casa{f' de {user}' if user else ''}, dentro do Home Assistant.",
+        "Responda em português do Brasil, curto e direto, em texto simples (no máximo uma lista curta).",
+        "Pode responder sobre o que está na tela, sobre o inventário ou sobre qualquer outro assunto.",
+        "Use só os dados do inventário abaixo; não invente itens nem valores. Você não muda o inventário: se pedirem, diga como fazer no app.",
+        "",
+        "Dados do inventário:",
+        chat_context(screen),
+        "",
+        "Conversa até agora:",
+        *conv,
+        "",
+        "Responda à última mensagem da Pessoa. Só o texto da resposta.",
+    ])
+
+
+def chat_entity() -> str:
+    """A IA da conversa: a de buscar na internet (um assistente com busca responde também o que é de fora), senão a de ler fotos."""
+    return search_entity() or photo_entity()
+
+
+def ai_chat(body: dict, user: str | None) -> dict:
+    need_ai_on()
+    raw = body.get("messages") if isinstance(body, dict) else None
+    if not isinstance(raw, list) or not raw:
+        raise ApiError(400, "Escreva uma mensagem.")
+    msgs = []
+    for m in raw[-CHAT_TURNS:]:
+        if not isinstance(m, dict) or m.get("role") not in ("user", "assistant"):
+            raise ApiError(400, "Conversa inválida.")
+        t = " ".join(str(m.get("text") or "").split()) if m["role"] == "user" else str(m.get("text") or "").strip()
+        if not t:
+            continue
+        msgs.append({"role": m["role"], "text": t[:CHAT_MAX_CHARS]})
+    if not msgs or msgs[-1]["role"] != "user":
+        raise ApiError(400, "Escreva uma mensagem.")
+    if not SUPERVISOR_TOKEN and not AI_MOCK:
+        raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
+    prompt = chat_prompt(msgs, body.get("screen") or {}, user)
+    entity = chat_entity()
+    with AiCall("chat", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
+        if AI_MOCK:
+            time.sleep(0.4)
+            reply = MOCK_CHAT
+        else:
+            res = ai_call_text("InventarIA: conversa", prompt, entity, timeout=120)
+            if isinstance(res, dict):  # tarefa de IA às vezes devolve um objeto
+                res = res.get("text") or res.get("resposta") or json.dumps(res, ensure_ascii=False)
+            reply = str(res or "").strip()
+            if not reply:
+                call.result = "formato"
+                raise ApiError(502, "A IA não devolveu resposta.")
+        call.answer(reply)
+    return {"reply": reply[:6000], "entity": entity or "padrão do Home Assistant"}
 
 
 # ---------------------------------------------------------------------------
@@ -2177,7 +2617,7 @@ def save_photo(body: dict) -> dict:
 
 
 MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
-        ".woff2": "font/woff2", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".woff2": "font/woff2", ".woff": "font/woff", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
         ".webp": "image/webp", ".json": "application/json; charset=utf-8", ".ico": "image/x-icon", ".webmanifest": "application/manifest+json"}
 
 
@@ -2210,7 +2650,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             with open(path, "rb") as f:
                 body = f.read()
-        except (FileNotFoundError, IsADirectoryError):
+        except (FileNotFoundError, IsADirectoryError, NotADirectoryError, ValueError):  # ValueError: byte nulo no caminho
             return self.send_json({"error": "Arquivo não encontrado."}, 404)
         headers = {"Cache-Control": cache}
         if download_name:
@@ -2219,7 +2659,23 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- entrada
     def user(self):
-        return (self.headers.get("X-Remote-User-Display-Name") or self.headers.get("X-Remote-User-Name") or "").strip()[:60] or None
+        v = (self.headers.get("X-Remote-User-Display-Name") or self.headers.get("X-Remote-User-Name") or "").strip()
+        try:
+            v = v.encode("latin-1").decode("utf-8")  # o http.server lê os cabeçalhos como latin-1; o Ingress manda UTF-8
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            pass
+        return v[:60] or None
+
+    def content_length(self) -> int:
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = -1
+        if n < 0:
+            self.close_connection = True
+            self._body_read = True
+            raise ApiError(400, "Pedido inválido.")
+        return n
 
     def read_raw(self, limit=MAX_BODY) -> bytes:
         if "chunked" in (self.headers.get("Transfer-Encoding") or "").lower():
@@ -2242,7 +2698,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.rfile.readline(65537)
             self._body_read = True
             return bytes(out)
-        length = int(self.headers.get("Content-Length") or 0)
+        length = self.content_length()
         if length > limit:
             self.close_connection = True
             raise ApiError(413, "Arquivo grande demais.")
@@ -2255,9 +2711,24 @@ class Handler(BaseHTTPRequestHandler):
         if not raw:
             return {}
         try:
-            return json.loads(raw.decode("utf-8"))
+            body = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, ValueError):
             raise ApiError(400, "Pedido inválido (JSON).")
+        if not isinstance(body, dict):
+            raise ApiError(400, "Pedido inválido.")
+        return body
+
+    def send_error(self, code, message=None, explain=None):
+        if code != 501:
+            return super().send_error(code, message, explain)
+        body = json.dumps({"error": "Método não aceito."}, ensure_ascii=False).encode("utf-8")  # PATCH, OPTIONS…: em JSON, como os outros erros
+        self.close_connection = True
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_GET(self):
         self.dispatch("GET")
@@ -2290,7 +2761,9 @@ class Handler(BaseHTTPRequestHandler):
                 if m == method:
                     match = rx.fullmatch(path)
                     if match:
-                        return fn(self, *match.groups(), query=query)
+                        fn(self, *match.groups(), query=query)
+                        self.drain()  # corpo que a rota não leu não pode sobrar para o próximo pedido da mesma conexão
+                        return None
             if method == "GET":
                 return self.static(path)
             raise ApiError(404, "Endereço não encontrado.")
@@ -2310,7 +2783,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.close_connection = True
                 self._body_read = True
                 return
-            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                length = self.content_length()
+            except ApiError:
+                length = 0
             if 0 < length <= MAX_BODY:
                 self.rfile.read(length)
             elif length:
@@ -2378,7 +2854,10 @@ def r_items_batch(h, query):
     bodies = body.get("items") or []
     if not isinstance(bodies, list) or not bodies or len(bodies) > 60:
         raise ApiError(400, "Envie de 1 a 60 itens.")
-    created = STORE.create_items(bodies, h.user(), room_photo=body.get("roomPhoto"))
+    rp = body.get("roomPhoto")
+    if rp is not None and not isinstance(rp, dict):
+        raise ApiError(400, "Foto do cômodo inválida.")
+    created = STORE.create_items(bodies, h.user(), room_photo=rp)
     h.send_json({"items": created, "rev": STORE.data["rev"], "rooms": STORE.data["rooms"]}, 201)
 
 
@@ -2496,13 +2975,27 @@ def r_web_cancel(h, jid, query):
     h.send_json({"ok": True})
 
 
+def r_chat(h, query):
+    h.send_json(ai_chat(h.read_body(), h.user()))
+
+
 def r_news_start(h, query):
     h.send_json(news_job_start(h.read_body()), 202)
 
 
 def r_news_status(h, jid, query):
     job = web_job(jid)
-    h.send_json({"stage": job["stage"], "msg": job["msg"], "news": job.get("news")})
+    h.send_json({"stage": job["stage"], "msg": job["msg"], "news": job.get("news"), "progress": job.get("progress"), "summary": job.get("summary")})
+
+
+def r_news_overview(h, query):
+    need_ai_on()
+    h.send_json(news_overview())
+
+
+def r_news_all(h, query):
+    h.read_body()
+    h.send_json(news_batch_start(), 202)
 
 
 def r_news_cancel(h, jid, query):
@@ -2535,6 +3028,11 @@ def r_settings_put(h, query):
             if not isinstance(body[key], bool):
                 raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
             upd[key] = body[key]
+    if "news_cats" in body:
+        nc = body["news_cats"]
+        if not isinstance(nc, list) or any(not isinstance(c, str) or c not in STORE.cat_map() for c in nc):
+            raise ApiError(400, "Categoria inválida.")
+        upd["news_cats"] = list(dict.fromkeys(nc))
     with STORE.lock:
         STORE.settings.update(upd)
         STORE.save_settings()
@@ -2567,8 +3065,9 @@ def r_export(h, kind, query):
         h.send_header("Content-Disposition", f'attachment; filename="inventario-{day}.zip"')
         h.send_header("Cache-Control", "no-store")
         h.end_headers()
-        with open(tmp, "rb") as f:
-            shutil.copyfileobj(f, h.wfile, 256 * 1024)
+        if h.command != "HEAD":
+            with open(tmp, "rb") as f:
+                shutil.copyfileobj(f, h.wfile, 256 * 1024)
     finally:
         os.unlink(tmp)
 
@@ -2677,7 +3176,10 @@ def r_history_restore(h, query):
     name = h.read_body().get("name") or ""
     if not HISTORY_NAME.fullmatch(name):
         raise ApiError(400, "Versão inválida.")
-    data = read_json(os.path.join(HISTORY_DIR, name))
+    try:
+        data = read_json(os.path.join(HISTORY_DIR, name))
+    except (ValueError, OSError):
+        raise ApiError(400, "Esta versão está corrompida. Escolha outra.") from None
     if data is None:
         raise ApiError(404, "Versão não encontrada.")
     STORE.replace_all(data)
@@ -2776,7 +3278,7 @@ def r_integracao_itens(h, query):
         items = sorted(STORE.data.get("items") or [], key=lambda it: (order.get(it.get("room"), 999), (it.get("name") or "").lower()))
         out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "comodo": it.get("room") or "", "zona": (it.get("zone") or "")[:60],
                 "categoria": it.get("cat") or "outros", "valor": round(float(it.get("value") or 0), 2),
-                "valor_em": str(it.get("valueAt") or it.get("updatedAt") or it.get("createdAt") or "")[:10]} for it in items if it.get("id")]
+                "valor_em": str(it.get("valueAt") or it.get("createdAt") or "")[:10]} for it in items if it.get("id")]
         cats = STORE.cat_map()  # as categorias da casa (editáveis em Mais > Opções)
     h.send_json({"versao": VERSION, "itens": out[:2000], "categorias": cats})
 
@@ -2810,7 +3312,10 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/web-photos/([a-f0-9]{16})", r_web_status),
     ("GET", r"/api/web-photos/([a-f0-9]{16})/(\d)", r_web_image),
     ("DELETE", r"/api/web-photos/([a-f0-9]{16})", r_web_cancel),
+    ("POST", r"/api/chat", r_chat),
+    ("GET", r"/api/news", r_news_overview),
     ("POST", r"/api/news", r_news_start),
+    ("POST", r"/api/news/all", r_news_all),
     ("GET", r"/api/news/([a-f0-9]{16})", r_news_status),
     ("DELETE", r"/api/news/([a-f0-9]{16})", r_news_cancel),
     ("GET", r"/api/settings", r_settings_get),

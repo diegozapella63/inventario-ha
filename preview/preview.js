@@ -9,7 +9,8 @@
   const catsOf = (d) => { if (!Array.isArray(d.cats) || !d.cats.length) d.cats = clone(DEF_CATS); return d.cats; };
   const CATS = { has: (k) => ST.data && catsOf(ST.data).some((c) => c.id === k) };
   const foldName = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const ST = { data: null, rev: 1, blobs: new Map(), jobs: new Map(), settings: { ai_entity: "", ai_search: "", ai: true, zones: false, ha_sensors: false, voice_stt: "" } };
+  const ST = { data: null, rev: 1, blobs: new Map(), jobs: new Map(), settings: { ai_entity: "", ai_search: "", ai: true, zones: false, ha_sensors: false, voice_stt: "" },
+    news: { itens: {}, triagem: {}, ultima: null } };
   const now = () => new Date().toISOString();
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -253,12 +254,69 @@
       if (!j.results.length) return { stage: "error", msg: "Não achei fotos desse produto nas páginas que a IA encontrou. Tente buscar só pela marca e o modelo.", results: [], product: j.product };
       return { stage: "done", msg: "", results: j.results.map(({ file, ...r }) => r), product: j.product, example: true };
     }
+    // Novidades de todos: a "IA" da prévia escolhe os eletrônicos e aparelhos, e cada um ganha as novidades de exemplo
+    const NEWS_DEF = ["eletronicos", "cozinha", "utilidades", "saude", "outros"];
+    const newsCats = () => (Array.isArray(ST.settings.news_cats) ? ST.settings.news_cats : NEWS_DEF).filter((c) => CATS.has(c));
+    const PICK = /\b(tv|televis|notebook|computador|celular|tablet|geladeira|micro-?ondas|maquina|lavadora|lampada|fone|caixa de som|soundbar|cafeteira|ar.condicionado|aspirador|roteador|impressora|monitor|console|camera|forno)/i;
+    const plain = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const exampleNews = (name) => {
+      const y = new Date().getFullYear();
+      return { produto: name, novidades: [
+        { tipo: "atualizacao", titulo: "Atualização de software com correções", resumo: "O fabricante liberou uma versão nova, com correções de estabilidade.", data: `${y}-09`, fonte: "https://exemplo.com/atualizacao", site: "exemplo.com", boato: false },
+        { tipo: "sucessor", titulo: "Modelo novo da mesma linha anunciado", resumo: "A geração seguinte chega com melhorias de consumo e conexão.", data: `${y}-10`, fonte: "https://exemplo.com/lancamento", site: "exemplo.com", boato: false },
+        { tipo: "lancamento", titulo: "Versão nova pode chegar no próximo ano", resumo: "Sites de tecnologia falam de uma versão nova; o fabricante não confirmou.", data: "", fonte: "https://exemplo.com/rumor", site: "exemplo.com", boato: true },
+      ].sort((a, b) => (b.data || "0").localeCompare(a.data || "0")) };
+    };
+    const newsJobOf = () => [...ST.jobs.entries()].find(([, j]) => j.lote && !j.done);
+    const newsTick = (j) => { // a conferência anda com o relógio: um item a cada 0,7 s
+      const n = Math.min(j.todo.length, Math.floor((Date.now() - j.at) / 700));
+      for (const it of j.todo.slice(j.saved, n)) ST.news.itens[it.id] = { at: new Date().toISOString(), news: exampleNews(it.name) };
+      j.saved = n;
+      if (n >= j.todo.length && !j.done) { j.done = true; ST.news.ultima = { at: new Date().toISOString(), conferidos: n, com_novidades: n, selecionados: n, em_dia: 0, erros: 0 }; }
+      return n;
+    };
+    if (method === "GET" && path === "api/news") {
+      aiOff();
+      const cats = newsCats(), tri = ST.news.triagem;
+      const live = newsJobOf();
+      if (live) newsTick(live[1]);
+      const lj = newsJobOf();
+      return { cats, triagem: { ...tri }, pendentes: d.items.filter((i) => cats.includes(i.cat) && !(i.id in tri)).length,
+        itens: { ...ST.news.itens }, ultima: ST.news.ultima, job: lj ? { id: lj[0], stage: "busy", msg: "Conferindo…", progress: null, summary: null } : null };
+    }
+    if (method === "POST" && path === "api/news/all") {
+      aiOff();
+      const live = newsJobOf();
+      if (live) return { id: live[0] };
+      const cats = newsCats();
+      if (!cats.length) fail("Marque ao menos uma categoria.");
+      for (const i of d.items) if (cats.includes(i.cat) && !(i.id in ST.news.triagem)) ST.news.triagem[i.id] = i.cat === "eletronicos" || PICK.test(plain(i.name));
+      const week = Date.now() - 7 * 864e5;
+      const todo = d.items.filter((i) => cats.includes(i.cat) && ST.news.triagem[i.id] && !(ST.news.itens[i.id] && Date.parse(ST.news.itens[i.id].at) > week));
+      const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");
+      ST.jobs.set(id, { lote: true, at: Date.now(), todo, saved: 0, done: false });
+      return { id };
+    }
+    if ((m = path.match(/^api\/news\/([a-f0-9]+)$/)) && ST.jobs.get(m[1]) && ST.jobs.get(m[1]).lote) {
+      const j = ST.jobs.get(m[1]);
+      if (method === "DELETE") { j.done = true; ST.jobs.delete(m[1]); return { ok: true }; }
+      aiOff();
+      const n = newsTick(j);
+      if (!j.done) return { stage: "busy", msg: `Conferindo ${n + 1} de ${j.todo.length}: ${j.todo[n].name}`, progress: { feitos: n, total: j.todo.length, atual: j.todo[n].name } };
+      return { stage: "done", msg: "", summary: { ...ST.news.ultima }, example: true };
+    }
+    if (method === "POST" && path === "api/chat") {
+      aiOff();
+      await wait(900);
+      const last = [...(body.messages || [])].reverse().find((m) => m.role === "user");
+      return { reply: `Exemplo da prévia: no Home Assistant, a IA responde de verdade, com os dados desta tela.\n- Você perguntou: “${String(last ? last.text : "").slice(0, 120)}”`, entity: "ai_task.exemplo" };
+    }
     if (method === "POST" && path === "api/news") {
       aiOff();
       const it = d.items.find((i) => i.id === body.item);
       if (!it) fail("Item não encontrado.", 404);
       const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");
-      ST.jobs.set(id, { at: Date.now(), news: true, name: it.name });
+      ST.jobs.set(id, { at: Date.now(), news: true, name: it.name, item: it.id });
       return { id };
     }
     if ((m = path.match(/^api\/news\/([a-f0-9]+)$/))) {
@@ -267,6 +325,7 @@
       if (!j) fail("Esta busca terminou. Busque de novo.", 404);
       aiOff();
       if (Date.now() - j.at < 1600) return { stage: "busy", msg: "Procurando novidades…" };
+      ST.news.itens[j.item] = { at: new Date().toISOString(), news: exampleNews(j.name) };
       const y = new Date().getFullYear();
       return { stage: "done", msg: "", example: true, news: { produto: j.name, novidades: [
         { tipo: "atualizacao", titulo: "Atualização de software com correções", resumo: "O fabricante liberou uma versão nova, com correções de estabilidade.", data: `${y}-09`, fonte: "https://exemplo.com/atualizacao", site: "exemplo.com", boato: false },

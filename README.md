@@ -34,7 +34,8 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 - **Falar**: o microfone no alto da tela. Fale os itens e quanto valem; o Home Assistant transcreve com a fala para texto que você escolher (ou a do Assist) e a IA separa os itens para você conferir.
 - **Uso da IA**: chamadas de hoje, da semana e do mês, gráfico por dia, últimas chamadas com tokens estimados e, se você ligar, o sensor `sensor.inventaria_ia_hoje` no Home Assistant.
 - **Fotos da internet**: num item sem foto, a IA procura o produto no fabricante e nas lojas e o app mostra as fotos para você escolher. A foto fica marcada como ilustrativa, com o site de onde veio. Na mesma busca, a IA traz nome, detalhes, categoria e valor para preencher o item.
-- **Novidades** de cada item: a IA procura atualizações, lançamentos, modelo novo, recalls e fim de suporte, com a fonte de cada um.
+- **Novidades** de cada item ou de todos os equipamentos de uma vez (a IA escolhe quais): atualizações, lançamentos, modelo novo, recalls e fim de suporte, com a fonte de cada um.
+- **Conversar** com a IA a qualquer momento, ao lado do microfone, sobre o que está na tela ou qualquer outro assunto.
 - **Buscar** por nome, marca ou detalhe, sem se importar com acentos, com filtros por cômodo e categoria.
 - **Relatório para seguro** por cômodo, com fotos, pronto para imprimir ou salvar em PDF.
 - **Exportar** em CSV, JSON ou ZIP com fotos, **backup** na pasta `share/inventario` e versões automáticas a cada 10 minutos de uso.
