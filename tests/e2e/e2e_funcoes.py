@@ -27,6 +27,16 @@ async def body(r, p):
     r.eq(await ev("() => __f.esc('<img src=x onerror=alert(1)>&\"')"), "&lt;img src=x onerror=alert(1)&gt;&amp;&quot;", "texto escapado (sem HTML de fora)")
     r.eq(await ev("() => __f.siteOf('https://www.loja.exemplo/p?x=1')"), "loja.exemplo", "site de uma foto da internet")
 
+    # Cor do dia: uma cor da paleta por dia, pela data local; o cinza fica de fora; depois da última, a primeira
+    r.eq(await ev("() => [__f.accents().length, __f.dayAccents()]"),
+         [10, ["amarelo", "laranja", "coral", "rosa", "lilas", "azul", "turquesa", "verde", "kraft"]], "Cor do dia: as 10 cores menos o Cinza")
+    dias = await ev("() => [[2026, 10, 3], [2026, 10, 4], [2026, 10, 5], [2026, 10, 6], [2026, 11, 31], [2027, 0, 1], [2024, 1, 29], [1970, 0, 1]].map(([y, m, d]) => __f.colorOfDay(new Date(y, m, d, 12)))")
+    r.eq(dias, ["turquesa", "verde", "kraft", "amarelo", "laranja", "coral", "amarelo", "amarelo"], "Cor do dia em datas fixas (de Kraft volta a Amarelo; virada do ano; 29 de fevereiro)")
+    r.eq(await ev("() => [0, 1, 12, 23].map(h => __f.colorOfDay(new Date(2026, 10, 3, h, h ? 59 : 0, h ? 59 : 0)))"), ["turquesa"] * 4, "a mesma cor o dia todo, da meia-noite às 23h59")
+    seq = await ev("() => Array.from({ length: 18 }, (_, i) => __f.colorOfDay(new Date(2026, 10, 3 + i)))")
+    r.check(len(set(seq[:9])) == 9 and seq[9:] == seq[:9], f"9 dias seguidos, 9 cores diferentes, e de novo ({seq})")
+    r.check(await ev("() => Array.from({ length: 3700 }, (_, i) => __f.colorOfDay(new Date(2026, 0, 1 + i))).every(c => c !== 'cinza')"), "em 10 anos, nenhum dia Cinza")
+
     # Falar sem IA: separa pelas vírgulas, pontos e "e"; valor falado vai para o item
     split = await ev("(t) => __f.splitSpoken(t).map(i => [i.name, i.value])",
                      "Sofá cinza, 2.000 reais. Mesa de jantar e quatro cadeiras, TV Samsung R$ 3.000, cafeteira por 499,90 reais")

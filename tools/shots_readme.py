@@ -2,7 +2,7 @@
 """Tira as 4 imagens do README (docs/*.png) com a casa de exemplo de demo.py.
 
 Uso: shots_readme.py <url-do-servidor-de-exemplo> <ia.json> <pasta-de-saida>
-Celular 390x844 em 2x, tema escuro, cor padrão (amarelo), usuário "Diego".
+Celular 390x844 em 2x, tema escuro, cor padrão (amarelo, sem a Cor do dia), usuário "Diego".
 """
 import asyncio
 import json
@@ -23,6 +23,7 @@ async def main():
         ctx = await b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, color_scheme="dark",
                                   is_mobile=True, has_touch=True, reduced_motion="reduce",
                                   extra_http_headers={"X-Remote-User-Display-Name": "Diego"})
+        await ctx.add_init_script("try{localStorage.setItem('inv:accentDaily', 'false')}catch(e){}")
         pg = await ctx.new_page()
         pg.on("pageerror", lambda e: errors.append(str(e)))
 

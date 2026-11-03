@@ -32,7 +32,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 
 | Arquivo | O que cobre |
 |---|---|
-| `e2e_funcoes` | as contas puras da tela (valores, quantidades, Falar sem IA, dados da internet, categorias, datas das novidades) |
+| `e2e_funcoes` | as contas puras da tela (valores, quantidades, Falar sem IA, dados da internet, categorias, datas das novidades, a Cor do dia) |
 | `e2e_inicio_busca` | Início em 4 tamanhos, busca sem acento, filtros, ordem, endereço da busca |
 | `e2e_busca` | zonas na busca, mais resultados, limpar, Voltar, ordem por relevância, filtros pelo endereço |
 | `e2e_itens` | ficha, cadastro com foto, salvar e adicionar outro, editar, mover, duplicar, excluir e desfazer, conflito, rascunho, atalhos |
@@ -57,7 +57,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | `e2e_backups` | lista de backups, restaurar um antigo, pasta share indisponível |
 | `e2e_versoes` | versões anteriores: nenhuma, várias, os motivos, restaurar cada uma |
 | `e2e_importar_partes` | backup em partes, só fotos, cancelar no meio, progresso |
-| `e2e_ajustes` | Integrações com o Home Assistant de mentira (IA, Falar, uso, sensor, Usar IA), Aparência (tema e as 10 cores), Opções (zonas e categorias) |
+| `e2e_ajustes` | Integrações com o Home Assistant de mentira (IA, Falar, uso, sensor, Usar IA), Aparência (tema, as 10 cores e a Cor do dia: ligada de início, a cor de cada dia, a virada da meia-noite, escolher uma cor desliga), Opções (zonas e categorias) |
 | `e2e_uso_ia` | painel Uso da IA: dias, barras, tipos, últimas chamadas, links do provedor |
 | `e2e_relatorio` | totais, ordem, fotos, zonas, impressão e PDF |
 | `e2e_navegacao` | abas, arrastar para o lado, Voltar, endereços que não existem, atualização vinda de outro aparelho |

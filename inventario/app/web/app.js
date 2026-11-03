@@ -86,7 +86,17 @@
   // Cor do app (as cores ficam no style.css, em [data-accent]). Cada aparelho guarda a sua.
   const ACCENTS = [["amarelo", "Amarelo"], ["laranja", "Laranja"], ["coral", "Coral"], ["rosa", "Rosa"], ["lilas", "Lilás"],
     ["azul", "Azul"], ["turquesa", "Turquesa"], ["verde", "Verde"], ["kraft", "Kraft"], ["cinza", "Cinza"]];
-  const accentOf = () => { const a = LS.get("accent", "amarelo"); return ACCENTS.some(([k]) => k === a) ? a : "amarelo"; };
+  const pickedAccent = () => { const a = LS.get("accent", "amarelo"); return ACCENTS.some(([k]) => k === a) ? a : "amarelo"; };
+  // Cor do dia (Mais > Aparência): ligada até a pessoa desligar ou escolher uma cor. Uma cor da paleta por dia,
+  // pela data local: a mesma o dia todo e em todos os aparelhos; amanhã, a seguinte. O cinza fica de fora.
+  // O index.html faz a mesma conta antes de pintar a tela.
+  const DAY_ACCENTS = ACCENTS.map(([k]) => k).filter((k) => k !== "cinza");
+  function colorOfDay(d = new Date()) {
+    const day = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000), n = DAY_ACCENTS.length;
+    return DAY_ACCENTS[((day % n) + n) % n];
+  }
+  const accentDaily = () => LS.get("accentDaily", true) !== false;
+  const accentOf = () => (accentDaily() ? colorOfDay() : pickedAccent());
   // Mais em abas, como no CronologIA e no ResolvIA: #/mais (Dados, com Exportar no alto), #/mais/integracoes e #/mais/aparencia.
   const ALL_TABS = [["dados", "Dados", "archive"], ["novidades", "Novidades", "spark"], ["integracoes", "Integrações", "plug"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
   const moreTabs = () => ALL_TABS.filter(([k]) => k !== "novidades" || aiOn()); // Novidades usa a IA: com ela desligada, a aba some
@@ -94,8 +104,15 @@
   function applyAccent(a) {
     if (a === "amarelo") delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = a;
+    // Aparência aberta: a cor que está valendo fica marcada
+    document.querySelectorAll('[data-input="accent"]').forEach((r) => { r.checked = r.value === a; });
   }
   applyAccent(accentOf());
+  // passou da meia-noite com o app aberto: a cor do dia novo, sem recarregar
+  const refreshAccent = () => { if (accentDaily()) applyAccent(colorOfDay()); };
+  setInterval(refreshAccent, 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshAccent(); });
+  window.addEventListener("focus", refreshAccent);
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
   const tokens = (q) => norm(q).split(/\s+/).filter(Boolean);
   function hl(text, toks) {
@@ -1151,6 +1168,8 @@
     <section class="panel" id="p-accent">
       <h2 id="accent-h">${secIc("palette")}Cor do app</h2>
       <p class="lead">Tema e cor valem só para este aparelho.</p>
+      <ul class="opts"><li><div class="ot"><b id="daily-h">Cor do dia</b><span>Muda a cor do app todo dia.</span></div>
+        <div class="oa">${switchHtml("accent-daily", accentDaily(), "daily-h")}</div></li></ul>
       <div class="swatches" role="radiogroup" aria-labelledby="accent-h">${ACCENTS.map(([k, v]) => `<label class="sw" data-accent="${k}"><input type="radio" name="accent" value="${k}" data-input="accent"${k === accent ? " checked" : ""}>${SWATCH}<span>${v}</span></label>`).join("")}</div>
     </section>`;
   }
@@ -2985,10 +3004,18 @@
     else delete document.documentElement.dataset.theme;
     $$('[data-act="theme"]').forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === t)));
   }
+  // escolher uma cor desliga a Cor do dia e fica com ela
   function setAccent(a) {
     if (!ACCENTS.some(([k]) => k === a)) a = "amarelo";
     LS.set("accent", a);
-    applyAccent(a);
+    setAccentDaily(false);
+  }
+  // ligada, a cor do dia; desligada, a última cor escolhida (ou o amarelo)
+  function setAccentDaily(on) {
+    LS.set("accentDaily", on);
+    const sw = $('[data-input="accent-daily"]');
+    if (sw) sw.checked = on;
+    applyAccent(accentOf());
   }
 
   // ------------------------------------------------------------------ eventos globais
@@ -3096,6 +3123,7 @@
     else if (k === "search-ord") updateSearch({ ord: t.value });
     else if (k === "rep-photos") { LS.set("reportPhotos", t.checked); renderView(false); }
     else if (k === "accent" && t.checked) setAccent(t.value);
+    else if (k === "accent-daily") setAccentDaily(t.checked);
     else if (k === "ai-entity") {
       try { await API.put("api/settings", { ai_entity: t.value }); S.settings.ai_entity = t.value; const slot = $('#view [data-slot="ai-panel"]'); if (slot) renderAiPanel(slot, await aiStatus(true)); toast("IA para ler fotos atualizada"); }
       catch (er) { fail(er); }
@@ -3226,7 +3254,8 @@
   // os testes da tela (tests/e2e) pedem as funções puras para conferir as contas e as regras
   if (typeof window.INV_TEST === "function") {
     window.INV_TEST({ esc, norm, numTxt, money, moneyR, plural, pct, pctFmt, ago, parseMoney, moneyInput, qtyClean, qtyNum, qtyLabel, qtyShort,
-      splitSpoken, wordsToNumbers, newsDate, chatHtml, webFills, siteOf, suggestCode, hl, applyCats, cats: () => CATS });
+      splitSpoken, wordsToNumbers, newsDate, chatHtml, webFills, siteOf, suggestCode, hl, applyCats, cats: () => CATS,
+      colorOfDay, dayAccents: () => DAY_ACCENTS, accents: () => ACCENTS.map(([k]) => k) });
   }
   if (!PREVIEW || window.INV_BACKEND) boot();
   else window.INV_BOOT = boot;

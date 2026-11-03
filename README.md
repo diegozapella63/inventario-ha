@@ -40,7 +40,7 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 - **Relatório para seguro** por cômodo, com fotos, pronto para imprimir ou salvar em PDF.
 - **Exportar** em CSV, JSON ou ZIP com fotos, **backup** na pasta `share/inventario` e versões automáticas a cada 10 minutos de uso.
 - **Importar backup** pelo celular, inclusive dividido em partes.
-- **Tema claro e escuro** e **cor do app**: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza.
+- **Tema claro e escuro** e **cor do app**: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza, ou a **Cor do dia**, que muda todo dia.
 
 Mais detalhes em [inventario/DOCS.md](inventario/DOCS.md).
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.23.0
+
+- **Cor do dia**, em Mais > Aparência: a cor do app muda todo dia (a mesma o dia todo, em todos os aparelhos), sem o cinza. Vem ligada. Escolher uma cor desliga; ligar de novo volta à cor do dia.
+- No celular estreito, as chaves de Mais ficam à direita, na linha do nome.
+
 ## 1.22.0
 
 - **Novidades**: vêm só as 3 mais recentes de cada equipamento. As já guardadas também passam a mostrar só as 3.

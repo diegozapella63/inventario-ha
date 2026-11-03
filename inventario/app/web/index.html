@@ -7,7 +7,8 @@
 <meta name="referrer" content="same-origin">
 <title>InventarIA</title>
 <link rel="stylesheet" href="style.css?v=%%V%%">
-<script>try{var t=JSON.parse(localStorage.getItem("inv:theme")||"null");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;var a=JSON.parse(localStorage.getItem("inv:accent")||"null");if(typeof a==="string"&&/^[a-z]{2,16}$/.test(a)&&a!=="amarelo")document.documentElement.dataset.accent=a}catch(e){}</script>
+<!-- tema e cor antes de pintar a tela; a Cor do dia é a mesma conta do colorOfDay do app.js -->
+<script>try{var h=document.documentElement,L=function(k){try{return JSON.parse(localStorage.getItem("inv:"+k)||"null")}catch(e){return null}},t=L("theme"),a=L("accent");if(t==="light"||t==="dark")h.dataset.theme=t;if(L("accentDaily")!==false){var c=["amarelo","laranja","coral","rosa","lilas","azul","turquesa","verde","kraft"],d=new Date();a=c[Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5)%c.length]}if(typeof a==="string"&&/^[a-z]{2,16}$/.test(a)&&a!=="amarelo")h.dataset.accent=a}catch(e){}</script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">

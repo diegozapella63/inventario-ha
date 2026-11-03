@@ -896,6 +896,7 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .opts { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
 .opts > li { display: flex; align-items: center; gap: 16px; padding: 14px 4px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .opts .ot { flex: 1; min-width: 220px; }
+.opts > li:has(> .oa > .switch) .ot { min-width: 0; } /* a chave fica à direita, mesmo no celular estreito */
 .opts .ot b { display: block; font-weight: 600; }
 .opts .ot span { color: var(--muted); font-size: 14px; }
 .opts .oa { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -910,6 +911,7 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 /* cor do app: amostras em forma de etiqueta, cada uma pintada pelo próprio data-accent */
 .swatches { flex: 1 1 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: -6px -4px 0; min-width: 0; }
 @media (min-width: 700px) { .swatches { grid-template-columns: repeat(10, minmax(0, 76px)); } }
+.opts + .swatches { margin-top: 10px; } /* abaixo da Cor do dia */
 .sw { --sw-bg: var(--paper); position: relative; display: grid; justify-items: center; gap: 4px; padding: 8px 2px 7px; border-radius: 10px; background: var(--sw-bg); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 @media (hover: hover) { .sw:hover { --sw-bg: var(--surface-2); } }
 .sw input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }

@@ -107,8 +107,8 @@ class Run:
         ctx = await b.new_context(viewport={"width": w, "height": h}, device_scale_factor=2 if mobile else 1, is_mobile=mobile, has_touch=mobile,
                                   color_scheme=scheme, reduced_motion=motion, user_agent=ua, permissions=perms or [],
                                   extra_http_headers={"X-Remote-User-Display-Name": user} if user else {})
-        if accent:  # None: fica a cor que a pessoa escolher na tela
-            await ctx.add_init_script(f"try{{localStorage.setItem('inv:accent', JSON.stringify('{accent}'))}}catch(e){{}}")
+        if accent:  # uma cor fixa, sem a Cor do dia; None: fica a do dia ou a que a pessoa escolher na tela
+            await ctx.add_init_script(f"try{{localStorage.setItem('inv:accent', JSON.stringify('{accent}'));localStorage.setItem('inv:accentDaily', 'false')}}catch(e){{}}")
         if init:
             await ctx.add_init_script(init)
         pg = await ctx.new_page()
