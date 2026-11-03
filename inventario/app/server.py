@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.21.0"
+VERSION = "1.21.1"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -2719,6 +2719,8 @@ class Handler(BaseHTTPRequestHandler):
         return body
 
     def send_error(self, code, message=None, explain=None):
+        if getattr(self, "request_version", "") == "HTTP/0.9":
+            self.request_version = "HTTP/1.0"  # pedido torto: no Python 3.12 a resposta saía sem a linha de status
         if code != 501:
             return super().send_error(code, message, explain)
         body = json.dumps({"error": "Método não aceito."}, ensure_ascii=False).encode("utf-8")  # PATCH, OPTIONS…: em JSON, como os outros erros

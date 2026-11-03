@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testes do InventarIA (só Python 3, sem instalar nada):
+# Testes do InventarIA (só Python 3, sem instalar nada; usa o python3.12 se houver, como o app):
 #
 #   tests/run.sh               unitários e de integração
 #   tests/run.sh unit          só os unitários
@@ -10,9 +10,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 export TZ="${TZ:-America/Sao_Paulo}"
 what="${1:-all}"
 code=0
+PY="${PYTHON:-$(command -v python3.12 || echo python3)}"
 run() {
   echo "== $1"
-  (cd "$HERE/$1" && "${PYTHON:-python3}" -W error::ResourceWarning -m unittest discover -s . -t . -p 'test_*.py' "${@:2}") || code=1
+  (cd "$HERE/$1" && "$PY" -W error::ResourceWarning -m unittest discover -s . -t . -p 'test_*.py' "${@:2}") || code=1
 }
 case "$what" in
   unit) run unit ;;

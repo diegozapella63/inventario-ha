@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.21.1
+
+- Um pedido torto (de um programa que não é o navegador) recebe a resposta de erro completa.
+
 ## 1.21.0
 
 - **Conversar**: o balão ao lado do microfone abre uma conversa com a IA, em qualquer tela, sobre o que está nela ou outro assunto. A IA vê o item, o cômodo, a busca ou as novidades da tela e o resumo da casa, mas não muda o inventário. Dá para falar a pergunta.
