@@ -21,6 +21,7 @@ from helpers import AppServer, FakeHA, FakeSite  # noqa: E402,F401
 TMP = os.environ.get("E2E_TMP") or os.path.join(os.environ.get("TMPDIR", "/tmp"), "inventaria-e2e")
 SHOTS = os.path.join(TMP, "shots")
 os.makedirs(SHOTS, exist_ok=True)
+COV = os.environ.get("E2E_COV")  # pasta: grava a cobertura do app.js (tools/cobertura.py)
 
 ANDROID_APP_UA = ("Mozilla/5.0 (Linux; Android 14; SM-S921B Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 "
                   "Chrome/130.0 Mobile Safari/537.36 Home Assistant/2026.10.1-full")
@@ -40,6 +41,7 @@ class Run:
         self.app: AppServer | None = None
         self.site: FakeSite | None = None
         self.pages = []  # para a captura de tela quando o teste para no meio
+        self.cov, self._cdp = [], {}
 
     # -- conferências
     def check(self, cond, label):
@@ -90,7 +92,15 @@ class Run:
         args = []
         if camera or mic:
             args = ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"]
-        return await p.chromium.launch(args=args)
+        b = await p.chromium.launch(args=args)
+        if COV:
+            close = b.close
+
+            async def b_close(*a, **k):
+                await self.cov_take_all()
+                return await close(*a, **k)
+            b.close = b_close
+        return b
 
     async def page(self, b, size="cel", scheme="dark", accent="amarelo", ua=None, perms=None, init=None, user="Diego", motion="reduce"):
         w, h, mobile = SIZES[size]
@@ -103,9 +113,47 @@ class Run:
             await ctx.add_init_script(init)
         pg = await ctx.new_page()
         self.pages.append(pg)
+        if COV:
+            await self._cov_start(ctx, pg)
         pg.on("pageerror", lambda e: self.logs.append(f"[pageerror] {e}"))
         pg.on("console", lambda m: self.logs.append(f"[console] {m.text}") if m.type == "error" and "Failed to load resource" not in m.text else None)
         return ctx, pg
+
+    # -- cobertura do app.js (E2E_COV): o Chromium perde a contagem ao recarregar, então ela é lida antes de cada goto/reload e ao fechar
+    async def _cov_start(self, ctx, pg):
+        cdp = await ctx.new_cdp_session(pg)
+        await cdp.send("Profiler.enable")
+        await cdp.send("Profiler.startPreciseCoverage", {"callCount": False, "detailed": True})
+        self._cdp[id(pg)] = cdp
+        for name in ("goto", "reload", "close"):
+            orig = getattr(pg, name)
+
+            async def wrapped(*a, _orig=orig, **k):
+                await self._cov_take(pg)
+                return await _orig(*a, **k)
+            setattr(pg, name, wrapped)
+        close = ctx.close
+
+        async def ctx_close(*a, **k):
+            await self.cov_take_all()
+            return await close(*a, **k)
+        ctx.close = ctx_close
+
+    async def _cov_take(self, pg):
+        cdp = self._cdp.get(id(pg))
+        if not cdp or pg.is_closed():
+            return
+        try:
+            res = (await cdp.send("Profiler.takePreciseCoverage"))["result"]
+        except Exception:  # noqa: BLE001
+            return
+        for sc in res:
+            if sc["url"].split("?")[0].endswith("/app.js"):
+                self.cov.append([[[r["startOffset"], r["endOffset"], r["count"]] for r in f["ranges"]] for f in sc["functions"]])
+
+    async def cov_take_all(self):
+        for pg in self.pages:
+            await self._cov_take(pg)
 
     async def open(self, pg, hash_="#/", wait=".tag, .welcome, #view .empty, .sbar, .rooms, .more-tabs, .report, .rhead"):
         if pg.url.startswith(self.base):  # só o # mudaria: recarrega para ler o que a API gravou
@@ -115,6 +163,10 @@ class Run:
         await pg.wait_for_timeout(250)
 
     def finish(self):
+        if COV and self.cov:
+            os.makedirs(COV, exist_ok=True)
+            with open(os.path.join(COV, f"js-{self.name}-{os.getpid()}.json"), "w") as f:
+                json.dump(self.cov, f)
         if self.app:
             self.app.stop()
         if self.site:
@@ -138,6 +190,7 @@ def main(name: str, body):
         async with async_playwright() as p:
             try:
                 await body(run, p)
+                await run.cov_take_all()
             except Exception as e:  # noqa: BLE001
                 import traceback
                 traceback.print_exc()

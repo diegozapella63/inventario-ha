@@ -10,6 +10,10 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 
 `tests/run.sh` roda as duas primeiras (só Python 3.12 ou mais novo, sem instalar nada; uns 2 minutos). Os visuais precisam de `pip install playwright && python -m playwright install chromium`; `E2E_JOBS=4 tests/e2e/run.sh` roda quatro de cada vez (uns 10 minutos). As capturas ficam em `$E2E_TMP/shots` e a saída de cada teste em `$E2E_TMP/logs`; no GitHub, no artefato **capturas-e-saidas** de cada execução.
 
+## Cobertura
+
+`tools/cobertura.py` roda as três camadas e mostra quanto do `server.py` (por camada e no total) e do `app.js` (pelos visuais) os testes executam; `--sem-visuais` pula os visuais. Só biblioteca padrão: o servidor é medido com `sys.monitoring` (`cobertura/sitecustomize.py`, Python 3.12+) e a tela com a contagem do próprio Chromium (`E2E_COV` em `e2e/e2e_lib.py`). As linhas que nenhum teste roda ficam em `faltam-server.txt` e `faltam-app.txt`, na pasta que ele mostra no fim.
+
 ## A casa de teste
 
 `fixtures/casa/` é uma casa **inventada** (6 cômodos, 38 itens, 9 fotos ilustradas): é a casa de todos os testes, da prévia (`tools/build_preview.py`) e do `dev/run.sh`. Nunca use dados, fotos ou valores reais do dono aqui.

@@ -49,6 +49,7 @@ dev/run.sh --limpar     # volta ao começo
 tests/run.sh                        # unitários e integração (só Python, ~40 s)
 tests/e2e/run.sh                    # visuais (pip install playwright; python -m playwright install chromium)
 E2E_JOBS=4 tests/e2e/run.sh e2e_itens e2e_telas   # só alguns, quatro de cada vez
+E2E_JOBS=4 tools/cobertura.py       # tudo, com a cobertura do server.py e do app.js (e o que falta)
 ```
 
 Tudo roda no GitHub a cada push (workflow **Testes**; as capturas ficam no artefato da execução). Detalhes e a lista do que cada teste cobre: `tests/README.md`. Mudou o comportamento, ajuste ou crie o teste; achou um erro, escreva o teste que o pega antes de corrigir; tela ou janela nova entra em `tests/e2e/e2e_telas.py` (confere 320 px a computador, claro e escuro).
