@@ -915,16 +915,12 @@
     return `
     <section class="panel" id="p-news">
       <h2>${secIc("spark")}Novidades</h2>
-      <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos equipamentos.</p>
-      <ul class="opts"><li><div class="ot"><b>Conferir todos</b><span>A IA escolhe os equipamentos das categorias marcadas, sem móveis nem decoração.</span></div>
+      <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos eletrônicos.</p>
+      <ul class="opts"><li><div class="ot"><b>Conferir todos</b><span>A IA escolhe, entre os eletrônicos, os que vale conferir.</span></div>
         <div class="oa"><button type="button" class="btn primary" data-act="news-all">${ic("spark")}Conferir novidades</button></div></li>
         <li><div class="ot"><b>Limpar</b><span>Apaga as novidades encontradas e as escolhas da IA.</span></div>
         <div class="oa"><button type="button" class="btn" data-act="news-clear">${ic("trash")}Limpar novidades</button></div></li></ul>
       <div data-slot="news-job"></div>
-    </section>
-    <section class="panel" id="p-news-cats">
-      <h2>${secIc("grid")}Categorias</h2>
-      <div data-slot="news-cats"><p class="muted">Carregando…</p></div>
     </section>
     <section class="panel" id="p-news-list">
       <h2>${secIc("tag")}Equipamentos</h2>
@@ -950,16 +946,15 @@
   }
   function renderNews() {
     const ov = newsOv;
-    const cs = $('#view [data-slot="news-cats"]'), ls = $('#view [data-slot="news-list"]');
-    if (!ov || !cs || !ls) return;
-    cs.innerHTML = `<div class="chips" role="group" aria-label="Categorias para conferir">${CATS.map(([k, v]) => `<label class="chip"><input type="checkbox" value="${esc(k)}" data-input="news-cat"${ov.cats.includes(k) ? " checked" : ""}><span>${esc(v)}</span></label>`).join("")}</div>`;
+    const ls = $('#view [data-slot="news-list"]');
+    if (!ov || !ls) return;
     const res = ov.itens || {}, tri = ov.triagem || {};
     const rank = (it) => { const r = res[it.id]; return newsRecall(r) ? 0 : newsCount(r) ? 1 : !r ? 2 : 3; };
     const sortIt = (a, b) => rank(a) - rank(b) || newsCount(res[b.id]) - newsCount(res[a.id]) || a.name.localeCompare(b.name, "pt-BR");
     const chosen = S.items.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || (res[it.id] && tri[it.id] !== false))).sort(sortIt);
     const out = S.items.filter((it) => tri[it.id] === false && ov.cats.includes(it.cat)).sort(sortIt);
     ls.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map((it) => newsRow(it, res[it.id])).join("")}</ul>`
-        : `<p class="muted">${ov.pendentes ? "Toque em Conferir novidades: a IA escolhe os equipamentos." : "Nenhum equipamento nas categorias marcadas."}</p>`}
+        : `<p class="muted">${ov.pendentes ? "Toque em Conferir novidades: a IA escolhe os equipamentos." : "Nenhum item em Eletrônicos."}</p>`}
       ${out.length ? `<details class="news-out"><summary>${ic("chev", "sm")}Deixados de fora pela IA (${int(out.length)})</summary><ul class="nlist">${out.map((it) => newsRow(it, res[it.id])).join("")}</ul></details>` : ""}`;
     if (!newsJob) renderNewsJob(null);
   }
@@ -3137,11 +3132,6 @@
         if (slot) renderVoicePanel(slot);
         toast(S.voice && S.voice.ready ? `Falar agora transcreve com ${S.voice.name || S.voice.engine}` : "Fala para texto atualizada");
       } catch (er) { fail(er); t.disabled = false; }
-    }
-    else if (k === "news-cat") {
-      const cats = $$('[data-input="news-cat"]:checked').map((x) => x.value);
-      try { await API.put("api/settings", { news_cats: cats }); S.settings.news_cats = cats; loadNews(); }
-      catch (er) { t.checked = !t.checked; fail(er); }
     }
     else if (k === "ai-search") {
       try { await API.put("api/settings", { ai_search: t.value }); S.settings.ai_search = t.value; aiCache.at = 0; toast("IA para buscar fotos atualizada"); }

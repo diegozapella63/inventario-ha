@@ -110,11 +110,11 @@ class Todos(ServerCase):
     server_kw = {"mock_ai": True}
 
     def setUp(self):
-        self.app.ok("PUT", "api/settings", {"ai": True, "news_cats": ["eletronicos", "cozinha"]})
+        self.app.ok("PUT", "api/settings", {"ai": True})
 
     def test_visao_da_aba(self):
         ov = self.app.ok("GET", "api/news")
-        self.assertEqual(ov["cats"], ["eletronicos", "cozinha"])
+        self.assertEqual(ov["cats"], ["eletronicos"])
         self.assertIn("pendentes", ov)
         self.assertIn("itens", ov)
 
@@ -124,13 +124,12 @@ class Todos(ServerCase):
 
     def test_conferir_todos_do_comeco_ao_fim(self):
         app = self.fresh(mock_ai=True)
-        app.ok("PUT", "api/settings", {"news_cats": ["eletronicos"]})
         st, _, body = app.request("POST", "api/news/all", {})
         self.assertEqual(st, 202)
         fim = esperar(app, body["id"], timeout=30)
         self.assertEqual(fim["stage"], "done")
-        n = sum(1 for i in app.data()["items"] if i["cat"] == "eletronicos")
-        self.assertEqual(fim["summary"]["conferidos"], n, "a IA simulada escolhe todos os eletrônicos")
+        n = sum(1 for i in app.data()["items"] if i["cat"] == "eletronicos" and i["name"] != "Caixa de som de estante")
+        self.assertEqual(fim["summary"]["conferidos"], n, "a IA simulada escolhe os eletrônicos, menos a caixa de som de estante")
         ov = app.ok("GET", "api/news")
         self.assertEqual(len(ov["itens"]), n)
         self.assertEqual(ov["ultima"]["conferidos"], n)
@@ -163,14 +162,17 @@ class Todos(ServerCase):
         jid = self.app.ok("POST", "api/news/all", {})["id"]
         self.assertEqual(self.app.ok("DELETE", f"api/news/{jid}"), {"ok": True})
 
-    def test_sem_categoria_recusa(self):
-        self.app.ok("PUT", "api/settings", {"news_cats": []})
-        st, _, body = self.app.request("POST", "api/news/all", {})
+    def test_sem_a_categoria_eletronicos_recusa(self):
+        app = self.fresh(mock_ai=True)
+        app.ok("DELETE", "api/cats/eletronicos")
+        st, _, body = app.request("POST", "api/news/all", {})
         self.assertEqual(st, 400)
-        self.assertIn("categoria", body["error"])
+        self.assertIn("Eletrônicos foi excluída", body["error"])
 
-    def test_categoria_invalida_nas_configuracoes(self):
-        self.assertEqual(self.app.request("PUT", "api/settings", {"news_cats": ["nao-existe"]})[0], 400)
+    def test_escolher_categorias_nao_vale_mais(self):
+        app = self.fresh(mock_ai=True)
+        self.assertEqual(app.request("PUT", "api/settings", {"news_cats": ["cozinha"]})[0], 200)
+        self.assertEqual(app.ok("GET", "api/news")["cats"], ["eletronicos"])
 
     def test_padrao_so_eletronicos(self):
         app = self.fresh(mock_ai=True)
@@ -178,7 +180,6 @@ class Todos(ServerCase):
 
     def test_limpar_novidades(self):
         app = self.fresh(mock_ai=True)
-        app.ok("PUT", "api/settings", {"news_cats": ["eletronicos"]})
         esperar(app, app.ok("POST", "api/news/all", {})["id"], timeout=30)
         self.assertTrue(app.ok("GET", "api/news")["itens"])
         rev = app.ok("GET", "api/rev")["rev"]
@@ -187,7 +188,7 @@ class Todos(ServerCase):
         self.assertEqual((ov["itens"], ov["triagem"], ov["ultima"]), ({}, {}, None))
         self.assertEqual(app.ok("GET", "api/news")["itens"], {}, "continua limpo")
         self.assertEqual(app.ok("GET", "api/rev")["rev"], rev, "o inventário não muda")
-        self.assertEqual(app.ok("GET", "api/news")["cats"], ["eletronicos"], "as categorias ficam")
+        self.assertEqual(app.ok("GET", "api/news")["cats"], ["eletronicos"], "continua em Eletrônicos")
 
     def test_ia_desligada_recusa_conferir_todos(self):
         self.app.ok("PUT", "api/settings", {"ai": False})

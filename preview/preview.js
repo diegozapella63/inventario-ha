@@ -255,9 +255,8 @@
       return { stage: "done", msg: "", results: j.results.map(({ file, ...r }) => r), product: j.product, example: true };
     }
     // Novidades de todos: a "IA" da prévia escolhe os eletrônicos e aparelhos, e cada um ganha as novidades de exemplo
-    const NEWS_DEF = ["eletronicos"];
-    const newsCats = () => (Array.isArray(ST.settings.news_cats) ? ST.settings.news_cats : NEWS_DEF).filter((c) => CATS.has(c));
-    const PICK = /\b(tv|televis|notebook|computador|celular|tablet|geladeira|micro-?ondas|maquina|lavadora|lampada|fone|caixa de som|soundbar|cafeteira|ar.condicionado|aspirador|roteador|impressora|monitor|console|camera|forno)/i;
+    const newsCats = () => ["eletronicos"].filter((c) => CATS.has(c)); // só Eletrônicos, como o servidor
+    const PICK = /\b(tv|televis|notebook|computador|celular|tablet|geladeira|micro-?ondas|maquina|lavadora|lampada|fone|soundbar|cafeteira|ar.condicionado|aspirador|roteador|impressora|monitor|console|camera|forno)/i;
     const plain = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const exampleNews = (name) => {
       const y = new Date().getFullYear();
@@ -294,8 +293,8 @@
       const live = newsJobOf();
       if (live) return { id: live[0] };
       const cats = newsCats();
-      if (!cats.length) fail("Marque ao menos uma categoria.");
-      for (const i of d.items) if (cats.includes(i.cat) && !(i.id in ST.news.triagem)) ST.news.triagem[i.id] = i.cat === "eletronicos" || PICK.test(plain(i.name));
+      if (!cats.length) fail("A categoria Eletrônicos foi excluída: crie de novo em Mais > Opções.");
+      for (const i of d.items) if (cats.includes(i.cat) && !(i.id in ST.news.triagem)) ST.news.triagem[i.id] = PICK.test(plain(i.name));
       const week = Date.now() - 7 * 864e5;
       const todo = d.items.filter((i) => cats.includes(i.cat) && ST.news.triagem[i.id] && !(ST.news.itens[i.id] && Date.parse(ST.news.itens[i.id].at) > week));
       const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");

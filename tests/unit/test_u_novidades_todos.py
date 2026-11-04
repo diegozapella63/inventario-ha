@@ -1,4 +1,4 @@
-"""Novidades de todos os equipamentos (Mais > Novidades): categorias, a escolha da IA, a conferência em lote e o que fica guardado."""
+"""Novidades de todos os equipamentos (Mais > Novidades): só Eletrônicos, a escolha da IA, a conferência em lote e o que fica guardado."""
 import json
 import time
 import unittest
@@ -7,6 +7,7 @@ from unittest import mock
 from _boot import UnitBase, server
 
 TV, SOFA, GELADEIRA, FRUTEIRA = "sal-007", "sal-001", "coz-004", "coz-003"
+AR, NOTEBOOK, CAIXA = "qua-005", "esc-001", "sal-010"  # eletrônicos: a IA simulada deixa a caixa de som de estante de fora
 
 
 def novidade(titulo="Firmware novo", tipo="atualizacao"):
@@ -14,33 +15,32 @@ def novidade(titulo="Firmware novo", tipo="atualizacao"):
 
 
 class Categorias(UnitBase):
-    def test_padrao_so_eletronicos(self):
+    def test_so_eletronicos(self):
         self.assertEqual(server.news_cats(), ["eletronicos"])
 
-    def test_padrao_nao_tem_moveis_nem_cozinha(self):
-        for c in ("moveis", "decoracao", "texteis", "plantas", "livros", "vestuario", "cozinha", "utilidades", "outros"):
+    def test_nada_de_moveis_cozinha_ou_outras(self):
+        for c in ("moveis", "decoracao", "texteis", "plantas", "livros", "vestuario", "cozinha", "utilidades", "saude", "outros"):
             self.assertNotIn(c, server.news_cats())
 
-    def test_categoria_da_casa_com_nome_de_equipamento_entra_no_padrao(self):
-        self.store.create_cat({"name": "Ferramentas elétricas"})
+    def test_categoria_criada_com_nome_parecido_nao_entra(self):
         self.store.create_cat({"name": "Informática"})
-        self.store.create_cat({"name": "Brinquedos"})
-        cats = self.store.cat_map()
-        ids = {v: k for k, v in cats.items()}
-        self.assertIn(ids["Ferramentas elétricas"], server.news_cats())
-        self.assertIn(ids["Informática"], server.news_cats())
-        self.assertNotIn(ids["Brinquedos"], server.news_cats())
-
-    def test_escolha_da_casa_vale(self):
-        self.store.settings["news_cats"] = ["eletronicos"]
         self.assertEqual(server.news_cats(), ["eletronicos"])
 
-    def test_escolha_vazia_vale_vazia(self):
-        self.store.settings["news_cats"] = []
+    def test_escolha_antiga_gravada_nao_vale_mais(self):
+        self.store.settings["news_cats"] = ["cozinha", "utilidades"]
+        self.assertEqual(server.news_cats(), ["eletronicos"])
+
+    def test_eletronicos_renomeada_continua(self):
+        self.store.update_cat("eletronicos", {"name": "Tecnologia"})
+        self.assertEqual(server.news_cats(), ["eletronicos"])
+
+    def test_eletronicos_excluida_fica_sem(self):
+        self.store.delete_cat("eletronicos")
         self.assertEqual(server.news_cats(), [])
 
-    def test_categoria_excluida_sai_da_escolha(self):
-        self.store.settings["news_cats"] = ["eletronicos", "sumiu"]
+    def test_eletronicos_criada_de_novo_volta(self):
+        self.store.delete_cat("eletronicos")
+        self.store.create_cat({"name": "Eletrônicos"})
         self.assertEqual(server.news_cats(), ["eletronicos"])
 
 
@@ -111,13 +111,14 @@ class Lote(UnitBase):
         p2 = mock.patch.object(server.time, "sleep", lambda s: None)  # a IA simulada não espera
         p2.start()
         self.addCleanup(p2.stop)
-        self.store.settings["news_cats"] = ["eletronicos", "cozinha", "saude", "utilidades", "outros"]  # com cozinha: a IA tem o que deixar de fora
 
     def test_confere_so_o_que_a_ia_escolheu(self):
         job = self.run_batch()
         saved = server.news_read()["itens"]
         self.assertIn(TV, saved)
-        self.assertIn(GELADEIRA, saved)
+        self.assertIn(NOTEBOOK, saved)
+        self.assertIn(AR, saved)
+        self.assertNotIn(CAIXA, saved, "a IA deixou de fora")
         self.assertNotIn(SOFA, saved)
         self.assertEqual(job["summary"]["conferidos"], len(saved))
 
@@ -125,19 +126,20 @@ class Lote(UnitBase):
         self.run_batch()
         tri = server.news_read()["triagem"]
         self.assertTrue(tri[TV]["conferir"])
-        self.assertFalse(tri[FRUTEIRA]["conferir"], "fruteira de madeira fica de fora")
-        self.assertNotIn(SOFA, tri, "sofá nem vai para a IA: móveis não está marcada")
+        self.assertFalse(tri[CAIXA]["conferir"], "a caixa de som de estante fica de fora")
+        self.assertNotIn(SOFA, tri, "sofá nem vai para a IA: não é eletrônico")
+        self.assertNotIn(GELADEIRA, tri, "nem a geladeira (Cozinha e bar)")
 
-    def test_so_as_categorias_marcadas(self):
+    def test_escolha_antiga_de_categorias_nao_vale(self):
         self.store.settings["news_cats"] = ["cozinha"]
         self.run_batch()
         saved = server.news_read()["itens"]
-        self.assertIn(GELADEIRA, saved)
-        self.assertNotIn(TV, saved)
+        self.assertIn(TV, saved)
+        self.assertNotIn(GELADEIRA, saved)
 
-    def test_sem_categoria_marcada_recusa(self):
-        self.store.settings["news_cats"] = []
-        self.assertApiError(400, server.news_batch_start, msg_part="ao menos uma categoria")
+    def test_sem_a_categoria_eletronicos_recusa(self):
+        self.store.delete_cat("eletronicos")
+        self.assertApiError(400, server.news_batch_start, msg_part="Eletrônicos foi excluída")
 
     def test_ia_desligada_recusa(self):
         self.store.settings["ai"] = False
@@ -161,10 +163,10 @@ class Lote(UnitBase):
 
     def test_item_mudado_volta_para_a_ia_escolher(self):
         self.run_batch()
-        self.assertFalse(server.news_read()["triagem"][FRUTEIRA]["conferir"])
-        self.store.update_item(FRUTEIRA, {"name": "Smart TV 32 polegadas"}, "Diego")
+        self.assertFalse(server.news_read()["triagem"][CAIXA]["conferir"])
+        self.store.update_item(CAIXA, {"name": "Smart TV 32 polegadas"}, "Diego")
         self.run_batch()
-        self.assertTrue(server.news_read()["triagem"][FRUTEIRA]["conferir"])
+        self.assertTrue(server.news_read()["triagem"][CAIXA]["conferir"])
 
     def test_conferido_ha_mais_de_uma_semana_entra_de_novo(self):
         self.run_batch()
@@ -179,13 +181,13 @@ class Lote(UnitBase):
         d = server.news_read()
         for iid in d["itens"]:
             d["itens"][iid]["at"] = "2020-02-01T00:00:00-03:00"
-        d["itens"][GELADEIRA]["at"] = "2020-01-01T00:00:00-03:00"
+        d["itens"][NOTEBOOK]["at"] = "2020-01-01T00:00:00-03:00"
         server.write_json_atomic(server.NEWS_FILE, d)
         seen = []
         real = server.ai_find_news
         with mock.patch.object(server, "ai_find_news", lambda n, de, e: seen.append(n) or real(n, de, e)):
             self.run_batch()
-        self.assertEqual(seen[0], self.store.item(GELADEIRA)["name"])
+        self.assertEqual(seen[0], self.store.item(NOTEBOOK)["name"])
 
     def test_cota_da_ia_para_e_o_que_foi_conferido_fica(self):
         calls = []
@@ -309,10 +311,9 @@ class Limpar(UnitBase):
         server.news_clear()
         self.assertEqual(json.dumps(self.store.public(), sort_keys=True), antes)
 
-    def test_nem_as_categorias_escolhidas(self):
-        self.store.settings["news_cats"] = ["eletronicos", "saude"]
+    def test_continua_so_eletronicos(self):
         server.news_clear()
-        self.assertEqual(server.news_cats(), ["eletronicos", "saude"])
+        self.assertEqual(server.news_cats(), ["eletronicos"])
 
     def test_para_a_conferencia_em_andamento(self):
         job = {"stage": "busy", "msg": "", "kind": "lote", "at": time.time(), "results": []}
@@ -418,20 +419,12 @@ class Configuracao(UnitBase):
         server.r_settings_put(h, {})
         return h.sent
 
-    def test_grava_as_categorias(self):
-        self.assertEqual(self.put({"news_cats": ["eletronicos", "cozinha"]})[1]["news_cats"], ["eletronicos", "cozinha"])
-
-    def test_repetidas_ficam_uma_vez(self):
-        self.assertEqual(self.put({"news_cats": ["eletronicos", "eletronicos"]})[1]["news_cats"], ["eletronicos"])
-
-    def test_categoria_que_nao_existe_recusa(self):
-        self.assertApiError(400, self.put, {"news_cats": ["nao-existe"]})
-
-    def test_tem_que_ser_lista(self):
-        self.assertApiError(400, self.put, {"news_cats": "eletronicos"})
-
-    def test_lista_vazia_vale(self):
-        self.assertEqual(self.put({"news_cats": []})[1]["news_cats"], [])
+    def test_categorias_nao_se_escolhem_mais(self):
+        st, out = self.put({"news_cats": ["cozinha"], "zones": True})
+        self.assertEqual(st, 200)
+        self.assertNotIn("news_cats", out, "o pedido antigo não grava nada")
+        self.assertTrue(out["zones"], "e o resto do pedido vale")
+        self.assertEqual(server.news_cats(), ["eletronicos"])
 
 
 if __name__ == "__main__":

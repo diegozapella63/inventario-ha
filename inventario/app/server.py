@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.23.0"
+VERSION = "1.24.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -2278,20 +2278,16 @@ def news_job_start(body: dict) -> dict:
 # pergunta só, sem busca na web; fica guardado até o item mudar) e o app confere um por um, guardando cada resultado.
 NEWS_LOCK = threading.Lock()
 NEWS_FRESH_DAYS = 7  # conferido há menos que isso fica para a próxima
-NEWS_DEFAULT_CATS = ("eletronicos",)
-NEWS_CAT_WORDS = re.compile(r"eletr|inform|comput|celular|ferrament|clima|ar condicionado|automac|seguranc|camera|game|video|audio|veicul|carro|moto")
+NEWS_CATS = ("eletronicos",)  # só Eletrônicos: móveis, panelas e roupas não têm novidades
 TRIAGE_CHUNK = 60
 MOCK_TRIAGE = re.compile(r"\b(tv|televis|notebook|computador|celular|smartphone|tablet|geladeira|refrigerador|micro-?ondas|maquina|lavadora|"
-                         r"lampada|fone|caixa de som|soundbar|cafeteira|ar condicionado|aspirador|roteador|impressora|monitor|console|camera|forno)", re.I)
+                         r"lampada|fone|soundbar|cafeteira|ar.?condicionado|aspirador|roteador|impressora|monitor|console|camera|forno)", re.I)  # caixa de som passiva fica de fora
 
 
 def news_cats() -> list[str]:
-    """Categorias em que a IA procura equipamentos: a escolha da casa, ou eletrônicos (e categorias criadas parecidas, como Informática)."""
+    """Categorias em que a IA procura equipamentos: só Eletrônicos (se a categoria não foi excluída)."""
     cats = STORE.cat_map()
-    chosen = STORE.settings.get("news_cats")
-    if isinstance(chosen, list):
-        return [c for c in chosen if c in cats]
-    return [c for c, name in cats.items() if c in NEWS_DEFAULT_CATS or NEWS_CAT_WORDS.search(fold(name))]
+    return [c for c in NEWS_CATS if c in cats]
 
 
 def item_sig(it: dict) -> str:
@@ -2373,7 +2369,7 @@ def ai_triage(items: list[dict]) -> set[str]:
         prompt = triage_prompt(part)
         with AiCall("triagem", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
             if AI_MOCK:
-                data = {"conferir": [i["id"] for i in part if i.get("cat") == "eletronicos" or MOCK_TRIAGE.search(fold(i["name"]))]}
+                data = {"conferir": [i["id"] for i in part if MOCK_TRIAGE.search(fold(i["name"]))]}
                 call.answer(data)
             else:
                 raw = ai_call_text("InventarIA: escolher equipamentos", prompt, entity, timeout=180)
@@ -2468,7 +2464,7 @@ def news_batch_start() -> dict:
                 return {"id": j}  # já tem uma conferência andando: acompanha a mesma
     web_jobs_cleanup()
     if not news_cats():
-        raise ApiError(400, "Marque ao menos uma categoria.")
+        raise ApiError(400, "A categoria Eletrônicos foi excluída: crie de novo em Mais > Opções.")
     jid = secrets.token_hex(8)
     with WEB_LOCK:
         WEB_JOBS[jid] = {"stage": "busy", "msg": "Começando…", "results": [], "at": time.time(), "kind": "lote",
@@ -3055,11 +3051,6 @@ def r_settings_put(h, query):
             if not isinstance(body[key], bool):
                 raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
             upd[key] = body[key]
-    if "news_cats" in body:
-        nc = body["news_cats"]
-        if not isinstance(nc, list) or any(not isinstance(c, str) or c not in STORE.cat_map() for c in nc):
-            raise ApiError(400, "Categoria inválida.")
-        upd["news_cats"] = list(dict.fromkeys(nc))
     with STORE.lock:
         STORE.settings.update(upd)
         STORE.save_settings()

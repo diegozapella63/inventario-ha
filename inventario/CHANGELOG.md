@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.24.0
+
+- **Mais > Novidades**: só Eletrônicos, sem escolher categorias. A lista de categorias saiu; itens de outras categorias não entram, nem na lista (pela ficha, dá para conferir qualquer item).
+
 ## 1.23.0
 
 - **Cor do dia**, em Mais > Aparência: a cor do app muda todo dia (a mesma o dia todo, em todos os aparelhos), sem o cinza. Vem ligada. Escolher uma cor desliga; ligar de novo volta à cor do dia.
