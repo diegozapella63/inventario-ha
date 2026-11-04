@@ -1,4 +1,5 @@
-"""Mais > Dados: abas, exportar (CSV, JSON, ZIP), backup na pasta share, versões anteriores, importar; botões do mesmo tamanho e alinhados."""
+"""Mais é um menu (Novidades, Categorias, Relatório, Configurações), com Voltar e os endereços antigos; Mais > Configurações > Dados: abas,
+exportar (CSV, JSON, ZIP), backup na pasta share, versões anteriores, importar; botões do mesmo tamanho e alinhados."""
 import csv
 import io
 import json
@@ -22,17 +23,59 @@ async def body(r, p):
     r.start(search=False)
     b = await r.browser(p)
     ctx, pg = await r.page(b, "cel", "dark", accent="azul")
-    await r.open(pg, "#/mais", ".more-tabs")
+
+    # Mais: um menu
+    await r.open(pg, "#/", ".tag")
+    await pg.click('.tabbar a[data-tab="data"]')
+    await pg.wait_for_selector(".menu-list")
+    r.eq((await pg.text_content(".page-title")).strip(), "Mais", "a aba Mais abre um menu")
+    rows = await pg.evaluate("[...document.querySelectorAll('.menu-row')].map(a => [a.querySelector('b').textContent, a.getAttribute('href')])")
+    r.eq(rows, [["Novidades", "#/novidades"], ["Categorias", "#/categorias"], ["Relatório para seguro", "#/relatorio"], ["Configurações", "#/config"]],
+         "com Novidades, Categorias, Relatório e Configurações")
+    r.eq(await pg.locator("#view .more-tabs").count(), 0, "sem as abas de configurações no menu")
+    r.eq(await pg.get_attribute('.tabbar a[data-tab="data"]', "aria-current"), "page", "a aba Mais fica marcada")
+    hs = await pg.evaluate("[...document.querySelectorAll('.menu-row')].map(a => Math.round(a.getBoundingClientRect().height))")
+    r.check(min(hs) >= 64 and max(hs) - min(hs) <= 24, f"linhas grandes, fáceis de tocar ({hs})")
+    r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
+    await r.shot(pg, "menu")
+    for title, href, wait in (("Novidades", "#/novidades", "#p-news"), ("Categorias", "#/categorias", "#p-cats"),
+                              ("Relatório", "#/relatorio", ".report"), ("Configurações", "#/config", ".more-tabs")):
+        await pg.click(f'.menu-row[href="{href}"]')
+        await pg.wait_for_selector(wait, timeout=8000)
+        r.check(pg.url.endswith(href), f"{title} abre a sua tela ({href})")
+        r.eq(await pg.get_attribute('.tabbar a[data-tab="data"]', "aria-current"), "page", f"{title}: a aba Mais continua marcada")
+        if href != "#/relatorio":
+            r.eq((await pg.text_content(".page-title")).strip(), title, f"{title}: com o título")
+        r.check(await pg.locator('.uplink[href="#/mais"]').count() == 1, f"{title}: com o link de volta para Mais")
+        await pg.go_back()
+        await pg.wait_for_selector(".menu-list")
+    r.check(True, "Voltar volta ao menu")
+    await pg.click('.menu-row[href="#/config"]')
+    await pg.wait_for_selector(".more-tabs")
+    await pg.click('.uplink[href="#/mais"]')
+    await pg.wait_for_selector(".menu-list")
+    r.check(True, "o link Mais, no alto, volta ao menu")
+
+    # endereços antigos: Mais com abas
+    for old, new in (("#/mais/integracoes", "#/config/integracoes"), ("#/mais/opcoes", "#/config/opcoes"), ("#/mais/novidades", "#/novidades"), ("#/dados", "#/config")):
+        await pg.goto("about:blank")
+        await pg.goto(r.base + old)
+        await pg.wait_for_selector(".more-tabs, #p-news", timeout=8000)
+        r.check(pg.url.endswith(new), f"o endereço antigo {old} vira {new}")
+
+    await r.open(pg, "#/config", ".more-tabs")
+    r.eq((await pg.text_content(".page-title")).strip(), "Configurações", "Configurações com o título")
     tabs = await pg.evaluate("[...document.querySelectorAll('.more-tabs [role=tab]')].map(t => t.textContent.trim())")
-    r.eq(tabs, ["Dados", "Novidades", "Integrações", "Aparência", "Opções"], "as cinco abas")
+    r.eq(tabs, ["Dados", "Integrações", "Aparência", "Opções"], "as quatro abas, sem Novidades")
+    r.eq(await pg.locator('#view a[href="#/relatorio"]').count(), 0, "o Relatório fica no menu, não em Dados")
     r.eq((await pg.text_content(".page-sub")).replace("\xa0", " "), "38 itens e 9 fotos no inventário", "resumo no alto")
     foot = await pg.text_content(".foot")
     r.check(f"v{r.data()['version']}" in foot, f"rodapé com a versão ({foot.strip()[:40]})")
-    for k in ("novidades", "integracoes", "aparencia", "opcoes", "dados"):
+    for k in ("integracoes", "aparencia", "opcoes", "dados"):
         await tab(pg, k)
-        r.check(pg.url.endswith("#/mais" if k == "dados" else f"#/mais/{k}"), f"aba {k} no endereço")
+        r.check(pg.url.endswith("#/config" if k == "dados" else f"#/config/{k}"), f"aba {k} no endereço")
         sizes = await pg.evaluate(BUTTONS)
-        if k == "aparencia":  # tema e cor: botões de escolha, sem linhas
+        if k in ("aparencia", "opcoes"):  # tema e cor: botões de escolha; Opções: só a chave das zonas
             continue
         r.check(sizes and all(w == 280 and h == 44 for w, h, _ in sizes), f"[{k}] botões 280×44 ({sorted({(w, h) for w, h, _ in sizes})})")
         r.check(len({x for _, _, x in sizes}) == 1, f"[{k}] alinhados pela direita ({sorted({x for _, _, x in sizes})})")
@@ -42,14 +85,14 @@ async def body(r, p):
     await pg.focus("#mt-dados")
     await pg.keyboard.press("ArrowRight")
     await pg.wait_for_timeout(400)
-    r.check(pg.url.endswith("#/mais/novidades"), "seta para a direita troca de aba")
+    r.check(pg.url.endswith("#/config/integracoes"), "seta para a direita troca de aba")
     await tab(pg, "dados")
     await ctx.close()
 
     # celular estreito: tudo cabe
     ctx, pg = await r.page(b, "estreito", "light")
-    await r.open(pg, "#/mais", ".more-tabs")
-    for k in ("dados", "novidades", "integracoes", "aparencia", "opcoes"):
+    await r.open(pg, "#/config", ".more-tabs")
+    for k in ("dados", "integracoes", "aparencia", "opcoes"):
         await tab(pg, k)
         sizes = await pg.evaluate(BUTTONS)
         r.check(all(h == 44 for _, h, _ in sizes) and len({w for w, _, _ in sizes}) <= 1, f"[estreito {k}] botões iguais ({sorted({(w, h) for w, h, _ in sizes})})")
@@ -59,7 +102,7 @@ async def body(r, p):
 
     # exportar
     ctx, pg = await r.page(b, "pc", "light")
-    await r.open(pg, "#/mais", ".more-tabs")
+    await r.open(pg, "#/config", ".more-tabs")
     got = {}
     for kind in ("csv", "json", "zip"):
         async with pg.expect_download() as dl:
@@ -122,7 +165,7 @@ async def body(r, p):
     bad = os.path.join(TMP, "lista.txt")
     with open(bad, "w") as f:
         f.write("não é backup")
-    await r.open(pg, "#/mais", ".more-tabs")
+    await r.open(pg, "#/config", ".more-tabs")
     async with pg.expect_file_chooser() as fc:
         await pg.click('[data-act="import-file"]')
     await (await fc.value).set_files(bad)

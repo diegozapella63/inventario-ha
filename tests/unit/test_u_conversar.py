@@ -60,11 +60,21 @@ class Contexto(UnitBase):
     def test_busca_sem_acento_acha_com_acento(self):
         self.assertIn("Sofá de 3 lugares", server.chat_context({"view": "search", "q": "sofa"}))
 
-    def test_aba_novidades(self):
+    def test_tela_novidades(self):
         server.news_save_result(TV, server.news_clean({"novidades": [{"titulo": "Firmware novo", "fonte": "https://fab.exemplo/f"}]}))
-        c = server.chat_context({"view": "data", "tab": "novidades"})
-        self.assertIn("Aba Novidades: 1 equipamentos com novidades conferidas.", c)
+        c = server.chat_context({"view": "news"})
+        self.assertIn("Tela Novidades: 1 eletrônicos com novidades conferidas.", c)
         self.assertIn("- Smart TV 55 polegadas: [outro] Firmware novo", c)
+
+    def test_tela_novidades_pelo_jeito_antigo(self):
+        server.news_save_result(TV, server.news_clean({"novidades": [{"titulo": "Firmware novo", "fonte": "https://fab.exemplo/f"}]}))
+        self.assertIn("Tela Novidades:", server.chat_context({"view": "data", "tab": "novidades"}))
+
+    def test_menu_mais_e_categorias_levam_so_o_resumo(self):
+        for view in ("menu", "cats"):
+            c = server.chat_context({"view": view})
+            self.assertNotIn("Tela Novidades", c)
+            self.assertIn("Sala de estar", c)
 
     def test_item_ou_comodo_que_nao_existe_e_ignorado(self):
         c = server.chat_context({"view": "item", "item": "nao-existe", "room": "nao-existe"})

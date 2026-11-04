@@ -153,7 +153,7 @@ async def body(r, p):
     r.eq(await pg.locator(".aibox, [data-ed='ai'], [data-ed-hint]").count(), 0, "IA desligada: com foto, nada de Preencher com IA")
     await r.shot(pg, "ia-desligada")
     st, _, out = r.app.post("api/ai/identify", {"file": photo0, "mode": "single"})
-    r.eq((st, out.get("error")), (409, "A IA está desligada. Para usar, ligue em Mais > Integrações."), "e o servidor recusa a leitura")
+    r.eq((st, out.get("error")), (409, "A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."), "e o servidor recusa a leitura")
     r.eq(len(ha.calls("POST", "/core/api/services/ai_task/generate_data")), n_calls, "nenhuma chamada à IA com ela desligada")
     await ctx.close()
     await b.close()

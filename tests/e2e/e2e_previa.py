@@ -111,8 +111,12 @@ async def body(r, p):
     r.check("Exemplo da prévia" in await pg.text_content("dialog.chat .msg.ai"), "Conversar: resposta de exemplo")
     await pg.click("dialog.chat [data-x]")
 
-    # Mais: as abas abrem; exportar explica que é prévia
+    # Mais é um menu; Configurações: as abas abrem; exportar explica que é prévia
     await pg.goto(r.base + "#/mais")
+    await pg.wait_for_selector(".menu-list")
+    r.eq(await pg.evaluate("[...document.querySelectorAll('.menu-row b')].map(b => b.textContent)"), ["Novidades", "Categorias", "Relatório para seguro", "Configurações"],
+         "Mais: o menu")
+    await pg.click('.menu-row[href="#/config"]')
     await pg.wait_for_selector(".more-tabs")
     for k in ("integracoes", "aparencia", "opcoes", "dados"):
         await pg.click(f'.more-tabs [data-tab="{k}"]')

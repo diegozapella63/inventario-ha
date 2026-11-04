@@ -4,7 +4,7 @@
   "use strict";
 
   // ------------------------------------------------------------------ constantes
-  // categorias: a lista padrão até a casa editar (Mais > Opções > Categorias); a lista da casa vem com os dados
+  // categorias: a lista padrão até a casa editar (Mais > Categorias); a lista da casa vem com os dados
   const DEFAULT_CATS = [
     ["eletronicos", "Eletrônicos"], ["moveis", "Móveis"], ["decoracao", "Decoração e arte"],
     ["colecao", "Colecionáveis"], ["cozinha", "Cozinha e bar"], ["texteis", "Tapetes e têxteis"],
@@ -29,7 +29,7 @@
   const CAMERA = CAMERA_DIRECT || ANDROID_APP;
   const MULTI_PICK = !ANDROID_APP;
   // O ícone do app (o mesmo desenho do ícone do app no Home Assistant: a etiqueta com R$ e o fio), na cor
-  // escolhida em Mais > Aparência. O fio fica na cor do texto, para aparecer no tema escuro.
+  // escolhida em Mais > Configurações > Aparência. O fio fica na cor do texto, para aparecer no tema escuro.
   const APP_ICON = `<svg class="app-ic" viewBox="0 0 32 32" aria-hidden="true"><g transform="rotate(-12 17 19)"><path d="M10 10h18a2.5 2.5 0 0 1 2.5 2.5v13a2.5 2.5 0 0 1-2.5 2.5H10l-7-7v-4z" style="fill:var(--tag);stroke:var(--tag-edge)" stroke-width="1"/><path d="M12.6 12.6v12.8" style="stroke:var(--tag-ink)" stroke-opacity=".32" stroke-width="1.1" stroke-dasharray="1.7 1.5"/><circle cx="8" cy="19" r="2.3" style="fill:var(--paper);stroke:var(--tag-ring)" stroke-width="1.3"/><text x="21.8" y="23.3" text-anchor="middle" style="font:700 10.5px var(--font-c);fill:var(--tag-ink)">R$</text></g><path d="M8.2 20.9C6.6 15 5.7 8.6 7 2.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
   const BRAND = APP_ICON;
 
@@ -87,7 +87,7 @@
   const ACCENTS = [["amarelo", "Amarelo"], ["laranja", "Laranja"], ["coral", "Coral"], ["rosa", "Rosa"], ["lilas", "Lilás"],
     ["azul", "Azul"], ["turquesa", "Turquesa"], ["verde", "Verde"], ["kraft", "Kraft"], ["cinza", "Cinza"]];
   const pickedAccent = () => { const a = LS.get("accent", "amarelo"); return ACCENTS.some(([k]) => k === a) ? a : "amarelo"; };
-  // Cor do dia (Mais > Aparência): ligada até a pessoa desligar ou escolher uma cor. Uma cor da paleta por dia,
+  // Cor do dia (Mais > Configurações > Aparência): ligada até a pessoa desligar ou escolher uma cor. Uma cor da paleta por dia,
   // pela data local: a mesma o dia todo e em todos os aparelhos; amanhã, a seguinte. O cinza fica de fora.
   // O index.html faz a mesma conta antes de pintar a tela.
   const DAY_ACCENTS = ACCENTS.map(([k]) => k).filter((k) => k !== "cinza");
@@ -97,10 +97,12 @@
   }
   const accentDaily = () => LS.get("accentDaily", true) !== false;
   const accentOf = () => (accentDaily() ? colorOfDay() : pickedAccent());
-  // Mais em abas, como no CronologIA e no ResolvIA: #/mais (Dados, com Exportar no alto), #/mais/integracoes e #/mais/aparencia.
-  const ALL_TABS = [["dados", "Dados", "archive"], ["novidades", "Novidades", "spark"], ["integracoes", "Integrações", "plug"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
-  const moreTabs = () => ALL_TABS.filter(([k]) => k !== "novidades" || aiOn()); // Novidades usa a IA: com ela desligada, a aba some
-  const moreTab = (t) => (moreTabs().some(([k]) => k === t) ? t : ALL_TABS[0][0]);
+  // Mais é um menu (#/mais): Novidades (#/novidades), Categorias (#/categorias), Relatório e Configurações. Configurações em abas, como no CronologIA
+  // e no ResolvIA: #/config (Dados, com Exportar no alto), #/config/integracoes, #/config/aparencia e #/config/opcoes.
+  const ALL_TABS = [["dados", "Dados", "archive"], ["integracoes", "Integrações", "plug"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
+  const moreTabs = () => ALL_TABS;
+  const moreTab = (t) => (ALL_TABS.some(([k]) => k === t) ? t : ALL_TABS[0][0]);
+  const IN_MORE = ["menu", "news", "cats", "data", "report"]; // telas que ficam embaixo de Mais
   function applyAccent(a) {
     if (a === "amarelo") delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = a;
@@ -388,7 +390,13 @@
       case "buscar": return { name: "search", q };
       case "relatorio": return { name: "report", q };
       case "comodos": return { name: "rooms", q };
-      case "mais": case "dados": return { name: "data", tab: moreTab(parts[1]), q };
+      case "mais": // #/mais é o menu; #/mais/<aba> é o endereço antigo de Configurações (e de Novidades)
+        if (!parts[1]) return { name: "menu", q };
+        if (parts[1] === "novidades") return { name: aiOn() ? "news" : "menu", q };
+        return { name: "data", tab: moreTab(parts[1]), q };
+      case "config": case "dados": return { name: "data", tab: moreTab(parts[1]), q };
+      case "novidades": return { name: aiOn() ? "news" : "menu", q }; // Novidades usa a IA: desligada, fica o menu
+      case "categorias": return { name: "cats", q };
       default: return { name: "home", q };
     }
   }
@@ -403,7 +411,10 @@
       }
       case "report": return "#/relatorio";
       case "rooms": return "#/comodos";
-      case "data": { const t = moreTab(r.tab); return t === ALL_TABS[0][0] ? "#/mais" : `#/mais/${t}`; }
+      case "menu": return "#/mais";
+      case "news": return "#/novidades";
+      case "cats": return "#/categorias";
+      case "data": { const t = moreTab(r.tab); return t === ALL_TABS[0][0] ? "#/config" : `#/config/${t}`; }
       default: return "#/";
     }
   }
@@ -428,6 +439,9 @@
       showItemSheet(it);
       return;
     }
+    if (IN_MORE.includes(r.name) && location.hash.split("?")[0] !== hashOf(r)) { // endereço antigo: troca pelo de agora
+      try { history.replaceState(history.state, "", hashOf(r)); } catch { /* ok */ }
+    }
     const hadSheet = !!sheet;
     if (sheet) finalize(sheet);
     if (rendered && rendered === hashOf(r) && (hadSheet || r.name === "search")) { base = r; return; }
@@ -450,7 +464,7 @@
         <a href="#/buscar"${cr("search")}>${ic("search")}Buscar<kbd>/</kbd></a>
         <a href="#/comodos"${cr("rooms")}>${ic("rooms")}Cômodos</a>
         <a href="#/relatorio"${cr("report")}>${ic("report")}Relatório</a>
-        <a href="#/mais"${cr("data")}>${ic("gear")}Mais</a>
+        <a href="#/mais"${IN_MORE.includes(cur.name) && cur.name !== "report" ? ' aria-current="page"' : ""}>${ic("menu")}Mais</a>
       </nav>
       <div class="side-h"><h2>Cômodos</h2><span>${int(D.rooms.length)}</span></div>
       <div class="side-rooms">
@@ -463,16 +477,16 @@
 
   function viewTitle(r) {
     if (r.name === "room") return D.roomById.get(r.id)?.name || "Cômodo";
-    return { home: "Início", search: "Buscar", rooms: "Cômodos", report: "Relatório", data: "Mais" }[r.name] || "InventarIA";
+    return { home: "Início", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", news: "Novidades", cats: "Categorias", data: "Configurações" }[r.name] || "InventarIA";
   }
   // Topo de cada tela, igual nos apps da família (EconomIA, ResolvIA): nome do app com "IA" na cor
   // do app, saudação ao usuário do Home Assistant e o título grande da tela.
-  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", data: "data", report: "data" };
+  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", menu: "data", news: "data", cats: "data", data: "data", report: "data" };
   function renderTop() {
     const el = $("#topbar");
     const r = base;
     const first = (S.user || "").trim().split(/\s+/)[0];
-    const up = r.name === "room" ? ["#/comodos", "Cômodos"] : r.name === "report" ? ["#/mais", "Mais"] : null;
+    const up = r.name === "room" ? ["#/comodos", "Cômodos"] : IN_MORE.includes(r.name) && r.name !== "menu" ? ["#/mais", "Mais"] : null;
     const title = r.name === "room" || r.name === "report" ? "" : viewTitle(r);
     const sub = r.name === "rooms" && D.rooms.length
       ? `${plural(D.rooms.length, "cômodo", "cômodos")}, ${plural(S.items.length, "item", "itens")}, ${money(D.total)}`
@@ -508,6 +522,9 @@
         case "search": html = viewSearch(base.q); break;
         case "report": html = viewReport(); break;
         case "rooms": html = viewRooms(); break;
+        case "menu": html = viewMenu(); break;
+        case "news": html = `<div class="mscreen">${moreNews()}</div>`; break;
+        case "cats": html = `<div class="mscreen">${viewCats()}</div>`; break;
         case "data": html = viewData(); break;
         default: html = viewHome();
       }
@@ -568,6 +585,7 @@
       box?.focus({ preventScroll: true });
     }
     if (base.name === "data") loadDataPanels();
+    if (base.name === "news") loadNews();
     if (navigated && slideFrom) { // a tela nova entra pelo lado para onde o dedo foi
       const dir = slideFrom;
       slideFrom = 0;
@@ -887,12 +905,24 @@
   // -- dados e ajustes
   const SW_TAG = "M8 0h20a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8L0 13V7z";
   const SWATCH = `<svg viewBox="-5 -5 40 30" aria-hidden="true"><path class="sw-ring" d="${SW_TAG}"/><path class="sw-gap" d="${SW_TAG}"/><path class="sw-fill" d="${SW_TAG}M9.7 10a2.7 2.7 0 1 0-5.4 0a2.7 2.7 0 1 0 5.4 0z"/><path class="sw-check" d="m14.6 10.3 3.2 3.2 6.5-6.9"/></svg>`;
+  // -- Mais: um menu com o que não cabe na barra (Novidades, Relatório) e, por último, Configurações
+  function viewMenu() {
+    const rows = [
+      aiOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
+      ["#/categorias", "grid", "Categorias", "Criar, renomear e excluir."],
+      ["#/relatorio", "report", "Relatório para seguro", "Por cômodo, com fotos. Imprime ou salva em PDF."],
+      ["#/config", "gear", "Configurações", "Dados e backup, integrações, aparência e opções."],
+    ].filter(Boolean);
+    return `<nav aria-label="Mais"><ul class="menu-list">${rows.map(([h, i, t, d]) => `<li><a class="menu-row" href="${h}">${secIc(i)}
+        <span class="mb"><b>${t}</b><span>${d}</span></span>${ic("chev", "sm")}</a></li>`).join("")}</ul></nav>
+    <p class="foot"><b>InventarIA</b><br>${PREVIEW ? "Prévia do app do Home Assistant: as alterações ficam só nesta tela." : `v${esc(S.version)}, com os dados em arquivos abertos (JSON e JPG) dentro do Home Assistant.`}</p>`;
+  }
   function viewData() {
     const tab = moreTab(base.tab);
     const label = ALL_TABS.find(([k]) => k === tab)[1];
-    const bodies = { dados: () => moreExport() + moreData(), novidades: moreNews, integracoes: moreIntegrations, aparencia: moreLook, opcoes: moreOptions };
+    const bodies = { dados: () => moreExport() + moreData(), integracoes: moreIntegrations, aparencia: moreLook, opcoes: moreOptions };
     return `<div class="more-anchor" aria-hidden="true"></div>
-    <div class="more-tabs" role="tablist" aria-label="Seções de Mais">
+    <div class="more-tabs" role="tablist" aria-label="Seções de Configurações">
       ${moreTabs().map(([k, l, i]) => `<button type="button" role="tab" id="mt-${k}" aria-controls="mp" aria-selected="${k === tab}" tabindex="${k === tab ? 0 : -1}" data-act="more-tab" data-tab="${k}">${ic(i, "sm")}<span>${l}</span></button>`).join("")}
     </div>
     <div class="more-panel" id="mp" role="tabpanel" aria-labelledby="mt-${tab}" aria-label="${label}">${bodies[tab]()}</div>
@@ -906,7 +936,6 @@
         <li><div class="ot"><b>Planilha (CSV)</b><span>Abre no Excel e no Google Planilhas.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="csv">${ic("download")}Baixar CSV</button></div></li>
         <li><div class="ot"><b>Dados completos (JSON)</b><span>Todos os campos.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="json">${ic("download")}Baixar JSON</button></div></li>
         <li><div class="ot"><b>Tudo com fotos (ZIP)</b><span>JSON, CSV e fotos.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="zip">${ic("download")}Baixar ZIP</button></div></li>
-        <li><div class="ot"><b>Relatório para seguro</b><span>Por cômodo, com fotos. Imprime ou salva em PDF.</span></div><div class="oa"><a class="btn" href="#/relatorio">${ic("report")}Abrir relatório</a></div></li>
       </ul>
     </section>`;
   }
@@ -914,7 +943,6 @@
   function moreNews() {
     return `
     <section class="panel" id="p-news">
-      <h2>${secIc("spark")}Novidades</h2>
       <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos eletrônicos.</p>
       <ul class="opts"><li><div class="ot"><b>Conferir todos</b><span>A IA escolhe, entre os eletrônicos, os que vale conferir.</span></div>
         <div class="oa"><button type="button" class="btn primary" data-act="news-all">${ic("spark")}Conferir novidades</button></div></li>
@@ -1176,9 +1204,12 @@
       <p class="lead">Partes de um cômodo, como Estante ou Rack da TV.</p>
       <ul class="opts"><li><div class="ot"><b id="zones-h">Usar zonas</b><span>Vale para todos os aparelhos. Desligar não apaga as zonas.</span></div>
         <div class="oa">${switchHtml("zones-on", zonesOn(), "zones-h")}</div></li></ul>
-    </section>
+    </section>`;
+  }
+  // -- Categorias: uma tela própria, no menu Mais
+  function viewCats() {
+    return `
     <section class="panel" id="p-cats">
-      <h2>${secIc("grid")}Categorias</h2>
       <ul class="opts cats">
         <li><div class="ot"><b>${plural(CATS.length, "categoria", "categorias")}</b><span>Valem para todos os aparelhos.</span></div>
           <div class="oa"><button type="button" class="btn" data-act="cat-new">${ic("plus")}Nova categoria</button></div></li>
@@ -1269,7 +1300,6 @@
     } catch (e) { bslot.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
     if (aslot) { const st = await aiStatus(true); if (document.contains(aslot)) renderAiPanel(aslot, st); }
     showMoreTab();
-    if (tab === "novidades") loadNews();
     const vslot = tab === "integracoes" ? $('#view [data-slot="voice-panel"]') : null;
     if (vslot) { renderVoicePanel(vslot); }
     const uslot = tab === "integracoes" ? $('#view [data-slot="usage"]') : null;
@@ -1301,7 +1331,7 @@
     <li>No Home Assistant, abra Configurações, Dispositivos e serviços, Adicionar integração.</li>
     <li>Escolha Anthropic, OpenAI, Google Gemini ou Ollama (local, grátis) e cole a chave de API.</li>
     <li>Na integração, adicione uma tarefa de IA (AI Task) com um modelo que leia imagens.</li>
-    <li>Escolha essa IA aqui, em Mais > Integrações.</li></ol>`;
+    <li>Escolha essa IA aqui, em Mais > Configurações > Integrações.</li></ol>`;
   function renderAiPanel(slot, st) {
     if (st.preview) {
       slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status warn"><i></i>Exemplo simulado na prévia</span></b><span>Na prévia, a leitura é simulada.</span></div></li></ul><div style="margin-top:12px"><b>Como configurar no Home Assistant</b>${AI_STEPS}</div>`;
@@ -1335,7 +1365,7 @@
       html: `<div class="dlg"><div class="dlg-h"><h2>Leitura por IA</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b"><p style="margin-top:0"><span class="status ${st.reason === "no_vision" ? "warn" : "bad"}"><i></i>${esc(aiReasonText(st))}</span></p>
         <p>Configure no Home Assistant:</p>${AI_STEPS}</div>
-        <div class="dlg-f"><a class="btn" href="#/mais/integracoes" data-x>Abrir Integrações</a><button class="btn primary" data-x>Entendi</button></div></div>`,
+        <div class="dlg-f"><a class="btn" href="#/config/integracoes" data-x>Abrir Integrações</a><button class="btn primary" data-x>Entendi</button></div></div>`,
     });
     entry.dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); });
     return false;
@@ -1539,7 +1569,7 @@
   }
   const webImg = (job, n) => (window.INV_WEB_IMG ? window.INV_WEB_IMG(job, n) : `api/web-photos/${job}/${n}`);
   function webPhotoSearch({ name, details = "", qty = "1", fills = null }) {
-    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return Promise.resolve(null); }
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return Promise.resolve(null); }
     return new Promise((resolve) => {
       let job = null, timer = null, chosen = null, results = [], got = null, gen = 0, product = null;
       const entry = openDialog({
@@ -1679,7 +1709,7 @@
     }).catch(() => {});
   }
   async function searchItemNews(it) {
-    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return; }
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return; }
     stopItemNews();
     const my = INEWS.gen;
     Object.assign(INEWS, { id: it.id, st: { busy: true } });
@@ -1703,7 +1733,7 @@
     poll();
   }
   function openNews(it) {
-    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return; }
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return; }
     let job = null, timer = null, gen = 0;
     const entry = openDialog({
       cls: "modal", label: "Novidades",
@@ -2304,13 +2334,13 @@
     if (sc.item) return D.itemById.get(sc.item)?.name || "este item";
     if (sc.room) return D.roomById.get(sc.room)?.name || "este cômodo";
     if (sc.view === "search") return sc.q ? `a busca “${sc.q}”` : "a busca";
-    if (sc.view === "data" && sc.tab === "novidades") return "as novidades dos equipamentos";
-    return { home: "o inventário", rooms: "os cômodos", report: "o relatório", data: "o inventário" }[sc.view] || "o inventário";
+    if (sc.view === "news") return "as novidades dos eletrônicos";
+    return { home: "o inventário", rooms: "os cômodos", report: "o relatório", data: "o inventário", menu: "o inventário" }[sc.view] || "o inventário";
   }
   function chatIdeas(sc) {
     if (sc.item) return ["Vale a pena pôr no seguro?", "Como conservar melhor?", "Quanto vale hoje, mais ou menos?"];
     if (sc.room) return ["Qual o item mais caro daqui?", "O que falta cadastrar num cômodo assim?"];
-    if (sc.view === "data" && sc.tab === "novidades") return ["Alguma novidade importante?", "Tem algum recall?"];
+    if (sc.view === "news") return ["Alguma novidade importante?", "Tem algum recall?"];
     return ["Quais cômodos valem mais?", "O que eu devia pôr no seguro?", "Quantos eletrônicos eu tenho?"];
   }
   function chatHtml(t) { // texto simples da IA: negrito, listas, links e quebras de linha
@@ -2396,7 +2426,7 @@
   // ------------------------------------------------------------------ catalogar foto com IA (vários itens); também a revisão do Falar
   async function openCatalog({ room = null, file = null, voice = false } = {}) {
     if (!D.rooms.length) { toast("Crie um cômodo antes."); openRoomNew(); return; }
-    if (!voice && !aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return; }
+    if (!voice && !aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return; }
     if (!voice && !(await needAi())) return;
     const zonesUse = zonesOn();
     const useAi = voice ? aiOn() && !!(await aiStatus()).ready : true;
@@ -3234,7 +3264,7 @@
   // Arrastar para o lado troca de aba no celular, como no ResolvIA e no CronologIA: Início ⇄ Buscar ⇄ Cômodos ⇄ Mais.
   // Dentro de um cômodo, arrastar para a direita volta para Cômodos; no relatório, para Mais. Não vale começando na
   // borda da tela (é o Voltar do celular), num campo, numa fileira que rola para o lado ou com uma janela aberta.
-  const SWIPE_TABS = [["home", "#/"], ["search", "#/buscar"], ["rooms", "#/comodos"], ["data", "#/mais"]];
+  const SWIPE_TABS = [["home", "#/"], ["search", "#/buscar"], ["rooms", "#/comodos"], ["menu", "#/mais"]];
   let swipe = null, slideFrom = 0;
   document.addEventListener("touchstart", (e) => {
     swipe = null;
@@ -3257,7 +3287,7 @@
     const d = dx < 0 ? 1 : -1; // dedo para a esquerda: a próxima aba
     let to = null;
     if (base.name === "room") to = d < 0 ? "#/comodos" : null;
-    else if (base.name === "report") to = d < 0 ? "#/mais" : null;
+    else if (IN_MORE.includes(base.name) && base.name !== "menu") to = d < 0 ? "#/mais" : null; // Relatório, Novidades, Configurações: volta ao menu
     else {
       const i = SWIPE_TABS.findIndex(([n]) => n === base.name), j = i + d;
       if (i >= 0 && j >= 0 && j < SWIPE_TABS.length) to = SWIPE_TABS[j][1];

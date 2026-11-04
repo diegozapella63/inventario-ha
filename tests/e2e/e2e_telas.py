@@ -3,7 +3,7 @@ nada passa da largura (o Chrome do celular encolheria a página), as janelas cab
 de baixo visíveis, e nenhum texto de botão fica cortado."""
 from e2e_lib import main
 
-PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/mais/novidades", "#/mais/integracoes", "#/mais/aparencia", "#/mais/opcoes"]
+PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/novidades", "#/categorias", "#/config", "#/config/integracoes", "#/config/aparencia", "#/config/opcoes"]
 
 # (nome, endereço, como abrir, seletor que aparece)
 DIALOGS = [
@@ -16,8 +16,8 @@ DIALOGS = [
     ("novo-comodo", "#/comodos", '#view [data-act="room-new"]', "#rn-name"),
     ("editar-comodo", "#/c/sala", '.rhead-actions [data-act="room-edit"]', "#re-name"),
     ("mover", "#/i/sal-002", 'dialog.sheet [data-act="item-move"]', "#mv-room"),
-    ("versoes", "#/mais", '[data-act="versions"]', "dialog .dlg-b"),
-    ("categoria", "#/mais/opcoes", '[data-act="cat-new"]', "#cn-name"),
+    ("versoes", "#/config", '[data-act="versions"]', "dialog .dlg-b"),
+    ("categoria", "#/categorias", '[data-act="cat-new"]', "#cn-name"),
     ("foto-comodo", "#/c/sala", ".strip .ph", "dialog.viewer"),
     ("excluir-item", "#/i/var-001", 'dialog.sheet [data-act="item-delete"]', '[data-r="1"]'),
     ("novidades", "#/i/sal-007", 'dialog.sheet [data-act="item-news"]', ".news li"),
@@ -73,7 +73,7 @@ async def body(r, p):
             for name, h, opener, wait in DIALOGS:
                 if name in ("falar", "adicionar") and size == "pc":  # no computador: botões no alto, sem a barra de baixo
                     continue
-                await r.open(pg, h, ".tag, .sbar, .rooms, .more-tabs, .report, .rhead, dialog[open]")
+                await r.open(pg, h, ".tag, .sbar, .rooms, .more-tabs, .report, .rhead, #p-cats, dialog[open]")
                 if opener:
                     await pg.locator(opener).first.click()
                 await pg.wait_for_selector(wait, timeout=8000)

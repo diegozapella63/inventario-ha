@@ -1,4 +1,4 @@
-"""Importar um backup em partes (Mais > Dados > Importar): vários arquivos de uma vez no seletor, na ordem das partes,
+"""Importar um backup em partes (Mais > Configurações > Dados > Importar): vários arquivos de uma vez no seletor, na ordem das partes,
 com o progresso do envio; uma parte sem o inventário só traz fotos; cancelar no meio pergunta antes, e nada muda
 (ou, em partes, o que já chegou fica)."""
 import asyncio
@@ -66,7 +66,7 @@ async def body(r, p):
     pg.on("request", lambda q: starts.append(q.post_data_json.get("name")) if q.url.endswith("/api/upload") and q.method == "POST" else None)
 
     async def choose(*paths):
-        await r.open(pg, "#/mais", ".more-tabs")
+        await r.open(pg, "#/config", ".more-tabs")
         async with pg.expect_file_chooser() as fc:
             await pg.click('[data-act="import-file"]')
         chooser = await fc.value

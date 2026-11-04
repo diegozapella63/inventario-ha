@@ -42,7 +42,7 @@ async def body(r, p):
     # -- ligar
     await r.open(pg, "#/c/sala", ".rhead")
     r.eq(await pg.locator("#view .zone-h").count(), 0, "de início, zonas desligadas: a sala é uma lista só")
-    await r.open(pg, "#/mais/opcoes", ".more-tabs")
+    await r.open(pg, "#/config/opcoes", ".more-tabs")
     await switch(pg, True)
     r.check(r.data()["settings"]["zones"] is True and await pg.is_checked('[data-input="zones-on"]'), "a chave liga as zonas para a casa toda")
 
@@ -127,7 +127,7 @@ async def body(r, p):
 
     # -- desligar não apaga
     zoned = {i["id"]: i["zone"] for i in r.data()["items"] if i.get("zone")}
-    await r.open(pg, "#/mais/opcoes", ".more-tabs")
+    await r.open(pg, "#/config/opcoes", ".more-tabs")
     await switch(pg, False)
     r.eq({i["id"]: i["zone"] for i in r.data()["items"] if i.get("zone")}, zoned, "desligar as zonas não apaga nenhuma")
     await r.open(pg, "#/c/sala", ".rhead")
@@ -156,7 +156,7 @@ async def body(r, p):
     await pg.wait_for_selector("dialog.modal", state="detached", timeout=8000)
     r.eq(r.item_named("Porta-retrato")["zone"], "", "desligadas: item novo nasce sem zona, mesmo com a última zona lembrada")
     # ligar de novo: tudo volta
-    await r.open(pg, "#/mais/opcoes", ".more-tabs")
+    await r.open(pg, "#/config/opcoes", ".more-tabs")
     await switch(pg, True)
     await r.open(pg, "#/c/sala", ".rhead")
     names = [z[0] for z in await pg.evaluate(ZONES)]

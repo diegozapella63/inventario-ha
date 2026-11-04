@@ -152,7 +152,7 @@ async def body(r, p):
     r.eq(focus_after, "item-new", "depois de salvar, o foco volta para Adicionar item")
 
     # -- Enter nos formulários de uma linha
-    await r.open(pg, "#/mais/opcoes", ".more-tabs")
+    await r.open(pg, "#/categorias", "#p-cats")
     await pg.click('[data-act="cat-new"]')
     await pg.wait_for_function("document.activeElement && document.activeElement.id === 'cn-name'", timeout=3000)
     await pg.keyboard.type("Ferramentas")
@@ -172,14 +172,14 @@ async def body(r, p):
     await pg.wait_for_timeout(300)
 
     # -- abas de Mais: setas, Home e End
-    await r.open(pg, "#/mais", ".more-tabs")
+    await r.open(pg, "#/config", ".more-tabs")
     await pg.focus("#mt-dados")
     seq = []
     for k in ("ArrowLeft", "Home", "End", "ArrowRight"):
         await pg.keyboard.press(k)
         await pg.wait_for_timeout(250)
         seq.append([hash_(pg), await pg.evaluate("document.activeElement.id")])
-    r.eq(seq, [["#/mais/opcoes", "mt-opcoes"], ["#/mais", "mt-dados"], ["#/mais/opcoes", "mt-opcoes"], ["#/mais", "mt-dados"]],
+    r.eq(seq, [["#/config/opcoes", "mt-opcoes"], ["#/config", "mt-dados"], ["#/config/opcoes", "mt-opcoes"], ["#/config", "mt-dados"]],
          "abas de Mais: seta para a esquerda dá a volta, Home e End vão às pontas, e o foco acompanha")
     tabidx = await pg.evaluate("[...document.querySelectorAll('.more-tabs [role=tab]')].map(t => t.tabIndex)")
     r.check(len(tabidx) >= 4 and tabidx[0] == 0 and set(tabidx[1:]) == {-1}, f"só a aba atual entra no Tab; as outras, pelas setas ({tabidx})")

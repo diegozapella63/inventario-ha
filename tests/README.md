@@ -51,13 +51,13 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | `e2e_camera` | câmera dentro do app no Android, várias fotos, Voltar, sem câmera, navegador do celular, computador |
 | `e2e_internet` | Buscar na internet: fotos e dados do produto na ficha e no editor, Desfazer, sem fotos, sem busca, IA desligada |
 | `e2e_novidades` | Novidades na própria ficha: só as 3 mais recentes, tipos, datas, fontes, boato, guardadas ao abrir de novo, Buscar de novo, fechar no meio, erro, IA desligada |
-| `e2e_novidades_todos` | Mais > Novidades: só Eletrônicos, sem escolher categorias, item de outra categoria fora da lista, conferir todos com a IA escolhendo, andamento, Parar, deixados de fora, Limpar com confirmação, aba some sem IA |
+| `e2e_novidades_todos` | Novidades (no menu Mais): só Eletrônicos, sem escolher categorias, item de outra categoria fora da lista, conferir todos com a IA escolhendo, andamento, Parar, deixados de fora, Limpar com confirmação, aba some sem IA |
 | `e2e_conversar` | Conversar: botão ao lado do microfone, ideias, Enter, resposta formatada, da ficha, erro, ditar, computador, IA desligada |
-| `e2e_mais` | abas, botões 280×44 alinhados, exportar CSV/JSON/ZIP, backup e restaurar, versões, importar |
+| `e2e_mais` | o menu Mais (Novidades, Categorias, Relatório, Configurações), Voltar, endereços antigos; Configurações: abas, botões 280×44 alinhados, exportar CSV/JSON/ZIP, backup e restaurar, versões, importar |
 | `e2e_backups` | lista de backups, restaurar um antigo, pasta share indisponível |
 | `e2e_versoes` | versões anteriores: nenhuma, várias, os motivos, restaurar cada uma |
 | `e2e_importar_partes` | backup em partes, só fotos, cancelar no meio, progresso |
-| `e2e_ajustes` | Integrações com o Home Assistant de mentira (IA, Falar, uso, sensor, Usar IA), Aparência (tema, as 10 cores e a Cor do dia: ligada de início, a cor de cada dia, a virada da meia-noite, escolher uma cor desliga), Opções (zonas e categorias) |
+| `e2e_ajustes` | Integrações com o Home Assistant de mentira (IA, Falar, uso, sensor, Usar IA), Aparência (tema, as 10 cores e a Cor do dia: ligada de início, a cor de cada dia, a virada da meia-noite, escolher uma cor desliga), Opções (zonas), Categorias (tela própria) |
 | `e2e_uso_ia` | painel Uso da IA: dias, barras, tipos, últimas chamadas, links do provedor |
 | `e2e_relatorio` | totais, ordem, fotos, zonas, impressão e PDF |
 | `e2e_navegacao` | abas, arrastar para o lado, Voltar, endereços que não existem, atualização vinda de outro aparelho |

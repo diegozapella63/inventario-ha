@@ -1,4 +1,4 @@
-"""Mais > Novidades: só Eletrônicos, sem escolher categorias; conferir todos (a IA escolhe, entre os eletrônicos, o que vale conferir),
+"""Novidades (no menu Mais): só Eletrônicos, sem escolher categorias; conferir todos (a IA escolhe, entre os eletrônicos, o que vale conferir),
 progresso e Parar, a lista com recall primeiro, abrir um item, os deixados de fora, item de outra categoria fora da lista,
 Limpar novidades com confirmação e a aba some com a IA desligada."""
 from e2e_lib import OVERFLOW, main
@@ -10,11 +10,10 @@ async def body(r, p):
     r.start(search=False)
     b = await r.browser(p)
     ctx, pg = await r.page(b, "cel", "dark", accent="laranja")
-    await r.open(pg, "#/mais/novidades", ".more-tabs")
+    await r.open(pg, "#/novidades", "#p-news")
     await pg.wait_for_selector('[data-slot="news-list"] p, #p-news-list .nlist', timeout=8000)
-    tabs = await pg.evaluate("[...document.querySelectorAll('.more-tabs [role=tab]')].map(t => t.textContent.trim())")
-    r.eq(tabs, ["Dados", "Novidades", "Integrações", "Aparência", "Opções"], "a aba Novidades em Mais")
-    r.eq(await pg.get_attribute("#mt-novidades", "aria-selected"), "true", "abre pelo endereço")
+    r.eq((await pg.text_content(".page-title")).strip(), "Novidades", "Novidades numa tela própria, aberta pelo endereço")
+    r.eq(await pg.locator("#view .more-tabs").count(), 0, "sem as abas de configurações")
     r.eq(await pg.locator("#view .chip, #p-news-cats").count(), 0, "sem escolher categorias")
     r.check("dos eletrônicos" in await pg.text_content("#p-news .lead"), "diz que é dos eletrônicos")
     r.check("Toque em Conferir novidades" in await pg.text_content('[data-slot="news-list"]'), "antes da primeira vez, diz o que fazer")
@@ -80,7 +79,7 @@ async def body(r, p):
             break
         await pg.wait_for_timeout(200)
     r.check("coz-004" in r.api("GET", "api/news")["itens"], "a geladeira foi conferida pela ficha")
-    await r.open(pg, "#/mais/novidades", "#p-news-list .nlist")
+    await r.open(pg, "#/novidades", "#p-news-list .nlist")
     todos = await pg.evaluate("[...document.querySelectorAll('#p-news-list .nrow b')].map(b => b.textContent)")
     r.check("Geladeira frost free inox" not in todos and "Smart TV 55 polegadas" in todos, "mas não entra na lista: só eletrônicos")
     r.eq(await pg.locator("#view .chip").count(), 0, "e continua sem escolher categorias")
@@ -117,11 +116,8 @@ async def body(r, p):
     r.app = None
     r.start(search=False)
     ctx, pg = await r.page(b, "estreito", "light", accent="verde")
-    await r.open(pg, "#/mais/novidades", '[data-act="news-all"]')
-    vis = await pg.evaluate("(() => { const bar = document.querySelector('.more-tabs'), on = bar.querySelector('[aria-selected=true]'); const a = bar.getBoundingClientRect(), o = on.getBoundingClientRect(); return o.left >= a.left - 1 && o.right <= a.right + 1; })()")
-    r.check(vis, "no celular estreito, a aba escolhida fica à vista na barra")
-    cut = await pg.evaluate("[...document.querySelectorAll('.more-tabs button')].some(b => b.scrollWidth > b.clientWidth + 1)")
-    r.check(not cut, "nenhum nome de aba cortado")
+    await r.open(pg, "#/novidades", '[data-act="news-all"]')
+    r.check(await pg.evaluate(OVERFLOW), "no celular estreito, nada passa da largura")
     await pg.click('[data-act="news-all"]')
     await pg.wait_for_function("/Conferindo [2-9] de/.test(document.querySelector('.njob')?.textContent || '')", timeout=20000)
     await pg.click('[data-act="news-cancel"]')
@@ -136,9 +132,9 @@ async def body(r, p):
     # IA desligada: a aba some e o endereço volta para Dados
     r.api("PUT", "api/settings", {"ai": False})
     ctx, pg = await r.page(b, "cel", "light")
-    await r.open(pg, "#/mais/novidades", ".more-tabs")
-    r.eq(await pg.locator("#mt-novidades").count(), 0, "IA desligada: sem a aba Novidades")
-    r.eq(await pg.get_attribute("#mt-dados", "aria-selected"), "true", "e abre em Dados")
+    await r.open(pg, "#/novidades", ".menu-list")
+    r.check(pg.url.endswith("#/mais"), "IA desligada: o endereço de Novidades abre o menu Mais")
+    r.check("Novidades" not in await pg.evaluate("[...document.querySelectorAll('.menu-row b')].map(b => b.textContent)"), "e o menu fica sem Novidades")
     await ctx.close()
     await b.close()
     app2.stop()

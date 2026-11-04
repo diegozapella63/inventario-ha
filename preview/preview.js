@@ -230,7 +230,7 @@
       return { ready: true, preview: true, reason: null, entities: [{ id: "ai_task.exemplo", name: "Exemplo simulado", attachments: true }],
         agents: [{ id: "conversation.exemplo", name: "Assistente de exemplo" }], selected: ST.settings.ai_entity || "", search: ST.settings.ai_search || "" };
     }
-    const aiOff = () => { if (ST.settings.ai === false) fail("A IA está desligada. Para usar, ligue em Mais > Integrações.", 409); };
+    const aiOff = () => { if (ST.settings.ai === false) fail("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações.", 409); };
     if (method === "GET" && path.startsWith("api/voice/status")) {
       const sel = STT.find((e) => e.id === ST.settings.voice_stt);
       return { ready: true, engine: (sel || STT[0]).id, language: "pt-BR", name: (sel || STT[0]).name, assistant: sel ? "" : "Assistente de exemplo",
@@ -297,7 +297,7 @@
       const live = newsJobOf();
       if (live) return { id: live[0] };
       const cats = newsCats();
-      if (!cats.length) fail("A categoria Eletrônicos foi excluída: crie de novo em Mais > Opções.");
+      if (!cats.length) fail("A categoria Eletrônicos foi excluída: crie de novo em Mais > Categorias.");
       for (const i of d.items) if (cats.includes(i.cat) && !(i.id in ST.news.triagem)) ST.news.triagem[i.id] = PICK.test(plain(i.name));
       const week = Date.now() - 7 * 864e5;
       const todo = d.items.filter((i) => cats.includes(i.cat) && ST.news.triagem[i.id] && !(ST.news.itens[i.id] && Date.parse(ST.news.itens[i.id].at) > week));

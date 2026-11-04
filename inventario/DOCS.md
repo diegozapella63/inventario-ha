@@ -26,18 +26,18 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - **Buscar na internet**: num item sem foto (ou no editor do item), a IA procura o produto no fabricante e nas lojas e o app mostra as fotos encontradas para você escolher. Na mesma busca, a IA traz nome, detalhes, categoria e valor do produto para preencher o item. Veja [Fotos da internet](#fotos-da-internet).
 - **Buscar**: por nome, marca ou detalhe, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome ou data.
 - **Relatório**: lista por cômodo com fotos e valores, pronta para imprimir ou salvar em PDF (útil para seguro).
-- **Mais**, em abas como nos outros apps: **Dados** (exportar planilha, JSON, ZIP com fotos e o relatório; backup; importar; versões anteriores), **Integrações** (ligar ou desligar a IA e escolher qual IA do Home Assistant usar), **Aparência** (tema claro, escuro ou automático e a cor do app: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza; com a **Cor do dia**, ligada de início, a cor muda todo dia, a mesma o dia todo e em todos os aparelhos, sem o cinza; escolher uma cor desliga a Cor do dia) e **Opções** (as zonas e as categorias). O tema e a cor ficam em cada aparelho; a IA e as zonas valem para todos.
-- No celular, **arrastar para o lado** troca de aba (Início, Buscar, Cômodos e Mais); dentro de um cômodo, arrastar para a direita volta para Cômodos.
+- **Mais** é um menu: **Novidades**, **Categorias**, **Relatório para seguro** e **Configurações**. Configurações, em abas como nos outros apps: **Dados** (exportar planilha, JSON e ZIP com fotos; backup; importar; versões anteriores), **Integrações** (ligar ou desligar a IA e escolher qual IA do Home Assistant usar), **Aparência** (tema claro, escuro ou automático e a cor do app: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza; com a **Cor do dia**, ligada de início, a cor muda todo dia, a mesma o dia todo e em todos os aparelhos, sem o cinza; escolher uma cor desliga a Cor do dia) e **Opções** (as zonas). O tema e a cor ficam em cada aparelho; a IA e as zonas valem para todos.
+- No celular, **arrastar para o lado** troca de aba (Início, Buscar, Cômodos e Mais); dentro de um cômodo, arrastar para a direita volta para Cômodos, e em Novidades, Categorias, Relatório ou Configurações, volta para o menu Mais.
 - Atalhos no computador: `/` abre a busca, `N` cria um item, `Ctrl+Enter` salva o formulário.
 
 O valor de cada item é o que você quiser registrar, somando todas as unidades.
 
 ## Opções da casa
 
-- **Usar IA** (Mais > Integrações), ligada de início: desligada, o app esconde tudo o que usa IA (Catalogar foto com IA, Preencher com IA, Buscar na internet, Novidades, Conversar) e não chama a IA. O **Falar** continua: quem transcreve é a fala para texto do Home Assistant, e o próprio app separa os itens pelas vírgulas.
-- **Usar zonas** (Mais > Opções), desligada de início: as zonas dividem um cômodo em partes, como Estante, Bancada ou Rack da TV. Ligadas, aparecem o campo Zona no cadastro, a zona na ficha do item, na busca e no relatório, e os itens de cada cômodo ficam separados por zona.
+- **Usar IA** (Mais > Configurações > Integrações), ligada de início: desligada, o app esconde tudo o que usa IA (Catalogar foto com IA, Preencher com IA, Buscar na internet, Novidades, Conversar) e não chama a IA. O **Falar** continua: quem transcreve é a fala para texto do Home Assistant, e o próprio app separa os itens pelas vírgulas.
+- **Usar zonas** (Mais > Configurações > Opções), desligada de início: as zonas dividem um cômodo em partes, como Estante, Bancada ou Rack da TV. Ligadas, aparecem o campo Zona no cadastro, a zona na ficha do item, na busca e no relatório, e os itens de cada cômodo ficam separados por zona.
 
-- **Categorias** (Mais > Opções): renomeie, crie ou exclua categorias. Os itens de uma categoria excluída vão para Outros, que não pode ser excluída. As categorias ficam no inventário: entram no backup, na exportação e nas versões, e a IA passa a usar as novas.
+- **Categorias** (Mais > Categorias): renomeie, crie ou exclua categorias. Os itens de uma categoria excluída vão para Outros, que não pode ser excluída. As categorias ficam no inventário: entram no backup, na exportação e nas versões, e a IA passa a usar as novas.
 
 Desligar uma opção só esconde: nada do que já foi gravado se perde, e ligar de novo traz tudo de volta.
 
@@ -56,11 +56,11 @@ Para configurar:
 
 1. Em **Configurações > Dispositivos e serviços > Adicionar integração**, escolha a integração e siga os passos.
 2. Na página da integração, adicione uma **tarefa de IA** (AI Task) e escolha um modelo que leia imagens.
-3. No app, abra **Mais > Integrações** e escolha essa IA em **IA para ler fotos**. "Padrão do Home Assistant" usa a IA preferida definida em **Configurações > Sistema > Geral**.
+3. No app, abra **Mais > Configurações > Integrações** e escolha essa IA em **IA para ler fotos**. "Padrão do Home Assistant" usa a IA preferida definida em **Configurações > Sistema > Geral**.
 
 Na hora da leitura, o app copia a foto por alguns segundos para `media/inventario/ia-temp`, chama a IA pelo Home Assistant e apaga a cópia em seguida. A IA não recebe número de série, IMEI ou dados pessoais: as instruções pedem só descrição do objeto.
 
-Sem IA configurada, todo o resto funciona normalmente. Se não for usar IA, desligue **Usar IA** em **Mais > Integrações** e os botões de IA somem.
+Sem IA configurada, todo o resto funciona normalmente. Se não for usar IA, desligue **Usar IA** em **Mais > Configurações > Integrações** e os botões de IA somem.
 
 ## Falar
 
@@ -69,17 +69,17 @@ O **microfone** fica no alto da tela, à direita (e também em **Adicionar > Fal
 - Dentro de um cômodo, os itens vão para ele; dá para trocar o cômodo antes de adicionar. Se você falar o cômodo ("na sala"), a IA já escolhe.
 - Sem IA (Usar IA desligada ou sem integração de IA), o app separa o que foi dito pelas vírgulas e pelo "e", e o valor ("2.000 reais", "R$ 500", "dois mil reais", "três mil") vai para o item anterior.
 - Até 2 minutos por vez. Na primeira vez, o navegador ou o app do celular pede permissão para o microfone.
-- O microfone só aparece quando o Home Assistant tem fala para texto. Em **Mais > Integrações > Falar** você vê qual transcreve e escolhe outra em **Fala para texto**, como na escolha da IA: **Padrão do Home Assistant** usa a fala para texto do assistente de voz preferido (Configurações > Assistentes de voz), e embaixo vêm as que o Home Assistant tem, como Home Assistant Cloud, Google AI ou Whisper.
+- O microfone só aparece quando o Home Assistant tem fala para texto. Em **Mais > Configurações > Integrações > Falar** você vê qual transcreve e escolhe outra em **Fala para texto**, como na escolha da IA: **Padrão do Home Assistant** usa a fala para texto do assistente de voz preferido (Configurações > Assistentes de voz), e embaixo vêm as que o Home Assistant tem, como Home Assistant Cloud, Google AI ou Whisper.
 - A fala para texto não depende de **Usar IA**: com a IA desligada, o Falar continua transcrevendo e o app separa os itens pelas vírgulas. Para não usar nada do Gemini, escolha uma fala para texto que não seja a do Google AI.
 - O microfone precisa do Home Assistant aberto com https (como o endereço do Nabu Casa) ou pelo app do celular; pelo endereço http da rede de casa, o navegador não deixa usar.
 
 ## Uso da IA
 
-Em **Mais > Integrações > Uso da IA** ficam as chamadas de hoje, dos últimos 7 dias e do mês, um gráfico por dia (toque numa barra para ver o dia), o tipo de uso (Preencher com IA, Catalogar foto e Buscar foto na internet) e as últimas chamadas, com a IA usada, o tempo e o resultado (cota excedida, resposta fora do formato, IA sem busca na web ou erro).
+Em **Mais > Configurações > Integrações > Uso da IA** ficam as chamadas de hoje, dos últimos 7 dias e do mês, um gráfico por dia (toque numa barra para ver o dia), o tipo de uso (Preencher com IA, Catalogar foto e Buscar foto na internet) e as últimas chamadas, com a IA usada, o tempo e o resultado (cota excedida, resposta fora do formato, IA sem busca na web ou erro).
 
 O Home Assistant não informa tokens nem custo, então o app conta as chamadas e estima os tokens pelo tamanho do texto (uns 4 caracteres por token). As imagens e a busca na web gastam mais do que essa estimativa. O consumo exato e o custo ficam no painel do provedor: Google Cloud Console para o Gemini, platform.openai.com/usage para a OpenAI e Claude Console para a Anthropic.
 
-Com **Sensores no Home Assistant** ligado (em **Mais > Integrações**; vem desligado), o app cria no Home Assistant o sensor `sensor.inventaria_ia_hoje`, com as chamadas de hoje no estado e os detalhes nos atributos (`erros`, `cota_excedida`, `tokens_texto_estimados`, `imagens`, `por_tipo`, `ultimos_7_dias`, `este_mes` e `ultima_chamada`). Dá para pôr num painel ou numa automação, por exemplo para avisar quando passar de 50 chamadas no dia. O sensor zera na virada do dia; se o Home Assistant reiniciar, ele volta em alguns minutos. Desligando a opção, o sensor sai do Home Assistant na hora.
+Com **Sensores no Home Assistant** ligado (em **Mais > Configurações > Integrações**; vem desligado), o app cria no Home Assistant o sensor `sensor.inventaria_ia_hoje`, com as chamadas de hoje no estado e os detalhes nos atributos (`erros`, `cota_excedida`, `tokens_texto_estimados`, `imagens`, `por_tipo`, `ultimos_7_dias`, `este_mes` e `ultima_chamada`). Dá para pôr num painel ou numa automação, por exemplo para avisar quando passar de 50 chamadas no dia. O sensor zera na virada do dia; se o Home Assistant reiniciar, ele volta em alguns minutos. Desligando a opção, o sensor sai do Home Assistant na hora.
 
 ## Fotos da internet
 
@@ -93,13 +93,13 @@ A IA precisa ter a **busca na web** ligada:
 - **Google Gemini**: a Pesquisa Google só funciona num assistente de conversa. Ligue **Enable Google Search tool** nele e escolha esse assistente.
 - **OpenAI**: nas opções da tarefa de IA, ligue **Enable web search** (precisa do gpt-4o ou de um modelo mais novo).
 
-Escolha a IA em **Mais > Integrações > IA para buscar fotos na internet**. Como na leitura de fotos, "Padrão do Home Assistant" usa a tarefa de IA preferida definida no Home Assistant; para o Gemini, escolha o assistente de conversa na lista.
+Escolha a IA em **Mais > Configurações > Integrações > IA para buscar fotos na internet**. Como na leitura de fotos, "Padrão do Home Assistant" usa a tarefa de IA preferida definida no Home Assistant; para o Gemini, escolha o assistente de conversa na lista.
 
 A IA recebe só o nome, o começo dos detalhes e a quantidade do item. O app baixa as fotos apenas de endereços públicos da internet (nunca da rede da casa) e guarda só a foto que você escolher; as outras são apagadas em até 30 minutos. Cada busca usa a busca na web da sua IA, que pode ter custo à parte.
 
 ## Novidades do produto
 
-Na ficha do item, **Novidades** pede à IA de busca (a mesma da busca de fotos, em Mais > Integrações) o que saiu nos últimos 12 meses e o que já foi anunciado para os próximos meses sobre o produto: atualizações de firmware ou software, modelo novo, lançamentos da mesma linha, recalls e fim de suporte.
+Na ficha do item, **Novidades** pede à IA de busca (a mesma da busca de fotos, em Mais > Configurações > Integrações) o que saiu nos últimos 12 meses e o que já foi anunciado para os próximos meses sobre o produto: atualizações de firmware ou software, modelo novo, lançamentos da mesma linha, recalls e fim de suporte.
 
 - Vêm só as 3 novidades mais recentes. Cada uma vem com o tipo, a data quando se sabe e o site da fonte, que abre fora do app. Sem fonte, não entra. Rumor aparece marcado como **Boato**; recall (só o oficial, do fabricante ou de um órgão como o Procon) fica em destaque.
 - A IA só acha o que já foi publicado: lançamento que ainda não foi anunciado não aparece.
@@ -112,7 +112,7 @@ Na ficha do item, **Novidades** pede à IA de busca (a mesma da busca de fotos, 
 
 O balão ao lado do microfone, no alto da tela (e na ficha do item), abre uma conversa com a IA. Pergunte sobre o que está na tela ("qual o item mais caro daqui?", "vale pôr no seguro?") ou sobre qualquer outro assunto. A IA recebe o resumo da casa e o que está na tela: o item, o cômodo com os itens, a busca ou as novidades. Ela responde, mas não muda o inventário.
 
-- Responde a IA de buscar fotos na internet (Mais > Integrações); sem ela, a de ler fotos. Um assistente de conversa com a Pesquisa Google ligada responde também o que é de fora da casa.
+- Responde a IA de buscar fotos na internet (Mais > Configurações > Integrações); sem ela, a de ler fotos. Um assistente de conversa com a Pesquisa Google ligada responde também o que é de fora da casa.
 - Com o microfone da conversa, dá para falar a pergunta.
 - A conversa fica até fechar o app; **Nova conversa** começa outra. Cada pergunta conta em Uso da IA.
 
@@ -127,10 +127,10 @@ Tudo fica em arquivos abertos, dentro da pasta de dados do app:
 Formas de guardar uma cópia:
 
 - **Backups do Home Assistant**: incluem o app e os dados dele.
-- **Mais > Dados > Backup na pasta share**: cria um `.zip` completo (JSON, CSV e fotos) em `share/inventario`, que você acessa pela rede (por exemplo `\\homeassistant.local\share\inventario` com o app Samba).
-- **Mais > Dados > Exportar**: CSV (abre no Excel), JSON ou ZIP com fotos, direto para o seu computador ou celular.
+- **Mais > Configurações > Dados > Backup na pasta share**: cria um `.zip` completo (JSON, CSV e fotos) em `share/inventario`, que você acessa pela rede (por exemplo `\\homeassistant.local\share\inventario` com o app Samba).
+- **Mais > Configurações > Dados > Exportar**: CSV (abre no Excel), JSON ou ZIP com fotos, direto para o seu computador ou celular.
 
-Para restaurar, use **Mais > Dados**: escolha um backup da pasta share, volte para uma versão anterior (**Versões anteriores > Ver versões**, com a data, quantos itens cada uma tem e por que foi guardada) ou importe um arquivo (`.zip` de backup ou `.json`) do computador ou do celular. Antes de restaurar ou importar, o app guarda uma cópia do que existe naquele momento.
+Para restaurar, use **Mais > Configurações > Dados**: escolha um backup da pasta share, volte para uma versão anterior (**Versões anteriores > Ver versões**, com a data, quantos itens cada uma tem e por que foi guardada) ou importe um arquivo (`.zip` de backup ou `.json`) do computador ou do celular. Antes de restaurar ou importar, o app guarda uma cópia do que existe naquele momento.
 
 ## Cômodos e itens nos outros apps
 

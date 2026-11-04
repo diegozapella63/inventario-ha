@@ -1,4 +1,4 @@
-"""Mais > Dados > Versões anteriores: nenhuma no começo; a cópia automática (uma a cada 10 minutos de uso); as de antes
+"""Mais > Configurações > Dados > Versões anteriores: nenhuma no começo; a cópia automática (uma a cada 10 minutos de uso); as de antes
 de restaurar e de antes de importar, com o motivo, a data e o número de itens; restaurar cada uma (pergunta antes,
 guarda uma cópia do atual e ficam só as 3 mais recentes)."""
 import copy
@@ -21,7 +21,7 @@ async def body(r, p):
     ctx, pg = await r.page(b, "pc", "light", accent="rosa")
 
     async def versions():
-        await r.open(pg, "#/mais", ".more-tabs")
+        await r.open(pg, "#/config", ".more-tabs")
         await pg.click('[data-act="versions"]')
         await pg.wait_for_function(f"(e => e && !e.textContent.includes('Carregando'))(document.querySelector('{DLG} [data-slot=versions]'))", timeout=8000)
         return await pg.evaluate(ROWS)
@@ -107,7 +107,7 @@ async def body(r, p):
     d = copy.deepcopy(fx)
     d["items"] = d["items"][:10]
     helpers.write_file(js, json.dumps(d, ensure_ascii=False))
-    await r.open(pg, "#/mais", ".more-tabs")
+    await r.open(pg, "#/config", ".more-tabs")
     async with pg.expect_file_chooser() as fc:
         await pg.click('[data-act="import-file"]')
     await (await fc.value).set_files(js)
@@ -120,7 +120,7 @@ async def body(r, p):
 
     # -- celular: a lista cabe
     ctx, pg = await r.page(b, "estreito", "dark", accent="azul")
-    await r.open(pg, "#/mais", ".more-tabs")
+    await r.open(pg, "#/config", ".more-tabs")
     await pg.click('[data-act="versions"]')
     await pg.wait_for_selector(f"{DLG} .versions li", timeout=8000)
     r.check(await pg.evaluate(OVERFLOW), "celular de 320 px: a lista de versões sem rolagem para o lado")

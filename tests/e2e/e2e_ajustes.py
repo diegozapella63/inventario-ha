@@ -1,4 +1,4 @@
-"""Mais > Integrações (com um Home Assistant de mentira), Aparência (tema e cor) e Opções (zonas e categorias)."""
+"""Mais > Configurações > Integrações (com um Home Assistant de mentira), Aparência (tema e cor) e Opções (zonas e categorias)."""
 import datetime
 import json
 import time
@@ -25,7 +25,7 @@ async def body(r, p):
 
     # -- Integrações
     ctx, pg = await r.page(b, "cel", "dark", accent="laranja")
-    await r.open(pg, "#/mais/integracoes", ".more-tabs")
+    await r.open(pg, "#/config/integracoes", ".more-tabs")
     await pg.wait_for_selector('#p-ai .status.ok', timeout=10000)
     r.eq((await pg.text_content("#p-ai .status")).strip(), "Pronta para ler fotos", "a IA do Home Assistant está pronta")
     opts = await pg.evaluate("[...document.querySelectorAll('[data-input=ai-entity] option')].map(o => [o.textContent, o.disabled])")
@@ -54,7 +54,7 @@ async def body(r, p):
 
     # uso da IA: uma leitura de foto conta
     r.api("POST", "api/ai/identify", {"file": photo, "mode": "single"})
-    await r.open(pg, "#/mais/integracoes", ".more-tabs")
+    await r.open(pg, "#/config/integracoes", ".more-tabs")
     await pg.wait_for_selector(".uso-tiles", timeout=10000)
     hoje = await pg.text_content(".uso-tiles .uso-tile .v")
     r.eq(hoje.strip(), "1", "Uso da IA: 1 chamada hoje")
@@ -107,7 +107,7 @@ async def body(r, p):
     ha.states = [s for s in ha.states if not s["entity_id"].startswith("stt.")]
     r.api("PUT", "api/settings", {"voice_stt": ""})
     ctx, pg = await r.page(b, "cel", "light")
-    await r.open(pg, "#/mais/integracoes", ".more-tabs")
+    await r.open(pg, "#/config/integracoes", ".more-tabs")
     await pg.click('[data-act="voice-refresh"]')
     await pg.wait_for_function("(e => e && e.textContent.includes('Sem fala para texto'))(document.querySelector('[data-slot=voice-panel] .status'))", timeout=10000)
     r.check("Assistentes de voz" in await pg.text_content('[data-slot="voice-panel"]'), "sem fala para texto: diz onde configurar")
@@ -118,7 +118,7 @@ async def body(r, p):
     # -- Aparência: tema e cor, só neste aparelho; a Cor do dia vem ligada
     ctx, pg = await r.page(b, "cel", "light", accent=None)
     await ctx.clock.install(time=datetime.datetime(2026, 11, 3, 23, 59, 30))  # hora local
-    await r.open(pg, "#/mais/aparencia", ".more-tabs")
+    await r.open(pg, "#/config/aparencia", ".more-tabs")
     r.eq(await pg.evaluate("[new Date().getDate(), new Date().getHours()]"), [3, 23], "o navegador está em 3 de novembro, 23h59")
     html_ = pg.locator("html")
     daily = pg.get_by_role("switch", name="Cor do dia")
@@ -176,7 +176,7 @@ async def body(r, p):
     await pg.wait_for_function("document.documentElement.dataset.accent !== 'kraft'", timeout=5000)
     r.eq(await pg.evaluate("document.documentElement.dataset.accent || 'amarelo'"), "amarelo", "6 de novembro: depois do Kraft, o Amarelo de novo (o Cinza fica de fora)")
     await r.shot(pg, "cor-do-dia-inicio")
-    await r.open(pg, "#/mais/aparencia", ".more-tabs")
+    await r.open(pg, "#/config/aparencia", ".more-tabs")
     r.check(await pg.get_by_role("switch", name="Cor do dia").is_checked() and await pg.evaluate(checked) == "amarelo", "na Aparência, ligada e com o Amarelo marcado")
     await ctx.close()
 
@@ -208,9 +208,10 @@ async def body(r, p):
             await r.shot(pg, f"cor-{a}-{scheme}")
         await ctx.close()
 
-    # -- Opções: zonas e categorias
+    # -- Opções: zonas; Categorias: tela própria, no menu Mais
     ctx, pg = await r.page(b, "cel", "dark", accent="rosa")
-    await r.open(pg, "#/mais/opcoes", ".more-tabs")
+    await r.open(pg, "#/config/opcoes", ".more-tabs")
+    r.eq(await pg.locator("#p-cats").count(), 0, "Opções sem as categorias")
     await pg.click('label.switch:has([data-input="zones-on"])')
     await pg.locator(".toast", has_text="Zonas ligadas").wait_for(timeout=5000)
     r.check(r.data()["settings"]["zones"] is True, "Usar zonas fica gravado")
@@ -218,6 +219,8 @@ async def body(r, p):
     await pg.locator(".toast", has_text="Zonas desligadas").wait_for(timeout=5000)
     r.check(r.data()["settings"]["zones"] is False and any(i.get("zone") for i in r.data()["items"]), "desligar não apaga as zonas")
 
+    await r.open(pg, "#/categorias", "#p-cats")
+    r.eq((await pg.text_content(".page-title")).strip(), "Categorias", "Categorias numa tela própria")
     r.eq((await pg.text_content("#p-cats .opts li .ot b")).strip(), "13 categorias", "13 categorias de início")
     r.eq(await pg.locator('#p-cats [data-act="cat-del"][data-cat="outros"]').count(), 0, "Outros não se exclui")
     await pg.click('[data-act="cat-new"]')
@@ -242,7 +245,7 @@ async def body(r, p):
     await pg.wait_for_timeout(600)
     r.eq(next(c["name"] for c in r.data()["cats"] if c["id"] == cat["id"]), "Ferramentas e jardim", "renomear")
     furadeira = r.api("POST", "api/items", {"name": "Furadeira", "room": "lavanderia", "cat": cat["id"], "value": 300})["item"]
-    await r.open(pg, "#/mais/opcoes", ".more-tabs")
+    await r.open(pg, "#/categorias", "#p-cats")
     await pg.click(f'[data-act="cat-del"][data-cat="{cat["id"]}"]')
     await pg.wait_for_selector('[data-r="1"]')
     r.check("1 item vai para Outros" in await pg.text_content("dialog[open]:last-of-type"), "excluir avisa para onde vão os itens")
@@ -260,8 +263,10 @@ async def body(r, p):
     r.check("Mobília" in await pg.evaluate("[...document.querySelectorAll('[data-input=search-cat] option')].map(o => o.textContent)"), "o nome novo aparece na busca")
     await r.open(pg, "#/i/sal-001", "dialog.sheet h1")
     r.check("Mobília" in await pg.text_content("dialog.sheet .props"), "e na ficha do item")
-    await r.open(pg, "#/mais/opcoes", ".more-tabs")
+    await r.open(pg, "#/config/opcoes", ".more-tabs")
     await r.shot(pg, "opcoes", full_page=True)
+    await r.open(pg, "#/categorias", "#p-cats")
+    await r.shot(pg, "categorias", full_page=True)
     await ctx.close()
     await b.close()
     ha.stop()

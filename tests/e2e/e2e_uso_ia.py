@@ -1,4 +1,4 @@
-"""Mais > Integrações > Uso da IA (Home Assistant de mentira): os números de hoje, 7 dias e do mês, as chamadas por dia
+"""Mais > Configurações > Integrações > Uso da IA (Home Assistant de mentira): os números de hoje, 7 dias e do mês, as chamadas por dia
 (tocar numa barra mostra o dia), os tipos, as últimas chamadas com erro e cota, e o link do consumo exato para
 OpenAI, Anthropic e Google (ou o texto geral quando não dá para saber o provedor)."""
 import json
@@ -67,7 +67,7 @@ async def body(r, p):
     ctx, pg = await r.page(b, "cel", "dark", accent="turquesa")
 
     async def panel():
-        await r.open(pg, "#/mais/integracoes", ".more-tabs")
+        await r.open(pg, "#/config/integracoes", ".more-tabs")
         await pg.wait_for_selector(".uso-tiles", timeout=10000)
 
     async def help_text():

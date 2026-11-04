@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.25.0"
+VERSION = "1.26.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -162,7 +162,7 @@ def default_cats() -> list[dict]:
 
 
 def clean_cats(raw) -> list[dict] | None:
-    """Categorias da casa (editáveis em Mais > Opções), na ordem. "outros" sempre existe: é para onde vão os itens."""
+    """Categorias da casa (editáveis em Mais > Categorias), na ordem. "outros" sempre existe: é para onde vão os itens."""
     out, seen = [], set()
     for c in raw if isinstance(raw, list) else []:
         if isinstance(c, dict):
@@ -1050,13 +1050,13 @@ def zones_enabled() -> bool:
 
 
 def sensors_enabled() -> bool:
-    """Sensores no Home Assistant: só com a opção ligada (Mais > Integrações); vem desligada."""
+    """Sensores no Home Assistant: só com a opção ligada (Mais > Configurações > Integrações); vem desligada."""
     return STORE.settings.get("ha_sensors") is True
 
 
 def need_ai_on():
     if not ai_enabled():
-        raise ApiError(409, "A IA está desligada. Para usar, ligue em Mais > Integrações.")
+        raise ApiError(409, "A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações.")
 
 
 # -- uso da IA: o Home Assistant não devolve tokens nem custo, então o app conta as chamadas (como no EconomIA)
@@ -1523,7 +1523,7 @@ STT_LEGACY = {"cloud": "Home Assistant Cloud", "stt.home_assistant_cloud": "Home
 
 
 def stt_entities() -> list[dict]:
-    """As falas para texto do Home Assistant (entidades stt.*), para escolher em Mais > Integrações > Falar."""
+    """As falas para texto do Home Assistant (entidades stt.*), para escolher em Mais > Configurações > Integrações > Falar."""
     out, states = [], ha_request("GET", "/states")
     for st in states if isinstance(states, list) else []:
         if not isinstance(st, dict):
@@ -1685,7 +1685,7 @@ WEB_LOCK = threading.Lock()
 WEB_KINDS = {"jpeg": ("jpg", "image/jpeg"), "png": ("png", "image/png"), "webp": ("webp", "image/webp"), "avif": ("avif", "image/avif")}
 SEARCH_HOWTO = ("Na Anthropic, ligue \"Enable web search\" nas opções da tarefa de IA. No Google Gemini, a Pesquisa Google só "
                 "funciona num assistente de conversa: ligue \"Enable Google Search tool\" nele e escolha esse assistente em "
-                "Mais, Integrações, IA para buscar fotos na internet.")
+                "Mais, Configurações, Integrações, IA para buscar fotos na internet.")
 
 
 class WebError(Exception):
@@ -2472,7 +2472,7 @@ def news_batch_start() -> dict:
                 return {"id": j}  # já tem uma conferência andando: acompanha a mesma
     web_jobs_cleanup()
     if not news_cats():
-        raise ApiError(400, "A categoria Eletrônicos foi excluída: crie de novo em Mais > Opções.")
+        raise ApiError(400, "A categoria Eletrônicos foi excluída: crie de novo em Mais > Categorias.")
     jid = secrets.token_hex(8)
     with WEB_LOCK:
         WEB_JOBS[jid] = {"stage": "busy", "msg": "Começando…", "results": [], "at": time.time(), "kind": "lote",
@@ -2548,10 +2548,10 @@ def chat_context(screen: dict) -> str:
             words = [fold(w) for w in q.split()]
             hits = [i for i in items if all(w in fold(f"{i.get('name')} {i.get('details')} {i.get('zone')}") for w in words)][:40]
             lines += ["- " + _item_line(i, cats) for i in hits] or ["(nenhum item encontrado)"]
-    elif view == "data" and screen.get("tab") == "novidades":
+    elif view == "news" or (view == "data" and screen.get("tab") == "novidades"):  # a tela Novidades (antes, uma aba de Mais)
         d = news_read()
         com = [(STORE.item(k), v) for k, v in d["itens"].items() if STORE.item(k) and ((v.get("news") or {}).get("novidades"))]
-        lines.append(f"Aba Novidades: {len(com)} equipamentos com novidades conferidas.")
+        lines.append(f"Tela Novidades: {len(com)} eletrônicos com novidades conferidas.")
         for i, v in com[:20]:
             ns = v["news"]["novidades"]
             lines.append(f"- {i['name']}: " + "; ".join(f"[{n.get('tipo')}] {n.get('titulo')}" for n in ns[:3]))
@@ -3306,7 +3306,7 @@ def r_integracao_itens(h, query):
         out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "comodo": it.get("room") or "", "zona": (it.get("zone") or "")[:60],
                 "categoria": it.get("cat") or "outros", "valor": round(float(it.get("value") or 0), 2),
                 "valor_em": str(it.get("valueAt") or it.get("createdAt") or "")[:10]} for it in items if it.get("id")]
-        cats = STORE.cat_map()  # as categorias da casa (editáveis em Mais > Opções)
+        cats = STORE.cat_map()  # as categorias da casa (editáveis em Mais > Categorias)
     h.send_json({"versao": VERSION, "itens": out[:2000], "categorias": cats})
 
 

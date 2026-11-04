@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.0
+
+- **Mais** agora é um menu: **Novidades**, **Categorias**, **Relatório para seguro** e **Configurações**, cada um na sua tela, com o caminho de volta para Mais no alto.
+- **Configurações** fica com as abas Dados, Integrações, Aparência e Opções (as zonas). Novidades e Categorias saíram de lá, e o Relatório saiu de Dados.
+- Os endereços antigos (como Mais > Integrações) levam para o lugar novo.
+
 ## 1.25.0
 
 - **Novidades na ficha do item**: o que já foi conferido aparece direto na ficha, embaixo dos dados, sem abrir outra janela e sem chamar a IA. **Novidades** (ou **Buscar de novo**) procura ali mesmo; fechar a ficha no meio da busca não perde o resultado.

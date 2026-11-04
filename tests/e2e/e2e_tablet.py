@@ -5,14 +5,14 @@ from e2e_lib import SIZES, main
 
 SIZES.setdefault("tablet-deitado", (1100, 820, True))  # só neste teste; o e2e_lib já tem o tablet em pé ("tablet")
 
-PAGES = ["#/", "#/buscar", "#/comodos", "#/c/sala", "#/relatorio", "#/mais", "#/mais/integracoes", "#/mais/aparencia", "#/mais/opcoes"]
+PAGES = ["#/", "#/buscar", "#/comodos", "#/c/sala", "#/relatorio", "#/mais", "#/novidades", "#/categorias", "#/config", "#/config/integracoes", "#/config/aparencia", "#/config/opcoes"]
 # (nome, endereço, como abrir, o que aparece, tipo da janela)
 DIALOGS = [
     ("item-novo", "#/c/escritorio", '.rhead-actions [data-act="item-new"]', "#f-name", "modal"),
     ("ficha", "#/i/sal-001", None, "dialog.sheet h1", "sheet"),
     ("catalogar", "#/c/quarto", '.rhead-actions [data-act="catalog"]', '[data-ct="upload"]', "wide"),
     ("falar", "#/", ".mic-top", ".voice", "wide"),
-    ("versoes", "#/mais", '[data-act="versions"]', "dialog .dlg-b", "narrow"),
+    ("versoes", "#/config", '[data-act="versions"]', "dialog .dlg-b", "narrow"),
     ("mover", "#/i/sal-002", 'dialog.sheet [data-act="item-move"]', "#mv-room", "narrow"),
     ("foto-comodo", "#/c/sala", ".strip .ph", "dialog.viewer", "viewer"),
     ("adicionar", "#/", ".tabbar .plus", "[data-go]", "narrow"),  # só em pé: deitado não tem a barra de abas
@@ -85,7 +85,7 @@ async def body(r, p):
             await r.open(pg, h)
             bad = await pg.evaluate(PAGE_CHECK, mode)
             r.check(not bad, f"[{mode}] {h}: sem rolagem para o lado, botões do alto inteiros e alinhados, abas no lugar" + (f": {bad[:3]}" if bad else ""))
-            if h in ("#/", "#/c/sala", "#/mais", "#/mais/integracoes"):
+            if h in ("#/", "#/c/sala", "#/mais", "#/config", "#/config/integracoes"):
                 await r.shot(pg, f"{size}-{h.strip('#/').replace('/', '-') or 'inicio'}")
         for name, h, opener, wait, kind in DIALOGS:
             if name == "adicionar" and mode == "deitado":

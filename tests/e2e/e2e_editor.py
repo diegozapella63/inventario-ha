@@ -158,7 +158,7 @@ async def body(r, p):
 
     ctx, pg = await r.page(b, "pc", "light", accent="verde")
     # -- categoria nova criada em Opções aparece no cadastro
-    await r.open(pg, "#/mais/opcoes", ".more-tabs")
+    await r.open(pg, "#/categorias", "#p-cats")
     await pg.click('[data-act="cat-new"]')
     await pg.fill("#cn-name", "Ferramentas")
     await pg.click("dialog [data-ok]")

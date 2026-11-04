@@ -128,7 +128,7 @@ async def body(r, p):
     await pg.wait_for_selector("dialog.sheet .inews .formerr", timeout=10000)
     r.check("busca na web" in await pg.text_content("dialog.sheet .inews .formerr"), "sem busca na web: explica, na ficha")
     err = await pg.text_content("dialog.sheet .inews .formerr")
-    r.check(err.count("Mais, Integrações") == 1 and await pg.locator("dialog.sheet .wtip").count() == 0, "e diz uma vez só onde escolher a IA de busca")
+    r.check(err.count("Mais, Configurações, Integrações") == 1 and await pg.locator("dialog.sheet .wtip").count() == 0, "e diz uma vez só onde escolher a IA de busca")
     r.eq((await pg.text_content('dialog.sheet [data-act="item-news"]')).strip(), "Buscar de novo", "dá para tentar de novo")
     await r.shot(pg, "erro")
     ha.ai_reply = lambda kind, payload: json.dumps(NEWS)

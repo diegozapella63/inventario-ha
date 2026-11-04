@@ -1,6 +1,6 @@
 """Rotas da IA, do Falar e das fotos da internet pelo HTTP, com o servidor de verdade: /api/ai/status, /api/ai/identify,
 /api/ai/usage, /api/ai/text, /api/voice/status, /api/voice e /api/web-photos*. Com a IA simulada do app (INV_AI_MOCK,
-a mesma da prévia), com a IA desligada (Mais > Integrações > Usar IA) e sem Home Assistant."""
+a mesma da prévia), com a IA desligada (Mais > Configurações > Integrações > Usar IA) e sem Home Assistant."""
 import json
 import os
 import shutil
@@ -16,7 +16,7 @@ OCTET = {"Content-Type": "application/octet-stream"}
 PCM = b"\x01\x00" * 16000  # 1 segundo de áudio
 VOICE_MIN = int(16000 * 2 * 0.4)
 VOICE_MAX = 16000 * 2 * 125
-DESLIGADA = "A IA está desligada. Para usar, ligue em Mais > Integrações."
+DESLIGADA = "A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."
 SEM_HA = "O app não tem acesso à API do Home Assistant."
 
 

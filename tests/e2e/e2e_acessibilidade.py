@@ -47,7 +47,7 @@ async def body(r, p):
 
     # -- telas: nada sem nome, um h1 por tela, a aba certa marcada
     screens = [("#/", "home"), ("#/buscar?q=mesa", "search"), ("#/comodos", "rooms"), ("#/c/sala", "rooms"), ("#/relatorio", "data"),
-               ("#/mais", "data"), ("#/mais/integracoes", "data"), ("#/mais/aparencia", "data"), ("#/mais/opcoes", "data")]
+               ("#/mais", "data"), ("#/novidades", "data"), ("#/categorias", "data"), ("#/config", "data"), ("#/config/integracoes", "data"), ("#/config/aparencia", "data"), ("#/config/opcoes", "data")]
     for h, tab in screens:
         await r.open(pg, h)
         await pg.wait_for_timeout(300)
@@ -77,12 +77,12 @@ async def body(r, p):
         ("adicionar", "#/", ".tabbar .plus", "[data-go]", "Adicionar"),
         ("catalogar", "#/c/quarto", '.rhead-actions [data-act="catalog"]', '[data-ct="upload"]', "Catalogar foto com IA"),
         ("editar cômodo", "#/c/sala", '.rhead-actions [data-act="room-edit"]', "#re-name", "Editar cômodo"),
-        ("nova categoria", "#/mais/opcoes", '[data-act="cat-new"]', "#cn-name", "Nova categoria"),
-        ("versões", "#/mais", '[data-act="versions"]', "dialog .dlg-b", "Versões anteriores"),
+        ("nova categoria", "#/categorias", '[data-act="cat-new"]', "#cn-name", "Nova categoria"),
+        ("versões", "#/config", '[data-act="versions"]', "dialog .dlg-b", "Versões anteriores"),
     ]
     for name, h, opener, wait, label in dialogs:
         if h:
-            await r.open(pg, h, ".tag, .sbar, .rooms, .more-tabs, .rhead, dialog[open]")
+            await r.open(pg, h, ".tag, .sbar, .rooms, .more-tabs, .rhead, #p-cats, dialog[open]")
         if opener:
             await pg.locator(opener).first.click()
         await pg.wait_for_selector(wait, timeout=8000)
@@ -106,7 +106,7 @@ async def body(r, p):
     await r.open(pg, "#/relatorio", ".report")
     r.eq(await pg.evaluate("[...document.querySelectorAll('.side nav [aria-current=page]')].map(a => a.textContent.trim())"), ["Relatório"], "no relatório, Relatório marcado")
 
-    await r.open(pg, "#/mais/opcoes", ".more-tabs")
+    await r.open(pg, "#/config/opcoes", ".more-tabs")
     tabs = await pg.evaluate("""(() => { const l = document.querySelector('.more-tabs'); return { role: l.getAttribute('role'), label: l.getAttribute('aria-label'),
       tabs: [...l.children].map(t => [t.getAttribute('role'), t.getAttribute('aria-selected'), t.getAttribute('aria-controls')]) }; })()""")
     r.check(tabs["role"] == "tablist" and tabs["label"] and all(t[0] == "tab" and t[2] == "mp" for t in tabs["tabs"])
@@ -120,11 +120,11 @@ async def body(r, p):
     await pg.click('label.switch:has([data-input="zones-on"])')
     await pg.locator(".toast", has_text="Zonas ligadas").wait_for(timeout=5000)
     r.check(await pg.get_by_role("switch", name="Usar zonas").is_checked(), "ligada, o leitor de tela ouve que está ligada")
-    await r.open(pg, "#/mais/integracoes", ".more-tabs")
+    await r.open(pg, "#/config/integracoes", ".more-tabs")
     await pg.wait_for_timeout(500)
     names = await pg.evaluate("[...document.querySelectorAll('[role=switch]')].map(i => (document.getElementById(i.getAttribute('aria-labelledby')) || {}).textContent)")
     r.eq(names, ["Usar IA", "Criar os sensores"], "Integrações: Usar IA e Criar os sensores são chaves com nome")
-    await r.open(pg, "#/mais/aparencia", ".more-tabs")
+    await r.open(pg, "#/config/aparencia", ".more-tabs")
     look = await pg.evaluate("""[document.querySelector('.seg.themes').getAttribute('role'), [...document.querySelectorAll('[data-act=theme]')].map(b => b.getAttribute('aria-pressed')),
       document.querySelector('.swatches').getAttribute('role'), document.getElementById(document.querySelector('.swatches').getAttribute('aria-labelledby')).textContent.trim()]""")
     r.check(look[0] == "group" and look[1].count("true") == 1 and look[2] == "radiogroup" and look[3] == "Cor do app",

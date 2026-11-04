@@ -80,12 +80,13 @@ Este repositório é público e tem **só código**. O inventário real (itens, 
 
 - Tudo em português do Brasil, sem palavras em inglês na tela.
 - **Menos é mais**: textos curtos, sem explicar o óbvio, sem "porquês" desnecessários, sem avisos repetidos. Um texto que diz onde fica algo que já está à vista sai.
-- Botões lado a lado com o mesmo tamanho e alinhados; nada torto nem cortado. Em Mais, os botões e as seleções das linhas têm 280 × 44 e ficam alinhados pela direita.
-- O que depende da IA respeita a chave **Usar IA** (Mais > Integrações): desligada, os botões de IA somem, o servidor recusa as rotas de IA (409) e nada chama a IA; uma busca que começou com a IA ligada e terminou com ela desligada não entrega o resultado. O **Falar** continua sem IA: o Home Assistant transcreve e o app separa os itens (`splitSpoken` no app.js).
+- Botões lado a lado com o mesmo tamanho e alinhados; nada torto nem cortado. Em Configurações (e nas telas de Mais), os botões e as seleções das linhas têm 280 × 44 e ficam alinhados pela direita.
+- **Mais** é um menu (`#/mais`), não uma tela de ajustes: cada coisa que não cabe na barra de baixo tem a sua linha e a sua tela (Novidades `#/novidades`, Categorias `#/categorias`, Relatório `#/relatorio`), e **Configurações** (`#/config`, em abas: Dados, Integrações, Aparência, Opções) vem por último. Nada de misturar uma função do app com as configurações.
+- O que depende da IA respeita a chave **Usar IA** (Mais > Configurações > Integrações): desligada, os botões de IA somem, o servidor recusa as rotas de IA (409) e nada chama a IA; uma busca que começou com a IA ligada e terminou com ela desligada não entrega o resultado. O **Falar** continua sem IA: o Home Assistant transcreve e o app separa os itens (`splitSpoken` no app.js).
 - Valores livres: o app não sugere "valor de mercado"; o valor é o que a pessoa quiser.
 - Em http (sem https) não há câmera nem microfone: explicar e oferecer escolher a foto. No app do Home Assistant no Android, a câmera é a do próprio app (tela cheia); no navegador do celular, a do aparelho.
 - Celular primeiro (390 px; nada pode passar da largura nem em 320 px); tema claro e escuro; as 10 cores do app.
-- Quando o dono pede "igual ao ResolvIA" ou "como no CronologIA", abra o código do outro app (repositórios acima) e siga o mesmo jeito: textos, botões, câmera, Falar, uso da IA, abas de Mais.
+- Quando o dono pede "igual ao ResolvIA" ou "como no CronologIA", abra o código do outro app (repositórios acima) e siga o mesmo jeito: textos, botões, câmera, Falar, uso da IA, menu Mais e abas de Configurações.
 - Exemplos e capturas sempre de uma casa inventada: nunca itens, fotos ou valores reais do dono.
 
 ## Conversa com o dono

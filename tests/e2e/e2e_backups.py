@@ -1,4 +1,4 @@
-"""Backups na pasta share (Mais > Dados): a lista (vários, do mais novo ao mais antigo, até 12, com data e tamanho, sem
+"""Backups na pasta share (Mais > Configurações > Dados): a lista (vários, do mais novo ao mais antigo, até 12, com data e tamanho, sem
 outros arquivos da pasta), restaurar um antigo (pergunta antes, guarda uma cópia do atual), criar um novo; e a pasta
 share indisponível (botão desligado, importar continua)."""
 import copy
@@ -52,7 +52,7 @@ async def body(r, p):
 
     b = await r.browser(p)
     ctx, pg = await r.page(b, "pc", "light", accent="cinza")
-    await r.open(pg, "#/mais", ".more-tabs")
+    await r.open(pg, "#/config", ".more-tabs")
     await pg.wait_for_selector('[data-act="backup-restore"]', timeout=10000)
     rows = await pg.evaluate(ROWS)
     r.eq(len(rows), 12, "mostra os 12 backups mais novos (eram 13)")
@@ -106,7 +106,7 @@ async def body(r, p):
 
     # -- celular estreito: o nome comprido quebra sem passar da tela
     ctx, pg = await r.page(b, "estreito", "dark", accent="verde")
-    await r.open(pg, "#/mais", ".more-tabs")
+    await r.open(pg, "#/config", ".more-tabs")
     await pg.wait_for_selector(f'[data-name="{LONG}"]', timeout=10000)
     r.check(await pg.evaluate(OVERFLOW), "celular de 320 px: nome comprido sem rolagem para o lado")
     await pg.locator(f'[data-name="{LONG}"]').scroll_into_view_if_needed()
@@ -119,7 +119,7 @@ async def body(r, p):
     app = AppServer(seed=True, env={"INV_SHARE": os.path.join(tmp, "share", "inventario")})
     try:
         ctx, pg = await r.page(b, "cel", "light", accent="azul")
-        await pg.goto(app.base + "#/mais")
+        await pg.goto(app.base + "#/config")
         await pg.wait_for_selector('[data-act="backup-create"]', timeout=10000)
         r.eq(" ".join((await pg.text_content("#p-backup .opts li .ot span")).split()), "A pasta share não está disponível.", "sem a pasta share: diz isso")
         r.check(await pg.is_disabled('[data-act="backup-create"]'), "e Criar backup fica desligado")
@@ -147,7 +147,7 @@ async def body(r, p):
     app = AppServer(seed=True, env={"INV_SHARE": os.path.join(tmp, "inventario")})
     try:
         ctx, pg = await r.page(b, "cel", "light")
-        await pg.goto(app.base + "#/mais")
+        await pg.goto(app.base + "#/config")
         await pg.wait_for_function("(e => e && !e.textContent.includes('Carregando'))(document.querySelector('[data-slot=backups]'))", timeout=10000)
         txt = " ".join((await pg.text_content('[data-slot="backups"]')).split())
         await r.shot(pg, "share-arquivo")

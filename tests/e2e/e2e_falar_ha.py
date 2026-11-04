@@ -64,7 +64,7 @@ async def body(r, p):
     r.check(len(voz) == 2 and all(i["room"] == "quarto" for i in voz), "os itens falados vão para o Quarto, como falados")
 
     # -- outra fala para texto, escolhida em Integrações: o idioma é o que ela aceita
-    await r.open(pg, "#/mais/integracoes", ".more-tabs")
+    await r.open(pg, "#/config/integracoes", ".more-tabs")
     await pg.wait_for_selector('[data-input="voice-stt"]', timeout=10000)
     await pg.select_option('[data-input="voice-stt"]', "stt.faster_whisper")
     await pg.locator(".toast", has_text="Falar agora transcreve com faster-whisper").wait_for(timeout=8000)
@@ -80,7 +80,7 @@ async def body(r, p):
 
     # -- a escolhida saiu do Home Assistant: volta para a do assistente
     ha.states = [s for s in ha.states if s["entity_id"] != "stt.faster_whisper"]
-    await r.open(pg, "#/mais/integracoes", ".more-tabs")
+    await r.open(pg, "#/config/integracoes", ".more-tabs")
     await pg.click('[data-act="voice-refresh"]')
     await pg.wait_for_function("(document.querySelector('[data-slot=voice-panel]') || {}).textContent?.includes('saiu do Home Assistant')", timeout=10000)
     st = " ".join((await pg.text_content('[data-slot="voice-panel"] .ot span:not(.status)')).split())

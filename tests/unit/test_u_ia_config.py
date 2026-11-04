@@ -219,7 +219,7 @@ class Opcoes(UnitBase):
 
     def test_need_ai_on_com_ia_desligada_diz_onde_ligar(self):
         self.store.settings["ai"] = False
-        self.assertApiError(409, S.need_ai_on, msg_part="ligue em Mais > Integrações")
+        self.assertApiError(409, S.need_ai_on, msg_part="ligue em Mais > Configurações > Integrações")
 
     def test_need_ai_on_ligada_ou_sem_opcao_gravada_passa(self):
         self.assertIsNone(S.need_ai_on())
