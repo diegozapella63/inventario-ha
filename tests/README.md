@@ -54,7 +54,8 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | `e2e_novidades_todos` | Novidades (no menu Mais): o mesmo equipamento em vários cômodos numa linha só, só Eletrônicos, sem escolher categorias, item de outra categoria fora da lista, conferir todos com a IA escolhendo, andamento, Parar, deixados de fora, Limpar com confirmação, aba some sem IA |
 | `e2e_conversar` | Conversar: botão ao lado do microfone, ideias, Enter, resposta formatada, da ficha, erro, ditar, computador, IA desligada |
 | `e2e_graficos` | Mais > Gráficos: números do alto, cômodos e categorias do maior para o menor, faixas de valor, itens mais valiosos, mês a mês (tocar mostra o valor), cada linha abre a sua tela, 320 px e computador |
-| `e2e_mais` | o menu Mais (Novidades, Categorias, Relatório, Configurações), Voltar, endereços antigos; Configurações: abas, botões 280×44 alinhados, exportar CSV/JSON/ZIP, backup e restaurar, versões, importar |
+| `e2e_mais` | o menu Mais (Gráficos, Novidades, Categorias, Relatório, Configurações, Sobre), Voltar, endereços antigos; Configurações: abas, botões 280×44 alinhados, exportar CSV/JSON/ZIP, backup e restaurar, versões, importar |
+| `e2e_sobre` | Mais > Sobre, a última linha do menu: CorrerIA Code, por que CorrerIA, os seis apps (cada um para o seu GitHub, com o IA em destaque e uma linha; o InventarIA com "Este app" e a versão), Meu GitHub, os 7 links abrindo fora, Voltar e ‹ Mais de volta ao menu, 320 e 390 px e computador, claro e escuro |
 | `e2e_backups` | lista de backups, restaurar um antigo, pasta share indisponível |
 | `e2e_versoes` | versões anteriores: nenhuma, várias, os motivos, restaurar cada uma |
 | `e2e_importar_partes` | backup em partes, só fotos, cancelar no meio, progresso |

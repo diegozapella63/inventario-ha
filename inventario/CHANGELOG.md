@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.29.0
+
+- **Mais > Sobre**, a última linha do menu: quem faz o app (**CorrerIA Code**, desenvolvimento de softwares, e por que esse nome), os apps da família (CronologIA, ResolvIA, GerencIA, InventarIA, EconomIA e MemorIA), cada um com uma linha e o link para o GitHub, e o botão **Meu GitHub**. O InventarIA aparece marcado com a versão instalada.
+
 ## 1.28.1
 
 - **Início** mais curto: Categorias e Mais valiosos saíram, porque já estão em Mais > Gráficos. Ficam a etiqueta do patrimônio, a busca, os destaques, os cômodos e os cadastrados recentemente.

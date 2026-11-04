@@ -98,12 +98,12 @@
   }
   const accentDaily = () => LS.get("accentDaily", true) !== false;
   const accentOf = () => (accentDaily() ? colorOfDay() : pickedAccent());
-  // Mais é um menu (#/mais): Novidades (#/novidades), Categorias (#/categorias), Relatório e Configurações. Configurações em abas, como no CronologIA
+  // Mais é um menu (#/mais): Novidades (#/novidades), Categorias (#/categorias), Relatório, Configurações e, por último, Sobre (#/sobre). Configurações em abas, como no CronologIA
   // e no ResolvIA: #/config (Dados, com Exportar no alto), #/config/integracoes, #/config/aparencia e #/config/opcoes.
   const ALL_TABS = [["dados", "Dados", "archive"], ["integracoes", "Integrações", "plug"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
   const moreTabs = () => ALL_TABS;
   const moreTab = (t) => (ALL_TABS.some(([k]) => k === t) ? t : ALL_TABS[0][0]);
-  const IN_MORE = ["menu", "charts", "news", "cats", "data", "report"]; // telas que ficam embaixo de Mais
+  const IN_MORE = ["menu", "charts", "news", "cats", "data", "report", "about"]; // telas que ficam embaixo de Mais
   function applyAccent(a) {
     if (a === "amarelo") delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = a;
@@ -394,11 +394,13 @@
       case "mais": // #/mais é o menu; #/mais/<aba> é o endereço antigo de Configurações (e de Novidades)
         if (!parts[1]) return { name: "menu", q };
         if (parts[1] === "novidades") return { name: aiOn() ? "news" : "menu", q };
+        if (parts[1] === "sobre") return { name: "about", q }; // como no CronologIA (#/mais/sobre)
         return { name: "data", tab: moreTab(parts[1]), q };
       case "config": case "dados": return { name: "data", tab: moreTab(parts[1]), q };
       case "novidades": return { name: aiOn() ? "news" : "menu", q }; // Novidades usa a IA: desligada, fica o menu
       case "categorias": return { name: "cats", q };
       case "graficos": return { name: "charts", q };
+      case "sobre": return { name: "about", q };
       default: return { name: "home", q };
     }
   }
@@ -417,6 +419,7 @@
       case "news": return "#/novidades";
       case "cats": return "#/categorias";
       case "charts": return "#/graficos";
+      case "about": return "#/sobre";
       case "data": { const t = moreTab(r.tab); return t === ALL_TABS[0][0] ? "#/config" : `#/config/${t}`; }
       default: return "#/";
     }
@@ -480,11 +483,11 @@
 
   function viewTitle(r) {
     if (r.name === "room") return D.roomById.get(r.id)?.name || "Cômodo";
-    return { home: "Início", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", charts: "Gráficos", news: "Novidades", cats: "Categorias", data: "Configurações" }[r.name] || "InventarIA";
+    return { home: "Início", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", charts: "Gráficos", news: "Novidades", cats: "Categorias", data: "Configurações", about: "Sobre" }[r.name] || "InventarIA";
   }
   // Topo de cada tela, igual nos apps da família (EconomIA, ResolvIA): nome do app com "IA" na cor
   // do app, saudação ao usuário do Home Assistant e o título grande da tela.
-  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", menu: "data", charts: "data", news: "data", cats: "data", data: "data", report: "data" };
+  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", menu: "data", charts: "data", news: "data", cats: "data", data: "data", report: "data", about: "data" };
   function renderTop() {
     const el = $("#topbar");
     const r = base;
@@ -530,6 +533,7 @@
         case "cats": html = `<div class="mscreen">${viewCats()}</div>`; break;
         case "charts": html = viewCharts(); break;
         case "data": html = viewData(); break;
+        case "about": html = viewAbout(); break;
         default: html = viewHome();
       }
     } catch (e) {
@@ -896,7 +900,7 @@
   // -- dados e ajustes
   const SW_TAG = "M8 0h20a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8L0 13V7z";
   const SWATCH = `<svg viewBox="-5 -5 40 30" aria-hidden="true"><path class="sw-ring" d="${SW_TAG}"/><path class="sw-gap" d="${SW_TAG}"/><path class="sw-fill" d="${SW_TAG}M9.7 10a2.7 2.7 0 1 0-5.4 0a2.7 2.7 0 1 0 5.4 0z"/><path class="sw-check" d="m14.6 10.3 3.2 3.2 6.5-6.9"/></svg>`;
-  // -- Mais: um menu com o que não cabe na barra (Novidades, Relatório) e, por último, Configurações
+  // -- Mais: um menu com o que não cabe na barra (Novidades, Relatório), Configurações e, por último, Sobre
   function viewMenu() {
     const rows = [
       ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
@@ -904,10 +908,48 @@
       ["#/categorias", "grid", "Categorias", "Criar, renomear e excluir."],
       ["#/relatorio", "report", "Relatório para seguro", "Por cômodo, com fotos. Imprime ou salva em PDF."],
       ["#/config", "gear", "Configurações", "Dados e backup, integrações, aparência e opções."],
+      ["#/sobre", "info", "Sobre", "CorrerIA Code, os apps e o GitHub."],
     ].filter(Boolean);
     return `<nav aria-label="Mais"><ul class="menu-list">${rows.map(([h, i, t, d]) => `<li><a class="menu-row" href="${h}">${secIc(i)}
         <span class="mb"><b>${t}</b><span>${d}</span></span>${ic("chev", "sm")}</a></li>`).join("")}</ul></nav>
     <p class="foot"><b>InventarIA</b><br>${PREVIEW ? "Prévia do app do Home Assistant: as alterações ficam só nesta tela." : `v${esc(S.version)}, com os dados em arquivos abertos (JSON e JPG) dentro do Home Assistant.`}</p>`;
+  }
+  // -- Sobre: quem faz o app (CorrerIA Code), os apps da família, cada um com uma linha e o link para o GitHub, e Meu GitHub.
+  // A mesma página em todos os apps da família (o about.js do CronologIA): aqui o InventarIA fica marcado, com a versão.
+  const GITHUB = "https://github.com/diegozapella63";
+  const PRODUCTS = [ // [nome, repositório, ícone, a linha sobre ele], nesta ordem
+    ["CronologIA", "cronologia-ha", "calendar", "Agenda da família, remédios, rotinas e placar."],
+    ["ResolvIA", "resolvia-ha", "checks", "Listas de tarefas com prazos, pontos e repetição."],
+    ["GerencIA", "gerencia-ha", "wallet", "Finanças da casa: caixa, cartões e investimentos."],
+    ["InventarIA", "inventario-ha", "package", "Inventário da casa: cômodos, itens e valores."],
+    ["EconomIA", "economia-ha", "receipt", "Lista de compras com o melhor preço perto de casa."],
+    ["MemorIA", "memoria-ha", "book", "Cadernos de anotação que abrem na hora certa."],
+  ];
+  const wordmark = (n) => `<span class="ab-wm">${esc(n.slice(0, -2))}<span>${esc(n.slice(-2))}</span></span>`; // o "IA" na cor do app, sem quebrar o nome
+  const outLink = (href, body, cls) => `<a class="${cls}" href="${href}" target="_blank" rel="noopener">${body}</a>`;
+  function viewAbout() {
+    return `<div class="mscreen about">
+    <div class="about-hero">
+      <span class="ab-mark" aria-hidden="true">${ic("flash")}</span>
+      <h2 class="ab-name">Correr<span>IA</span> Code</h2>
+      <p class="ab-what">desenvolvimento de softwares</p>
+      <p class="ab-tag">Feito na correria, rodado pela IA.</p>
+    </div>
+    <section class="panel about-why">
+      <h2>${secIc("hourglass")}Por que CorrerIA?</h2>
+      <p>Porque eu sou um programador sem tempo: vivo na correria. Então eu uso a IA para rodar tudo isso aqui. Ela escreve, testa e publica; eu dou as ideias e reclamo dos botões tortos.</p>
+    </section>
+    <section class="panel">
+      <h2>${secIc("layers")}Os apps</h2>
+      <ul class="about-apps" aria-label="Os apps">${PRODUCTS.map(([n, repo, i, line]) => {
+        const here = n === "InventarIA";
+        return `<li>${outLink(`${GITHUB}/${repo}`, `${secIc(i)}
+          <span class="mb"><b>${wordmark(n)}${here ? `<em class="ab-here">Este app · v${esc(S.version)}</em>` : ""}</b><span>${line}</span></span>${ic("external", "sm")}`,
+          `ab-row${here ? " here" : ""}`)}</li>`;
+      }).join("")}</ul>
+    </section>
+    ${outLink(GITHUB, `${ic("external")}Meu GitHub`, "btn primary ab-github")}
+    </div>`;
   }
   // -- Gráficos: onde está o valor da casa. Barras de uma cor só (a do app), da maior para a menor, com o valor
   // escrito (o gráfico não depende do toque); faixas de valor em colunas e o patrimônio mês a mês.
@@ -3444,7 +3486,7 @@
     const d = dx < 0 ? 1 : -1; // dedo para a esquerda: a próxima aba
     let to = null;
     if (base.name === "room") to = d < 0 ? "#/comodos" : null;
-    else if (IN_MORE.includes(base.name) && base.name !== "menu") to = d < 0 ? "#/mais" : null; // Relatório, Novidades, Configurações: volta ao menu
+    else if (IN_MORE.includes(base.name) && base.name !== "menu") to = d < 0 ? "#/mais" : null; // Relatório, Novidades, Configurações, Sobre: volta ao menu
     else {
       const i = SWIPE_TABS.findIndex(([n]) => n === base.name), j = i + d;
       if (i >= 0 && j >= 0 && j < SWIPE_TABS.length) to = SWIPE_TABS[j][1];

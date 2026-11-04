@@ -155,7 +155,7 @@ class Run:
         for pg in self.pages:
             await self._cov_take(pg)
 
-    async def open(self, pg, hash_="#/", wait=".tag, .welcome, #view .empty, .sbar, .rooms, .more-tabs, .report, .rhead, .menu-list, #p-news, #p-cats, .kpis"):
+    async def open(self, pg, hash_="#/", wait=".tag, .welcome, #view .empty, .sbar, .rooms, .more-tabs, .report, .rhead, .menu-list, #p-news, #p-cats, .kpis, .about"):
         if pg.url.startswith(self.base):  # só o # mudaria: recarrega para ler o que a API gravou
             await pg.goto("about:blank")
         await pg.goto(self.base + hash_)

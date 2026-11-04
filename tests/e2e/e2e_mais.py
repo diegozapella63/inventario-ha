@@ -1,4 +1,4 @@
-"""Mais é um menu (Novidades, Categorias, Relatório, Configurações), com Voltar e os endereços antigos; Mais > Configurações > Dados: abas,
+"""Mais é um menu (Gráficos, Novidades, Categorias, Relatório, Configurações, Sobre), com Voltar e os endereços antigos; Mais > Configurações > Dados: abas,
 exportar (CSV, JSON, ZIP), backup na pasta share, versões anteriores, importar; botões do mesmo tamanho e alinhados."""
 import csv
 import io
@@ -30,8 +30,8 @@ async def body(r, p):
     await pg.wait_for_selector(".menu-list")
     r.eq((await pg.text_content(".page-title")).strip(), "Mais", "a aba Mais abre um menu")
     rows = await pg.evaluate("[...document.querySelectorAll('.menu-row')].map(a => [a.querySelector('b').textContent, a.getAttribute('href')])")
-    r.eq(rows, [["Gráficos", "#/graficos"], ["Novidades", "#/novidades"], ["Categorias", "#/categorias"], ["Relatório para seguro", "#/relatorio"], ["Configurações", "#/config"]],
-         "com Gráficos, Novidades, Categorias, Relatório e Configurações")
+    r.eq(rows, [["Gráficos", "#/graficos"], ["Novidades", "#/novidades"], ["Categorias", "#/categorias"], ["Relatório para seguro", "#/relatorio"], ["Configurações", "#/config"], ["Sobre", "#/sobre"]],
+         "com Gráficos, Novidades, Categorias, Relatório, Configurações e, por último, Sobre")
     r.eq(await pg.locator("#view .more-tabs").count(), 0, "sem as abas de configurações no menu")
     r.eq(await pg.get_attribute('.tabbar a[data-tab="data"]', "aria-current"), "page", "a aba Mais fica marcada")
     hs = await pg.evaluate("[...document.querySelectorAll('.menu-row')].map(a => Math.round(a.getBoundingClientRect().height))")
@@ -39,7 +39,7 @@ async def body(r, p):
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "menu")
     for title, href, wait in (("Gráficos", "#/graficos", ".kpis"), ("Novidades", "#/novidades", "#p-news"), ("Categorias", "#/categorias", "#p-cats"),
-                              ("Relatório", "#/relatorio", ".report"), ("Configurações", "#/config", ".more-tabs")):
+                              ("Relatório", "#/relatorio", ".report"), ("Configurações", "#/config", ".more-tabs"), ("Sobre", "#/sobre", ".about")):
         await pg.click(f'.menu-row[href="{href}"]')
         await pg.wait_for_selector(wait, timeout=8000)
         r.check(pg.url.endswith(href), f"{title} abre a sua tela ({href})")
