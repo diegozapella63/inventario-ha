@@ -5,6 +5,7 @@ import csv
 import io
 import json
 import os
+import time
 import re
 import unittest
 import zipfile
@@ -253,7 +254,11 @@ class Exportar(DadosCase):
 
     def test_zip_nao_deixa_arquivo_temporario(self):
         self.app.get("api/export.zip")
-        self.assertEqual([n for n in os.listdir(self.app.path("data", "tmp")) if n.endswith(".zip")], [])
+        sobra = lambda: [n for n in os.listdir(self.app.path("data", "tmp")) if n.endswith(".zip")]  # noqa: E731
+        fim = time.time() + 3  # o servidor apaga logo depois de mandar o último byte: espera um instante
+        while sobra() and time.time() < fim:
+            time.sleep(0.05)
+        self.assertEqual(sobra(), [])
 
 
 class Backups(DadosCase):
