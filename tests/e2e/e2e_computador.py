@@ -57,8 +57,8 @@ async def body(r, p):
         # -- Início em duas colunas, com largura máxima
         hero = await pg.evaluate("[document.querySelector('.hero .tagwrap'), document.querySelector('.hero .hero-side')].map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right), Math.round(r.top)]; })")
         r.check(hero[1][0] > hero[0][1] and abs(hero[0][2] - hero[1][2]) < 80, f"{tag} etiqueta e busca lado a lado ({hero})")
-        cols = await pg.evaluate("[...document.querySelectorAll('.cols > .sec')].map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; })")
-        r.check(len(cols) == 2 and cols[1][0] > cols[0][0] and cols[0][1] == cols[1][1], f"{tag} Categorias e Mais valiosos em duas colunas ({cols})")
+        secs = await pg.evaluate("[...document.querySelectorAll('#view .sec')].map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; })")
+        r.check(len(secs) == 2 and all(s == secs[0] for s in secs), f"{tag} Cômodos e Cadastrados recentemente na largura toda ({secs})")
         if w == 1920:
             r.check(m["view"]["w"] == 1040 and near(m["view"]["l"] - m["main"]["l"], m["main"]["r"] - m["view"]["r"]), f"{tag} conteúdo com 1040 px, no meio da área ({m['view']})")
         else:

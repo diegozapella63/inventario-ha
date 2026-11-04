@@ -21,7 +21,7 @@ async def body(r, p):
         pos = await pg.evaluate("[document.querySelector('.homesearch').getBoundingClientRect().bottom, document.querySelector('.facts').getBoundingClientRect().top]")
         r.check(pos[0] < pos[1], f"[{size}] busca acima de Mais valioso")
         heads = await pg.evaluate("[...document.querySelectorAll('.sec-h h2')].map(h => h.textContent.trim())")
-        r.check(heads[:2] == ["Cômodos", "Categorias"], f"[{size}] seções ({heads})")
+        r.eq(heads, ["Cômodos", "Cadastrados recentemente"], f"[{size}] seções: Categorias e Mais valiosos ficam em Mais > Gráficos")
         rows = await pg.evaluate("document.querySelectorAll('.sec .rows .rrow').length")
         r.check(rows >= 6, f"[{size}] cada cômodo com a sua parte do total ({rows})")
         r.check(await pg.evaluate(OVERFLOW), f"[{size}] sem rolagem para o lado")

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.28.1
+
+- **Início** mais curto: Categorias e Mais valiosos saíram, porque já estão em Mais > Gráficos. Ficam a etiqueta do patrimônio, a busca, os destaques, os cômodos e os cadastrados recentemente.
+
 ## 1.28.0
 
 - **Mais > Gráficos**: o patrimônio, os itens, o valor médio e quantos têm foto no alto; os cômodos e as categorias que mais valem, do maior para o menor, com o valor e a parte do total; as faixas de valor; os 10 itens mais valiosos; e o patrimônio mês a mês. Tocar numa linha abre o cômodo, a categoria ou o item. No computador, os gráficos ficam lado a lado.

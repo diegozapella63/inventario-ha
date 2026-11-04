@@ -27,7 +27,7 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 
 ## O que tem
 
-- **Início** com a etiqueta do patrimônio, o item mais valioso, o maior cômodo, os últimos cadastros e a parte de cada cômodo e de cada categoria no total.
+- **Início** com a etiqueta do patrimônio, o item mais valioso, o maior cômodo, os últimos cadastros e a parte de cada cômodo no total.
 - **Cômodos** com foto, número de itens e valor. Em **Organizar**, as setas mudam a ordem. Se quiser, ligue as **zonas** para separar os itens de cada cômodo (sofá, estante, bancada), com o subtotal de cada uma.
 - **Cadastro de itens** com várias fotos (câmera, galeria, arrastar ou colar), quantidade e valor, e **categorias** que você renomeia, cria ou exclui.
 - **Leitura de fotos por IA**: a IA preenche um item a partir da foto, ou lista tudo o que aparece numa foto de prateleira, e você confere antes de salvar. Funciona com Anthropic Claude, OpenAI, Google Gemini ou um modelo local no Ollama, pela ação `ai_task.generate_data` do Home Assistant. Quem não quiser IA desliga numa chave e os botões somem.

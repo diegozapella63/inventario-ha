@@ -509,8 +509,6 @@ button.chip { font: inherit; font-size: 14.5px; text-align: left; }
 .sec-h .aside { color: var(--muted); font-size: 14px; white-space: nowrap; }
 .sec-h a.aside { text-decoration: none; font-weight: 500; color: var(--ink-2); }
 .sec-h a.aside:hover { text-decoration: underline; }
-.cols { display: grid; gap: 44px; }
-@media (min-width: 900px) { .cols { grid-template-columns: 1fr 1fr; gap: 40px; } .cols .sec { margin-top: 44px; } }
 
 /* linhas de cômodo com barra de proporção */
 .rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }

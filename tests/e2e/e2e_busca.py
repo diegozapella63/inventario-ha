@@ -123,13 +123,13 @@ async def body(r, p):
     shown = await pg.input_value('[data-input="search-room"]')
     r.check(shown == "" and await rows(pg) == 38, f"cômodo que não existe no endereço: mostra todos, como diz a seleção ({await rows(pg)})")
     await r.shot(pg, "comodo-inexistente")
-    # categoria pelo Início
-    await r.open(pg, "#/", ".tag")
-    await pg.click('.sec .rrow.nocode[href*="cat=eletronicos"]')
+    # categoria pelos Gráficos
+    await r.open(pg, "#/graficos", ".kpis")
+    await pg.click('#g-cats .hbar[href*="cat=eletronicos"]')
     await pg.wait_for_selector(".ssum")
     await pg.wait_for_timeout(250)
     r.check(await pg.input_value('[data-input="search-cat"]') == "eletronicos" and await pg.input_value('[data-input="search-ord"]') == "val",
-            "uma categoria no Início abre a busca dela, por valor")
+            "uma categoria nos Gráficos abre a busca dela, por valor")
 
     # -- muitos itens: Mostrar mais
     for start in (0, 60, 120):

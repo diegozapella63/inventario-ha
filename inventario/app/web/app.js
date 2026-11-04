@@ -653,8 +653,6 @@
     const recent = [...S.items].sort((a, b) => parseDate(b.createdAt) - parseDate(a.createdAt)).slice(0, 6);
     const maxRoom = Math.max(0, ...D.rooms.map((r) => D.roomTotals.get(r.id) || 0));
     const bigRoom = D.rooms.find((r) => (D.roomTotals.get(r.id) || 0) === maxRoom);
-    const cats = [...D.catTotals.entries()].sort((a, b) => b[1].value - a[1].value);
-    const maxCat = cats.length ? cats[0][1].value : 0;
     const top = byValue[0], last = recent[0];
     return `
     <section class="hero">
@@ -686,18 +684,6 @@
       <div class="sec-h"><h2>${secIc("rooms")}Cômodos</h2><button type="button" class="btn ghost sm" data-act="room-new">${ic("plus", "sm")}Novo cômodo</button></div>
       <ul class="rows">${D.rooms.map((r) => roomRow(r, maxRoom)).join("")}</ul>
     </section>
-    <div class="cols">
-      <section class="sec">
-        <div class="sec-h"><h2>${secIc("grid")}Categorias</h2><span class="aside">${plural(cats.length, "categoria", "categorias")}</span></div>
-        <ul class="rows">${cats.map(([c, t]) => `<li><a class="rrow nocode" href="#/buscar?cat=${c}&amp;ord=val">
-          <span class="rn">${esc(CAT[c])}<small>${plural(t.count, "item", "itens")}</small></span><span class="rv">${moneyR(t.value)}</span>
-          <span class="bar"><i style="width:${maxCat ? ((t.value / maxCat) * 100).toFixed(2) : 0}%"></i></span><span class="pct">${pctFmt(pct(t.value, D.total))}</span></a></li>`).join("")}</ul>
-      </section>
-      <section class="sec">
-        <div class="sec-h"><h2>${secIc("gem")}Mais valiosos</h2><a class="aside" href="#/buscar?ord=val">Ver todos</a></div>
-        <ul class="ilist">${byValue.slice(0, 7).map((it) => itemRow(it)).join("")}</ul>
-      </section>
-    </div>
     <section class="sec">
       <div class="sec-h"><h2>${secIc("clock")}Cadastrados recentemente</h2><a class="aside" href="#/buscar?ord=new">Ver todos</a></div>
       <ul class="ilist">${recent.map((it) => itemRow(it)).join("")}</ul>
