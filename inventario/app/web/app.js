@@ -1631,8 +1631,8 @@
       start();
     });
   }
-  // Novidades do produto: a IA com busca na web traz atualizações, lançamentos, modelo novo, recalls e fim de suporte,
-  // cada um com a fonte. O resultado fica guardado até fechar o app (abrir de novo não chama a IA outra vez).
+  // Novidades do produto: a IA com busca na web traz as 3 mais recentes (atualizações, lançamentos, modelo novo, recalls e
+  // fim de suporte), cada uma com a fonte. O resultado fica guardado no servidor: a ficha mostra direto, sem chamar a IA.
   const NEWS_KIND = { atualizacao: "Atualização", lancamento: "Lançamento", sucessor: "Modelo novo", recall: "Recall", suporte: "Fim de suporte", outro: "Novidade" };
   const MES = ["jan.", "fev.", "mar.", "abr.", "maio", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."];
   const newsDate = (d) => {
@@ -1640,6 +1640,68 @@
     if (!y) return "";
     return day ? `${+day} ${MES[+m - 1]} ${y}` : m ? `${MES[+m - 1]} ${y}` : y;
   };
+  function newsListHtml(r, it) {
+    const list = (r.news && r.news.novidades) || [], prod = (r.news && r.news.produto) || "";
+    return `${list.length ? `<ul class="news">${list.map((x) => `<li>
+        <div class="news-meta"><span class="pill${x.tipo === "recall" ? " warn" : ""}">${esc(NEWS_KIND[x.tipo] || "Novidade")}</span>${x.boato ? `<span class="pill">Boato</span>` : ""}${x.data ? `<span class="news-date">${esc(newsDate(x.data))}</span>` : ""}</div>
+        <b>${esc(x.titulo)}</b>${x.resumo ? `<p>${esc(x.resumo)}</p>` : ""}
+        <a href="${esc(x.fonte)}" target="_blank" rel="noopener noreferrer">${esc(x.site || siteOf(x.fonte))}</a></li>`).join("")}</ul>`
+      : `<p class="muted news-none">Nada novo nos últimos 12 meses.</p>`}
+      <p class="muted news-foot">${r.example ? "Exemplo simulado da prévia. " : ""}Buscado ${esc(whenShort(r.at))}${prod && norm(prod) !== norm(it.name) ? `, como ${esc(prod)}` : ""}.</p>`;
+  }
+  // na ficha: o que já foi conferido aparece direto; Novidades (ou Buscar de novo) procura ali mesmo. A busca segue no
+  // servidor se a ficha fechar, e o resultado fica guardado.
+  const INEWS = { id: null, st: null, gen: 0, timer: null };
+  function itemNewsHtml(it) {
+    const st = INEWS.id === it.id ? INEWS.st : null;
+    const btn = (icon, label) => `<button type="button" class="btn" data-act="item-news" data-id="${esc(it.id)}">${ic(icon)}${label}</button>`;
+    if (!st) return btn("spark", "Novidades");
+    if (st.busy) return `<div class="wbusy"><span class="spin"></span><p><b>Procurando novidades…</b><span>Pode levar até um minuto.</span></p></div>`;
+    return `<h3 class="inews-h">${ic("spark")}Novidades</h3>${st.error ? `<p class="formerr">${esc(st.error)}</p>` : newsListHtml(st.r, it)}${btn("refresh", "Buscar de novo")}`;
+  }
+  function paintItemNews() {
+    const slot = sheet && sheet.itemId === INEWS.id && $('[data-slot="item-news"]', sheet.dlg);
+    const it = INEWS.id && D.itemById.get(INEWS.id);
+    if (slot && it) slot.innerHTML = itemNewsHtml(it);
+  }
+  function stopItemNews() { INEWS.gen++; clearTimeout(INEWS.timer); }
+  function loadItemNews(it) {
+    if (INEWS.id === it.id) { paintItemNews(); return; } // a ficha foi redesenhada: fica como estava
+    stopItemNews();
+    const my = INEWS.gen;
+    const saved = newsOv && newsOv.itens && newsOv.itens[it.id];
+    Object.assign(INEWS, { id: it.id, st: saved ? { r: saved } : null });
+    paintItemNews();
+    API.get(`api/news?item=${encodeURIComponent(it.id)}`).then((r) => {
+      if (my !== INEWS.gen) return;
+      INEWS.st = r && r.news ? { r } : null;
+      paintItemNews();
+    }).catch(() => {});
+  }
+  async function searchItemNews(it) {
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return; }
+    stopItemNews();
+    const my = INEWS.gen;
+    Object.assign(INEWS, { id: it.id, st: { busy: true } });
+    paintItemNews();
+    const done = (st) => { if (my === INEWS.gen) { INEWS.st = st; paintItemNews(); } };
+    let id;
+    try { id = (await API.post("api/news", { item: it.id })).id; }
+    catch (e) { done({ error: e.message }); return; }
+    const poll = async () => {
+      if (my !== INEWS.gen) return;
+      let st;
+      try { st = await API.get(`api/news/${id}`); }
+      catch (e) { done({ error: e.message }); return; }
+      if (st.stage === "busy") { if (my === INEWS.gen) INEWS.timer = setTimeout(poll, 1200); return; }
+      API.del(`api/news/${id}`).catch(() => {});
+      if (st.stage === "error") { done({ error: st.msg }); return; }
+      const r = { news: st.news, at: new Date().toISOString(), example: !!st.example };
+      if (newsOv) { newsOv.itens = { ...(newsOv.itens || {}), [it.id]: r }; renderNews(); }
+      done({ r });
+    };
+    poll();
+  }
   function openNews(it) {
     if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Integrações."); return; }
     let job = null, timer = null, gen = 0;
@@ -1654,15 +1716,7 @@
     const dlg = entry.dlg, slot = $('[data-slot="news"]', dlg), again = $("[data-again]", dlg);
     const show = (html, done) => { slot.innerHTML = html; again.hidden = !done; };
     const error = (m) => show(`<p class="formerr">${esc(m)}</p>`, true);
-    function render(r) {
-      const list = (r.news && r.news.novidades) || [], prod = (r.news && r.news.produto) || "";
-      show(`${list.length ? `<ul class="news">${list.map((x) => `<li>
-          <div class="news-meta"><span class="pill${x.tipo === "recall" ? " warn" : ""}">${esc(NEWS_KIND[x.tipo] || "Novidade")}</span>${x.boato ? `<span class="pill">Boato</span>` : ""}${x.data ? `<span class="news-date">${esc(newsDate(x.data))}</span>` : ""}</div>
-          <b>${esc(x.titulo)}</b>${x.resumo ? `<p>${esc(x.resumo)}</p>` : ""}
-          <a href="${esc(x.fonte)}" target="_blank" rel="noopener noreferrer">${esc(x.site || siteOf(x.fonte))}</a></li>`).join("")}</ul>`
-        : `<p class="muted">Nada novo nos últimos 12 meses.</p>`}
-        <p class="muted news-foot">${r.example ? "Exemplo simulado da prévia. " : ""}Buscado ${esc(whenShort(r.at))}${prod && norm(prod) !== norm(it.name) ? `, como ${esc(prod)}` : ""}.</p>`, true);
-    }
+    const render = (r) => show(newsListHtml(r, it), true);
     async function poll(my) {
       let st;
       try { st = await API.get(`api/news/${job}`); }
@@ -1732,12 +1786,13 @@
       sheet.dlg.innerHTML = html;
       if (box) sheet.dlg.append(box);
       sheet.dlg.setAttribute("aria-label", it.name); sheet.itemId = it.id; sheet.closing = false;
-      return;
+    } else {
+      sheet = openDialog({ cls: "sheet", html, routed: true, label: it.name });
+      sheet.itemId = it.id;
+      sheet.onRouteClose = leaveItem;
+      sheet.onClose = () => { sheet = null; stopItemNews(); INEWS.id = null; };
     }
-    sheet = openDialog({ cls: "sheet", html, routed: true, label: it.name });
-    sheet.itemId = it.id;
-    sheet.onRouteClose = leaveItem;
-    sheet.onClose = () => { sheet = null; };
+    if (aiOn()) loadItemNews(it);
   }
   function leaveItem() {
     if (inAppNavs > 0) history.back();
@@ -1778,7 +1833,7 @@
           ${it.createdAt ? `<dt>Cadastrado</dt><dd>${esc(dateTime(it.createdAt))}${by(it.createdBy)}</dd>` : ""}
           ${it.updatedAt && it.updatedAt !== it.createdAt ? `<dt>Alterado</dt><dd>${esc(dateTime(it.updatedAt))}${by(it.updatedBy)}</dd>` : ""}
         </dl>
-        ${aiOn() ? `<div class="inews"><button type="button" class="btn" data-act="item-news" data-id="${esc(it.id)}">${ic("spark")}Novidades</button></div>` : ""}
+        ${aiOn() ? `<div class="inews" data-slot="item-news" aria-live="polite">${itemNewsHtml(it)}</div>` : ""}
       </div>
       <div class="dlg-f">
         <button type="button" class="btn danger" data-act="item-delete" data-id="${esc(it.id)}" aria-label="Excluir">${lbl("trash", "Excluir")}</button>
@@ -3060,7 +3115,7 @@
       case "gal": if (item) { const g = $('[data-slot="gallery"]', sheet ? sheet.dlg : document); if (g) g.innerHTML = galleryHtml(item, +b.dataset.i); } break;
       case "item-edit": if (item) openEditor({ item }); break;
       case "web-photo": if (item) addWebPhoto(item); break;
-      case "item-news": if (item) openNews(item); break;
+      case "item-news": if (item) searchItemNews(item); break;
       case "item-dup": if (item) openEditor({ dup: item }); break;
       case "item-move": if (item) moveItem(item); break;
       case "item-delete": if (item) deleteItem(item); break;

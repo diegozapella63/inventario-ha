@@ -766,6 +766,11 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .news-out[open] summary .ic { transform: rotate(90deg); }
 .news-out .nlist { margin-top: 8px; }
 .inews { margin-top: 18px; }
+.inews-h { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 17px; font-weight: 700; }
+.inews-h .ic { color: var(--tag-text); }
+.inews > .btn { margin-top: 14px; }
+.inews > .formerr { margin: 10px 0 0; }
+.inews .wbusy { padding: 8px 4px; }
 .news-of { margin: 0 0 4px; font-weight: 600; }
 .news { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
 .news li { display: grid; gap: 4px; padding: 14px 2px; border-bottom: 1px solid var(--line); min-width: 0; }

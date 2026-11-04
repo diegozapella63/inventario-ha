@@ -1,5 +1,5 @@
-"""Novidades do produto na ficha do item: só as 3 mais recentes, com tipo, data, fonte e boato; guardada ao abrir de novo; Buscar de novo;
-nada novo; erro da busca na web; IA desligada esconde o botão."""
+"""Novidades do produto na ficha do item, ali mesmo: só as 3 mais recentes, com tipo, data, fonte e boato; guardadas e mostradas
+ao abrir a ficha de novo, sem chamar a IA; Buscar de novo; fechar no meio da busca; nada novo; erro da busca na web; IA desligada."""
 import json
 import os
 
@@ -30,12 +30,13 @@ async def body(r, p):
     r.eq(await btn.count(), 1, "a ficha tem o botão Novidades")
     r.eq((await btn.text_content()).strip(), "Novidades", "com o nome curto")
     await btn.click()
-    await pg.wait_for_selector("dialog.modal .wbusy", timeout=4000)
-    r.check("Procurando novidades" in await pg.text_content("dialog.modal .wbusy"), "enquanto busca, diz o que faz")
+    await pg.wait_for_selector("dialog.sheet .inews .wbusy", timeout=4000)
+    r.check("Procurando novidades" in await pg.text_content("dialog.sheet .inews .wbusy"), "enquanto busca, diz o que faz, na própria ficha")
+    r.eq(await pg.locator("dialog.modal").count(), 0, "sem abrir outra janela")
     await r.shot(pg, "buscando")
-    await pg.wait_for_selector(".news li", timeout=10000)
-    r.eq((await pg.text_content("dialog.modal .news-of")).strip(), "Smart TV 55 polegadas", "o nome do item no alto")
-    rows = await pg.evaluate("""[...document.querySelectorAll('.news li')].map(li => ({
+    await pg.wait_for_selector("dialog.sheet .news li", timeout=10000)
+    r.eq((await pg.text_content("dialog.sheet .inews-h")).strip(), "Novidades", "as novidades aparecem na ficha, com título")
+    rows = await pg.evaluate("""[...document.querySelectorAll('dialog.sheet .news li')].map(li => ({
         tipo: [...li.querySelectorAll('.pill')].map(p => p.textContent), data: li.querySelector('.news-date')?.textContent || '',
         titulo: li.querySelector('b').textContent, site: li.querySelector('a').textContent, href: li.querySelector('a').href,
         alvo: li.querySelector('a').target }))""")
@@ -47,35 +48,49 @@ async def body(r, p):
     r.eq(rows[0]["tipo"], ["Modelo novo", "Boato"], "boato vem marcado")
     r.eq(rows[2]["site"], "noticias.exemplo", "a fonte aparece pelo site")
     r.check(rows[1]["href"] == "https://fabricante.exemplo/notas" and rows[1]["alvo"] == "_blank", "e abre a página fora do app")
-    r.check(await pg.locator(".news .pill.warn", has_text="Recall").count() == 1, "recall em destaque")
-    foot = await pg.text_content(".news-foot")
+    r.check(await pg.locator("dialog.sheet .news .pill.warn", has_text="Recall").count() == 1, "recall em destaque")
+    foot = await pg.text_content("dialog.sheet .news-foot")
     r.check(foot.startswith("Buscado hoje"), f"quando foi buscado ({foot.strip()})")
-    r.check(await pg.is_visible("[data-again]"), "Buscar de novo aparece")
+    r.eq((await btn.text_content()).strip(), "Buscar de novo", "o botão vira Buscar de novo")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
+    await pg.locator("dialog.sheet .inews").scroll_into_view_if_needed()
     await r.shot(pg, "lista")
-    await pg.click("dialog.modal .dlg-f [data-x]")
-    await pg.wait_for_timeout(300)
-    r.eq(await pg.locator("dialog.modal").count(), 0, "Fechar volta para a ficha")
 
-    # abrir de novo não chama a IA outra vez
+    # fechar e abrir a ficha: as novidades já aparecem, sem chamar a IA
     n = len(sent)
+    await pg.click('dialog.sheet [data-act="sheet-close"]')
+    await pg.wait_for_timeout(400)
+    await r.open(pg, "#/i/sal-007", "dialog.sheet .news li")
+    r.eq(await pg.locator("dialog.sheet .news li").count(), 3, "abrir a ficha de novo mostra as novidades guardadas")
+    r.eq(len(sent), n, "sem chamar a IA")
     await pg.click('dialog.sheet [data-act="item-news"]')
-    await pg.wait_for_selector(".news li", timeout=3000)
-    r.eq(len(sent), n, "abrir de novo mostra o que já foi buscado, sem chamar a IA")
-    await pg.click("[data-again]")
-    await pg.wait_for_selector(".news li", timeout=10000)
+    await pg.wait_for_selector("dialog.sheet .inews .wbusy", timeout=4000)
+    await pg.wait_for_selector("dialog.sheet .news li", timeout=10000)
     r.eq(len(sent), n + 1, "Buscar de novo chama a IA outra vez")
-    await pg.click("dialog.modal .dlg-h [data-x]")
-    await pg.wait_for_timeout(300)
+
+    # outro item: não mostra as novidades do anterior
+    await r.open(pg, "#/i/sal-009", "dialog.sheet h1")
+    await pg.wait_for_timeout(400)
+    r.eq(await pg.locator("dialog.sheet .news li").count(), 0, "outro item, sem as novidades do anterior")
+    r.eq((await pg.text_content('dialog.sheet [data-act="item-news"]')).strip(), "Novidades", "só o botão")
+
+    # fechar a ficha no meio da busca: a busca termina e fica guardada
+    await pg.click('dialog.sheet [data-act="item-news"]')
+    await pg.wait_for_selector("dialog.sheet .inews .wbusy", timeout=4000)
+    await pg.click('dialog.sheet [data-act="sheet-close"]')
+    await pg.wait_for_timeout(1500)
+    r.check("sal-009" in r.api("GET", "api/news")["itens"], "fechar a ficha no meio: a busca termina e fica guardada")
+    await r.open(pg, "#/i/sal-009", "dialog.sheet .news li")
+    r.check(True, "e aparece ao abrir a ficha")
 
     # nada novo
     with open(mock, "w", encoding="utf-8") as f:
         json.dump({"produto": "Sofá", "novidades": []}, f)
     await r.open(pg, "#/i/sal-001", "dialog.sheet h1")
     await pg.click('dialog.sheet [data-act="item-news"]')
-    await pg.wait_for_selector("dialog.modal .news-foot", timeout=10000)
-    r.check("Nada novo nos últimos 12 meses" in await pg.text_content('dialog.modal [data-slot="news"]'), "nada novo: diz em uma linha")
-    r.check(", como Sofá." in await pg.text_content(".news-foot"), "diz como a IA identificou o produto quando o nome é outro")
+    await pg.wait_for_selector("dialog.sheet .news-foot", timeout=10000)
+    r.check("Nada novo nos últimos 12 meses" in await pg.text_content('dialog.sheet [data-slot="item-news"]'), "nada novo: diz em uma linha")
+    r.check(", como Sofá." in await pg.text_content("dialog.sheet .news-foot"), "diz como a IA identificou o produto quando o nome é outro")
     await r.shot(pg, "nada-novo")
     await ctx.close()
 
@@ -84,9 +99,8 @@ async def body(r, p):
         json.dump(NEWS, f, ensure_ascii=False)
     for size, scheme in (("estreito", "light"), ("pc", "light")):
         ctx, pg = await r.page(b, size, scheme, accent="verde")
-        await r.open(pg, "#/i/sal-007", "dialog.sheet h1")
-        await pg.click('dialog.sheet [data-act="item-news"]')
-        await pg.wait_for_selector(".news li", timeout=10000)
+        await r.open(pg, "#/i/sal-007", "dialog.sheet .news li")
+        await pg.locator("dialog.sheet .inews").scroll_into_view_if_needed()
         r.check(await pg.evaluate(OVERFLOW), f"[{size}] sem rolagem para o lado")
         fits = await pg.evaluate("[...document.querySelectorAll('.news a')].every(a => a.getBoundingClientRect().right <= a.closest('li').getBoundingClientRect().right + 1)")
         r.check(fits, f"[{size}] links dentro da borda")
@@ -111,16 +125,16 @@ async def body(r, p):
     ctx, pg = await r.page(b, "cel", "dark", accent="coral")
     await r.open(pg, "#/i/sal-007", "dialog.sheet h1")
     await pg.click('dialog.sheet [data-act="item-news"]')
-    await pg.wait_for_selector("dialog.modal .formerr", timeout=10000)
-    r.check("busca na web" in await pg.text_content("dialog.modal .formerr"), "sem busca na web: explica")
-    err = await pg.text_content("dialog.modal .formerr")
-    r.check(err.count("Mais, Integrações") == 1 and await pg.locator("dialog.modal .wtip").count() == 0, "e diz uma vez só onde escolher a IA de busca")
-    r.check(await pg.is_visible("[data-again]"), "dá para tentar de novo")
+    await pg.wait_for_selector("dialog.sheet .inews .formerr", timeout=10000)
+    r.check("busca na web" in await pg.text_content("dialog.sheet .inews .formerr"), "sem busca na web: explica, na ficha")
+    err = await pg.text_content("dialog.sheet .inews .formerr")
+    r.check(err.count("Mais, Integrações") == 1 and await pg.locator("dialog.sheet .wtip").count() == 0, "e diz uma vez só onde escolher a IA de busca")
+    r.eq((await pg.text_content('dialog.sheet [data-act="item-news"]')).strip(), "Buscar de novo", "dá para tentar de novo")
     await r.shot(pg, "erro")
     ha.ai_reply = lambda kind, payload: json.dumps(NEWS)
-    await pg.click("[data-again]")
-    await pg.wait_for_selector(".news li", timeout=10000)
-    r.eq(await pg.locator(".news li").count(), 3, "Tentar de novo traz as novidades")
+    await pg.click('dialog.sheet [data-act="item-news"]')
+    await pg.wait_for_selector("dialog.sheet .news li", timeout=10000)
+    r.eq(await pg.locator("dialog.sheet .news li").count(), 3, "Tentar de novo traz as novidades")
     instr = ha.calls("POST", "/core/api/services/ai_task")[-1]["body"]["instructions"]
     r.check("Produto: Smart TV 55 polegadas" in instr, "a IA recebe o nome do item")
     await ctx.close()

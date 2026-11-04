@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.24.0"
+VERSION = "1.25.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -2308,6 +2308,14 @@ def news_read() -> dict:
     return d
 
 
+def news_of(iid: str) -> dict:
+    """O que já foi conferido de um item ({at, news}), para a ficha; vazio se nunca foi."""
+    v = news_read()["itens"].get(iid)
+    if not isinstance(v, dict) or not isinstance(v.get("news"), dict) or not STORE.item(iid):
+        return {}
+    return {"at": v.get("at"), "news": v["news"]}
+
+
 def news_clear() -> dict:
     """Apaga as novidades guardadas, as escolhas da IA e a última conferência; para a conferência em andamento."""
     for jid, job in list(WEB_JOBS.items()):
@@ -3009,7 +3017,8 @@ def r_news_status(h, jid, query):
 
 def r_news_overview(h, query):
     need_ai_on()
-    h.send_json(news_overview())
+    iid = (query.get("item") or [""])[0]
+    h.send_json(news_of(iid) if iid else news_overview())
 
 
 def r_news_clear(h, query):

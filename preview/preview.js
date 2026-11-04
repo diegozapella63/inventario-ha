@@ -274,6 +274,10 @@
       if (n >= j.todo.length && !j.done) { j.done = true; ST.news.ultima = { at: new Date().toISOString(), conferidos: n, com_novidades: n, selecionados: n, em_dia: 0, erros: 0 }; }
       return n;
     };
+    if (method === "GET" && path.startsWith("api/news?item=")) {
+      aiOff();
+      return ST.news.itens[decodeURIComponent(path.slice("api/news?item=".length))] || {};
+    }
     if (method === "GET" && path === "api/news") {
       aiOff();
       const cats = newsCats(), tri = ST.news.triagem;

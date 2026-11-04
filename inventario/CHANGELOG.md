@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.25.0
+
+- **Novidades na ficha do item**: o que já foi conferido aparece direto na ficha, embaixo dos dados, sem abrir outra janela e sem chamar a IA. **Novidades** (ou **Buscar de novo**) procura ali mesmo; fechar a ficha no meio da busca não perde o resultado.
+
 ## 1.24.0
 
 - **Mais > Novidades**: só Eletrônicos, sem escolher categorias. A lista de categorias saiu; itens de outras categorias não entram, nem na lista (pela ficha, dá para conferir qualquer item).

@@ -174,6 +174,17 @@ class Todos(ServerCase):
         self.assertEqual(app.request("PUT", "api/settings", {"news_cats": ["cozinha"]})[0], 200)
         self.assertEqual(app.ok("GET", "api/news")["cats"], ["eletronicos"])
 
+    def test_novidades_de_um_item_para_a_ficha(self):
+        app = self.fresh(mock_ai=True)
+        self.assertEqual(app.ok("GET", "api/news?item=sal-007"), {}, "nunca conferido")
+        esperar(app, app.ok("POST", "api/news", {"item": "sal-007"})["id"])
+        r = app.ok("GET", "api/news?item=sal-007")
+        self.assertTrue(r["at"])
+        self.assertEqual(len(r["news"]["novidades"]), 3)
+        self.assertEqual(app.ok("GET", "api/news?item=nao-existe"), {})
+        app.ok("PUT", "api/settings", {"ai": False})
+        self.assertEqual(app.request("GET", "api/news?item=sal-007")[0], 409, "IA desligada: recusa")
+
     def test_padrao_so_eletronicos(self):
         app = self.fresh(mock_ai=True)
         self.assertEqual(app.ok("GET", "api/news")["cats"], ["eletronicos"])

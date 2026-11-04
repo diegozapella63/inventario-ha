@@ -103,7 +103,7 @@ Na ficha do item, **Novidades** pede à IA de busca (a mesma da busca de fotos, 
 
 - Vêm só as 3 novidades mais recentes. Cada uma vem com o tipo, a data quando se sabe e o site da fonte, que abre fora do app. Sem fonte, não entra. Rumor aparece marcado como **Boato**; recall (só o oficial, do fabricante ou de um órgão como o Procon) fica em destaque.
 - A IA só acha o que já foi publicado: lançamento que ainda não foi anunciado não aparece.
-- O resultado fica guardado; **Buscar de novo** pergunta outra vez. Cada busca conta em Uso da IA.
+- As novidades aparecem na própria ficha e ficam guardadas: ao abrir a ficha de novo, já estão lá, sem chamar a IA. **Buscar de novo** pergunta outra vez; fechar a ficha no meio da busca não perde o resultado. Cada busca conta em Uso da IA.
 - **Mais > Novidades** confere todos os itens da categoria Eletrônicos de uma vez: toque em **Conferir novidades**. A IA escolhe, entre os eletrônicos, os que vale conferir e o app confere um por um, mostrando o andamento; **Parar** guarda o que já foi conferido. O que foi conferido nos últimos 7 dias fica para a próxima. A lista mostra recall primeiro, depois os com novidades; tocar num item abre o que foi achado. Os que a IA deixou de fora ficam recolhidos embaixo, e dá para conferir cada um sozinho. Itens de outras categorias não entram, nem na lista; dá para conferir um deles pela ficha.
 - **Limpar novidades** (com confirmação) apaga o que foi encontrado e as escolhas da IA, e para a conferência em andamento. O inventário não muda.
 - Quanto mais o nome do item tiver marca e modelo, como na nota fiscal, melhor a busca. O app mostra como a IA identificou o produto.

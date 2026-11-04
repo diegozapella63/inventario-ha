@@ -90,9 +90,16 @@ async def body(r, p):
     await pg.goto(r.base + "#/i/sal-007")
     await pg.wait_for_selector('dialog.sheet [data-act="item-news"]', timeout=8000)
     await pg.click('dialog.sheet [data-act="item-news"]')
-    await pg.wait_for_selector(".news li", timeout=10000)
-    r.check(await pg.locator(".news li").count() == 3 and "Exemplo simulado da prévia" in await pg.text_content(".news-foot"), "Novidades: exemplo marcado como simulado")
-    await pg.click("dialog.modal .dlg-h [data-x]")
+    await pg.wait_for_selector("dialog.sheet .news li", timeout=10000)
+    r.check(await pg.locator("dialog.sheet .news li").count() == 3 and "Exemplo simulado da prévia" in await pg.text_content("dialog.sheet .news-foot"),
+            "Novidades na ficha: exemplo marcado como simulado")
+    await pg.click('dialog.sheet [data-act="sheet-close"]')
+    await pg.wait_for_timeout(400)
+    await pg.goto(r.base + "#/i/sal-007")
+    await pg.wait_for_selector("dialog.sheet .news li", timeout=8000)
+    r.check(True, "e continuam lá ao abrir a ficha de novo")
+    await pg.click('dialog.sheet [data-act="sheet-close"]')
+    await pg.wait_for_timeout(400)
 
     # Conversar: resposta de exemplo
     await pg.goto(r.base + "#/")

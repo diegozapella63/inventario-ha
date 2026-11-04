@@ -352,6 +352,42 @@ class Limpar(UnitBase):
         self.assertEqual(ov["itens"], {})
 
 
+class DeUmItem(UnitBase):
+    """O que a ficha do item mostra: o que já foi conferido dele."""
+    def test_nunca_conferido_vem_vazio(self):
+        self.assertEqual(server.news_of(TV), {})
+
+    def test_conferido_vem_com_data_e_novidades(self):
+        server.news_save_result(TV, server.news_clean(novidade()))
+        r = server.news_of(TV)
+        self.assertTrue(r["at"])
+        self.assertEqual(r["news"]["novidades"][0]["titulo"], "Firmware novo")
+
+    def test_so_as_3_mais_recentes(self):
+        velhas = {"produto": "TV", "novidades": [{"tipo": "outro", "titulo": f"n{i}", "data": f"2026-{12 - i:02d}", "fonte": f"https://s.exemplo/{i}"}
+                                               for i in range(6)]}
+        server.write_json_atomic(server.NEWS_FILE, {"itens": {TV: {"at": "2026-11-01T10:00:00-03:00", "news": velhas}}, "triagem": {}})
+        self.assertEqual(len(server.news_of(TV)["news"]["novidades"]), 3)
+
+    def test_item_excluido_vem_vazio(self):
+        server.news_save_result(TV, server.news_clean(novidade()))
+        self.store.delete_item(TV)
+        self.assertEqual(server.news_of(TV), {})
+
+    def test_item_de_outra_categoria_tambem(self):
+        server.news_save_result(GELADEIRA, server.news_clean(novidade()))
+        self.assertIn("news", server.news_of(GELADEIRA), "a ficha mostra mesmo fora de Eletrônicos")
+
+    def test_guardado_estranho_vem_vazio(self):
+        server.write_json_atomic(server.NEWS_FILE, {"itens": {TV: {"at": "x", "news": "lixo"}}, "triagem": {}})
+        self.assertEqual(server.news_of(TV), {})
+
+    def test_depois_de_limpar_vem_vazio(self):
+        server.news_save_result(TV, server.news_clean(novidade()))
+        server.news_clear()
+        self.assertEqual(server.news_of(TV), {})
+
+
 class Visao(UnitBase):
     def test_vazia_no_comeco(self):
         ov = server.news_overview()
