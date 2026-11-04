@@ -77,6 +77,7 @@ class AppServer:
         e = dict(os.environ)
         for k in ("SUPERVISOR_TOKEN", "HASSIO_TOKEN", "INV_AI_MOCK", "INV_DEV", "INV_ALLOW", "INV_HA_API", "INV_HA_WS", "INV_MOCK_SEARCH", "INV_WEB_ALLOW_LOCAL"):
             e.pop(k, None)
+        e.setdefault("INV_HOJE", "2026-11-04")  # as novidades de exemplo são de 2026: os testes não envelhecem
         e.update({
             "INV_PORT": str(self.port), "INV_DATA": self.path("data"), "INV_SHARE": self.path("share"), "INV_MEDIA": self.path("media"),
             "INV_SEED": FIXTURE if seed else self.path("empty-seed"), "INV_WEB": WEB, "PYTHONUNBUFFERED": "1", "TZ": e.get("TZ", "America/Sao_Paulo"),

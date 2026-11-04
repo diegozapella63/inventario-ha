@@ -35,9 +35,9 @@ class Contexto(UnitBase):
         self.assertIn("Detalhes: Comprada em 2024, com nota", server.chat_context({"view": "item", "item": TV}))
 
     def test_item_leva_as_novidades_conferidas(self):
-        server.news_save_result(TV, server.news_clean({"novidades": [{"tipo": "recall", "titulo": "Troca da fonte", "data": "2026-08",
+        server.news_save_result(TV, server.news_clean({"novidades": [{"tipo": "recall", "titulo": "Recall: troca da fonte", "data": "2026-08",
                                                                       "fonte": "https://fab.exemplo/r"}]}))
-        self.assertIn("Novidade conferida: [recall] Troca da fonte (2026-08, fab.exemplo)", server.chat_context({"view": "item", "item": TV}))
+        self.assertIn("Novidade conferida: [recall] Recall: troca da fonte (2026-08, fab.exemplo)", server.chat_context({"view": "item", "item": TV}))
 
     def test_tela_de_um_comodo_lista_os_itens(self):
         c = server.chat_context({"view": "room", "room": SALA})

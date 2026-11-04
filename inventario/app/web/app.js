@@ -964,26 +964,42 @@
   }
   const newsCount = (r) => ((r && r.news && r.news.novidades) || []).length;
   const newsRecall = (r) => ((r && r.news && r.news.novidades) || []).some((x) => x.tipo === "recall");
-  function newsRow(it, r) {
-    const room = D.roomById.get(it.room);
+  // uma linha por equipamento: o mesmo em vários cômodos (ou no plural) fica junto, com o nome mais curto
+  function newsRow(g) {
+    const { it, r, items, open } = g;
+    const rooms = [...new Set(items.map((x) => x.room))];
+    const where = rooms.length > 1 ? plural(rooms.length, "cômodo", "cômodos") : (D.roomById.get(rooms[0])?.name || "");
     const n = newsCount(r);
     const st = !r ? "Ainda não conferido" : `${n ? plural(n, "novidade", "novidades") : "Nada novo"} · ${whenShort(r.at)}`;
-    return `<li><button type="button" class="nrow" data-act="news-open" data-id="${esc(it.id)}">
-        <span class="nb"><b>${esc(it.name)}</b><span class="nm">${esc(room ? room.name : "")} · ${esc(st)}</span></span>
+    return `<li><button type="button" class="nrow" data-act="news-open" data-id="${esc(open.id)}">
+        <span class="nb"><b>${esc(it.name)}</b><span class="nm">${esc(where)} · ${esc(st)}</span></span>
         ${newsRecall(r) ? `<span class="pill warn">Recall</span>` : n ? `<span class="pill">${int(n)}</span>` : ""}${ic("chev", "sm")}</button></li>`;
+  }
+  function newsGroups(list, ov) {
+    const res = ov.itens || {}, grp = ov.grupos || {}, by = new Map();
+    for (const it of list) {
+      const k = grp[it.id] || it.id;
+      if (!by.has(k)) by.set(k, []);
+      by.get(k).push(it);
+    }
+    return [...by.values()].map((items) => {
+      const it = [...items].sort((a, b) => a.name.length - b.name.length || a.name.localeCompare(b.name, "pt-BR"))[0];
+      const r = items.map((x) => res[x.id]).filter(Boolean).sort((a, b) => String(b.at).localeCompare(String(a.at)))[0];
+      return { it, r, items, open: items.find((x) => r && res[x.id] === r) || it }; // abre o que tem o resultado mais novo
+    });
   }
   function renderNews() {
     const ov = newsOv;
     const ls = $('#view [data-slot="news-list"]');
     if (!ov || !ls) return;
     const res = ov.itens || {}, tri = ov.triagem || {};
-    const rank = (it) => { const r = res[it.id]; return newsRecall(r) ? 0 : newsCount(r) ? 1 : !r ? 2 : 3; };
-    const sortIt = (a, b) => rank(a) - rank(b) || newsCount(res[b.id]) - newsCount(res[a.id]) || a.name.localeCompare(b.name, "pt-BR");
-    const chosen = S.items.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || (res[it.id] && tri[it.id] !== false))).sort(sortIt);
-    const out = S.items.filter((it) => tri[it.id] === false && ov.cats.includes(it.cat)).sort(sortIt);
-    ls.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map((it) => newsRow(it, res[it.id])).join("")}</ul>`
+    const rank = (g) => (newsRecall(g.r) ? 0 : newsCount(g.r) ? 1 : !g.r ? 2 : 3);
+    const sortG = (a, b) => rank(a) - rank(b) || newsCount(b.r) - newsCount(a.r) || a.it.name.localeCompare(b.it.name, "pt-BR");
+    const chosen = newsGroups(S.items.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || (res[it.id] && tri[it.id] !== false))), ov).sort(sortG);
+    const out = newsGroups(S.items.filter((it) => tri[it.id] === false && ov.cats.includes(it.cat)), ov).sort(sortG);
+    ls.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map(newsRow).join("")}</ul>`
         : `<p class="muted">${ov.pendentes ? "Toque em Conferir novidades: a IA escolhe os equipamentos." : "Nenhum item em Eletrônicos."}</p>`}
-      ${out.length ? `<details class="news-out"><summary>${ic("chev", "sm")}Deixados de fora pela IA (${int(out.length)})</summary><ul class="nlist">${out.map((it) => newsRow(it, res[it.id])).join("")}</ul></details>` : ""}`;
+      ${out.length ? `<details class="news-out"><summary>${ic("chev", "sm")}Deixados de fora pela IA (${int(out.length)})</summary><ul class="nlist">${out.map(newsRow).join("")}</ul></details>` : ""}`;
     if (!newsJob) renderNewsJob(null);
   }
   function renderNewsJob(st) {

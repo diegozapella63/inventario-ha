@@ -39,12 +39,12 @@ import urllib.request
 import zipfile
 import zlib
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.26.0"
+VERSION = "1.27.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -2172,14 +2172,15 @@ def news_prompt(name: str, details: str) -> str:
         "Você acompanha os equipamentos e objetos de uma casa no Brasil.",
         f"Produto: {name}",
         f"Detalhes: {details}" if details else "",
-        f"Hoje é {datetime.now().strftime('%Y-%m-%d')}.",
+        f"Hoje é {news_today().isoformat()}.",
         "",
         "Use a busca na web agora. Procure, de preferência no site do fabricante e em sites de tecnologia e de notícias confiáveis, "
         "o que saiu nos últimos 12 meses e o que já foi anunciado para os próximos meses sobre este produto:",
         "- atualizações de firmware, software ou aplicativo;",
         "- modelo novo ou sucessor;",
         "- lançamentos anunciados da mesma linha;",
-        "- recall ou aviso de segurança oficial deste modelo (do fabricante ou de um órgão como o Procon ou a Anatel);",
+        "- recall deste modelo: só quando o fabricante ou um órgão (como a Senacon) chama o produto de volta para troca, conserto ou reembolso. "
+        "Falha de segurança corrigida por atualização é atualizacao, não recall;",
         "- fim de suporte ou de atualizações.",
         "Cada novidade precisa de uma fonte que apareceu na busca. Não invente: sem fonte, deixe de fora. "
         "Rumor ou vazamento só entra marcado como boato.",
@@ -2191,6 +2192,45 @@ def news_prompt(name: str, details: str) -> str:
         'Se não achar nada, responda {"produto": "...", "novidades": []}.',
         'Se não conseguir usar a busca na web, responda apenas {"erro": "sem_busca"}.',
     ]))
+
+
+# "recall" só fica quando o texto fala de recall de verdade (chamar de volta, lote afetado, órgão do consumidor, risco);
+# a IA marcava recall em atualização de segurança e em notícia comum. O resto vira atualização ou outro.
+RECALL_WORDS = re.compile(r"recall|chamamento|convoca|recolhiment|recolher|senacon|cpsc|devolu|reembols|\blotes?\b|"
+                          r"risco de (incendio|choque|queimadura|explosao|ferimento)|pegar fogo")
+UPDATE_WORDS = re.compile(r"firmware|software|atualiza|patch|versao|aplicativo|corrig")  # falha só anunciada, sem correção: outro
+
+
+def news_today():
+    """Hoje (INV_HOJE fixa a data nos testes)."""
+    try:
+        return datetime.strptime(os.environ.get("INV_HOJE", ""), "%Y-%m-%d").date()
+    except ValueError:
+        return datetime.now().date()
+
+
+def news_recent(date: str) -> bool:
+    """Dos últimos 12 meses (ou sem data). "2023" e "2023-09" valem pelo fim do ano e do mês."""
+    if not date:
+        return True
+    y, m, d = (date.split("-") + ["", ""])[:3]
+    try:
+        y = int(y)
+        m = int(m) if m else 12
+        end = datetime(y, m, int(d)).date() if d else (datetime(y + (m == 12), m % 12 + 1, 1).date() - timedelta(days=1))
+    except ValueError:
+        return True
+    return end >= news_today() - timedelta(days=365)
+
+
+def news_kind(kind, title: str = "", summary: str = "") -> str:
+    kind = fold(str(kind or "")).strip()
+    kind = kind if kind in NEWS_KINDS else "outro"
+    if kind == "recall":
+        txt = fold(f"{title or ''} {summary or ''}")
+        if not RECALL_WORDS.search(txt):
+            kind = "atualizacao" if UPDATE_WORDS.search(txt) else "outro"
+    return kind
 
 
 def news_clean(data) -> dict:
@@ -2210,12 +2250,13 @@ def news_clean(data) -> dict:
         if key in seen:
             continue
         seen.add(key)
-        kind = fold(str(n.get("tipo") or n.get("type") or "")).strip()
         date = str(n.get("data") or n.get("date") or "").strip()[:10]
         if not re.fullmatch(r"\d{4}(-\d{2}(-\d{2})?)?", date):
             date = ""
-        out.append({"tipo": kind if kind in NEWS_KINDS else "outro", "titulo": title,
-                    "resumo": " ".join(str(n.get("resumo") or n.get("summary") or "").split())[:400],
+        if not news_recent(date):  # a IA às vezes traz notícia de anos atrás
+            continue
+        summary = " ".join(str(n.get("resumo") or n.get("summary") or "").split())[:400]
+        out.append({"tipo": news_kind(n.get("tipo") or n.get("type"), title, summary), "titulo": title, "resumo": summary,
                     "data": date, "fonte": url, "site": site_of(url), "boato": n.get("boato") is True or n.get("rumor") is True})
     out.sort(key=lambda x: x["data"] or "0000", reverse=True)
     return {"produto": " ".join(str(data.get("produto") or data.get("product") or "").split())[:200], "novidades": out[:NEWS_MAX]}
@@ -2248,8 +2289,8 @@ def _news_job_run(jid: str, name: str, details: str, entity: str, iid: str = "")
     try:
         found = ai_find_news(name, details, entity)
         if not job.get("cancelled"):
-            if iid:
-                news_save_result(iid, found)
+            for g in news_group_ids(iid) if iid else []:  # o mesmo equipamento nos outros cômodos ganha o mesmo resultado
+                news_save_result(g, found)
             job.update(stage="done", msg="", news=found)
     except ApiError as e:
         job.update(stage="error", msg=e.msg)
@@ -2290,6 +2331,24 @@ def news_cats() -> list[str]:
     return [c for c in NEWS_CATS if c in cats]
 
 
+def news_group_key(it: dict) -> str:
+    """O mesmo equipamento em vários cômodos (ou no plural) é um só nas novidades: pelo código do modelo (LX20, K300)
+    e a primeira palavra, no singular; sem código, pelo nome inteiro no singular."""
+    words = [w[:-1] if len(w) > 3 and w.endswith("s") and not re.search(r"\d", w) else w
+             for w in re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", fold(it.get("name") or ""))]
+    codes = sorted({w for w in words if len(w) >= 3 and re.search(r"\d", w) and re.search(r"[a-z]", w)})
+    return f"{words[0]}|{' '.join(codes)}" if codes and words else " ".join(words)
+
+
+def news_group_ids(iid: str) -> list[str]:
+    """Os itens do mesmo grupo do item (ele primeiro)."""
+    it = STORE.item(iid)
+    if not it:
+        return [iid]
+    key = news_group_key(it)
+    return [iid] + [i["id"] for i in STORE.data["items"] if i["id"] != iid and news_group_key(i) == key]
+
+
 def item_sig(it: dict) -> str:
     return fold(f"{it.get('name') or ''} | {' '.join(str(it.get('details') or '').split())[:200]}")
 
@@ -2303,8 +2362,10 @@ def news_read() -> dict:
             d[k] = {}
     for v in d["itens"].values():  # guardadas antes do limite: ficam só as mais recentes
         news = v.get("news") if isinstance(v, dict) else None
-        if isinstance(news, dict) and isinstance(news.get("novidades"), list):
-            news["novidades"] = news["novidades"][:NEWS_MAX]
+        if isinstance(news, dict) and isinstance(news.get("novidades"), list):  # guardadas antes: as mesmas regras de agora
+            news["novidades"] = [n for n in news["novidades"] if isinstance(n, dict) and news_recent(str(n.get("data") or ""))][:NEWS_MAX]
+            for n in news["novidades"]:
+                n["tipo"] = news_kind(n.get("tipo"), n.get("titulo"), n.get("resumo"))
     return d
 
 
@@ -2343,7 +2404,8 @@ def news_overview() -> dict:
     tri = {k: v for k, v in d["triagem"].items() if k in ids and isinstance(v, dict) and v.get("sig") == item_sig(ids[k])}
     job = next((dict(id=j, stage=v["stage"], msg=v["msg"], progress=v.get("progress"), summary=v.get("summary"))
                 for j, v in WEB_JOBS.items() if v.get("kind") == "lote" and v["stage"] == "busy"), None)
-    return {"cats": cats, "triagem": {k: bool(v.get("conferir")) for k, v in tri.items()},
+    grupos = {i["id"]: news_group_key(i) for i in STORE.data["items"] if i.get("cat") in cats or i["id"] in d["itens"]}
+    return {"cats": cats, "triagem": {k: bool(v.get("conferir")) for k, v in tri.items()}, "grupos": grupos,
             "pendentes": sum(1 for i in STORE.data["items"] if i.get("cat") in cats and i["id"] not in tri),
             "itens": {k: {"at": v.get("at"), "news": v.get("news")} for k, v in d["itens"].items() if k in ids and isinstance(v, dict)},
             "ultima": d.get("ultima"), "job": job}
@@ -2423,13 +2485,32 @@ def _news_batch_run(jid: str):
                 return datetime.fromisoformat(at).timestamp() if at else 0.0
             except (TypeError, ValueError):
                 return 0.0
-        todo = sorted([i for i in sel if checked_at(i) < fresh], key=checked_at)
+        groups = {}  # o mesmo equipamento em vários cômodos: uma busca só
+        for i in sel:
+            groups.setdefault(news_group_key(i), []).append(i)
+        todo = []
+        for members in groups.values():
+            best = max(members, key=checked_at)
+            if checked_at(best) < fresh:
+                todo.append(members)
+                continue
+            late = [m for m in members if checked_at(m) < fresh]  # um já conferido na semana: os outros ganham o mesmo resultado
+            if late:
+                with NEWS_LOCK:
+                    d2 = news_read()
+                    src = d2["itens"].get(best["id"])
+                    for m in late:
+                        if src:
+                            d2["itens"][m["id"]] = {**src, "sig": item_sig(m)}
+                    write_json_atomic(NEWS_FILE, d2)
+        todo.sort(key=lambda ms: max(checked_at(m) for m in ms))
         job["progress"] = {"feitos": 0, "total": len(todo), "atual": ""}
         entity = search_entity()
-        for n, it in enumerate(todo):
+        for n, members in enumerate(todo):
             if job.get("cancelled"):
                 break
             need_ai_on()
+            it = min(members, key=lambda m: (len(m["name"]), m["name"]))  # o nome mais curto: "Lâmpada", não "Lâmpadas"
             job["progress"] = {"feitos": n, "total": len(todo), "atual": it["name"]}
             job["msg"] = f"Conferindo {n + 1} de {len(todo)}: {it['name']}"
             try:
@@ -2441,10 +2522,11 @@ def _news_batch_run(jid: str):
                 continue
             if job.get("cleared"):  # Limpar novidades no meio: nada mais é gravado
                 return
-            news_save_result(it["id"], res)
+            for m in members:
+                news_save_result(m["id"], res)
             done += 1
             found += 1 if res["novidades"] else 0
-        summary = {"selecionados": len(sel), "conferidos": done, "com_novidades": found, "em_dia": len(sel) - len(todo), "erros": errors}
+        summary = {"selecionados": len(groups), "conferidos": done, "com_novidades": found, "em_dia": len(groups) - len(todo), "erros": errors}
         if job.get("cleared"):
             return
         with NEWS_LOCK:
@@ -2550,7 +2632,12 @@ def chat_context(screen: dict) -> str:
             lines += ["- " + _item_line(i, cats) for i in hits] or ["(nenhum item encontrado)"]
     elif view == "news" or (view == "data" and screen.get("tab") == "novidades"):  # a tela Novidades (antes, uma aba de Mais)
         d = news_read()
-        com = [(STORE.item(k), v) for k, v in d["itens"].items() if STORE.item(k) and ((v.get("news") or {}).get("novidades"))]
+        com, seen = [], set()
+        for k, v in d["itens"].items():
+            it = STORE.item(k)
+            if it and (v.get("news") or {}).get("novidades") and news_group_key(it) not in seen:  # o mesmo equipamento uma vez só
+                seen.add(news_group_key(it))
+                com.append((it, v))
         lines.append(f"Tela Novidades: {len(com)} eletrônicos com novidades conferidas.")
         for i, v in com[:20]:
             ns = v["news"]["novidades"]

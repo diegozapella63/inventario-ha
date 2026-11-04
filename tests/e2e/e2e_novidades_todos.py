@@ -8,6 +8,8 @@ ROWS = "[...document.querySelectorAll('#p-news-list > div > .nlist .nrow')].map(
 
 async def body(r, p):
     r.start(search=False)
+    for room, name in (("quarto", "Lâmpada inteligente Wi-Fi LX10"), ("sala", "Lâmpadas inteligentes Wi-Fi LX10")):  # o mesmo equipamento em 2 cômodos
+        r.api("POST", "api/items", {"room": room, "name": name, "cat": "eletronicos", "value": 90})
     b = await r.browser(p)
     ctx, pg = await r.page(b, "cel", "dark", accent="laranja")
     await r.open(pg, "#/novidades", "#p-news")
@@ -35,6 +37,12 @@ async def body(r, p):
     r.check(not any(n in nomes for n in ("Geladeira frost free inox", "Fruteira de madeira", "Sofá de 3 lugares cinza-azulado")),
             "só eletrônicos: sem geladeira, fruteira nem sofá")
     r.check(all("novidades" in x[1] and "hoje" in x[1] for x in rows), "cada um com quantas novidades e quando")
+    lx = [x for x in rows if "LX10" in x[0]]
+    r.eq([x[0] for x in lx], ["Lâmpada inteligente Wi-Fi LX10"], "o mesmo equipamento em dois cômodos é uma linha só, com o nome no singular")
+    r.check(lx and lx[0][1].startswith("2 cômodos · "), f"e diz em quantos cômodos está ({lx[0][1] if lx else ''})")
+    r.eq(r.api("GET", "api/ai/usage")["today"]["kinds"].get("novidades"), len(rows), "uma busca por equipamento, não por item")
+    lx_ids = [i["id"] for i in r.data()["items"] if "LX10" in i["name"]]
+    r.check(all(r.api("GET", f"api/news?item={i}").get("news") for i in lx_ids), "e o resultado vale para os dois itens")
     r.check(all(x[2] == ["3"] for x in rows), f"o número de novidades ao lado ({rows[0][2]})")
     fora = await pg.text_content(".news-out summary")
     r.check(fora.startswith("Deixados de fora pela IA ("), f"os que a IA deixou de fora ficam recolhidos ({fora.strip()})")

@@ -22,6 +22,7 @@ TMP = tempfile.mkdtemp(prefix="inventaria-unit-")
 for k in ("SUPERVISOR_TOKEN", "HASSIO_TOKEN", "INV_AI_MOCK", "INV_HA_API", "INV_HA_WS", "INV_MOCK_SEARCH", "INV_WEB_ALLOW_LOCAL", "INV_ALLOW"):
     os.environ.pop(k, None)
 os.environ.update({
+    "INV_HOJE": "2026-11-04",  # as novidades de exemplo são de 2026: os testes não envelhecem
     "INV_DATA": os.path.join(TMP, "data"), "INV_SHARE": os.path.join(TMP, "share"), "INV_MEDIA": os.path.join(TMP, "media"),
     "INV_SEED": helpers.FIXTURE, "INV_WEB": helpers.WEB, "INV_DEV": "1",
 })

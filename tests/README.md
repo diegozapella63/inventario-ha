@@ -51,7 +51,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | `e2e_camera` | câmera dentro do app no Android, várias fotos, Voltar, sem câmera, navegador do celular, computador |
 | `e2e_internet` | Buscar na internet: fotos e dados do produto na ficha e no editor, Desfazer, sem fotos, sem busca, IA desligada |
 | `e2e_novidades` | Novidades na própria ficha: só as 3 mais recentes, tipos, datas, fontes, boato, guardadas ao abrir de novo, Buscar de novo, fechar no meio, erro, IA desligada |
-| `e2e_novidades_todos` | Novidades (no menu Mais): só Eletrônicos, sem escolher categorias, item de outra categoria fora da lista, conferir todos com a IA escolhendo, andamento, Parar, deixados de fora, Limpar com confirmação, aba some sem IA |
+| `e2e_novidades_todos` | Novidades (no menu Mais): o mesmo equipamento em vários cômodos numa linha só, só Eletrônicos, sem escolher categorias, item de outra categoria fora da lista, conferir todos com a IA escolhendo, andamento, Parar, deixados de fora, Limpar com confirmação, aba some sem IA |
 | `e2e_conversar` | Conversar: botão ao lado do microfone, ideias, Enter, resposta formatada, da ficha, erro, ditar, computador, IA desligada |
 | `e2e_mais` | o menu Mais (Novidades, Categorias, Relatório, Configurações), Voltar, endereços antigos; Configurações: abas, botões 280×44 alinhados, exportar CSV/JSON/ZIP, backup e restaurar, versões, importar |
 | `e2e_backups` | lista de backups, restaurar um antigo, pasta share indisponível |

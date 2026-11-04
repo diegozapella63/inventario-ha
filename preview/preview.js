@@ -266,10 +266,17 @@
         { tipo: "lancamento", titulo: "Versão nova pode chegar no próximo ano", resumo: "Sites de tecnologia falam de uma versão nova; o fabricante não confirmou.", data: "", fonte: "https://exemplo.com/rumor", site: "exemplo.com", boato: true },
       ].sort((a, b) => (b.data || "0").localeCompare(a.data || "0")).slice(0, 3) }; // só as 3 mais recentes, como o servidor
     };
+    // o mesmo equipamento em vários cômodos é um só (como news_group_key do servidor)
+    const groupKey = (it) => {
+      const words = (plain(it.name).match(/[a-z0-9]+(?:-[a-z0-9]+)*/g) || []).map((w) => (w.length > 3 && w.endsWith("s") && !/\d/.test(w) ? w.slice(0, -1) : w));
+      const codes = [...new Set(words.filter((w) => w.length >= 3 && /\d/.test(w) && /[a-z]/.test(w)))].sort();
+      return codes.length && words.length ? `${words[0]}|${codes.join(" ")}` : words.join(" ");
+    };
+    const sameGroup = (it) => d.items.filter((x) => groupKey(x) === groupKey(it));
     const newsJobOf = () => [...ST.jobs.entries()].find(([, j]) => j.lote && !j.done);
     const newsTick = (j) => { // a conferência anda com o relógio: um item a cada 0,7 s
       const n = Math.min(j.todo.length, Math.floor((Date.now() - j.at) / 700));
-      for (const it of j.todo.slice(j.saved, n)) ST.news.itens[it.id] = { at: new Date().toISOString(), news: exampleNews(it.name) };
+      for (const it of j.todo.slice(j.saved, n)) for (const x of sameGroup(it)) ST.news.itens[x.id] = { at: new Date().toISOString(), news: exampleNews(it.name) };
       j.saved = n;
       if (n >= j.todo.length && !j.done) { j.done = true; ST.news.ultima = { at: new Date().toISOString(), conferidos: n, com_novidades: n, selecionados: n, em_dia: 0, erros: 0 }; }
       return n;
@@ -284,7 +291,8 @@
       const live = newsJobOf();
       if (live) newsTick(live[1]);
       const lj = newsJobOf();
-      return { cats, triagem: { ...tri }, pendentes: d.items.filter((i) => cats.includes(i.cat) && !(i.id in tri)).length,
+      const grupos = Object.fromEntries(d.items.filter((i) => cats.includes(i.cat) || i.id in ST.news.itens).map((i) => [i.id, groupKey(i)]));
+      return { cats, triagem: { ...tri }, grupos, pendentes: d.items.filter((i) => cats.includes(i.cat) && !(i.id in tri)).length,
         itens: { ...ST.news.itens }, ultima: ST.news.ultima, job: lj ? { id: lj[0], stage: "busy", msg: "Conferindo…", progress: null, summary: null } : null };
     }
     if (method === "DELETE" && path === "api/news") {
@@ -300,7 +308,9 @@
       if (!cats.length) fail("A categoria Eletrônicos foi excluída: crie de novo em Mais > Categorias.");
       for (const i of d.items) if (cats.includes(i.cat) && !(i.id in ST.news.triagem)) ST.news.triagem[i.id] = PICK.test(plain(i.name));
       const week = Date.now() - 7 * 864e5;
-      const todo = d.items.filter((i) => cats.includes(i.cat) && ST.news.triagem[i.id] && !(ST.news.itens[i.id] && Date.parse(ST.news.itens[i.id].at) > week));
+      const seen = new Set();
+      const todo = d.items.filter((i) => cats.includes(i.cat) && ST.news.triagem[i.id] && !(ST.news.itens[i.id] && Date.parse(ST.news.itens[i.id].at) > week))
+        .filter((i) => !seen.has(groupKey(i)) && seen.add(groupKey(i))); // uma busca por equipamento
       const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");
       ST.jobs.set(id, { lote: true, at: Date.now(), todo, saved: 0, done: false });
       return { id };
@@ -334,7 +344,8 @@
       aiOff();
       if (Date.now() - j.at < 1600) return { stage: "busy", msg: "Procurando novidades…" };
       const news = exampleNews(j.name);
-      ST.news.itens[j.item] = { at: new Date().toISOString(), news };
+      const it = d.items.find((i) => i.id === j.item);
+      for (const x of it ? sameGroup(it) : [{ id: j.item }]) ST.news.itens[x.id] = { at: new Date().toISOString(), news };
       return { stage: "done", msg: "", example: true, news };
     }
     if (method === "POST" && path === "api/ai/identify") {

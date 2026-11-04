@@ -41,7 +41,7 @@ dev/run.sh --vazio      # como numa instalação nova
 dev/run.sh --limpar     # volta ao começo
 ```
 
-À mão: `cd inventario/app` e `INV_DEV=1 INV_DATA=/tmp/i/data INV_SEED=../../tests/fixtures/casa INV_WEB=./web INV_SHARE=/tmp/i/share INV_MEDIA=/tmp/i/media INV_AI_MOCK=1 python3 server.py`. `INV_PORT` muda a porta; `INV_URL_INTERNA` é o endereço que os outros apps usam. Outras variáveis (para testes): `INV_HA_API`/`INV_HA_WS`/`SUPERVISOR_TOKEN` apontam para outro Home Assistant (o `tests/fake_ha.py`), `INV_MOCK_SEARCH` é um JSON com a resposta da busca na internet, `INV_WEB_ALLOW_LOCAL=1` deixa baixar fotos de 127.0.0.1, `INV_ALLOW` libera IPs fora do Ingress.
+À mão: `cd inventario/app` e `INV_DEV=1 INV_DATA=/tmp/i/data INV_SEED=../../tests/fixtures/casa INV_WEB=./web INV_SHARE=/tmp/i/share INV_MEDIA=/tmp/i/media INV_AI_MOCK=1 python3 server.py`. `INV_PORT` muda a porta; `INV_URL_INTERNA` é o endereço que os outros apps usam. Outras variáveis (para testes): `INV_HA_API`/`INV_HA_WS`/`SUPERVISOR_TOKEN` apontam para outro Home Assistant (o `tests/fake_ha.py`), `INV_MOCK_SEARCH` é um JSON com a resposta da busca na internet, `INV_WEB_ALLOW_LOCAL=1` deixa baixar fotos de 127.0.0.1, `INV_ALLOW` libera IPs fora do Ingress, `INV_HOJE` (AAAA-MM-DD) fixa o "hoje" das novidades (os testes usam 2026-11-04, para as datas de exemplo não envelhecerem).
 
 ## Testes
 

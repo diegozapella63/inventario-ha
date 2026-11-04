@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.27.0
+
+- **Novidades**: o mesmo equipamento em vários cômodos (ou escrito no plural) agora é uma linha só, com uma busca só. O resultado aparece na ficha de cada um.
+- **Recall** só quando o produto é chamado de volta (troca, conserto ou reembolso). Falha de segurança corrigida por atualização aparece como Atualização. Vale também para o que já estava guardado.
+- Novidades com mais de 12 meses saem, também das já guardadas.
+
 ## 1.26.0
 
 - **Mais** agora é um menu: **Novidades**, **Categorias**, **Relatório para seguro** e **Configurações**, cada um na sua tela, com o caminho de volta para Mais no alto.

@@ -352,6 +352,95 @@ class Limpar(UnitBase):
         self.assertEqual(ov["itens"], {})
 
 
+class Grupo(UnitBase):
+    """O mesmo equipamento em vários cômodos (ou escrito no plural) é uma linha só e uma busca só."""
+    def key(self, name):
+        return server.news_group_key({"name": name})
+
+    def test_mesmo_modelo_singular_e_plural(self):
+        self.assertEqual(self.key("Lâmpada inteligente Lumi LX20"), self.key("Lâmpadas inteligentes Lumi LX20"))
+        self.assertEqual(self.key("Lâmpada inteligente LX20"), self.key("Lâmpada Wi-Fi colorida LX20"), "o código do modelo manda")
+
+    def test_modelos_diferentes_nao_juntam(self):
+        self.assertNotEqual(self.key("Lâmpada inteligente LX20"), self.key("Lâmpada inteligente LX25"))
+        self.assertNotEqual(self.key("Câmera Wi-Fi K300"), self.key("Suporte para câmera K300"), "acessório não junta com o aparelho")
+
+    def test_sem_codigo_junta_pelo_nome(self):
+        self.assertEqual(self.key("Smart TV 55 polegadas"), self.key("Smart TV 55 polegadas"))
+        self.assertEqual(self.key("Caixas de som Bluetooth"), self.key("Caixa de som Bluetooth"))
+        self.assertNotEqual(self.key("Smart TV 55 polegadas"), self.key("Smart TV 43 polegadas"))
+
+    def test_nome_vazio(self):
+        self.assertEqual(self.key(""), "")
+
+    def add(self, room, name):
+        return self.store.create_items([{"room": room, "name": name, "cat": "eletronicos"}], "Diego")[0]["id"]
+
+    def test_ids_do_mesmo_grupo(self):
+        a = self.add("sala", "Lâmpada inteligente Lumi LX20")
+        b = self.add("quarto", "Lâmpadas inteligentes Lumi LX20")
+        c = self.add("cozinha", "Lâmpada inteligente Lumi LX20")
+        self.assertEqual(set(server.news_group_ids(b)), {a, b, c})
+        self.assertEqual(server.news_group_ids(b)[0], b, "o próprio item primeiro")
+        self.assertEqual(server.news_group_ids(TV), [TV], "a TV fica sozinha")
+        self.assertEqual(server.news_group_ids("nao-existe"), ["nao-existe"])
+
+    def test_buscar_pela_ficha_vale_para_todos_do_grupo(self):
+        a = self.add("sala", "Lâmpada inteligente Lumi LX20")
+        b = self.add("quarto", "Lâmpadas inteligentes Lumi LX20")
+        with mock.patch.object(server, "AI_MOCK", True), mock.patch.object(server.time, "sleep", lambda s: None):
+            jid = server.news_job_start({"item": a})["id"]
+            while server.WEB_JOBS[jid]["stage"] == "busy":
+                time.sleep(0.02)
+        self.assertIn("news", server.news_of(b), "o outro cômodo ganha o mesmo resultado")
+
+    def test_conferir_todos_busca_uma_vez_por_equipamento(self):
+        ids = [self.add(r, n) for r, n in (("sala", "Lâmpada inteligente Lumi LX20"), ("quarto", "Lâmpadas inteligentes Lumi LX20"),
+                                            ("cozinha", "Lâmpada inteligente Lumi LX20"))]
+        seen = []
+        with mock.patch.object(server, "AI_MOCK", True), mock.patch.object(server.time, "sleep", lambda s: None), \
+                mock.patch.object(server, "ai_find_news", lambda n, de, e: seen.append(n) or novidade()):
+            jid = server.news_batch_start()["id"]
+            while server.WEB_JOBS[jid]["stage"] == "busy":
+                time.sleep(0.02)
+            job = server.WEB_JOBS[jid]
+        self.assertEqual(seen.count("Lâmpada inteligente Lumi LX20"), 1, f"uma busca só para as três ({seen})")
+        self.assertNotIn("Lâmpadas inteligentes Lumi LX20", seen, "com o nome mais curto")
+        saved = server.news_read()["itens"]
+        self.assertTrue(all(i in saved for i in ids), "e o resultado vale para as três")
+        n = len({server.news_group_key(server.STORE.item(i)) for i in saved})
+        self.assertEqual(job["summary"]["conferidos"], n, "conta equipamentos, não itens")
+
+    def test_um_ja_conferido_na_semana_passa_para_os_outros(self):
+        a = self.add("sala", "Lâmpada inteligente Lumi LX20")
+        server.news_save_result(a, server.news_clean(novidade("Firmware do grupo")))
+        b = self.add("quarto", "Lâmpadas inteligentes Lumi LX20")
+        seen = []
+        with mock.patch.object(server, "AI_MOCK", True), mock.patch.object(server.time, "sleep", lambda s: None), \
+                mock.patch.object(server, "ai_find_news", lambda n, de, e: seen.append(n) or novidade()):
+            jid = server.news_batch_start()["id"]
+            while server.WEB_JOBS[jid]["stage"] == "busy":
+                time.sleep(0.02)
+        self.assertFalse(any("LX20" in x for x in seen), "sem gastar a IA de novo")
+        self.assertEqual(server.news_of(b)["news"]["novidades"][0]["titulo"], "Firmware do grupo")
+
+    def test_visao_manda_os_grupos(self):
+        a = self.add("sala", "Lâmpada inteligente Lumi LX20")
+        b = self.add("quarto", "Lâmpadas inteligentes Lumi LX20")
+        g = server.news_overview()["grupos"]
+        self.assertEqual(g[a], g[b])
+        self.assertNotEqual(g[a], g[TV])
+        self.assertNotIn(SOFA, g, "só os eletrônicos (e os já conferidos)")
+
+    def test_conversar_lista_o_equipamento_uma_vez(self):
+        a = self.add("sala", "Lâmpada inteligente Lumi LX20")
+        b = self.add("quarto", "Lâmpadas inteligentes Lumi LX20")
+        for i in (a, b):
+            server.news_save_result(i, server.news_clean(novidade("Firmware novo")))
+        c = server.chat_context({"view": "news"})
+        self.assertEqual(c.count("Firmware novo"), 1, c)
+
+
 class DeUmItem(UnitBase):
     """O que a ficha do item mostra: o que já foi conferido dele."""
     def test_nunca_conferido_vem_vazio(self):
