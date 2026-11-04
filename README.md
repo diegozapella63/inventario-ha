@@ -5,8 +5,8 @@
 Um App do Home Assistant para fazer o **inventário da casa**: cômodos, itens, **fotos e valores**, com **relatório para seguro** e **leitura de fotos por IA**, pela integração de IA que você já usa no Home Assistant.
 
 <p align="center">
-  <img src="docs/inicio.png" width="24%" alt="Início com a etiqueta do patrimônio">
-  <img src="docs/comodos.png" width="24%" alt="Cômodos com foto, itens e valor">
+  <img src="docs/inicio.png" width="24%" alt="Início com a etiqueta do patrimônio e os destaques">
+  <img src="docs/graficos.png" width="24%" alt="Gráficos com o patrimônio e o valor de cada cômodo">
   <img src="docs/comodo.png" width="24%" alt="Sala de estar com fotos e itens por zona">
   <img src="docs/ia.png" width="24%" alt="Itens que a IA encontrou na foto de uma estante">
 </p>
@@ -27,11 +27,11 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 
 ## O que tem
 
-- **Início** com a etiqueta do patrimônio, o item mais valioso, o maior cômodo, os últimos cadastros e a parte de cada cômodo no total.
-- **Cômodos** com foto, número de itens e valor. Em **Organizar**, as setas mudam a ordem. Se quiser, ligue as **zonas** para separar os itens de cada cômodo (sofá, estante, bancada), com o subtotal de cada uma.
-- **Cadastro de itens** com várias fotos (câmera, galeria, arrastar ou colar), quantidade e valor, e **categorias** que você renomeia, cria ou exclui.
+- **Início** com a etiqueta do patrimônio, a busca, o item mais valioso, o maior cômodo, os últimos cadastros e a parte de cada cômodo no total.
+- **Cômodos** com foto, número de itens e valor. Em **Organizar**, as setas mudam a ordem. Cada foto do cômodo mostra os itens que estão nela. Se quiser, ligue as **zonas** para separar os itens de cada cômodo (sofá, estante, bancada), com o subtotal de cada uma.
+- **Cadastro de itens** com várias fotos (câmera, galeria, arrastar ou colar), quantidade e valor, e **categorias** que você renomeia, cria ou exclui. Na ficha do item, **Duplicar**, **Mover** e **Excluir**, com Desfazer.
 - **Leitura de fotos por IA**: a IA preenche um item a partir da foto, ou lista tudo o que aparece numa foto de prateleira, e você confere antes de salvar. Funciona com Anthropic Claude, OpenAI, Google Gemini ou um modelo local no Ollama, pela ação `ai_task.generate_data` do Home Assistant. Quem não quiser IA desliga numa chave e os botões somem.
-- **Falar**: o microfone no alto da tela. Fale os itens e quanto valem; o Home Assistant transcreve com a fala para texto que você escolher (ou a do Assist) e a IA separa os itens para você conferir.
+- **Falar**: o microfone no alto da tela. Fale os itens e quanto valem; o Home Assistant transcreve com a fala para texto que você escolher (ou a do Assist) e a IA separa os itens para você conferir. Sem IA, o próprio app separa.
 - **Uso da IA**: chamadas de hoje, da semana e do mês, gráfico por dia, últimas chamadas com tokens estimados e, se você ligar, o sensor `sensor.inventaria_ia_hoje` no Home Assistant.
 - **Fotos da internet**: num item sem foto, a IA procura o produto no fabricante e nas lojas e o app mostra as fotos para você escolher. A foto fica marcada como ilustrativa, com o site de onde veio. Na mesma busca, a IA traz nome, detalhes, categoria e valor para preencher o item.
 - **Novidades** de cada item ou de todos os eletrônicos de uma vez (a IA escolhe quais): atualizações, lançamentos, modelo novo, recalls e fim de suporte, com a fonte de cada um.
@@ -41,6 +41,8 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 - **Gráficos**: os cômodos, as categorias e os itens que mais valem, as faixas de valor e o patrimônio mês a mês.
 - **Exportar** em CSV, JSON ou ZIP com fotos, **backup** na pasta `share/inventario` e versões automáticas a cada 10 minutos de uso.
 - **Importar backup** pelo celular, inclusive dividido em partes.
+- **Nos outros apps da casa**: o [ResolvIA](https://github.com/diegozapella63/resolvia-ha) liga tarefas a cômodos e itens daqui (e o [CronologIA](https://github.com/diegozapella63/cronologia-ha) mostra nas tarefas), e o [GerencIA](https://github.com/diegozapella63/gerencia-ha) soma os itens no patrimônio, como bens. Eles só leem: nada muda aqui.
+- **Celular e computador**: no celular, arrastar para o lado troca de aba; no computador, barra lateral com os cômodos e atalhos de teclado.
 - **Tema claro e escuro** e **cor do app**: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza, ou a **Cor do dia**, que muda todo dia.
 
 Mais detalhes em [inventario/DOCS.md](inventario/DOCS.md).

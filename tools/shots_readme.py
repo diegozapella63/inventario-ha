@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Tira as 4 imagens do README (docs/*.png) com a casa de exemplo de demo.py.
+"""Tira as 4 imagens do README (docs/*.png) com a casa de exemplo de demo.py: Início, Gráficos, um cômodo e a leitura por IA.
 
 Uso: shots_readme.py <url-do-servidor-de-exemplo> <ia.json> <pasta-de-saida>
-Celular 390x844 em 2x, tema escuro, cor padrão (amarelo, sem a Cor do dia), usuário "Diego".
+O servidor de exemplo é o server.py com INV_SEED=<saída do demo.py>/seed, INV_DEV=1 e INV_AI_MOCK=1, numa porta livre
+(INV_PORT). Liga as zonas no servidor. Celular 390x844 em 2x, tema escuro, cor padrão (amarelo, sem a Cor do dia),
+usuário "Diego".
 """
 import asyncio
 import json
 import os
 import sys
+import urllib.request
 
 from playwright.async_api import async_playwright
 
@@ -17,6 +20,10 @@ BASE, IA, OUT = sys.argv[1].rstrip("/") + "/", sys.argv[2], sys.argv[3]
 async def main():
     os.makedirs(OUT, exist_ok=True)
     ia = json.load(open(IA, encoding="utf-8"))
+    # zonas ligadas: a sala aparece separada por zona, com o subtotal de cada uma
+    req = urllib.request.Request(BASE + "api/settings", data=json.dumps({"ai": True, "zones": True}).encode(), method="PUT",
+                                 headers={"Content-Type": "application/json"})
+    urllib.request.urlopen(req).read()
     errors = []
     async with async_playwright() as p:
         b = await p.chromium.launch()
@@ -36,11 +43,12 @@ async def main():
         await pg.evaluate("document.fonts.ready")
         await shot("inicio.png")
 
-        await pg.click('.tabbar [data-tab="rooms"]')
-        await pg.wait_for_selector(".rooms")
-        await shot("comodos.png")
+        await pg.click('.tabbar [data-tab="data"]')
+        await pg.click('.menu-row[href="#/graficos"]')
+        await pg.wait_for_selector(".kpis")
+        await shot("graficos.png")
 
-        await pg.click('.rooms a[href="#/c/sala"]')
+        await pg.click('#g-rooms a[href="#/c/sala"]')
         await pg.wait_for_selector(".rhead")
         await shot("comodo.png")
 

@@ -615,7 +615,10 @@ async def render():
 def data():
     from datetime import datetime, timedelta, timezone
     tz = timezone(timedelta(hours=-3))
-    now = datetime(2026, 10, 18, 18, 0, tzinfo=tz)
+    # as datas acompanham o dia em que as imagens são tiradas ("há 3 horas" no Início), e os cômodos foram cadastrados
+    # ao longo de uns três meses, para Mais > Gráficos ter o patrimônio mês a mês
+    now = datetime.now(tz).replace(minute=0, second=0, microsecond=0)
+    weeks = {"sala": 10, "cozinha": 7, "quarto": 4, "escritorio": 2}
     rooms = []
     for i, (rid, code, name, photos) in enumerate(ROOMS):
         rooms.append({"id": rid, "code": code, "name": name, "order": i, "cover": 0,
@@ -624,7 +627,7 @@ def data():
     for rid, zone, name, details, cat, qty, value, photo, hours in ITEMS:
         seq[rid] = seq.get(rid, 0) + 1
         code = next(r[1] for r in ROOMS if r[0] == rid)
-        when = (now - timedelta(hours=hours)).isoformat()
+        when = (now - timedelta(hours=hours, weeks=weeks.get(rid, 0))).isoformat()
         items.append({"id": f"{code.lower()}-{seq[rid]:03d}", "room": rid, "seq": seq[rid], "zone": zone, "name": name, "details": details,
                       "cat": cat, "qty": qty, "value": value, "photos": [photo] if photo else [], "checked": False, "flag": None,
                       "approx": True, "source": "foto" if photo else "manual", "createdAt": when, "updatedAt": when})
