@@ -47,7 +47,7 @@ async def body(r, p):
 
     # -- telas: nada sem nome, um h1 por tela, a aba certa marcada
     screens = [("#/", "home"), ("#/buscar?q=mesa", "search"), ("#/comodos", "rooms"), ("#/c/sala", "rooms"), ("#/relatorio", "data"),
-               ("#/mais", "data"), ("#/novidades", "data"), ("#/categorias", "data"), ("#/config", "data"), ("#/config/integracoes", "data"), ("#/config/aparencia", "data"), ("#/config/opcoes", "data")]
+               ("#/mais", "data"), ("#/graficos", "data"), ("#/novidades", "data"), ("#/categorias", "data"), ("#/config", "data"), ("#/config/integracoes", "data"), ("#/config/aparencia", "data"), ("#/config/opcoes", "data")]
     for h, tab in screens:
         await r.open(pg, h)
         await pg.wait_for_timeout(300)

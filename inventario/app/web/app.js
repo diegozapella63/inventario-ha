@@ -40,6 +40,7 @@
   const norm = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   const nf0 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
   const nf2 = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const nf1 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
   const numTxt = (v) => { v = +v || 0; return Number.isInteger(v) ? nf0.format(v) : nf2.format(v); };
   const money = (v) => "R$ " + numTxt(v);
   const moneyR = (v) => money(Math.round(+v || 0));
@@ -102,7 +103,7 @@
   const ALL_TABS = [["dados", "Dados", "archive"], ["integracoes", "Integrações", "plug"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
   const moreTabs = () => ALL_TABS;
   const moreTab = (t) => (ALL_TABS.some(([k]) => k === t) ? t : ALL_TABS[0][0]);
-  const IN_MORE = ["menu", "news", "cats", "data", "report"]; // telas que ficam embaixo de Mais
+  const IN_MORE = ["menu", "charts", "news", "cats", "data", "report"]; // telas que ficam embaixo de Mais
   function applyAccent(a) {
     if (a === "amarelo") delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = a;
@@ -397,6 +398,7 @@
       case "config": case "dados": return { name: "data", tab: moreTab(parts[1]), q };
       case "novidades": return { name: aiOn() ? "news" : "menu", q }; // Novidades usa a IA: desligada, fica o menu
       case "categorias": return { name: "cats", q };
+      case "graficos": return { name: "charts", q };
       default: return { name: "home", q };
     }
   }
@@ -414,6 +416,7 @@
       case "menu": return "#/mais";
       case "news": return "#/novidades";
       case "cats": return "#/categorias";
+      case "charts": return "#/graficos";
       case "data": { const t = moreTab(r.tab); return t === ALL_TABS[0][0] ? "#/config" : `#/config/${t}`; }
       default: return "#/";
     }
@@ -477,11 +480,11 @@
 
   function viewTitle(r) {
     if (r.name === "room") return D.roomById.get(r.id)?.name || "Cômodo";
-    return { home: "Início", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", news: "Novidades", cats: "Categorias", data: "Configurações" }[r.name] || "InventarIA";
+    return { home: "Início", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", charts: "Gráficos", news: "Novidades", cats: "Categorias", data: "Configurações" }[r.name] || "InventarIA";
   }
   // Topo de cada tela, igual nos apps da família (EconomIA, ResolvIA): nome do app com "IA" na cor
   // do app, saudação ao usuário do Home Assistant e o título grande da tela.
-  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", menu: "data", news: "data", cats: "data", data: "data", report: "data" };
+  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", menu: "data", charts: "data", news: "data", cats: "data", data: "data", report: "data" };
   function renderTop() {
     const el = $("#topbar");
     const r = base;
@@ -525,6 +528,7 @@
         case "menu": html = viewMenu(); break;
         case "news": html = `<div class="mscreen">${moreNews()}</div>`; break;
         case "cats": html = `<div class="mscreen">${viewCats()}</div>`; break;
+        case "charts": html = viewCharts(); break;
         case "data": html = viewData(); break;
         default: html = viewHome();
       }
@@ -586,6 +590,7 @@
     }
     if (base.name === "data") loadDataPanels();
     if (base.name === "news") loadNews();
+    if (base.name === "charts") drawArea();
     if (navigated && slideFrom) { // a tela nova entra pelo lado para onde o dedo foi
       const dir = slideFrom;
       slideFrom = 0;
@@ -908,6 +913,7 @@
   // -- Mais: um menu com o que não cabe na barra (Novidades, Relatório) e, por último, Configurações
   function viewMenu() {
     const rows = [
+      ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
       aiOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
       ["#/categorias", "grid", "Categorias", "Criar, renomear e excluir."],
       ["#/relatorio", "report", "Relatório para seguro", "Por cômodo, com fotos. Imprime ou salva em PDF."],
@@ -917,6 +923,155 @@
         <span class="mb"><b>${t}</b><span>${d}</span></span>${ic("chev", "sm")}</a></li>`).join("")}</ul></nav>
     <p class="foot"><b>InventarIA</b><br>${PREVIEW ? "Prévia do app do Home Assistant: as alterações ficam só nesta tela." : `v${esc(S.version)}, com os dados em arquivos abertos (JSON e JPG) dentro do Home Assistant.`}</p>`;
   }
+  // -- Gráficos: onde está o valor da casa. Barras de uma cor só (a do app), da maior para a menor, com o valor
+  // escrito (o gráfico não depende do toque); faixas de valor em colunas e o patrimônio mês a mês.
+  const MES_C = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const moneyK = (v) => { // eixo e colunas: R$ 900, R$ 12 mil, R$ 1,2 mi
+    v = Math.round(+v || 0);
+    if (v >= 1e6) return `R$ ${nf1.format(v / 1e6)} mi`;
+    if (v >= 1e4) return `R$ ${int(Math.round(v / 1000))} mil`;
+    if (v >= 1000) return `R$ ${nf1.format(v / 1000)} mil`;
+    return `R$ ${int(v)}`;
+  };
+  const pctTxt = (v, t) => { const p = pct(v, t); return `${p >= 10 || p === 0 ? int(Math.round(p)) : nf1.format(p)}%`; };
+  const BANDS = [[0, 100, "até 100"], [100, 500, "100–500"], [500, 1000, "500–1 mil"], [1000, 5000, "1–5 mil"], [5000, Infinity, "5 mil+"]];
+  function chartData() {
+    const total = D.total;
+    const rooms = D.rooms.map((r) => ({ r, v: D.roomTotals.get(r.id) || 0, n: (D.byRoom.get(r.id) || []).length })).filter((x) => x.n).sort((a, b) => b.v - a.v || b.n - a.n);
+    const cats = [...D.catTotals].map(([k, t]) => ({ k, name: CAT[k] || "Outros", v: t.value, n: t.count })).sort((a, b) => b.v - a.v || b.n - a.n);
+    const items = [...S.items].sort((a, b) => (+b.value || 0) - (+a.value || 0));
+    const valued = items.filter((i) => +i.value > 0);
+    const bands = BANDS.map(([lo, hi, label]) => {
+      const list = valued.filter((i) => +i.value >= lo && +i.value < hi);
+      return { label, n: list.length, v: list.reduce((s, i) => s + (+i.value || 0), 0) };
+    });
+    const top10 = items.slice(0, 10).reduce((s, i) => s + (+i.value || 0), 0);
+    let acc = 0, half = 0; // quantos cômodos somam metade
+    for (const x of rooms) { if (acc * 2 >= total) break; acc += x.v; half++; }
+    // patrimônio mês a mês, pela data de cadastro, do primeiro mês até hoje
+    const ym = (d) => String(d || "").slice(0, 7);
+    const months = [...new Set(S.items.map((i) => ym(i.createdAt)).filter(Boolean))].sort();
+    let series = [];
+    if (months.length >= 2) {
+      const now = new Date(), last = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const add = new Map();
+      for (const i of S.items) { const m = ym(i.createdAt) || months[0]; add.set(m, (add.get(m) || 0) + (+i.value || 0)); }
+      let [y, mo] = months[0].split("-").map(Number), sum = 0;
+      for (let k = 0; k < 120; k++) { // até 10 anos
+        const key = `${y}-${String(mo).padStart(2, "0")}`;
+        sum += add.get(key) || 0;
+        series.push({ key, label: `${MES_C[mo - 1]}/${String(y).slice(2)}`, v: sum, add: add.get(key) || 0 });
+        if (key >= last && key >= months[months.length - 1]) break;
+        mo++; if (mo > 12) { mo = 1; y++; }
+      }
+    }
+    return { total, rooms, cats, items, valued, bands, top10, half, series, photos: S.items.filter((i) => (i.photos || []).length).length };
+  }
+  function hbars(rows) { // barras de uma cor, da maior para a menor; cada linha leva a algum lugar
+    const max = Math.max(...rows.map((x) => x.v), 1);
+    return `<ul class="hbars">${rows.map((x) => `<li><a class="hbar" href="${x.href}">
+        <span class="hb-t">${x.tag || ""}<b>${esc(x.name)}</b><span class="hb-s">${esc(x.sub)}</span></span>
+        <span class="hb-v"><b>${moneyR(x.v)}</b><span>${esc(x.share)}</span></span>
+        <span class="hb-bar" aria-hidden="true"><i style="width:${Math.max(0.6, (x.v / max) * 100).toFixed(2)}%"></i></span></a></li>`).join("")}</ul>`;
+  }
+  function viewCharts() {
+    if (!S.items.length) return `<div class="empty"><h2>Nada para mostrar ainda</h2><p>Cadastre itens para ver os gráficos.</p><div class="acts"><button class="btn primary" data-act="item-new">${ic("plus")}Adicionar item</button></div></div>`;
+    const c = chartData(), T = c.total;
+    const stat = (label, value, sub = "") => `<div class="kpi"><span>${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
+    const bmax = Math.max(...c.bands.map((b) => b.n), 1);
+    const zero = c.items.length - c.valued.length;
+    const roomRows = c.rooms.map((x) => ({ href: `#/c/${encodeURIComponent(x.r.id)}`, tag: `<span class="mt soft">${esc(x.r.code)}</span>`, name: x.r.name, sub: plural(x.n, "item", "itens"), v: x.v, share: pctTxt(x.v, T) }));
+    const catRows = c.cats.map((x) => ({ href: `#/buscar?cat=${encodeURIComponent(x.k)}&ord=val`, name: x.name, sub: plural(x.n, "item", "itens"), v: x.v, share: pctTxt(x.v, T) }));
+    const topRows = c.items.slice(0, 10).filter((i) => +i.value > 0).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: D.roomById.get(i.room)?.name || "", v: +i.value || 0, share: pctTxt(+i.value || 0, T) }));
+    const lead = (t) => `<p class="lead">${t}</p>`;
+    return `<div class="mscreen charts">
+    <div class="kpis">
+      ${stat("Patrimônio", moneyR(T))}
+      ${stat("Itens", int(c.items.length), plural(c.rooms.length, "cômodo", "cômodos"))}
+      ${stat("Valor médio", moneyR(c.valued.length ? T / c.valued.length : 0), "por item com valor")}
+      ${stat("Com foto", pctTxt(c.photos, c.items.length), `${int(c.photos)} de ${int(c.items.length)}`)}
+    </div>
+    <div class="chart-pair">
+    <section class="panel" id="g-rooms">
+      <h2>${secIc("rooms")}Cômodos</h2>
+      ${c.rooms.length > 1 ? lead(c.half === 1 ? `${esc(c.rooms[0].r.name)} tem ${pctTxt(c.rooms[0].v, T)} do patrimônio.` : `${int(c.half)} cômodos somam metade do patrimônio.`) : ""}
+      ${hbars(roomRows)}
+    </section>
+    <section class="panel" id="g-cats">
+      <h2>${secIc("grid")}Categorias</h2>
+      ${c.cats.length > 1 ? lead(`${esc(c.cats[0].name)} vale ${pctTxt(c.cats[0].v, T)} do total.`) : ""}
+      ${hbars(catRows)}
+    </section>
+    </div>
+    <div class="chart-pair">
+    <section class="panel" id="g-bands">
+      <h2>${secIc("bars")}Faixas de valor</h2>
+      ${c.items.length >= 10 ? lead(`Os 10 itens mais caros somam ${pctTxt(c.top10, T)} do patrimônio.`) : ""}
+      <div class="bands" role="list" aria-label="Itens por faixa de valor, em reais">
+        ${c.bands.map((b) => `<button type="button" class="band" role="listitem" aria-label="${esc(`${b.label} reais: ${plural(b.n, "item", "itens")}, ${moneyR(b.v)} no total`)}">
+          <span class="bd-bar"><span class="bd-n">${int(b.n)}</span><i style="height:${b.n ? Math.max(3, (b.n / bmax) * 100).toFixed(1) : 0}%"></i></span>
+          <span class="bd-l">${esc(b.label)}</span><span class="bd-v">${b.n ? moneyK(b.v) : "–"}</span></button>`).join("")}
+      </div>
+      <p class="muted bands-cap">Quantos itens em cada faixa, em reais, e quanto somam.${zero ? ` ${plural(zero, "item está", "itens estão")} sem valor.` : ""}</p>
+    </section>
+    <section class="panel" id="g-top">
+      <h2>${secIc("gem")}Itens mais valiosos</h2>
+      ${hbars(topRows)}
+    </section>
+    </div>
+    ${c.series.length >= 2 ? `<section class="panel" id="g-time">
+      <h2>${secIc("history")}Patrimônio mês a mês</h2>
+      ${lead(`Pela data de cadastro: ${moneyR(c.series[c.series.length - 1].v)} em ${esc(c.series[c.series.length - 1].label)}.`)}
+      <div class="area" data-slot="area" role="img" aria-label="${esc(`Patrimônio cadastrado mês a mês, de ${c.series[0].label} a ${c.series[c.series.length - 1].label}: de ${moneyR(c.series[0].v)} a ${moneyR(c.series[c.series.length - 1].v)}`)}"></div>
+      <details class="area-tab"><summary>${ic("chev", "sm")}Ver mês a mês</summary>
+        <table><thead><tr><th>Mês</th><th>Cadastrado</th><th>Total</th></tr></thead><tbody>
+        ${c.series.map((x) => `<tr><td>${esc(x.label)}</td><td>${moneyR(x.add)}</td><td>${moneyR(x.v)}</td></tr>`).join("")}</tbody></table></details>
+    </section>` : ""}
+    </div>`;
+  }
+  // a área do patrimônio: desenhada depois, com a largura de verdade; a linha vertical segue o dedo ou o mouse
+  function drawArea() {
+    const box = $('#view [data-slot="area"]');
+    if (!box) return;
+    const series = chartData().series;
+    const W = Math.max(240, Math.round(box.clientWidth)), H = 190, L = 62, R = 8, Tp = 14, B = 26;
+    const max = Math.max(...series.map((x) => x.v), 1);
+    const nice = (() => { const e = 10 ** Math.floor(Math.log10(max)), f = max / e; return (f <= 2 ? 2 : f <= 5 ? 5 : 10) * e; })();
+    const x = (i) => L + (i / (series.length - 1)) * (W - L - R), y = (v) => Tp + (1 - v / nice) * (H - Tp - B);
+    const pts = series.map((s, i) => [x(i), y(s.v)]);
+    const line = pts.map(([a, b], i) => `${i ? "L" : "M"}${a.toFixed(1)} ${b.toFixed(1)}`).join("");
+    const grid = [0.5, 1].map((f) => `<line class="g" x1="${L}" x2="${W - R}" y1="${y(nice * f).toFixed(1)}" y2="${y(nice * f).toFixed(1)}"/><text class="gt" x="${L - 8}" y="${(y(nice * f) + 4).toFixed(1)}" text-anchor="end">${esc(moneyK(nice * f))}</text>`).join("");
+    const every = Math.ceil(series.length / Math.max(2, Math.floor((W - L - R) / 56)));
+    const ticks = series.map((s, i) => (i % every === 0 || i === series.length - 1) && !(i !== series.length - 1 && series.length - 1 - i < every / 2)
+      ? `<text class="xt" x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="${i === 0 ? "start" : i === series.length - 1 ? "end" : "middle"}">${esc(s.label)}</text>` : "").join("");
+    const [ex, ey] = pts[pts.length - 1];
+    box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">
+      ${grid}<line class="base" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/>
+      <path class="fill" d="${line}L${(W - R).toFixed(1)} ${y(0)}L${L} ${y(0)}Z"/><path class="ln" d="${line}"/>
+      <circle class="end" cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="4.5"/>${ticks}
+      <line class="cross" x1="0" x2="0" y1="${Tp}" y2="${y(0)}" visibility="hidden"/><circle class="dot" r="4.5" visibility="hidden"/></svg>
+      <div class="ctip" hidden></div>`;
+    const svg = $("svg", box), tip = $(".ctip", box), cross = $(".cross", svg), dot = $(".dot", svg);
+    const show = (clientX) => {
+      const rx = clientX - svg.getBoundingClientRect().left;
+      const i = Math.max(0, Math.min(series.length - 1, Math.round(((rx - L) / (W - L - R)) * (series.length - 1))));
+      const [px, py] = pts[i];
+      cross.setAttribute("x1", px); cross.setAttribute("x2", px); cross.setAttribute("visibility", "visible");
+      dot.setAttribute("cx", px); dot.setAttribute("cy", py); dot.setAttribute("visibility", "visible");
+      tip.hidden = false;
+      tip.replaceChildren();
+      const b = document.createElement("b"); b.textContent = moneyR(series[i].v);
+      const sp = document.createElement("span"); sp.textContent = `${series[i].label} · +${moneyR(series[i].add)}`;
+      tip.append(b, sp);
+      tip.style.left = `${Math.max(0, Math.min(W - tip.offsetWidth, px - tip.offsetWidth / 2))}px`;
+    };
+    const hide = () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); };
+    svg.addEventListener("pointermove", (e) => show(e.clientX));
+    svg.addEventListener("pointerdown", (e) => show(e.clientX));
+    svg.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") hide(); }); // no toque, o valor fica até tocar fora
+  }
+  let areaTimer = null;
+  window.addEventListener("resize", () => { clearTimeout(areaTimer); areaTimer = setTimeout(() => { if (base.name === "charts") drawArea(); }, 150); });
   function viewData() {
     const tab = moreTab(base.tab);
     const label = ALL_TABS.find(([k]) => k === tab)[1];
@@ -3345,7 +3500,7 @@
   // os testes da tela (tests/e2e) pedem as funções puras para conferir as contas e as regras
   if (typeof window.INV_TEST === "function") {
     window.INV_TEST({ esc, norm, numTxt, money, moneyR, plural, pct, pctFmt, ago, parseMoney, moneyInput, qtyClean, qtyNum, qtyLabel, qtyShort,
-      splitSpoken, wordsToNumbers, newsDate, chatHtml, webFills, siteOf, suggestCode, hl, applyCats, cats: () => CATS,
+      splitSpoken, wordsToNumbers, newsDate, moneyK, pctTxt, chatHtml, webFills, siteOf, suggestCode, hl, applyCats, cats: () => CATS,
       colorOfDay, dayAccents: () => DAY_ACCENTS, accents: () => ACCENTS.map(([k]) => k) });
   }
   if (!PREVIEW || window.INV_BACKEND) boot();

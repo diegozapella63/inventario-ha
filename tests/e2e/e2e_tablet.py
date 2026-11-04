@@ -5,7 +5,7 @@ from e2e_lib import SIZES, main
 
 SIZES.setdefault("tablet-deitado", (1100, 820, True))  # só neste teste; o e2e_lib já tem o tablet em pé ("tablet")
 
-PAGES = ["#/", "#/buscar", "#/comodos", "#/c/sala", "#/relatorio", "#/mais", "#/novidades", "#/categorias", "#/config", "#/config/integracoes", "#/config/aparencia", "#/config/opcoes"]
+PAGES = ["#/", "#/buscar", "#/comodos", "#/c/sala", "#/relatorio", "#/mais", "#/graficos", "#/novidades", "#/categorias", "#/config", "#/config/integracoes", "#/config/aparencia", "#/config/opcoes"]
 # (nome, endereço, como abrir, o que aparece, tipo da janela)
 DIALOGS = [
     ("item-novo", "#/c/escritorio", '.rhead-actions [data-act="item-new"]', "#f-name", "modal"),

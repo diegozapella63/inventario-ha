@@ -66,6 +66,10 @@ async def body(r, p):
 
     # data das novidades do produto
     r.eq(await ev("() => ['2026-09-12', '2026-01', '2026', '', null].map(__f.newsDate)"), ["12 set. 2026", "jan. 2026", "2026", "", ""], "data das novidades")
+    r.eq(await ev("() => [0, 355, 999.6, 1000, 5130, 9999, 10000, 23460, 1234567].map(__f.moneyK)"),
+         ["R$ 0", "R$ 355", "R$ 1 mil", "R$ 1 mil", "R$ 5,1 mil", "R$ 10 mil", "R$ 10 mil", "R$ 23 mil", "R$ 1,2 mi"], "valores curtos dos gráficos")
+    r.eq(await ev("() => [[0, 100], [32.1, 100], [7.64, 100], [1, 3], [5, 0]].map(([v, t]) => __f.pctTxt(v, t))"),
+         ["0%", "32%", "7,6%", "33%", "0%"], "porcentagens dos gráficos")
 
     # categorias da casa
     r.eq(await ev("() => { __f.applyCats([{id: 'a', name: 'A'}, {id: 'outros', name: 'Outros'}]); const c = __f.cats(); __f.applyCats(null); return [c, __f.cats().length]; }"),

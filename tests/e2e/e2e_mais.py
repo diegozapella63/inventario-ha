@@ -30,15 +30,15 @@ async def body(r, p):
     await pg.wait_for_selector(".menu-list")
     r.eq((await pg.text_content(".page-title")).strip(), "Mais", "a aba Mais abre um menu")
     rows = await pg.evaluate("[...document.querySelectorAll('.menu-row')].map(a => [a.querySelector('b').textContent, a.getAttribute('href')])")
-    r.eq(rows, [["Novidades", "#/novidades"], ["Categorias", "#/categorias"], ["Relatório para seguro", "#/relatorio"], ["Configurações", "#/config"]],
-         "com Novidades, Categorias, Relatório e Configurações")
+    r.eq(rows, [["Gráficos", "#/graficos"], ["Novidades", "#/novidades"], ["Categorias", "#/categorias"], ["Relatório para seguro", "#/relatorio"], ["Configurações", "#/config"]],
+         "com Gráficos, Novidades, Categorias, Relatório e Configurações")
     r.eq(await pg.locator("#view .more-tabs").count(), 0, "sem as abas de configurações no menu")
     r.eq(await pg.get_attribute('.tabbar a[data-tab="data"]', "aria-current"), "page", "a aba Mais fica marcada")
     hs = await pg.evaluate("[...document.querySelectorAll('.menu-row')].map(a => Math.round(a.getBoundingClientRect().height))")
     r.check(min(hs) >= 64 and max(hs) - min(hs) <= 24, f"linhas grandes, fáceis de tocar ({hs})")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "menu")
-    for title, href, wait in (("Novidades", "#/novidades", "#p-news"), ("Categorias", "#/categorias", "#p-cats"),
+    for title, href, wait in (("Gráficos", "#/graficos", ".kpis"), ("Novidades", "#/novidades", "#p-news"), ("Categorias", "#/categorias", "#p-cats"),
                               ("Relatório", "#/relatorio", ".report"), ("Configurações", "#/config", ".more-tabs")):
         await pg.click(f'.menu-row[href="{href}"]')
         await pg.wait_for_selector(wait, timeout=8000)

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.28.0
+
+- **Mais > Gráficos**: o patrimônio, os itens, o valor médio e quantos têm foto no alto; os cômodos e as categorias que mais valem, do maior para o menor, com o valor e a parte do total; as faixas de valor; os 10 itens mais valiosos; e o patrimônio mês a mês. Tocar numa linha abre o cômodo, a categoria ou o item. No computador, os gráficos ficam lado a lado.
+
 ## 1.27.0
 
 - **Novidades**: o mesmo equipamento em vários cômodos (ou escrito no plural) agora é uma linha só, com uma busca só. O resultado aparece na ficha de cada um.

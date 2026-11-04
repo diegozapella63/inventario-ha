@@ -38,6 +38,7 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 - **Conversar** com a IA a qualquer momento, ao lado do microfone, sobre o que está na tela ou qualquer outro assunto.
 - **Buscar** por nome, marca ou detalhe, sem se importar com acentos, com filtros por cômodo e categoria.
 - **Relatório para seguro** por cômodo, com fotos, pronto para imprimir ou salvar em PDF.
+- **Gráficos**: os cômodos, as categorias e os itens que mais valem, as faixas de valor e o patrimônio mês a mês.
 - **Exportar** em CSV, JSON ou ZIP com fotos, **backup** na pasta `share/inventario` e versões automáticas a cada 10 minutos de uso.
 - **Importar backup** pelo celular, inclusive dividido em partes.
 - **Tema claro e escuro** e **cor do app**: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza, ou a **Cor do dia**, que muda todo dia.
