@@ -1309,7 +1309,7 @@
     </section>
     ${on ? `<section class="panel" id="p-voice">
       <h2>${secIc("mic")}Falar</h2>
-      <p class="lead">Fale os itens e quanto valem. O Home Assistant transcreve e a IA separa os itens.</p>
+      <p class="lead" data-slot="voice-lead">${voiceLead(aiCache.data)}</p>
       <div data-slot="voice-panel"><p class="muted">Verificando…</p></div>
     </section>
     <section class="panel" id="p-usage">
@@ -1580,7 +1580,7 @@
         </ul>`;
       }
     } catch (e) { bslot.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
-    if (aslot) { const st = await aiStatus(true); if (document.contains(aslot)) renderAiPanel(aslot, st); }
+    if (aslot) { const st = await aiStatus(true); if (document.contains(aslot)) { renderAiPanel(aslot, st); paintVoiceLead(); } }
     showMoreTab();
     const vslot = tab === "integracoes" ? $('#view [data-slot="voice-panel"]') : null;
     if (vslot) { renderVoicePanel(vslot); }
@@ -1599,6 +1599,10 @@
     try { aiCache = { at: Date.now(), data: await API.get("api/ai/status") }; } catch (e) { aiCache = { at: Date.now(), data: { ready: false, reason: "error", message: e.message, entities: [] } }; }
     return aiCache.data;
   }
+  // Falar: quem separa os itens é a IA, se houver uma pronta (como no openCatalog); sem ela, o app, pelas vírgulas
+  const voiceSplit = (st) => (st && !st.ready ? "o app separa pelas vírgulas" : "a IA separa os itens");
+  const voiceLead = (st) => `Fale os itens e quanto valem.${st ? ` O Home Assistant transcreve e ${voiceSplit(st)}.` : ""}`; // antes de saber, não diz quem separa
+  function paintVoiceLead() { const el = $('#view [data-slot="voice-lead"]'); if (el) el.textContent = voiceLead(aiCache.data); }
   function aiReasonText(st) {
     switch (st.reason) {
       case "no_api": return "O app não tem acesso à API do Home Assistant.";
@@ -3178,14 +3182,19 @@
     } catch (e) { fail(e); }
   }
 
-  function openAddMenu() {
+  let addMenuOpening = false;
+  async function openAddMenu() {
     const rid = base.name === "room" ? base.id : null;
     if (base.name === "bens") { openEditor({ room: D.bens?.id || BENS_NEW }); return; } // em Bens, Adicionar é um bem (sem foto do cômodo nem Falar)
+    if (addMenuOpening) return;
+    // com o Falar, a linha diz quem separa os itens: a IA, se houver uma pronta, ou o app (o mesmo teste do openCatalog)
+    let st = null;
+    if (voiceReady()) { addMenuOpening = true; try { st = await aiStatus(); } finally { addMenuOpening = false; } }
     // Novo cômodo fica na aba Cômodos; aqui só o que entra no inventário
     const opts = [
       ["item", "plus", "Adicionar item", "Com foto e valor, preenchendo os campos"],
       aiOn() && ["catalog", "scan", "Catalogar foto com IA", "A IA lista vários itens de uma foto"],
-      voiceReady() && ["voice", "mic", "Falar os itens", "Diga o que tem e quanto vale; a IA separa os itens"],
+      voiceReady() && ["voice", "mic", "Falar os itens", `Diga o que tem e quanto vale; ${voiceSplit(st)}`],
     ].filter(Boolean);
     if (opts.length === 1) { openEditor({ room: rid }); return; } // sem IA e sem Falar: direto no item, sem um menu de uma linha só
     const entry = openDialog({
@@ -3449,7 +3458,7 @@
         break;
       case "news-open": { const it = D.itemById.get(b.dataset.id); if (it) openNews(it); break; }
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }
-      case "ai-refresh": { const slot = $('#view [data-slot="ai-panel"]'); if (slot) { slot.innerHTML = `<p class="muted">Verificando…</p>`; renderAiPanel(slot, await aiStatus(true)); } break; }
+      case "ai-refresh": { const slot = $('#view [data-slot="ai-panel"]'); if (slot) { slot.innerHTML = `<p class="muted">Verificando…</p>`; renderAiPanel(slot, await aiStatus(true)); paintVoiceLead(); } break; }
       case "theme": setTheme(b.dataset.theme); break;
       case "more-tab": setMoreTab(b.dataset.tab); break;
       case "voice": openCatalog({ room: base.name === "room" ? base.id : null, voice: true }); break;
@@ -3492,7 +3501,7 @@
     else if (k === "accent" && t.checked) setAccent(t.value);
     else if (k === "accent-daily") setAccentDaily(t.checked);
     else if (k === "ai-entity") {
-      try { await API.put("api/settings", { ai_entity: t.value }); S.settings.ai_entity = t.value; const slot = $('#view [data-slot="ai-panel"]'); if (slot) renderAiPanel(slot, await aiStatus(true)); toast("IA para ler fotos atualizada"); }
+      try { await API.put("api/settings", { ai_entity: t.value }); S.settings.ai_entity = t.value; const slot = $('#view [data-slot="ai-panel"]'); if (slot) { renderAiPanel(slot, await aiStatus(true)); paintVoiceLead(); } toast("IA para ler fotos atualizada"); }
       catch (er) { fail(er); }
     }
     else if (k === "voice-stt") {

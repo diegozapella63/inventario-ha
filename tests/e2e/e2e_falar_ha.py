@@ -1,7 +1,8 @@
 """Falar com o Home Assistant de mentira de verdade (microfone de mentira do Chromium): o áudio vai para a fala para
 texto do assistente preferido, no idioma dele; a fala para texto escolhida em Integrações; a escolhida que saiu do
 Home Assistant; erros da fala para texto; "Não ouvi nada" com áudio curto; a IA separa os itens (e o cômodo dito);
-resposta da IA fora do formato; sem uma IA que responda, o app separa sozinho; com Usar IA desligada, o Falar some."""
+resposta da IA fora do formato; sem uma IA que responda, o app separa sozinho (e o Adicionar e o painel Falar dizem isso);
+com Usar IA desligada, o Falar some."""
 import json
 
 from e2e_lib import OVERFLOW, FakeHA, main
@@ -38,6 +39,17 @@ async def body(r, p):
         await pg.wait_for_selector(".voice.on", timeout=8000)
         await pg.wait_for_timeout(ms)
         await pg.click('[data-ct="done"]')
+
+    async def falar_says(pg):
+        """O que a tela diz de quem separa os itens: a linha Falar os itens (Adicionar) e o painel Falar (Integrações)."""
+        await r.open(pg, "#/", ".mic-top")
+        await pg.click(".tabbar .tab-add")
+        await pg.wait_for_selector('dialog [data-go="voice"]', timeout=8000)
+        add = (await pg.text_content('dialog [data-go="voice"] small')).strip()
+        await pg.click("dialog [data-x]")
+        await r.open(pg, "#/config/integracoes", "#p-voice")
+        await pg.wait_for_function("document.querySelector('[data-slot=\"voice-lead\"]').textContent.includes('transcreve')", timeout=8000)
+        return add, (await pg.text_content('[data-slot="voice-lead"]')).strip()
 
     async def voice_error():
         await pg.wait_for_selector(".voice .formerr, .dlg-b > .formerr", timeout=15000)
@@ -139,6 +151,9 @@ async def body(r, p):
     r.eq(len(stt_posts(ha)), n_stt, "Tentar de novo lê o mesmo texto, sem gravar de novo")
     await pg.click('.dlg-f [data-ct="cancel"]')
     await pg.click('[data-r="1"]')
+    add, lead = await falar_says(pg)
+    r.eq(add, "Diga o que tem e quanto vale; a IA separa os itens", "com uma IA pronta, Falar os itens diz que a IA separa")
+    r.eq(lead, "Fale os itens e quanto valem. O Home Assistant transcreve e a IA separa os itens.", "e o painel Falar também")
     await ctx.close()
 
     # -- IA ligada, mas sem uma IA no Home Assistant que responda: a fala para texto continua, e o app separa pelas vírgulas
@@ -152,6 +167,11 @@ async def body(r, p):
     r.eq(found, [["Sofá cinza", "2.000"], ["Televisão de 50 polegadas", "1.500"]], "sem IA que responda: o Home Assistant transcreve e o app separa, com os valores falados")
     r.eq(len(ha.calls("POST", "/core/api/services/ai_task/generate_data")), n_ai, "sem chamar a IA")
     await r.shot(pg, "sem-ia")
+    add, lead = await falar_says(pg)
+    r.eq(add, "Diga o que tem e quanto vale; o app separa pelas vírgulas", "sem IA que responda, Falar os itens diz que o app separa pelas vírgulas")
+    r.eq(lead, "Fale os itens e quanto valem. O Home Assistant transcreve e o app separa pelas vírgulas.", "e o painel Falar também")
+    r.check("a IA separa" not in await pg.text_content("#p-voice"), "nada diz que a IA separa")
+    await r.shot(pg, "sem-ia-integracoes", full_page=True)
     await ctx.close()
     ha.states += ai_states
 

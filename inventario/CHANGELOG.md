@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.31.2
+
+- **Falar** sem uma IA pronta no Home Assistant: **Adicionar > Falar os itens** e o painel **Falar** (Integrações) dizem que o app separa pelas vírgulas, em vez de "a IA separa os itens".
+
 ## 1.31.1
 
 - **Opções > Novidades**: **Avisar** e **Testar** só aparecem com **Conferir sozinho** ligado. Com "Não", nada avisaria.
