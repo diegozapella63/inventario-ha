@@ -19,6 +19,8 @@ inventario/CHANGELOG.md       o que mudou em cada versão (o HA mostra ao atuali
 inventario/DOCS.md            manual do usuário (aba Documentação no HA)
 inventario/app/server.py      servidor HTTP (Python, só biblioteca padrão): dados, fotos, IA, backups, integração
 inventario/app/web/           a tela: index.html, app.js (JavaScript puro, sem build), style.css, fontes
+inventario/app/web/selectsheet.js  as caixas de seleção no visual do app: arquivo igual em todos os apps (no ResolvIA e
+                              no CronologIA, frontend/src/selectsheet.js); ao mudar, copie para os outros
 inventario/seed/              ponto de partida vazio (LEIA-ME); nunca coloque dados reais aqui
 tests/                        testes unitários, de integração e visuais (veja tests/README.md)
 tests/fixtures/casa/          a casa de teste, inventada: usada pelos testes, pela prévia e pelo dev/run.sh

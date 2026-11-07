@@ -42,6 +42,7 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - No celular, **arrastar para o lado** troca de aba (Início, Buscar, Cômodos e Mais); dentro de um cômodo, arrastar para a direita volta para Cômodos, e em Gráficos, Novidades, Categorias, Relatório, Configurações ou Sobre, volta para o menu Mais.
 - No computador (tela de 1000 pixels ou mais), a barra de baixo vira uma **barra lateral**: Início, Buscar, Cômodos, Relatório e Mais, e embaixo os cômodos, com o valor de cada um, e **Novo cômodo**. **Catalogar foto com IA** e **Adicionar item** ficam no alto da tela.
 - Atalhos no computador: `/` abre a busca, `N` cria um item, `Ctrl+Enter` salva o formulário.
+- As **caixas de seleção** (como o cômodo de um item ou os filtros da busca) abrem uma janela de baixo para cima com as opções; a atual vem marcada. O Voltar do celular, o **X** ou tocar fora fecham sem mudar nada. No computador, a janela abre no meio da tela, e dá para escolher com as setas e Enter.
 
 O valor de cada item é o que você quiser registrar, somando todas as unidades.
 

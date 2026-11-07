@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.35.0
+
+- **Caixas de seleção** (os filtros da busca, cômodo e categoria do item, Mover, a IA usada, Fala para texto, Conferir sozinho, Avisar) abrem uma janela no visual do app, de baixo para cima, com as opções em linhas e a atual marcada na cor do app, no tema claro ou escuro, e não mais a janela padrão do celular, como nos outros apps da família. O Voltar do celular, o X ou tocar fora fecham só ela.
+
 ## 1.34.0
 
 - **+ Adicionar**: nova opção **Adicionar bem**, logo depois de Adicionar item.

@@ -19,6 +19,8 @@ OUT = sys.argv[1]
 html = open(f"{WEB}/index.html", encoding="utf-8").read()
 css = open(f"{WEB}/style.css", encoding="utf-8").read()
 app = open(f"{WEB}/app.js", encoding="utf-8").read()
+# as caixas de seleção no visual do app (o mesmo arquivo dos outros apps), antes do app: o Voltar dela vem primeiro
+caixas = open(f"{WEB}/selectsheet.js", encoding="utf-8").read()
 prev = open(f"{ROOT}/preview/preview.js", encoding="utf-8").read()
 version = re.search(r'VERSION = "([^"]+)"', open(f"{ROOT}/inventario/app/server.py", encoding="utf-8").read()).group(1)
 
@@ -32,7 +34,7 @@ css += """
 .pv-note a { font-weight: 600; }
 """
 
-body = html[html.index("<svg width=\"0\""):html.index("<script src=\"app.js")]
+body = html[html.index("<svg width=\"0\""):html.index("<script src=\"selectsheet.js")]
 body = body.replace('<div class="app">', '<div class="pv-note" role="note">Prévia do app do Home Assistant: dá para clicar em tudo, mas as alterações ficam só nesta tela.</div>\n<div class="app">', 1)
 theme = re.search(r"<script>try\{.*?</script>", html).group(0)
 
@@ -48,6 +50,9 @@ page = f"""<meta charset="utf-8">
 </style>
 {theme}
 {body}
+<script>
+{caixas}
+</script>
 <script>
 {prev}
 </script>
