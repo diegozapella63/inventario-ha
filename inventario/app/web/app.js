@@ -781,7 +781,7 @@
       <ul class="ilist">${its.map((it) => itemRow(it, { toks, mode: "room" })).join("")}</ul></section>`).join("");
   }
   // -- Bens (Mais > Bens): Imóveis, Veículos e Outros, cada grupo com o total
-  function viewBens() {
+  function viewBens() { // com bens, adicionar é o + de baixo (ou o Adicionar do alto, no computador): sem botão repetido
     const rid = D.bens ? D.bens.id : BENS_NEW;
     const add = `<button type="button" class="btn primary" data-act="item-new" data-room="${esc(rid)}">${ic("plus")}Adicionar bem</button>`;
     if (!D.bensItems.length) {
@@ -791,7 +791,6 @@
     const groups = BENS_GROUPS.map(([k, name]) => [name, D.bensItems.filter((it) => bensGroup(it) === k).sort((a, b) => (+b.value || 0) - (+a.value || 0))])
       .filter(([, its]) => its.length);
     return `<div class="mscreen bens">
-      <div class="bens-acts">${add}</div>
       ${groups.map(([name, its]) => `<section class="zone">
         <div class="zone-h"><h3>${esc(name)}</h3><span class="zs">${plural(its.length, "bem", "bens")}<b>${moneyR(its.reduce((t, i) => t + (+i.value || 0), 0))}</b></span></div>
         <ul class="ilist">${its.map((it) => itemRow(it, { mode: name === "Outros" ? "bens" : "room" })).join("")}</ul></section>`).join("")}
@@ -804,19 +803,26 @@
   }
 
   // -- busca
+  // o tipo, na busca (só quando há bens): os itens da casa ou um grupo de Mais > Bens; num tipo de bem, sem cômodo e categoria
+  const TIPOS = [["", "Todos os tipos"], ["casa", "Itens da casa"], ["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["outros", "Outros bens"]];
+  const tipoBens = (t) => t === "imoveis" || t === "veiculos" || t === "outros";
   function viewSearch(q) {
     const ord = q.ord || (q.q ? "rel" : "val");
+    const tipo = D.bensItems.length && TIPOS.some(([k]) => k === q.tipo) ? q.tipo || "" : "", house = !tipoBens(tipo);
+    const n = (D.bensItems.length ? 1 : 0) + (house ? 2 : 0) + 1;
     return `
     <section class="sbar">
       <form class="q" data-form="search" role="search">${ic("search")}
         <input class="input" type="search" name="q" data-input="search-q" value="${esc(q.q || "")}" placeholder="${zonesOn() ? "Nome, marca, detalhe ou zona" : "Nome, marca ou detalhe"}" aria-label="Buscar itens" autocomplete="off" enterkeyhint="search">
         <button type="button" class="btn ghost icon sm clear" data-act="search-clear" aria-label="Limpar busca"${q.q ? "" : " hidden"}>${ic("close", "sm")}</button>
       </form>
-      <div class="sfilters">
-        <select class="select" data-input="search-room" aria-label="Cômodo"><option value="">Todos os cômodos</option>
-          ${(D.bens ? [...D.rooms, D.bens] : D.rooms).map((r) => `<option value="${esc(r.id)}"${r.id === q.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select>
+      <div class="sfilters n${n}">
+        ${D.bensItems.length ? `<select class="select" data-input="search-tipo" aria-label="Tipo">
+          ${TIPOS.map(([k, v]) => `<option value="${k}"${k === tipo ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>` : ""}
+        ${house ? `<select class="select" data-input="search-room" aria-label="Cômodo"><option value="">Todos os cômodos</option>
+          ${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === q.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select>
         <select class="select" data-input="search-cat" aria-label="Categoria"><option value="">Todas as categorias</option>
-          ${CATS.map(([k, v]) => `<option value="${k}"${k === q.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
+          ${CATS.map(([k, v]) => `<option value="${k}"${k === q.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>` : ""}
         <select class="select ord" data-input="search-ord" aria-label="Ordenar">
           ${ORDERS.map(([k, v]) => `<option value="${k}"${k === ord ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
       </div>
@@ -826,8 +832,13 @@
   function searchItems(q) {
     const toks = tokens(q.q || "");
     let list = S.items;
-    if (q.room && D.roomById.has(q.room)) list = list.filter((i) => i.room === q.room); // cômodo de um link antigo: vale Todos, como diz a seleção
-    if (q.cat && CAT[q.cat]) list = list.filter((i) => (CAT[i.cat] ? i.cat : "outros") === q.cat);
+    const tipo = D.bensItems.length ? q.tipo : "";
+    if (tipo === "casa") list = list.filter((i) => !isBens(i.room));
+    else if (tipoBens(tipo)) list = list.filter((i) => isBens(i.room) && (bensGroup(i) || "outros") === tipo);
+    if (!tipoBens(tipo)) {
+      if (q.room && D.rooms.some((r) => r.id === q.room)) list = list.filter((i) => i.room === q.room); // cômodo de um link antigo: vale Todos, como diz a seleção
+      if (q.cat && CAT[q.cat]) list = list.filter((i) => (CAT[i.cat] ? i.cat : "outros") === q.cat);
+    }
     if (toks.length) list = list.filter((i) => matches(i, toks));
     const ord = q.ord || (toks.length ? "rel" : "val");
     const score = (it) => {
@@ -1012,11 +1023,16 @@
   };
   const pctTxt = (v, t) => { const p = pct(v, t); return `${p >= 10 || p === 0 ? int(Math.round(p)) : nf1.format(p)}%`; };
   const BANDS = [[0, 100, "até 100"], [100, 500, "100–500"], [500, 1000, "500–1 mil"], [1000, 5000, "1–5 mil"], [5000, Infinity, "5 mil+"]];
+  // os gráficos da casa (cômodos, categorias, faixas, mais valiosos) são só dos itens da casa; os bens (fora de casa) têm
+  // o gráfico deles. O patrimônio (o número do alto e o mês a mês) soma tudo.
   function chartData() {
-    const total = D.total;
-    const rooms = D.allRooms.map((r) => ({ r, v: D.roomTotals.get(r.id) || 0, n: (D.byRoom.get(r.id) || []).length })).filter((x) => x.n).sort((a, b) => b.v - a.v || b.n - a.n);
-    const cats = [...D.catTotals].map(([k, t]) => ({ k, name: CAT[k] || "Outros", v: t.value, n: t.count })).sort((a, b) => b.v - a.v || b.n - a.n);
-    const items = [...S.items].sort((a, b) => (+b.value || 0) - (+a.value || 0));
+    const total = D.houseTotal;
+    const house = S.items.filter((i) => !isBens(i.room));
+    const rooms = D.rooms.map((r) => ({ r, v: D.roomTotals.get(r.id) || 0, n: (D.byRoom.get(r.id) || []).length })).filter((x) => x.n).sort((a, b) => b.v - a.v || b.n - a.n);
+    const ct = new Map();
+    for (const i of house) { const k = CAT[i.cat] ? i.cat : "outros", t = ct.get(k) || { value: 0, count: 0 }; t.value += +i.value || 0; t.count++; ct.set(k, t); }
+    const cats = [...ct].map(([k, t]) => ({ k, name: CAT[k] || "Outros", v: t.value, n: t.count })).sort((a, b) => b.v - a.v || b.n - a.n);
+    const items = [...house].sort((a, b) => (+b.value || 0) - (+a.value || 0));
     const valued = items.filter((i) => +i.value > 0);
     const bands = BANDS.map(([lo, hi, label]) => {
       const list = valued.filter((i) => +i.value >= lo && +i.value < hi);
@@ -1042,7 +1058,9 @@
         mo++; if (mo > 12) { mo = 1; y++; }
       }
     }
-    return { total, rooms, cats, items, valued, bands, top10, half, series, photos: S.items.filter((i) => (i.photos || []).length).length };
+    const bens = [...D.bensItems].sort((a, b) => (+b.value || 0) - (+a.value || 0));
+    const groups = BENS_GROUPS.map(([k, name]) => ({ k, name, v: bens.filter((i) => bensGroup(i) === k).reduce((s, i) => s + (+i.value || 0), 0) })).filter((g) => g.v > 0).sort((a, b) => b.v - a.v);
+    return { total, rooms, cats, items, valued, bands, top10, half, series, bens, groups, photos: house.filter((i) => (i.photos || []).length).length };
   }
   function hbars(rows) { // barras de uma cor, da maior para a menor; cada linha leva a algum lugar
     const max = Math.max(...rows.map((x) => x.v), 1);
@@ -1057,22 +1075,24 @@
     const stat = (label, value, sub = "") => `<div class="kpi"><span>${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
     const bmax = Math.max(...c.bands.map((b) => b.n), 1);
     const zero = c.items.length - c.valued.length;
-    const roomRows = c.rooms.map((x) => ({ href: x.r === D.bens ? "#/bens" : `#/c/${encodeURIComponent(x.r.id)}`, tag: `<span class="mt soft">${esc(x.r.code)}</span>`, name: x.r.name,
-      sub: x.r === D.bens ? plural(x.n, "bem", "bens") : plural(x.n, "item", "itens"), v: x.v, share: pctTxt(x.v, T) }));
+    const nb = c.bens.length, of = nb ? "do que há em casa" : "do patrimônio";
+    const roomRows = c.rooms.map((x) => ({ href: `#/c/${encodeURIComponent(x.r.id)}`, tag: `<span class="mt soft">${esc(x.r.code)}</span>`, name: x.r.name,
+      sub: plural(x.n, "item", "itens"), v: x.v, share: pctTxt(x.v, T) }));
+    const bensRows = c.bens.slice(0, 10).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: { imoveis: "Imóvel", veiculos: "Veículo" }[i.cat] || CAT[i.cat] || "Outro", v: +i.value || 0, share: pctTxt(+i.value || 0, D.bensTotal) }));
     const catRows = c.cats.map((x) => ({ href: `#/buscar?cat=${encodeURIComponent(x.k)}&ord=val`, name: x.name, sub: plural(x.n, "item", "itens"), v: x.v, share: pctTxt(x.v, T) }));
     const topRows = c.items.slice(0, 10).filter((i) => +i.value > 0).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: D.roomById.get(i.room)?.name || "", v: +i.value || 0, share: pctTxt(+i.value || 0, T) }));
     const lead = (t) => `<p class="lead">${t}</p>`;
     return `<div class="mscreen charts">
     <div class="kpis">
-      ${stat("Patrimônio", moneyR(T))}
-      ${stat("Itens", int(c.items.length), `${plural(D.rooms.length, "cômodo", "cômodos")}${D.bensItems.length ? ` e ${plural(D.bensItems.length, "bem", "bens")}` : ""}`)}
+      ${stat("Patrimônio", moneyR(D.total), nb ? `${moneyR(D.bensTotal)} em bens` : "")}
+      ${stat("Itens", int(c.items.length), plural(D.rooms.length, "cômodo", "cômodos"))}
       ${stat("Valor médio", moneyR(c.valued.length ? T / c.valued.length : 0), "por item com valor")}
       ${stat("Com foto", pctTxt(c.photos, c.items.length), `${int(c.photos)} de ${int(c.items.length)}`)}
     </div>
     <div class="chart-pair">
     <section class="panel" id="g-rooms">
-      <h2>${secIc("rooms")}${D.bensItems.length ? "Cômodos e bens" : "Cômodos"}</h2>
-      ${c.rooms.length > 1 ? lead(c.half === 1 ? `${esc(c.rooms[0].r.name)} tem ${pctTxt(c.rooms[0].v, T)} do patrimônio.` : `${int(c.half)} cômodos somam metade do patrimônio.`) : ""}
+      <h2>${secIc("rooms")}Cômodos</h2>
+      ${c.rooms.length > 1 ? lead(c.half === 1 ? `${esc(c.rooms[0].r.name)} tem ${pctTxt(c.rooms[0].v, T)} ${of}.` : `${int(c.half)} cômodos somam metade ${of}.`) : ""}
       ${hbars(roomRows)}
     </section>
     <section class="panel" id="g-cats">
@@ -1081,10 +1101,15 @@
       ${hbars(catRows)}
     </section>
     </div>
+    ${nb ? `<section class="panel" id="g-bens">
+      <h2>${secIc("home")}Bens</h2>
+      ${lead(c.groups.length > 1 ? `${esc(c.groups[0].name)} são ${pctTxt(c.groups[0].v, D.bensTotal)} dos bens.` : `${plural(nb, "bem", "bens")} fora de casa, ${moneyR(D.bensTotal)}.`)}
+      ${hbars(bensRows)}
+    </section>` : ""}
     <div class="chart-pair">
     <section class="panel" id="g-bands">
       <h2>${secIc("bars")}Faixas de valor</h2>
-      ${c.items.length >= 10 ? lead(`Os 10 itens mais caros somam ${pctTxt(c.top10, T)} do patrimônio.`) : ""}
+      ${c.items.length >= 10 ? lead(`Os 10 itens mais caros somam ${pctTxt(c.top10, T)} ${of}.`) : ""}
       <div class="bands" role="list" aria-label="Itens por faixa de valor, em reais">
         ${c.bands.map((b) => `<button type="button" class="band" role="listitem" aria-label="${esc(`${b.label} reais: ${plural(b.n, "item", "itens")}, ${moneyR(b.v)} no total`)}">
           <span class="bd-bar"><span class="bd-n">${int(b.n)}</span><i style="height:${b.n ? Math.max(3, (b.n / bmax) * 100).toFixed(1) : 0}%"></i></span>
@@ -1505,6 +1530,8 @@
           <div class="oa"><button type="button" class="btn" data-act="cat-new">${ic("plus")}Nova categoria</button></div></li>
         ${CATS.map(([k, v]) => {
           const n = D.catTotals.get(k)?.count || 0;
+          // Eletrônicos é a categoria das novidades: fica sempre, com o mesmo nome
+          if (k === "eletronicos") return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}. Usada nas novidades.</span></div></li>`;
           return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}</span></div>
             <div class="oa"><button type="button" class="btn icon" data-act="cat-edit" data-cat="${esc(k)}" aria-label="Renomear ${esc(v)}">${ic("edit")}</button>
               ${k === "outros" ? `<span class="cat-keep" aria-hidden="true"></span>` : `<button type="button" class="btn icon danger" data-act="cat-del" data-cat="${esc(k)}" aria-label="Excluir ${esc(v)}">${ic("trash")}</button>`}</div></li>`;
@@ -2117,7 +2144,7 @@
       sheet.onRouteClose = leaveItem;
       sheet.onClose = () => { sheet = null; stopItemNews(); INEWS.id = null; };
     }
-    if (newsOn()) loadItemNews(it);
+    if (newsOn() && it.cat === "eletronicos") loadItemNews(it); // as novidades são só dos eletrônicos
   }
   function leaveItem() {
     if (inAppNavs > 0) history.back();
@@ -2158,7 +2185,7 @@
           ${it.createdAt ? `<dt>Cadastrado</dt><dd>${esc(dateTime(it.createdAt))}${by(it.createdBy)}</dd>` : ""}
           ${it.updatedAt && it.updatedAt !== it.createdAt ? `<dt>Alterado</dt><dd>${esc(dateTime(it.updatedAt))}${by(it.updatedBy)}</dd>` : ""}
         </dl>
-        ${newsOn() ? `<div class="inews" data-slot="item-news" aria-live="polite">${itemNewsHtml(it)}</div>` : ""}
+        ${newsOn() && it.cat === "eletronicos" ? `<div class="inews" data-slot="item-news" aria-live="polite">${itemNewsHtml(it)}</div>` : ""}
       </div>
       <div class="dlg-f">
         <button type="button" class="btn danger" data-act="item-delete" data-id="${esc(it.id)}" aria-label="Excluir">${lbl("trash", "Excluir")}</button>
@@ -3513,7 +3540,12 @@
     const t = e.target;
     const k = t.dataset && t.dataset.input;
     if (!k) return;
-    if (k === "search-room") updateSearch({ room: t.value });
+    if (k === "search-tipo") { // num tipo de bem, cômodo e categoria saem (e as seleções somem)
+      base.q = { ...base.q, tipo: t.value, ...(tipoBens(t.value) ? { room: "", cat: "" } : {}) };
+      try { history.replaceState(history.state, "", hashOf(base)); } catch { /* sem histórico */ }
+      searchLimit = 120; renderView(false);
+    }
+    else if (k === "search-room") updateSearch({ room: t.value });
     else if (k === "search-cat") updateSearch({ cat: t.value });
     else if (k === "search-ord") updateSearch({ ord: t.value });
     else if (k === "rep-photos") { LS.set("reportPhotos", t.checked); renderView(false); }

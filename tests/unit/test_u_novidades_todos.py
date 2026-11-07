@@ -30,17 +30,8 @@ class Categorias(UnitBase):
         self.store.settings["news_cats"] = ["cozinha", "utilidades"]
         self.assertEqual(server.news_cats(), ["eletronicos"])
 
-    def test_eletronicos_renomeada_continua(self):
-        self.store.update_cat("eletronicos", {"name": "Tecnologia"})
-        self.assertEqual(server.news_cats(), ["eletronicos"])
-
-    def test_eletronicos_excluida_fica_sem(self):
-        self.store.delete_cat("eletronicos")
-        self.assertEqual(server.news_cats(), [])
-
-    def test_eletronicos_criada_de_novo_volta(self):
-        self.store.delete_cat("eletronicos")
-        self.store.create_cat({"name": "Eletrônicos"})
+    def test_eletronicos_sempre_existe(self):
+        self.store.data["cats"] = [{"id": "moveis", "name": "Móveis"}, {"id": "outros", "name": "Outros"}]  # uma lista antiga, sem ela
         self.assertEqual(server.news_cats(), ["eletronicos"])
 
 
@@ -136,10 +127,6 @@ class Lote(UnitBase):
         saved = server.news_read()["itens"]
         self.assertIn(TV, saved)
         self.assertNotIn(GELADEIRA, saved)
-
-    def test_sem_a_categoria_eletronicos_recusa(self):
-        self.store.delete_cat("eletronicos")
-        self.assertApiError(400, server.news_batch_start, msg_part="Eletrônicos foi excluída")
 
     def test_ia_desligada_recusa(self):
         self.store.settings["ai"] = False

@@ -252,5 +252,21 @@ class Efeitos(Base):
         self.assertEqual(h.out["categorias"]["moveis"], "Mobília")
 
 
+
+class EletronicosFicaSempre(UnitBase):
+    """Eletrônicos é a categoria das novidades: sempre existe, com o mesmo nome."""
+
+    def test_lista_guardada_sem_eletronicos_ganha_de_volta(self):
+        self.store.data["cats"] = [{"id": "moveis", "name": "Móveis"}, {"id": "outros", "name": "Outros"}]
+        self.assertEqual([c["id"] for c in self.store.cats()], ["eletronicos", "moveis", "outros"])
+
+    def test_nao_renomeia_nem_exclui(self):
+        for f, args, msg in ((self.store.update_cat, ("eletronicos", {"name": "Aparelhos"}), "renomear"), (self.store.delete_cat, ("eletronicos",), "excluir")):
+            with self.assertRaises(S.ApiError) as e:
+                f(*args)
+            self.assertEqual((e.exception.status, e.exception.msg), (400, f"Eletrônicos é a categoria das novidades: não dá para {msg}."))
+        self.assertEqual(self.store.cat_map()["eletronicos"], "Eletrônicos")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -636,8 +636,10 @@ div.croom:hover { background: none; }
 .sbar .q .input { height: 52px; padding-left: 46px; padding-right: 44px; font-size: 18px; border-radius: 10px; }
 .sbar .q .clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
 .sfilters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.sfilters .select { height: 40px; font-size: 15px; }
-@media (max-width: 560px) { .sfilters { grid-template-columns: 1fr 1fr; } .sfilters .ord { grid-column: span 2; } }
+.sfilters .select { height: 40px; font-size: 15px; padding-left: 12px; padding-right: 30px; background-position: right 8px center; } /* "Todas as categorias" cabe em meia largura */
+.sfilters.n4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sfilters.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 560px) { .sfilters, .sfilters.n4 { grid-template-columns: 1fr 1fr; } .sfilters.n3 .ord { grid-column: span 2; } }
 .ssum { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 18px 0 8px; padding: 0 6px; color: var(--muted); font-size: 15px; }
 .ssum b { color: var(--ink); font: 600 19px/1 var(--font-c); }
 .more { display: flex; justify-content: center; padding: 18px 0; }
@@ -1149,10 +1151,7 @@ dialog.camera::backdrop { background: #000; }
 .cam-flash { position: absolute; inset: 0; background: #fff; pointer-events: none; animation: camflash 0.35s ease-out both; }
 @keyframes camflash { from { opacity: 0.85; } to { opacity: 0; } }
 
-/* Bens (Mais > Bens): o botão no alto, à direita, e os grupos como as zonas de um cômodo */
-.bens-acts { display: flex; justify-content: flex-end; margin-top: 22px; }
-.bens-acts .btn { min-width: 220px; }
-@media (max-width: 560px) { .bens-acts .btn { width: 100%; } }
+/* Bens (Mais > Bens): os grupos como as zonas de um cômodo */
 .bens .zone:first-of-type { margin-top: 18px; }
 /* o tipo de um bem (Imóvel, Veículo, Outro): três botões do mesmo tamanho */
 .seg.tipo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 440px); }

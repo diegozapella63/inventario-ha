@@ -160,6 +160,7 @@
     if ((m = path.match(/^api\/cats\/([a-z0-9_-]+)$/))) {
       const cats = catsOf(d), cat = cats.find((c) => c.id === m[1]);
       if (!cat) fail("Esta categoria não existe mais.", 404);
+      if (cat.id === "eletronicos") fail(`Eletrônicos é a categoria das novidades: não dá para ${method === "PUT" ? "renomear" : "excluir"}.`);
       if (method === "PUT") {
         const name = String(body.name || "").trim().replace(/\s+/g, " ");
         if (!name) fail("Preencha o campo nome da categoria.");
@@ -315,7 +316,6 @@
       const live = newsJobOf();
       if (live) return { id: live[0] };
       const cats = newsCats();
-      if (!cats.length) fail("A categoria Eletrônicos foi excluída: crie de novo em Mais > Categorias.");
       for (const i of d.items) if (cats.includes(i.cat) && !(i.id in ST.news.triagem)) ST.news.triagem[i.id] = PICK.test(plain(i.name));
       const week = Date.now() - 7 * 864e5;
       const seen = new Set();

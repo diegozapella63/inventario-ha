@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.32.1"
+VERSION = "1.33.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -416,7 +416,10 @@ class Store:
 
     # -- categorias: a lista padrão até alguém editar; editada, fica no inventário (entra no backup e nas versões)
     def cats(self) -> list[dict]:
-        return clean_cats(self.data.get("cats")) or default_cats()
+        cs = clean_cats(self.data.get("cats")) or default_cats()
+        if not any(c["id"] == "eletronicos" for c in cs):  # a das novidades sempre existe (uma lista antiga pode não ter)
+            cs.insert(0, {"id": "eletronicos", "name": CATS["eletronicos"]})
+        return cs
 
     def cat_map(self) -> dict:
         return {c["id"]: c["name"] for c in self.cats()}
@@ -443,6 +446,8 @@ class Store:
 
     def update_cat(self, cid: str, body: dict) -> dict:
         with self.lock:
+            if cid == "eletronicos":
+                raise ApiError(400, "Eletrônicos é a categoria das novidades: não dá para renomear.")
             cats = self.cats()
             cat = next((c for c in cats if c["id"] == cid), None)
             if not cat:
@@ -457,6 +462,8 @@ class Store:
         with self.lock:
             if cid == "outros":
                 raise ApiError(400, "A categoria Outros não pode ser excluída.")
+            if cid == "eletronicos":
+                raise ApiError(400, "Eletrônicos é a categoria das novidades: não dá para excluir.")
             cats = self.cats()
             if not any(c["id"] == cid for c in cats):
                 raise ApiError(404, "Esta categoria não existe mais.")
@@ -2363,6 +2370,8 @@ def news_job_start(body: dict) -> dict:
     it = STORE.item(str(body.get("item") or ""))
     if not it:
         raise ApiError(404, "Item não encontrado.")
+    if it.get("cat") not in news_cats():
+        raise ApiError(400, "As novidades são só dos eletrônicos.")
     if not SUPERVISOR_TOKEN and not AI_MOCK:
         raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
     web_jobs_cleanup()
@@ -2789,8 +2798,6 @@ def news_batch_start(auto: bool = False) -> dict:
             if v.get("kind") == "lote" and v["stage"] == "busy" and not v.get("cancelled"):
                 return {"id": j}  # já tem uma conferência andando: acompanha a mesma
     web_jobs_cleanup()
-    if not news_cats():
-        raise ApiError(400, "A categoria Eletrônicos foi excluída: crie de novo em Mais > Categorias.")
     jid = secrets.token_hex(8)
     with WEB_LOCK:
         WEB_JOBS[jid] = {"stage": "busy", "msg": "Começando…", "results": [], "at": time.time(), "kind": "lote", "auto": auto,

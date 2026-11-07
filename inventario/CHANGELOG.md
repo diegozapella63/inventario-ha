@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.33.0
+
+- **Buscar**: com bens cadastrados, o filtro **Tipo** vem antes do de cômodos: Itens da casa, Imóveis, Veículos ou Outros bens. Num tipo de bem, os filtros de cômodo e categoria saem, e **Bens** sai da lista de cômodos.
+- **Mais > Bens**: sai o botão Adicionar bem do alto da lista. O **+ Adicionar** de baixo já adiciona um bem nessa tela.
+- O botão **Novidades** da ficha só aparece nos **Eletrônicos**, como a lista de Novidades.
+- **Mais > Gráficos**: os bens saem de Cômodos, Categorias, Faixas de valor e Itens mais valiosos, que agora mostram só o que está dentro de casa. Os bens ganham um gráfico só deles. O patrimônio do alto continua somando tudo e diz quanto está em bens.
+- **Mais > Categorias**: **Eletrônicos** não se renomeia nem se exclui, porque é a categoria das novidades. Se tiver sido excluída antes, ela volta.
+
 ## 1.32.1
 
 - **Novo bem** e **Editar bem**: sem **Cômodo** e sem **Categoria**. No lugar, só o **Tipo**: Imóvel, Veículo ou Outro. Um item que veio de um cômodo pelo **Mover** fica em Outro e guarda a categoria que tinha. O botão diz **Salvar bem**.

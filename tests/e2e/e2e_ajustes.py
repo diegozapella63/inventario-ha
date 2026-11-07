@@ -223,6 +223,8 @@ async def body(r, p):
     r.eq((await pg.text_content(".page-title")).strip(), "Categorias", "Categorias numa tela própria")
     r.eq((await pg.text_content("#p-cats .opts li .ot b")).strip(), "15 categorias", "15 categorias de início")
     r.eq(await pg.locator('#p-cats [data-act="cat-del"][data-cat="outros"]').count(), 0, "Outros não se exclui")
+    r.eq(await pg.locator('#p-cats [data-cat="eletronicos"]').count(), 0, "Eletrônicos (a das novidades) não se renomeia nem se exclui")
+    r.check("Usada nas novidades" in await pg.locator("#p-cats li", has_text="Eletrônicos").first.text_content(), "e diz por quê")
     await pg.click('[data-act="cat-new"]')
     await pg.wait_for_selector("#cn-name")
     await pg.click("dialog [data-ok]")

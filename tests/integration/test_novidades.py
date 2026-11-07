@@ -66,6 +66,10 @@ class Simulado(ServerCase):
         st, _, body = self.app.request("POST", "api/news", {"item": "nao-existe"})
         self.assertEqual((st, body["error"]), (404, "Item não encontrado."))
 
+    def test_so_eletronicos(self):
+        st, _, body = self.app.request("POST", "api/news", {"item": "sal-001"})  # o sofá: Móveis
+        self.assertEqual((st, body["error"]), (400, "As novidades são só dos eletrônicos."))
+
     def test_sem_item_404(self):
         self.assertEqual(self.app.request("POST", "api/news", {})[0], 404)
 
@@ -162,12 +166,15 @@ class Todos(ServerCase):
         jid = self.app.ok("POST", "api/news/all", {})["id"]
         self.assertEqual(self.app.ok("DELETE", f"api/news/{jid}"), {"ok": True})
 
-    def test_sem_a_categoria_eletronicos_recusa(self):
+    def test_eletronicos_fica_sempre(self):
+        """Eletrônicos é a categoria das novidades: não se renomeia nem se exclui, e volta se faltar na lista guardada."""
         app = self.fresh(mock_ai=True)
-        app.ok("DELETE", "api/cats/eletronicos")
-        st, _, body = app.request("POST", "api/news/all", {})
-        self.assertEqual(st, 400)
-        self.assertIn("Eletrônicos foi excluída", body["error"])
+        st, _, body = app.request("DELETE", "api/cats/eletronicos")
+        self.assertEqual((st, body["error"]), (400, "Eletrônicos é a categoria das novidades: não dá para excluir."))
+        st, _, body = app.request("PUT", "api/cats/eletronicos", {"name": "Aparelhos"})
+        self.assertEqual((st, body["error"]), (400, "Eletrônicos é a categoria das novidades: não dá para renomear."))
+        self.assertEqual(app.data()["cats"][0], {"id": "eletronicos", "name": "Eletrônicos"})
+        self.assertEqual(app.ok("POST", "api/news/all", {})["id"] != "", True, "e as novidades continuam")
 
     def test_escolher_categorias_nao_vale_mais(self):
         app = self.fresh(mock_ai=True)

@@ -63,7 +63,8 @@ class Categorias(UnitBase):
     def test_lista_editada_com_imoveis_nao_repete(self):
         self.store.data["cats"] = [{"id": "imoveis", "name": "Casas"}, {"id": "outros", "name": "Outros"}]
         self.store.create_room({"kind": "bens"})
-        self.assertEqual([(c["id"], c["name"]) for c in self.store.cats()], [("imoveis", "Casas"), ("veiculos", "Veículos"), ("outros", "Outros")])
+        self.assertEqual([(c["id"], c["name"]) for c in self.store.cats()], [("eletronicos", "Eletrônicos"), ("imoveis", "Casas"), ("veiculos", "Veículos"), ("outros", "Outros")],
+                         "Eletrônicos (a das novidades) sempre existe")
 
     def test_lista_padrao_continua_padrao(self):
         self.store.create_room({"kind": "bens"})

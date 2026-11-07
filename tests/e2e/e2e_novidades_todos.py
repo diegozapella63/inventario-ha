@@ -80,16 +80,12 @@ async def body(r, p):
     await pg.locator(".toast", has_text="Tudo conferido nos últimos 7 dias").wait_for(timeout=15000)
     r.check(True, "conferir de novo na mesma semana não gasta a IA")
 
-    # um item de outra categoria conferido pela ficha não entra na lista (só eletrônicos)
-    jid = r.api("POST", "api/news", {"item": "coz-004"})["id"]
-    for _ in range(50):
-        if r.api("GET", f"api/news/{jid}")["stage"] != "busy":
-            break
-        await pg.wait_for_timeout(200)
-    r.check("coz-004" in r.api("GET", "api/news")["itens"], "a geladeira foi conferida pela ficha")
+    # um item de outra categoria: nem a ficha confere (só eletrônicos)
+    st, _, out = r.app.request("POST", "api/news", {"item": "coz-004"})
+    r.eq((st, out.get("error")), (400, "As novidades são só dos eletrônicos."), "a geladeira (Cozinha) não é conferida")
     await r.open(pg, "#/novidades", "#p-news-list .nlist")
     todos = await pg.evaluate("[...document.querySelectorAll('#p-news-list .nrow b')].map(b => b.textContent)")
-    r.check("Geladeira frost free inox" not in todos and "Smart TV 55 polegadas" in todos, "mas não entra na lista: só eletrônicos")
+    r.check("Geladeira frost free inox" not in todos and "Smart TV 55 polegadas" in todos, "e não entra na lista: só eletrônicos")
     r.eq(await pg.locator("#view .chip").count(), 0, "e continua sem escolher categorias")
 
     # Limpar novidades, com confirmação
