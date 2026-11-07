@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.33.1
+
+- **Buscar**: os filtros não cortam mais o texto, como em "Todas as categorias". Em celulares estreitos a letra fica um pouco menor e, nos bem estreitos, vem um filtro por linha.
+
 ## 1.33.0
 
 - **Buscar**: com bens cadastrados, o filtro **Tipo** vem antes do de cômodos: Itens da casa, Imóveis, Veículos ou Outros bens. Num tipo de bem, os filtros de cômodo e categoria saem, e **Bens** sai da lista de cômodos.

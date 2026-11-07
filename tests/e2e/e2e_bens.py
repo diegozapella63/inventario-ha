@@ -4,6 +4,10 @@ cômodos; no relatório, numa seção à parte (o total da casa não muda); a fi
 from e2e_lib import OVERFLOW, main
 
 
+# o texto escolhido de cada seleção da busca que não cabe nela (com a fonte do app)
+CUT = "[...document.querySelectorAll('.sfilters select')].filter(s => { const c = document.createElement('canvas').getContext('2d'); const st = getComputedStyle(s); c.font = st.fontSize + ' ' + st.fontFamily; return c.measureText(s.selectedOptions[0].textContent).width > s.clientWidth - parseFloat(st.paddingLeft) - parseFloat(st.paddingRight) + 1; }).map(s => s.selectedOptions[0].textContent)"
+
+
 def txt(s):
     return " ".join((s or "").replace("\xa0", " ").split())
 
@@ -110,7 +114,8 @@ async def body(r, p):
     r.check("Bens" not in await pg.evaluate("[...document.querySelectorAll('[data-input=\"search-room\"] option')].map(o => o.textContent)"), "Bens sai da lista de cômodos")
     grid = await pg.evaluate("[...document.querySelectorAll('.sfilters select')].map(s => { const b = s.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width)]; })")
     r.check(len({x[2] for x in grid}) == 1 and len({x[0] for x in grid}) == 2 and len({x[1] for x in grid}) == 2, f"no celular, quatro seleções iguais em duas linhas ({grid})")
-    cut = await pg.evaluate("[...document.querySelectorAll('.sfilters select')].filter(s => { const c = document.createElement('canvas').getContext('2d'); const st = getComputedStyle(s); c.font = st.fontSize + ' ' + st.fontFamily; return c.measureText(s.selectedOptions[0].textContent).width > s.clientWidth - parseFloat(st.paddingLeft) - parseFloat(st.paddingRight) + 1; }).map(s => s.selectedOptions[0].textContent)")
+    await pg.evaluate("document.fonts.ready.then(() => 1)")  # medir com a fonte do app, não com a de reserva
+    cut = await pg.evaluate(CUT)
     r.eq(cut, [], "nenhum texto das seleções cortado")
     await r.shot(pg, "busca-tipos")
     all_n = len(await pg.query_selector_all("#results .irow"))
@@ -206,6 +211,9 @@ async def body(r, p):
     for h, w in (("#/bens", ".mscreen.bens"), ("#/", ".tag")):
         await r.open(pg, h, w)
         r.check(await pg.evaluate(OVERFLOW), f"320 px, {h}: nada passa da largura")
+    await r.open(pg, "#/buscar", ".sfilters")
+    await pg.evaluate("document.fonts.ready.then(() => 1)")
+    r.eq(await pg.evaluate(CUT), [], "320 px: as seleções da busca, uma por linha, sem texto cortado")
     await r.shot(pg, "estreito", full_page=True)
     await ctx.close()
     await b.close()
