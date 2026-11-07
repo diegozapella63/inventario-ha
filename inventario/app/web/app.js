@@ -157,16 +157,18 @@
   const BENS_NEW = "@bens"; // a área ainda não existe: é criada ao gravar o primeiro bem
   const BENS_GROUPS = [["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["", "Outros"]];
   const bensGroup = (it) => (it.cat === "imoveis" || it.cat === "veiculos" ? it.cat : "");
+  const bensOn = () => S.settings.bens !== false; // Mais > Configurações > Opções > Usar bens (desligar não apaga)
   function derive() {
-    const all = [...S.rooms].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const bens = all.find((r) => r.kind === "bens") || null;
-    const rooms = all.filter((r) => r !== bens);
+    const sorted = [...S.rooms].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const area = sorted.find((r) => r.kind === "bens") || null, bens = bensOn() ? area : null;
+    const rooms = sorted.filter((r) => r !== area), all = bens ? sorted : rooms;
+    const items = area && !bens ? S.items.filter((i) => i.room !== area.id) : S.items; // os itens que contam (sem os bens, se desligados)
     const roomById = new Map(all.map((r) => [r.id, r]));
     const byRoom = new Map(all.map((r) => [r.id, []]));
     const photoItems = new Map();
     const catTotals = new Map();
     let total = 0;
-    for (const it of S.items) {
+    for (const it of items) {
       if (!byRoom.has(it.room)) byRoom.set(it.room, []);
       byRoom.get(it.room).push(it);
       const v = +it.value || 0;
@@ -183,15 +185,15 @@
       roomTotals.set(rid, list.reduce((s, i) => s + (+i.value || 0), 0));
     }
     const files = new Set();
-    for (const it of S.items) for (const p of it.photos || []) files.add(p);
+    for (const it of items) for (const p of it.photos || []) files.add(p);
     for (const r of rooms) for (const p of r.photos || []) files.add(p.file);
     const bensItems = bens ? byRoom.get(bens.id) || [] : [], bensTotal = bens ? roomTotals.get(bens.id) || 0 : 0;
-    D = { rooms, allRooms: all, bens, bensItems, bensTotal, houseTotal: total - bensTotal, houseCount: S.items.length - bensItems.length,
-      roomById, byRoom, roomTotals, catTotals, photoItems, total, photoCount: files.size, itemById: new Map(S.items.map((i) => [i.id, i])) };
+    D = { rooms, allRooms: all, bens, bensItems, bensTotal, houseTotal: total - bensTotal, houseCount: items.length - bensItems.length, items,
+      roomById, byRoom, roomTotals, catTotals, photoItems, total, photoCount: files.size, itemById: new Map(items.map((i) => [i.id, i])) };
   }
   const isBens = (rid) => rid === BENS_NEW || (!!D.bens && rid === D.bens.id);
   // as opções de cômodo de um item: os cômodos e, no fim, Bens
-  const roomOptions = (sel) => [...D.rooms, D.bens || { id: BENS_NEW, name: "Bens" }]
+  const roomOptions = (sel) => [...D.rooms, ...(bensOn() ? [D.bens || { id: BENS_NEW, name: "Bens" }] : [])]
     .map((r) => `<option value="${esc(r.id)}"${r.id === sel ? " selected" : ""}>${esc(r.name)}</option>`).join("");
   async function realRoom(rid) { // "@bens": cria a área Bens (uma vez) e devolve o id dela
     if (rid !== BENS_NEW) return rid;
@@ -407,7 +409,7 @@
     const q = Object.fromEntries(new URLSearchParams(qs));
     switch (parts[0]) {
       case "c": return D && D.bens && parts[1] === D.bens.id ? { name: "bens", q } : { name: "room", id: parts[1], q };
-      case "bens": return { name: "bens", q };
+      case "bens": return bensOn() ? { name: "bens", q } : { name: "menu" }; // bens desligados: o menu Mais
       case "i": return { name: "item", id: parts[1], q };
       case "buscar": return { name: "search", q };
       case "relatorio": return { name: "report", q };
@@ -677,9 +679,9 @@
         </div>
       </section>`;
     }
-    const n = S.items.length;
-    const byValue = [...S.items].sort((a, b) => (b.value || 0) - (a.value || 0));
-    const recent = [...S.items].sort((a, b) => parseDate(b.createdAt) - parseDate(a.createdAt)).slice(0, 6);
+    const n = D.items.length;
+    const byValue = [...D.items].sort((a, b) => (b.value || 0) - (a.value || 0));
+    const recent = [...D.items].sort((a, b) => parseDate(b.createdAt) - parseDate(a.createdAt)).slice(0, 6);
     const maxRoom = Math.max(0, ...D.rooms.map((r) => D.roomTotals.get(r.id) || 0));
     const bigRoom = D.rooms.find((r) => (D.roomTotals.get(r.id) || 0) === maxRoom);
     const top = byValue[0], last = recent[0];
@@ -831,7 +833,7 @@
   }
   function searchItems(q) {
     const toks = tokens(q.q || "");
-    let list = S.items;
+    let list = D.items;
     const tipo = D.bensItems.length ? q.tipo : "";
     if (tipo === "casa") list = list.filter((i) => !isBens(i.room));
     else if (tipoBens(tipo)) list = list.filter((i) => isBens(i.room) && (bensGroup(i) || "outros") === tipo);
@@ -962,7 +964,7 @@
   // -- Mais: um menu com o que não cabe na barra (Novidades, Relatório), Configurações e, por último, Sobre
   function viewMenu() {
     const rows = [
-      ["#/bens", "home", "Bens", "Casa, terreno, carro: o que fica fora de casa."],
+      bensOn() && ["#/bens", "home", "Bens", "Casa, terreno, carro: o que fica fora de casa."],
       ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
       newsOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
       ["#/categorias", "grid", "Categorias", "Criar, renomear e excluir."],
@@ -1027,7 +1029,7 @@
   // o gráfico deles. O patrimônio (o número do alto e o mês a mês) soma tudo.
   function chartData() {
     const total = D.houseTotal;
-    const house = S.items.filter((i) => !isBens(i.room));
+    const house = D.items.filter((i) => !isBens(i.room));
     const rooms = D.rooms.map((r) => ({ r, v: D.roomTotals.get(r.id) || 0, n: (D.byRoom.get(r.id) || []).length })).filter((x) => x.n).sort((a, b) => b.v - a.v || b.n - a.n);
     const ct = new Map();
     for (const i of house) { const k = CAT[i.cat] ? i.cat : "outros", t = ct.get(k) || { value: 0, count: 0 }; t.value += +i.value || 0; t.count++; ct.set(k, t); }
@@ -1043,12 +1045,12 @@
     for (const x of rooms) { if (acc * 2 >= total) break; acc += x.v; half++; }
     // patrimônio mês a mês, pela data de cadastro, do primeiro mês até hoje
     const ym = (d) => String(d || "").slice(0, 7);
-    const months = [...new Set(S.items.map((i) => ym(i.createdAt)).filter(Boolean))].sort();
+    const months = [...new Set(D.items.map((i) => ym(i.createdAt)).filter(Boolean))].sort();
     let series = [];
     if (months.length >= 2) {
       const now = new Date(), last = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const add = new Map();
-      for (const i of S.items) { const m = ym(i.createdAt) || months[0]; add.set(m, (add.get(m) || 0) + (+i.value || 0)); }
+      for (const i of D.items) { const m = ym(i.createdAt) || months[0]; add.set(m, (add.get(m) || 0) + (+i.value || 0)); }
       let [y, mo] = months[0].split("-").map(Number), sum = 0;
       for (let k = 0; k < 120; k++) { // até 10 anos
         const key = `${y}-${String(mo).padStart(2, "0")}`;
@@ -1070,7 +1072,7 @@
         <span class="hb-bar" aria-hidden="true"><i style="width:${Math.max(0.6, (x.v / max) * 100).toFixed(2)}%"></i></span></a></li>`).join("")}</ul>`;
   }
   function viewCharts() {
-    if (!S.items.length) return `<div class="empty"><h2>Nada para mostrar ainda</h2><p>Cadastre itens para ver os gráficos.</p><div class="acts"><button class="btn primary" data-act="item-new">${ic("plus")}Adicionar item</button></div></div>`;
+    if (!D.items.length) return `<div class="empty"><h2>Nada para mostrar ainda</h2><p>Cadastre itens para ver os gráficos.</p><div class="acts"><button class="btn primary" data-act="item-new">${ic("plus")}Adicionar item</button></div></div>`;
     const c = chartData(), T = c.total;
     const stat = (label, value, sub = "") => `<div class="kpi"><span>${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
     const bmax = Math.max(...c.bands.map((b) => b.n), 1);
@@ -1253,8 +1255,8 @@
     const res = ov.itens || {}, tri = ov.triagem || {};
     const rank = (g) => (newsRecall(g.r) ? 0 : newsCount(g.r) ? 1 : !g.r ? 2 : 3);
     const sortG = (a, b) => rank(a) - rank(b) || newsCount(b.r) - newsCount(a.r) || a.it.name.localeCompare(b.it.name, "pt-BR");
-    const chosen = newsGroups(S.items.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || (res[it.id] && tri[it.id] !== false))), ov).sort(sortG);
-    const out = newsGroups(S.items.filter((it) => tri[it.id] === false && ov.cats.includes(it.cat)), ov).sort(sortG);
+    const chosen = newsGroups(D.items.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || (res[it.id] && tri[it.id] !== false))), ov).sort(sortG);
+    const out = newsGroups(D.items.filter((it) => tri[it.id] === false && ov.cats.includes(it.cat)), ov).sort(sortG);
     ls.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map(newsRow).join("")}</ul>`
         : `<p class="muted">${ov.pendentes ? "Toque em Conferir novidades: a IA escolhe os equipamentos." : "Nenhum item em Eletrônicos."}</p>`}
       ${out.length ? `<details class="news-out"><summary>${ic("chev", "sm")}Deixados de fora pela IA (${int(out.length)})</summary><ul class="nlist">${out.map(newsRow).join("")}</ul></details>` : ""}`;
@@ -1514,6 +1516,12 @@
   }
   function moreOptions() {
     return `${moreNewsOptions()}
+    <section class="panel" id="p-bens">
+      <h2>${secIc("home")}Bens</h2>
+      <p class="lead">Casa, terreno, carro: o que fica fora de casa.</p>
+      <ul class="opts"><li><div class="ot"><b id="bens-h">Usar bens</b><span>Vale para todos os aparelhos. Desligar não apaga os bens.</span></div>
+        <div class="oa">${switchHtml("bens-on", bensOn(), "bens-h")}</div></li></ul>
+    </section>
     <section class="panel" id="p-zones">
       <h2>${secIc("pin")}Zonas</h2>
       <p class="lead">Partes de um cômodo, como Estante ou Rack da TV.</p>
@@ -3239,6 +3247,7 @@
     // Novo cômodo fica na aba Cômodos; aqui só o que entra no inventário
     const opts = [
       ["item", "plus", "Adicionar item", "Com foto e valor, preenchendo os campos"],
+      bensOn() && ["bem", "home", "Adicionar bem", "Casa, terreno, carro: o que fica fora de casa"],
       aiOn() && ["catalog", "scan", "Catalogar foto com IA", "A IA lista vários itens de uma foto"],
       voiceReady() && ["voice", "mic", "Falar os itens", `Diga o que tem e quanto vale; ${voiceSplit(st)}`],
     ].filter(Boolean);
@@ -3255,7 +3264,7 @@
       const b = e.target.closest("[data-go]");
       if (!b) return;
       const go = b.dataset.go;
-      finalizeThen(entry, () => { if (go === "item") openEditor({ room: rid }); else if (go === "catalog") openCatalog({ room: rid }); else if (go === "voice") openCatalog({ room: rid, voice: true }); });
+      finalizeThen(entry, () => { if (go === "item") openEditor({ room: rid }); else if (go === "bem") openEditor({ room: D.bens?.id || BENS_NEW }); else if (go === "catalog") openCatalog({ room: rid }); else if (go === "voice") openCatalog({ room: rid, voice: true }); });
     });
   }
 
@@ -3579,17 +3588,19 @@
           : val ? `Avisar: ${val === "todos" ? "todos" : (newsPeople || []).find((x) => x.id === val)?.name || "ligado"}` : "Sem aviso das novidades");
       } catch (er) { fail(er); renderView(false); }
     }
-    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on") {
-      const key = k === "ai-on" ? "ai" : k === "zones-on" ? "zones" : k === "news-on" ? "news" : "ha_sensors", on = t.checked;
+    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on" || k === "bens-on") {
+      const key = { "ai-on": "ai", "zones-on": "zones", "news-on": "news", "bens-on": "bens" }[k] || "ha_sensors", on = t.checked;
       t.disabled = true;
       try {
         await API.put("api/settings", { [key]: on });
         S.settings[key] = on;
         aiCache.at = 0;
+        if (key === "bens") derive(); // os bens entram ou saem de tudo (patrimônio, busca, gráficos, relatório)
         renderView(false);
         toast(key === "ai" ? (on ? "IA ligada" : "IA desligada: os botões de IA ficaram escondidos")
           : key === "ha_sensors" ? (on ? "Sensor criado no Home Assistant" : "Sensores desligados: o sensor saiu do Home Assistant")
           : key === "news" ? (on ? "Novidades ligadas" : "Novidades desligadas")
+          : key === "bens" ? (on ? "Bens ligados" : "Bens desligados: os bens gravados continuam guardados")
           : on ? "Zonas ligadas" : "Zonas desligadas: as zonas gravadas continuam guardadas");
       } catch (er) { t.checked = !on; fail(er); }
       finally { t.disabled = false; }

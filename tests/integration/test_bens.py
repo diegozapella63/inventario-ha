@@ -38,6 +38,24 @@ class Bens(ServerCase):
         rows = self.app.request("GET", "api/export.csv")[2].decode("utf-8-sig")
         self.assertIn("Terreno na serra", rows, "a planilha tem os bens")
 
+    def test_desligado_some_dos_outros_apps(self):
+        self.app.ok("POST", "api/rooms", {"kind": "bens"})
+        it = self.app.ok("POST", "api/items", {"room": "bens", "name": "Moto 150", "cat": "veiculos", "value": "9.000"})["item"]
+        self.assertEqual(self.app.ok("PUT", "api/settings", {"bens": False})["bens"], False)
+        self.assertIs(self.app.data()["settings"]["bens"], False)
+        try:
+            com = self.app.get("api/integracao/comodos", headers=self.chave())[2]["comodos"]
+            self.assertNotIn("bens", [c["id"] for c in com], "o ResolvIA e a CronologIA ficam sem a área Bens")
+            its = self.app.get("api/integracao/itens", headers=self.chave())[2]["itens"]
+            self.assertNotIn(it["id"], [i["id"] for i in its], "o GerencIA fica sem os bens no patrimônio")
+            self.assertIn(it["id"], [i["id"] for i in self.app.data()["items"]], "e o bem continua guardado")
+            self.assertEqual(self.app.post("api/rooms", {"kind": "bens"})[0], 409)
+            self.assertEqual(self.app.request("PUT", "api/settings", {"bens": "não"})[0], 400)
+        finally:
+            self.app.ok("PUT", "api/settings", {"bens": True})
+        its = self.app.get("api/integracao/itens", headers=self.chave())[2]["itens"]
+        self.assertIn(it["id"], [i["id"] for i in its], "ligado de novo: volta")
+
 
 if __name__ == "__main__":
     unittest.main()

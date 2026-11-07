@@ -9,7 +9,7 @@
   const catsOf = (d) => { if (!Array.isArray(d.cats) || !d.cats.length) d.cats = clone(DEF_CATS); return d.cats; };
   const CATS = { has: (k) => ST.data && catsOf(ST.data).some((c) => c.id === k) };
   const foldName = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const ST = { data: null, rev: 1, blobs: new Map(), jobs: new Map(), settings: { ai_entity: "", ai_search: "", ai: true, zones: false, ha_sensors: false, voice_stt: "", news: true, news_every: 0, news_notify: "" },
+  const ST = { data: null, rev: 1, blobs: new Map(), jobs: new Map(), settings: { ai_entity: "", ai_search: "", ai: true, zones: false, ha_sensors: false, voice_stt: "", news: true, news_every: 0, news_notify: "", bens: true },
     news: { itens: {}, triagem: {}, ultima: null } };
   const now = () => new Date().toISOString();
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -109,7 +109,7 @@
     if (method === "GET" && path === "api/data") {
       const st = ST.settings;
       return { ...clone(d), rev: ST.rev, version: "%%V%%", user: null, features: { ai: true, share: false },
-        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "" } };
+        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false } };
     }
     if (method === "GET" && path === "api/rev") return { rev: ST.rev };
     if (method === "POST" && path === "api/items") {
@@ -177,6 +177,7 @@
       }
     }
     if (method === "POST" && path === "api/rooms" && body.kind === "bens") { // a área Bens (fora de casa): criada uma vez
+      if (ST.settings.bens === false) fail("Os bens estão desligados. Para usar, ligue em Mais > Configurações > Opções.", 409);
       let r = d.rooms.find((x) => x.kind === "bens");
       if (!r) {
         r = { id: room(d, "bens") ? "bens-2" : "bens", code: d.rooms.some((x) => x.code === "BEN") ? "BEN2" : "BEN", name: "Bens", kind: "bens", order: d.rooms.length, cover: 0, photos: [], updatedAt: now() };

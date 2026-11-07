@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.33.1"
+VERSION = "1.34.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -636,6 +636,8 @@ class Store:
     def create_room(self, body: dict) -> dict:
         with self.lock:
             if body.get("kind") == "bens":  # a área Bens: criada na primeira vez, depois devolve a mesma
+                if not bens_enabled():
+                    raise ApiError(409, "Os bens estão desligados. Para usar, ligue em Mais > Configurações > Opções.")
                 return self._ensure_bens()
             if body.get("kind"):
                 raise ApiError(400, "Tipo de cômodo inválido.")
@@ -1085,6 +1087,20 @@ def ai_enabled() -> bool:
 
 def zones_enabled() -> bool:
     return STORE.settings.get("zones") is True
+
+
+def bens_enabled() -> bool:
+    """Bens (o que fica fora de casa): vem ligado. Desligado, os bens somem do app, dos outros apps e da IA, sem apagar."""
+    return STORE.settings.get("bens") is not False
+
+
+def visible_data() -> tuple[list, list]:
+    """Os cômodos e os itens que contam: sem a área Bens e os bens dela quando Usar bens está desligado."""
+    rooms, items = STORE.data.get("rooms") or [], STORE.data.get("items") or []
+    if bens_enabled():
+        return rooms, items
+    hid = {r["id"] for r in rooms if r.get("kind") == "bens"}
+    return [r for r in rooms if r["id"] not in hid], [i for i in items if i.get("room") not in hid]
 
 
 def sensors_enabled() -> bool:
@@ -2837,11 +2853,11 @@ def chat_context(screen: dict) -> str:
     """O que a IA precisa saber: o resumo da casa e o que está na tela (um item, um cômodo, uma busca, Novidades…)."""
     screen = screen if isinstance(screen, dict) else {}
     cats = STORE.cat_map()
-    items = STORE.data["items"]
+    rooms, items = visible_data()  # com Usar bens desligado, a IA não vê os bens
     total = sum(float(i.get("value") or 0) for i in items)
-    lines = [f"Inventário: {len(items)} itens em {len(STORE.data['rooms'])} cômodos, total {_money(total)}."]
+    lines = [f"Inventário: {len(items)} itens em {len(rooms)} cômodos, total {_money(total)}."]
     by_room = []
-    for r in sorted(STORE.data["rooms"], key=lambda r: r.get("order", 0)):
+    for r in sorted(rooms, key=lambda r: r.get("order", 0)):
         its = [i for i in items if i["room"] == r["id"]]
         by_room.append(f"{r['code']} {r['name']}: {len(its)} itens, {_money(sum(float(i.get('value') or 0) for i in its))}")
     lines.append("Cômodos: " + "; ".join(by_room) + ".")
@@ -3186,7 +3202,7 @@ def r_data(h, query):
         out = STORE.public()
     out.update({"version": VERSION, "user": h.user(),
                 "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai_search": STORE.settings.get("ai_search") or "",
-                             "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "ha_sensors": sensors_enabled(),
+                             "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "bens": bens_enabled(), "ha_sensors": sensors_enabled(),
                              "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target()},
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
     h.send_json(out)
@@ -3400,7 +3416,7 @@ def r_settings_put(h, query):
             if e and not re.fullmatch(rx, e):
                 raise ApiError(400, msg)
             upd[key] = e
-    for key in ("ai", "zones", "ha_sensors", "news"):
+    for key in ("ai", "zones", "ha_sensors", "news", "bens"):
         if key in body:
             if not isinstance(body[key], bool):
                 raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
@@ -3643,9 +3659,10 @@ def conexao_loop():
 
 def r_integracao_comodos(h, query):
     with STORE.lock:
-        rooms = sorted(STORE.data.get("rooms") or [], key=lambda r: r.get("order", 0))
+        rooms, items = visible_data()  # com Usar bens desligado, a área Bens não vai para os outros apps
+        rooms = sorted(rooms, key=lambda r: r.get("order", 0))
         conta = {}
-        for it in STORE.data.get("items") or []:
+        for it in items:
             conta[it.get("room")] = conta.get(it.get("room"), 0) + 1
         out = [{"id": r["id"], "nome": r.get("name") or r["id"], "codigo": r.get("code") or "", "itens": conta.get(r["id"], 0),
                 **({"tipo": "bens"} if r.get("kind") == "bens" else {})} for r in rooms]  # Bens: o que fica fora de casa
@@ -3656,8 +3673,9 @@ def r_integracao_itens(h, query):
     """Os itens (equipamentos, móveis…), para os outros apps: o ResolvIA liga uma tarefa a um deles; o GerencIA soma os valores
     no patrimônio (com a data do valor, para depreciar)."""
     with STORE.lock:
-        order = {r["id"]: r.get("order", 0) for r in STORE.data.get("rooms") or []}
-        items = sorted(STORE.data.get("items") or [], key=lambda it: (order.get(it.get("room"), 999), (it.get("name") or "").lower()))
+        rooms, items = visible_data()  # com Usar bens desligado, os bens não entram no patrimônio do GerencIA
+        order = {r["id"]: r.get("order", 0) for r in rooms}
+        items = sorted(items, key=lambda it: (order.get(it.get("room"), 999), (it.get("name") or "").lower()))
         out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "comodo": it.get("room") or "", "zona": (it.get("zone") or "")[:60],
                 "categoria": it.get("cat") or "outros", "valor": round(float(it.get("value") or 0), 2),
                 "valor_em": str(it.get("valueAt") or it.get("createdAt") or "")[:10]} for it in items if it.get("id")]

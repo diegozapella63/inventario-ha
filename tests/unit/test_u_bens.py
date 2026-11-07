@@ -71,5 +71,37 @@ class Categorias(UnitBase):
         self.assertNotIn("cats", self.store.data, "sem lista editada, nada é gravado")
 
 
+
+class UsarBens(UnitBase):
+    """Mais > Configurações > Opções > Usar bens: vem ligado; desligado, os bens somem do app, dos outros apps e da IA."""
+
+    def setUp(self):
+        super().setUp()
+        self.area = self.store.create_room({"kind": "bens"})
+        self.carro = self.store.create_items([{"room": self.area["id"], "name": "Carro hatch", "cat": "veiculos", "value": 60000}], None)[0]
+
+    def test_vem_ligado(self):
+        self.assertTrue(S.bens_enabled())
+        rooms, items = S.visible_data()
+        self.assertIn(self.area, rooms)
+        self.assertIn(self.carro, items)
+
+    def test_desligado_some_sem_apagar(self):
+        self.store.settings["bens"] = False
+        rooms, items = S.visible_data()
+        self.assertNotIn(self.area["id"], [r["id"] for r in rooms])
+        self.assertNotIn(self.carro["id"], [i["id"] for i in items])
+        self.assertIn(self.carro, self.store.data["items"], "o bem continua guardado")
+        self.assertNotIn("Carro hatch", S.chat_context({}), "a IA não vê os bens")
+        self.assertNotIn("Bens", S.chat_context({}).split("Cômodos:")[1].split(".")[0], "nem a área Bens")
+
+    def test_desligado_nao_cria_a_area(self):
+        self.store.data["rooms"] = [r for r in self.store.data["rooms"] if r.get("kind") != "bens"]
+        self.store.settings["bens"] = False
+        with self.assertRaises(S.ApiError) as e:
+            self.store.create_room({"kind": "bens"})
+        self.assertEqual((e.exception.status, e.exception.msg), (409, "Os bens estão desligados. Para usar, ligue em Mais > Configurações > Opções."))
+
+
 if __name__ == "__main__":
     unittest.main()

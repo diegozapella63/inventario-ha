@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.34.0
+
+- **+ Adicionar**: nova opção **Adicionar bem**, logo depois de Adicionar item.
+- **Mais > Configurações > Opções > Usar bens**: desligado, os bens somem de tudo:
+  - do menu Mais, do Início, da busca, dos gráficos, do relatório e da conversa com a IA;
+  - do ResolvIA, da CronologIA e do patrimônio do GerencIA.
+
+  Desligar não apaga os bens. Ao ligar de novo, eles voltam como estavam.
+
 ## 1.33.1
 
 - **Buscar**: os filtros não cortam mais o texto, como em "Todas as categorias". Em celulares estreitos a letra fica um pouco menor e, nos bem estreitos, vem um filtro por linha.
