@@ -370,8 +370,8 @@
       }
       return { items, entity: "ai_task.exemplo", example: true };
     }
-    if (method === "GET" && path === "api/news/targets") return { targets: [{ id: "mobile_app_celular_de_exemplo", name: "Celular de Exemplo" }] };
-    if (method === "POST" && path === "api/news/notify-test") return { ok: true, example: true };
+    if (method === "GET" && path === "api/news/people") return { people: [{ id: "person.ana", name: "Ana", phone: true }, { id: "person.beto", name: "Beto", phone: true }] };
+    if (method === "POST" && path === "api/news/notify-test") return { ok: true, sent: body.who === "todos" ? 2 : 1, example: true };
     if (path === "api/settings") { if (method === "PUT") Object.assign(ST.settings, body); return { ...ST.settings }; }
     if (path === "api/backups") fail(OFF + "os backups vão para a pasta share/inventario.");
     if (path === "api/history") {

@@ -1447,12 +1447,20 @@
   }
   // Opções: o que muda o jeito de cadastrar e de ver o inventário, para a casa toda
   const NEWS_EVERY = [[0, "Não"], [7, "Toda semana"], [15, "A cada 15 dias"], [30, "Todo mês"]];
-  let newsTargets = null; // os celulares que recebem aviso (do Home Assistant)
+  // Avisar: uma pessoa da casa (ou todas), nunca um aparelho, como no ResolvIA e na CronologIA; o aviso vai para os
+  // celulares ligados à pessoa no Home Assistant (Configurações > Pessoas)
+  let newsPeople = null;
   function newsNotifyOptions() {
-    const cur = S.settings.news_notify || "";
-    const list = [["", "Não avisar"], ["persistent", "Notificação do Home Assistant"], ...(newsTargets || []).map((t) => [t.id, t.name])];
-    if (cur && !list.some(([k]) => k === cur)) list.push([cur, cur.replace(/^mobile_app_/, "").replace(/_/g, " ")]); // o celular saiu do Home Assistant
-    return list.map(([k, v]) => `<option value="${esc(k)}"${k === cur ? " selected" : ""}>${esc(v)}</option>`).join("");
+    const cur = S.settings.news_notify || "", ps = newsPeople || [];
+    const list = [["", "Não avisar"], ...(ps.filter((x) => x.phone).length > 1 ? [["todos", "Todos"]] : []),
+      ...ps.map((x) => [x.id, x.phone ? x.name : `${x.name} (sem celular)`, !x.phone && x.id !== cur])];
+    if (cur && !list.some(([k]) => k === cur)) list.push([cur, cur === "todos" ? "Todos" : "Pessoa que saiu do Home Assistant"]);
+    return list.map(([k, v, off]) => `<option value="${esc(k)}"${k === cur ? " selected" : ""}${off ? " disabled" : ""}>${esc(v)}</option>`).join("");
+  }
+  function newsWhoHint() {
+    const ps = newsPeople;
+    if (ps && !ps.some((x) => x.phone)) return "Ligue o celular a uma pessoa no Home Assistant (Configurações > Pessoas).";
+    return "Quando a conferência sozinha achar novidade.";
   }
   // Avisar (e Testar) só com Conferir sozinho: o aviso vem só dessa conferência; com "Não", nada avisaria
   function moreNewsOptions() {
@@ -1465,7 +1473,7 @@
         <div class="oa">${switchHtml("news-on", on, "news-h")}</div></li>
       ${on ? `<li><div class="ot"><b>Conferir sozinho</b><span>A IA confere os eletrônicos de tempos em tempos.</span></div>
         <div class="oa"><select class="select" data-input="news-every" aria-label="Conferir sozinho">${NEWS_EVERY.map(([k, v]) => `<option value="${k}"${k === every ? " selected" : ""}>${v}</option>`).join("")}</select></div></li>
-      ${every ? `<li><div class="ot"><b>Avisar</b><span>Quando a conferência sozinha achar novidade.</span></div>
+      ${every ? `<li><div class="ot"><b>Avisar</b><span data-slot="news-who">${esc(newsWhoHint())}</span></div>
         <div class="oa"><select class="select" data-input="news-notify" aria-label="Avisar">${newsNotifyOptions()}</select></div></li>
       ${S.settings.news_notify ? `<li><div class="ot"><b>Testar o aviso</b><span>Manda um aviso agora.</span></div>
         <div class="oa"><button type="button" class="btn" data-act="news-notify-test">${ic("send")}Testar</button></div></li>` : ""}` : ""}` : ""}
@@ -1473,10 +1481,11 @@
     </section>`;
   }
   async function loadNewsTargets() {
-    if (newsTargets || !newsOn()) return;
-    try { newsTargets = (await API.get("api/news/targets")).targets || []; } catch { newsTargets = []; }
-    const sel = $('#view [data-input="news-notify"]');
+    if (newsPeople || !newsOn()) return;
+    try { newsPeople = (await API.get("api/news/people")).people || []; } catch { newsPeople = []; }
+    const sel = $('#view [data-input="news-notify"]'), hint = $('#view [data-slot="news-who"]');
     if (sel) sel.innerHTML = newsNotifyOptions();
+    if (hint) hint.textContent = newsWhoHint();
   }
   function moreOptions() {
     return `${moreNewsOptions()}
@@ -3454,7 +3463,7 @@
       case "news-clear": clearNews(); break;
       case "news-notify-test":
         b.disabled = true;
-        API.post("api/news/notify-test", { target: S.settings.news_notify }).then(() => toast("Aviso enviado"), fail).finally(() => { b.disabled = false; });
+        API.post("api/news/notify-test", { who: S.settings.news_notify }).then((r) => toast(r.sent > 1 ? `Aviso enviado para ${r.sent} celulares` : "Aviso enviado"), fail).finally(() => { b.disabled = false; });
         break;
       case "news-open": { const it = D.itemById.get(b.dataset.id); if (it) openNews(it); break; }
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }
@@ -3525,7 +3534,7 @@
         S.settings[key] = val;
         renderView(false);
         toast(key === "news_every" ? (val ? `Conferir sozinho: ${NEWS_EVERY.find(([d]) => d === val)[1].toLowerCase()}` : "Conferir sozinho desligado")
-          : val ? "Aviso das novidades ligado" : "Sem aviso das novidades");
+          : val ? `Avisar: ${val === "todos" ? "todos" : (newsPeople || []).find((x) => x.id === val)?.name || "ligado"}` : "Sem aviso das novidades");
       } catch (er) { fail(er); renderView(false); }
     }
     else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on") {

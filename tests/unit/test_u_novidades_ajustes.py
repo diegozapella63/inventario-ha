@@ -42,16 +42,63 @@ class Intervalo(UnitBase):
 
 
 class Destino(UnitBase):
-    def test_celular_ou_aviso_do_home_assistant(self):
-        for v, want in (("persistent", "persistent"), ("mobile_app_celular_da_ana", "mobile_app_celular_da_ana"), ("", ""),
-                        ("notify.mobile_app_x", ""), ("mobile_app_X", ""), ("mobile_app_a/../b", ""), (None, "")):
+    def test_todos_ou_uma_pessoa(self):
+        for v, want in (("todos", "todos"), ("person.ana", "person.ana"), ("", ""), ("persistent", ""), ("mobile_app_celular_da_ana", ""),
+                        ("person.Ana", ""), ("person.a/../b", ""), ("light.sala", ""), (None, "")):
             self.store.settings["news_notify"] = v
             self.assertEqual(server.news_notify_target(), want, repr(v))
 
-    def test_nome_do_celular(self):
-        self.assertEqual(server.phone_name("mobile_app_celular_da_ana"), "Celular da Ana")
-        self.assertEqual(server.phone_name("mobile_app_tablet_da_sala"), "Tablet da Sala")
-        self.assertEqual(server.phone_name("mobile_app_de_teste"), "De Teste", "a primeira palavra sempre maiúscula")
+    def test_slug_como_o_home_assistant(self):
+        self.assertEqual(server.ha_slug("Celular da Ana"), "celular_da_ana")
+        self.assertEqual(server.ha_slug("Relógio  Zé!"), "relogio_ze")
+
+
+class Pessoas(UnitBase):
+    """O aviso vai para a pessoa: os celulares dela são os do app Home Assistant entre os rastreadores dela (como no
+    ResolvIA e na CronologIA)."""
+
+    def test_pessoas_e_celulares(self):
+        self.fake_ha()
+        self.assertEqual(server.news_people(), [
+            {"id": "person.ana", "name": "Ana", "phones": ["mobile_app_celular_da_ana"]},  # pelo nome do aparelho, não do rastreador
+            {"id": "person.beto", "name": "Beto", "phones": []},  # o roteador não é celular
+            {"id": "person.carla", "name": "Carla", "phones": ["mobile_app_tablet_da_sala"]},  # fora dos registros: pelo nome do rastreador
+        ])
+
+    def test_sem_os_registros_pelo_nome_do_rastreador(self):
+        ha = self.fake_ha()
+        ha.ws_fail = True
+        ana = next(p for p in server.news_people() if p["id"] == "person.ana")
+        self.assertEqual(ana["phones"], [], "device_tracker.pixel_ana → mobile_app_pixel_ana, que não existe")
+        carla = next(p for p in server.news_people() if p["id"] == "person.carla")
+        self.assertEqual(carla["phones"], ["mobile_app_tablet_da_sala"])
+
+    def test_rastreadores_tortos(self):
+        self.assertEqual(server.tracker_phones(None, {"mobile_app_x"}, None), [])
+        self.assertEqual(server.tracker_phones(["device_tracker.x", "device_tracker.x"], {"mobile_app_x"}, None), ["mobile_app_x"], "sem repetir")
+        self.assertEqual(server.tracker_phones(["device_tracker.x"], {"mobile_app_x"}, {"device_tracker.x": None}), [], "rastreador sem aparelho")
+
+    def test_cache_de_um_minuto(self):
+        ha = self.fake_ha()
+        server.news_people()
+        n = len(ha.calls("GET", "/core/api/states"))
+        server.news_people()
+        self.assertEqual(len(ha.calls("GET", "/core/api/states")), n)
+
+    def test_sem_home_assistant_ninguem(self):
+        self.assertEqual(server.news_people(), [])
+
+    def test_celulares_de_quem_recebe(self):
+        self.fake_ha()
+        self.assertEqual(server.news_phones("todos"), ["mobile_app_celular_da_ana", "mobile_app_tablet_da_sala"],
+                         "todos: os celulares de todas as pessoas (o celular de ninguém fica de fora)")
+        self.assertEqual(server.news_phones("person.ana"), ["mobile_app_celular_da_ana"])
+        with self.assertRaises(server.ApiError) as e:
+            server.news_phones("person.beto")
+        self.assertEqual(e.exception.msg, "Sem celular ligado a Beto no Home Assistant (Configurações > Pessoas).")
+        with self.assertRaises(server.ApiError) as e:
+            server.news_phones("person.zeca")
+        self.assertIn("não está mais no Home Assistant", e.exception.msg)
 
 
 class NovasEntradas(UnitBase):
@@ -86,41 +133,41 @@ class Aviso(UnitBase):
         with mock.patch.object(server.socket, "gethostname", return_value="meu-computador"):
             self.assertIsNone(server.news_notice(2)["link"])
 
-    def test_no_celular(self):
+    def test_para_a_pessoa(self):
         ha = self.fake_ha()
         with mock.patch.object(server.socket, "gethostname", return_value="local-inventario"):
-            server.send_news_notice(3, "mobile_app_celular_da_ana")
+            self.assertEqual(server.send_news_notice(3, "person.ana"), 1)
         c = ha.calls("POST", "/core/api/services/notify/")
-        self.assertEqual([x["path"] for x in c], ["/core/api/services/notify/mobile_app_celular_da_ana"])
+        self.assertEqual([x["path"] for x in c], ["/core/api/services/notify/mobile_app_celular_da_ana"], "no celular da Ana")
         b = c[0]["body"]
         self.assertEqual((b["title"], b["message"]), ("InventarIA", "Novidades em 3 itens. Toque para abrir."))
         self.assertEqual(b["data"]["url"], "/app/local_inventario/novidades", "no iPhone, tocar abre o app em Novidades")
         self.assertEqual(b["data"]["clickAction"], "/app/local_inventario/novidades", "no Android também")
         self.assertEqual(b["data"]["tag"], "inventaria-novidades", "um aviso novo troca o anterior, não empilha")
 
-    def test_no_home_assistant(self):
+    def test_para_todos(self):
         ha = self.fake_ha()
-        with mock.patch.object(server.socket, "gethostname", return_value="local-inventario"):
-            server.send_news_notice(2, "persistent")
-        c = ha.calls("POST", "/core/api/services/persistent_notification/create")
-        self.assertEqual(len(c), 1)
-        self.assertEqual(c[0]["body"]["message"], "Novidades em 2 itens. [Abrir as novidades](/app/local_inventario/novidades)")
-        self.assertEqual(c[0]["body"]["notification_id"], "inventaria_novidades")
+        self.assertEqual(server.send_news_notice(2, "todos"), 2)
+        self.assertEqual(sorted(x["path"].rsplit("/", 1)[1] for x in ha.calls("POST", "/core/api/services/notify/")),
+                         ["mobile_app_celular_da_ana", "mobile_app_tablet_da_sala"])
+
+    def test_nenhum_celular_recebe_da_erro(self):
+        ha = self.fake_ha()
+        ha.notify_status = 500
+        with self.assertRaises(server.ApiError):
+            server.send_news_notice(2, "todos")
+
+    def test_o_escolhido_nas_opcoes(self):
+        self.fake_ha()
+        self.store.settings["news_notify"] = "person.carla"
+        self.assertEqual(server.send_news_notice(2), 1)
 
     def test_sem_destino_recusa(self):
         self.fake_ha()
-        with self.assertRaises(server.ApiError) as e:
-            server.send_news_notice(2, "")
-        self.assertEqual(e.exception.status, 400)
-
-    def test_celulares_do_home_assistant(self):
-        self.fake_ha()
-        self.assertEqual(server.notify_targets(), [{"id": "mobile_app_celular_da_ana", "name": "Celular da Ana"},
-                                                   {"id": "mobile_app_tablet_da_sala", "name": "Tablet da Sala"}],
-                         "só os celulares (notify.mobile_app_*), sem notify.notify nem a de luz")
-
-    def test_sem_home_assistant_nenhum_celular(self):
-        self.assertEqual(server.notify_targets(), [])
+        for who in ("", "persistent", "mobile_app_celular_da_ana"):
+            with self.assertRaises(server.ApiError) as e:
+                server.send_news_notice(2, who)
+            self.assertEqual((e.exception.status, e.exception.msg), (400, "Escolha quem avisar."))
 
 
 class Sozinho(UnitBase):

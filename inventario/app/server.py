@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.31.2"
+VERSION = "1.32.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -1092,7 +1092,8 @@ def need_ai_on():
 
 # -- Novidades nas Configurações (Opções): ligar e desligar, conferir sozinho de tempos em tempos e avisar no celular
 NEWS_EVERY = (0, 7, 15, 30)  # dias; 0 = só quando a pessoa pede
-NOTIFY_RE = re.compile(r"mobile_app_[a-z0-9_]+")
+NOTIFY_RE = re.compile(r"mobile_app_[a-z0-9_]+")  # o serviço de um celular (notify.mobile_app_*)
+WHO_RE = re.compile(r"todos|person\.[a-z0-9_]+")  # quem recebe o aviso: todos ou uma pessoa do Home Assistant
 NEWS_TICK = max(1, int(os.environ.get("INV_NEWS_TICK") or 1800))  # de quanto em quanto tempo o app olha se está na hora (s)
 
 
@@ -1112,8 +1113,9 @@ def news_every() -> int:
 
 
 def news_notify_target() -> str:
+    """Quem recebe o aviso das novidades: "todos", "person.<pessoa>" ou "" (não avisar)."""
     t = str(STORE.settings.get("news_notify") or "")
-    return t if t == "persistent" or NOTIFY_RE.fullmatch(t) else ""
+    return t if WHO_RE.fullmatch(t) else ""
 
 
 # -- uso da IA: o Home Assistant não devolve tokens nem custo, então o app conta as chamadas (como no EconomIA)
@@ -2634,45 +2636,116 @@ def news_notice(n: int, test: bool = False) -> dict:
     return {"title": "InventarIA" + (" (teste)" if test else ""), "message": msg, "link": link}
 
 
-def send_news_notice(n: int, target: str | None = None, test: bool = False):
-    target = target or news_notify_target()
+def send_news_notice(n: int, who: str | None = None, test: bool = False) -> int:
+    """Manda o aviso para os celulares de quem foi escolhido (todos ou uma pessoa). Devolve quantos celulares receberam."""
+    who = who or news_notify_target()
+    if not WHO_RE.fullmatch(who or ""):
+        raise ApiError(400, "Escolha quem avisar.")
+    phones = news_phones(who)
     note = news_notice(n, test)
-    if AI_MOCK and not SUPERVISOR_TOKEN and (target == "persistent" or NOTIFY_RE.fullmatch(target or "")):
-        log.info("aviso simulado para %s: %s", target, note["message"])  # dev/run.sh: sem Home Assistant
-        return
-    if target == "persistent":
-        msg = note["message"].replace("Toque para abrir.", f"[Abrir as novidades]({note['link']})" if note["link"] else "").strip()
-        ha_request("POST", "/services/persistent_notification/create",
-                   {"title": note["title"], "message": msg, "notification_id": "inventaria_novidades"}, timeout=15)
-    elif NOTIFY_RE.fullmatch(target or ""):
-        data = {"tag": "inventaria-novidades", "group": "inventaria", "channel": "Novidades"}
-        if note["link"]:
-            data.update(url=note["link"], clickAction=note["link"])
-        ha_request("POST", f"/services/notify/{target}", {"title": note["title"], "message": note["message"], "data": data}, timeout=15)
-    else:
-        raise ApiError(400, "Escolha onde avisar.")
-
-
-def phone_name(svc: str) -> str:
-    """mobile_app_celular_da_ana → "Celular da Ana"."""
-    small = {"da", "de", "do", "das", "dos", "e"}
-    ws = svc[len("mobile_app_"):].split("_")
-    return " ".join(w if i and w in small else w.capitalize() for i, w in enumerate(ws) if w)
-
-
-def notify_targets() -> list[dict]:
-    """Os celulares que recebem avisos (notify.mobile_app_*), com um nome legível."""
     if AI_MOCK and not SUPERVISOR_TOKEN:
-        return [{"id": "mobile_app_celular_de_teste", "name": "Celular de Teste"}]
+        log.info("aviso simulado para %s: %s", ", ".join(phones), note["message"])  # dev/run.sh: sem Home Assistant
+        return len(phones)
+    data = {"tag": "inventaria-novidades", "group": "inventaria", "channel": "Novidades"}
+    if note["link"]:
+        data.update(url=note["link"], clickAction=note["link"])
+    sent, err = 0, None
+    for ph in phones:
+        try:
+            ha_request("POST", f"/services/notify/{ph}", {"title": note["title"], "message": note["message"], "data": data}, timeout=15)
+            sent += 1
+        except ApiError as e:
+            log.warning("aviso das novidades para %s: %s", ph, e.msg)
+            err = e
+    if not sent and err:
+        raise err
+    return sent
+
+
+# -- as pessoas que recebem avisos: o app olha para a pessoa, nunca para um aparelho (como no ResolvIA e na CronologIA,
+# lib/phones.js). Os celulares de uma pessoa são os do app Home Assistant entre os rastreadores dela (Configurações > Pessoas).
+_people_cache = {"at": 0.0, "value": None}
+
+
+def ha_slug(v: str) -> str:
+    """Como o Home Assistant dá nome às coisas: "Celular da Ana" → "celular_da_ana"."""
+    v = unicodedata.normalize("NFD", str(v or "")).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "_", v).strip("_")
+
+
+def tracker_devices() -> dict | None:
+    """O aparelho de cada rastreador, pelos registros do Home Assistant: {entity_id: {"name", "mobile"} ou None};
+    None quando não deu para ler os registros. O serviço de aviso tem o nome do aparelho, não do rastreador."""
+    try:
+        ents = ha_ws({"type": "config/entity_registry/list_for_display"}) or {}
+        devs = ha_ws({"type": "config/device_registry/list"}) or []
+        if not isinstance(ents, dict) or not isinstance(ents.get("entities"), list) or not isinstance(devs, list):
+            return None
+    except (ApiError, OSError, ValueError):
+        return None
+    by_id = {d.get("id"): d for d in devs if isinstance(d, dict)}
+    out = {}
+    for e in ents["entities"]:
+        if isinstance(e, dict) and str(e.get("ei") or "").startswith("device_tracker."):
+            d = by_id.get(e.get("di"))
+            out[e["ei"]] = {"name": d.get("name") or "", "mobile": any(isinstance(i, list) and i[:1] == ["mobile_app"] for i in d.get("identifiers") or [])} if d else None
+    return out
+
+
+def tracker_phones(trackers, notify: set, devices: dict | None) -> list[str]:
+    """Os celulares (notify.mobile_app_*) desses rastreadores: pelo nome do aparelho do app Home Assistant; outro tipo
+    de rastreador (o roteador) não é celular. Sem os registros, pelo nome do rastreador (device_tracker.x → mobile_app_x)."""
+    out = []
+    for t in trackers if isinstance(trackers, list) else []:
+        tid = str(t)
+        by_id = "mobile_app_" + re.sub(r"^device_tracker\.", "", tid)
+        cands = [by_id]
+        if devices is not None and tid in devices:
+            d = devices[tid]
+            cands = [f"mobile_app_{ha_slug(d['name'])}", by_id] if d and d["mobile"] else []
+        hit = next((c for c in cands if c in notify), None)
+        if hit and hit not in out:
+            out.append(hit)
+    return out
+
+
+def news_people() -> list[dict]:
+    """As pessoas da casa no Home Assistant e os celulares de cada uma: [{id, name, phones}], por nome (cache de 60 s)."""
+    if AI_MOCK and not SUPERVISOR_TOKEN:
+        return [{"id": "person.pessoa_de_teste", "name": "Pessoa de Teste", "phones": ["mobile_app_celular_de_teste"]}]
     if not SUPERVISOR_TOKEN:
         return []
+    if _people_cache["value"] is not None and time.time() - _people_cache["at"] < 60:
+        return _people_cache["value"]
+    states = ha_request("GET", "/states", timeout=15) or []
+    notify = {svc for dom in ha_request("GET", "/services", timeout=15) or [] if isinstance(dom, dict) and dom.get("domain") == "notify"
+              for svc in (dom.get("services") or {}) if NOTIFY_RE.fullmatch(svc)}
+    devices = tracker_devices()
     out = []
-    for dom in ha_request("GET", "/services", timeout=15) or []:
-        if isinstance(dom, dict) and dom.get("domain") == "notify":
-            for svc in sorted((dom.get("services") or {}).keys()):
-                if NOTIFY_RE.fullmatch(svc):
-                    out.append({"id": svc, "name": phone_name(svc)})
+    for st in states if isinstance(states, list) else []:
+        eid = str((st or {}).get("entity_id") or "")
+        if re.fullmatch(r"person\.[a-z0-9_]+", eid):
+            a = st.get("attributes") or {}
+            out.append({"id": eid, "name": str(a.get("friendly_name") or eid[7:]), "phones": tracker_phones(a.get("device_trackers"), notify, devices)})
+    out.sort(key=lambda p: fold(p["name"]))
+    _people_cache.update(at=time.time(), value=out)
     return out
+
+
+def news_phones(who: str) -> list[str]:
+    """Os celulares de quem recebe: de todas as pessoas ou de uma."""
+    people = news_people()
+    if who == "todos":
+        phones = list(dict.fromkeys(ph for p in people for ph in p["phones"]))
+        if not phones:
+            raise ApiError(400, "Ninguém da casa tem celular ligado no Home Assistant (Configurações > Pessoas).")
+        return phones
+    p = next((x for x in people if x["id"] == who), None)
+    if not p:
+        raise ApiError(400, "Essa pessoa não está mais no Home Assistant. Escolha outra em Avisar.")
+    if not p["phones"]:
+        raise ApiError(400, f"Sem celular ligado a {p['name']} no Home Assistant (Configurações > Pessoas).")
+    return p["phones"]
 
 
 def news_auto_due(now: float) -> bool:
@@ -3283,17 +3356,16 @@ def r_news_all(h, query):
     h.send_json(news_batch_start(), 202)
 
 
-def r_news_targets(h, query):
-    h.send_json({"targets": notify_targets()})
+def r_news_people(h, query):
+    h.send_json({"people": [{"id": p["id"], "name": p["name"], "phone": bool(p["phones"])} for p in news_people()]})
 
 
 def r_news_notify_test(h, query):
     body = h.read_body()
-    target = str(body.get("target") or news_notify_target())
-    if target != "persistent" and not NOTIFY_RE.fullmatch(target):
-        raise ApiError(400, "Escolha onde avisar.")
-    send_news_notice(2, target, test=True)
-    h.send_json({"ok": True})
+    who = str(body.get("who") or news_notify_target())
+    if not WHO_RE.fullmatch(who):
+        raise ApiError(400, "Escolha quem avisar.")
+    h.send_json({"ok": True, "sent": send_news_notice(2, who, test=True)})
 
 
 def r_news_cancel(h, jid, query):
@@ -3332,8 +3404,8 @@ def r_settings_put(h, query):
         upd["news_every"] = int(body["news_every"])
     if "news_notify" in body:
         t = str(body.get("news_notify") or "")
-        if t and t != "persistent" and not NOTIFY_RE.fullmatch(t):
-            raise ApiError(400, "Escolha onde avisar.")
+        if t and not WHO_RE.fullmatch(t):
+            raise ApiError(400, "Escolha quem avisar.")
         upd["news_notify"] = t
     with STORE.lock:
         STORE.settings.update(upd)
@@ -3620,7 +3692,7 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/news", r_news_start),
     ("DELETE", r"/api/news", r_news_clear),
     ("POST", r"/api/news/all", r_news_all),
-    ("GET", r"/api/news/targets", r_news_targets),
+    ("GET", r"/api/news/people", r_news_people),
     ("POST", r"/api/news/notify-test", r_news_notify_test),
     ("GET", r"/api/news/([a-f0-9]{16})", r_news_status),
     ("DELETE", r"/api/news/([a-f0-9]{16})", r_news_cancel),

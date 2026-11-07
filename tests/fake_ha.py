@@ -2,15 +2,16 @@
 
 Responde o que o InventarIA usa do Home Assistant, e guarda cada pedido para os testes conferirem:
 
-- GET  /core/api/states                       entidades (tarefas de IA, assistentes de conversa, falas para texto)
+- GET  /core/api/states                       entidades (tarefas de IA, assistentes de conversa, falas para texto, pessoas)
 - GET/POST/DELETE /core/api/states/<entidade> o sensor de uso da IA
 - POST /core/api/services/ai_task/generate_data?return_response
 - POST /core/api/services/conversation/process?return_response
 - GET  /core/api/services                     serviços (os celulares em notify.mobile_app_*)
-- POST /core/api/services/notify/<celular>    aviso no celular; persistent_notification/create: aviso do Home Assistant
+- POST /core/api/services/notify/<celular>    aviso no celular
 - GET  /core/api/stt/<entidade>               idiomas da fala para texto
 - POST /core/api/stt/<entidade>               áudio para texto (exige o cabeçalho escrito "X-Speech-Content", como o Supervisor)
-- WS   /core/websocket                        auth + assist_pipeline/pipeline/list
+- WS   /core/websocket                        auth + assist_pipeline/pipeline/list, config/entity_registry/list_for_display,
+                                              config/device_registry/list (os aparelhos dos rastreadores das pessoas)
 
 Uso:
     ha = FakeHA(media_root="/tmp/media")   # sobe numa porta livre
@@ -40,7 +41,17 @@ DEFAULT_STATES = [
     {"entity_id": "stt.home_assistant_cloud", "state": "unknown", "attributes": {"friendly_name": "Home Assistant Cloud"}},
     {"entity_id": "stt.faster_whisper", "state": "unknown", "attributes": {"friendly_name": "faster-whisper"}},
     {"entity_id": "light.sala", "state": "off", "attributes": {"friendly_name": "Luz da sala"}},
+    # pessoas (inventadas): a Ana com o celular dela (o aparelho do app Home Assistant tem outro nome que o rastreador),
+    # o Beto só com o roteador (sem celular) e a Carla com um rastreador fora dos registros (pelo nome: mobile_app_tablet_da_sala)
+    {"entity_id": "person.ana", "state": "home", "attributes": {"friendly_name": "Ana", "user_id": "u-ana", "device_trackers": ["device_tracker.pixel_ana"]}},
+    {"entity_id": "person.beto", "state": "home", "attributes": {"friendly_name": "Beto", "user_id": "u-beto", "device_trackers": ["device_tracker.roteador_beto"]}},
+    {"entity_id": "person.carla", "state": "not_home", "attributes": {"friendly_name": "Carla", "device_trackers": ["device_tracker.tablet_da_sala"]}},
 ]
+DEFAULT_DEVICES = [
+    {"id": "d-ana", "name": "Celular da Ana", "identifiers": [["mobile_app", "abc123"]]},
+    {"id": "d-rot", "name": "Roteador", "identifiers": [["ping", "192.0.2.1"]]},
+]
+DEFAULT_TRACKERS = [{"ei": "device_tracker.pixel_ana", "di": "d-ana"}, {"ei": "device_tracker.roteador_beto", "di": "d-rot"}]
 
 DEFAULT_PIPELINES = {"preferred_pipeline": "gemini", "pipelines": [
     {"id": "cloud", "name": "Home Assistant", "stt_engine": "stt.home_assistant_cloud", "stt_language": "pt-BR"},
@@ -67,7 +78,9 @@ class FakeHA:
         self.token = token
         self.media_root = media_root
         self.states = [dict(s) for s in DEFAULT_STATES]
-        self.phones = ["mobile_app_celular_da_ana", "mobile_app_tablet_da_sala"]  # notify.mobile_app_* (inventados)
+        self.phones = ["mobile_app_celular_da_ana", "mobile_app_tablet_da_sala", "mobile_app_celular_velho"]  # notify.mobile_app_* (inventados)
+        self.devices = json.loads(json.dumps(DEFAULT_DEVICES))  # config/device_registry/list
+        self.trackers = json.loads(json.dumps(DEFAULT_TRACKERS))  # config/entity_registry/list_for_display (os rastreadores)
         self.notify_status = 200
         self.pipelines = json.loads(json.dumps(DEFAULT_PIPELINES))
         self.stt_text = "Sofá cinza, dois mil reais. Televisão de 50 polegadas, mil e quinhentos reais."
@@ -180,7 +193,7 @@ class FakeHA:
                         fake.requests[-1]["attachments_present"] = seen
                     data = fake.ai_reply(kind, body)
                     return self._send(200, {"changed_states": [], "service_response": {"data": data}})
-                if path.startswith("/core/api/services/notify/") or path == "/core/api/services/persistent_notification/create":
+                if path.startswith("/core/api/services/notify/"):
                     return self._send(fake.notify_status, [] if fake.notify_status == 200 else {"message": "falhou"})
                 if path == "/core/api/services/conversation/process":
                     if fake.ai_error:
@@ -260,6 +273,10 @@ class FakeHA:
                 send({"id": cmd.get("id"), "type": "result", "success": False, "error": {"code": "unknown", "message": "falhou"}})
             elif cmd.get("type") == "assist_pipeline/pipeline/list":
                 send({"id": cmd.get("id"), "type": "result", "success": True, "result": self.pipelines})
+            elif cmd.get("type") == "config/entity_registry/list_for_display":
+                send({"id": cmd.get("id"), "type": "result", "success": True, "result": {"entity_categories": {}, "entities": self.trackers}})
+            elif cmd.get("type") == "config/device_registry/list":
+                send({"id": cmd.get("id"), "type": "result", "success": True, "result": self.devices})
             else:
                 send({"id": cmd.get("id"), "type": "result", "success": False, "error": {"code": "unknown_command", "message": "Unknown command."}})
         except (OSError, ValueError, struct.error):

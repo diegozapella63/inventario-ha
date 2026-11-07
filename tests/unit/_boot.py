@@ -44,6 +44,7 @@ def reset_store():
     server._voice_cache.update(at=0.0, value=None)
     server._voice_cache.pop("engines", None)
     server._voice_cache.pop("missing", None)
+    server._people_cache.update(at=0.0, value=None)
     server.WEB_JOBS.clear()
     server._usage_sensor.update(day=None, checked=0.0)
     server.CONEXAO = server.Conexao()

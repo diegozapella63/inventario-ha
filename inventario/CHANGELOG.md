@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.32.0
+
+- **Opções > Novidades > Avisar**: agora você escolhe a **pessoa** (ou **Todos**), não o aparelho, como no ResolvIA e na CronologIA. O aviso vai para os celulares ligados a ela no Home Assistant (**Configurações > Pessoas**). Quem não tem celular ligado aparece como "sem celular". Saiu a opção Notificação do Home Assistant.
+
 ## 1.31.2
 
 - **Falar** sem uma IA pronta no Home Assistant: **Adicionar > Falar os itens** e o painel **Falar** (Integrações) dizem que o app separa pelas vírgulas, em vez de "a IA separa os itens".
