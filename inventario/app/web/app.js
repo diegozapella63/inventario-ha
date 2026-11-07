@@ -144,6 +144,7 @@
   // Desligar só esconde: nada do que já foi gravado se perde.
   const aiOn = () => S.settings.ai !== false;
   const zonesOn = () => S.settings.zones === true;
+  const newsOn = () => aiOn() && S.settings.news !== false; // Novidades: precisa da IA e pode ser desligada em Opções
   const sensorsOn = () => S.settings.ha_sensors === true; // sensores no Home Assistant: só com a opção ligada
   let D = null;
   const roomFilter = {};
@@ -393,11 +394,11 @@
       case "comodos": return { name: "rooms", q };
       case "mais": // #/mais é o menu; #/mais/<aba> é o endereço antigo de Configurações (e de Novidades)
         if (!parts[1]) return { name: "menu", q };
-        if (parts[1] === "novidades") return { name: aiOn() ? "news" : "menu", q };
+        if (parts[1] === "novidades") return { name: newsOn() ? "news" : "menu", q };
         if (parts[1] === "sobre") return { name: "about", q }; // como no CronologIA (#/mais/sobre)
         return { name: "data", tab: moreTab(parts[1]), q };
       case "config": case "dados": return { name: "data", tab: moreTab(parts[1]), q };
-      case "novidades": return { name: aiOn() ? "news" : "menu", q }; // Novidades usa a IA: desligada, fica o menu
+      case "novidades": return { name: newsOn() ? "news" : "menu", q }; // Novidades usa a IA e pode ser desligada: fica o menu
       case "categorias": return { name: "cats", q };
       case "graficos": return { name: "charts", q };
       case "sobre": return { name: "about", q };
@@ -904,7 +905,7 @@
   function viewMenu() {
     const rows = [
       ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
-      aiOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
+      newsOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
       ["#/categorias", "grid", "Categorias", "Criar, renomear e excluir."],
       ["#/relatorio", "report", "Relatório para seguro", "Por cômodo, com fotos. Imprime ou salva em PDF."],
       ["#/config", "gear", "Configurações", "Dados e backup, integrações, aparência e opções."],
@@ -1253,16 +1254,16 @@
     <section class="panel" id="p-ai">
       <h2>${secIc("scan")}IA do Home Assistant</h2>
       <p class="lead">A IA configurada no Home Assistant: Claude, OpenAI, Gemini ou Ollama.</p>
-      <ul class="opts"><li><div class="ot"><b id="ai-on-h">Usar IA</b><span>${on ? "Ler fotos, catalogar e buscar na internet." : "Os botões de IA ficam escondidos. O Falar continua, sem IA."} Vale para todos os aparelhos.</span></div>
+      <ul class="opts"><li><div class="ot"><b id="ai-on-h">Usar IA</b><span>${on ? "Ler fotos, catalogar e buscar na internet." : "Os botões de IA e o Falar ficam escondidos."} Vale para todos os aparelhos.</span></div>
         <div class="oa">${switchHtml("ai-on", on, "ai-on-h")}</div></li></ul>
       ${on ? `<div data-slot="ai-panel"><p class="muted">Verificando…</p></div>` : ""}
     </section>
-    <section class="panel" id="p-voice">
+    ${on ? `<section class="panel" id="p-voice">
       <h2>${secIc("mic")}Falar</h2>
-      <p class="lead">Fale os itens e quanto valem. O Home Assistant transcreve e ${on ? "a IA" : "o app"} separa os itens.</p>
+      <p class="lead">Fale os itens e quanto valem. O Home Assistant transcreve e a IA separa os itens.</p>
       <div data-slot="voice-panel"><p class="muted">Verificando…</p></div>
     </section>
-    ${on ? `<section class="panel" id="p-usage">
+    <section class="panel" id="p-usage">
       <h2>${secIc("bars")}Uso da IA</h2>
       <p class="lead">O Home Assistant não informa tokens nem custo: o app conta as chamadas e estima os tokens.</p>
       <div data-slot="usage"><p class="muted">Carregando…</p></div>
@@ -1396,8 +1397,39 @@
     </section>`;
   }
   // Opções: o que muda o jeito de cadastrar e de ver o inventário, para a casa toda
-  function moreOptions() {
+  const NEWS_EVERY = [[0, "Não"], [7, "Toda semana"], [15, "A cada 15 dias"], [30, "Todo mês"]];
+  let newsTargets = null; // os celulares que recebem aviso (do Home Assistant)
+  function newsNotifyOptions() {
+    const cur = S.settings.news_notify || "";
+    const list = [["", "Não avisar"], ["persistent", "Notificação do Home Assistant"], ...(newsTargets || []).map((t) => [t.id, t.name])];
+    if (cur && !list.some(([k]) => k === cur)) list.push([cur, cur.replace(/^mobile_app_/, "").replace(/_/g, " ")]); // o celular saiu do Home Assistant
+    return list.map(([k, v]) => `<option value="${esc(k)}"${k === cur ? " selected" : ""}>${esc(v)}</option>`).join("");
+  }
+  function moreNewsOptions() {
+    if (!aiOn()) return "";
+    const on = newsOn(), every = +S.settings.news_every || 0;
     return `
+    <section class="panel" id="p-news-opts">
+      <h2>${secIc("spark")}Novidades</h2>
+      <ul class="opts"><li><div class="ot"><b id="news-h">Usar novidades</b><span>Atualizações e recalls dos eletrônicos.</span></div>
+        <div class="oa">${switchHtml("news-on", on, "news-h")}</div></li>
+      ${on ? `<li><div class="ot"><b>Conferir sozinho</b><span>A IA confere os eletrônicos de tempos em tempos.</span></div>
+        <div class="oa"><select class="select" data-input="news-every" aria-label="Conferir sozinho">${NEWS_EVERY.map(([k, v]) => `<option value="${k}"${k === every ? " selected" : ""}>${v}</option>`).join("")}</select></div></li>
+      <li><div class="ot"><b>Avisar</b><span>Quando a conferência sozinha achar novidade.</span></div>
+        <div class="oa"><select class="select" data-input="news-notify" aria-label="Avisar">${newsNotifyOptions()}</select></div></li>
+      ${S.settings.news_notify ? `<li><div class="ot"><b>Testar o aviso</b><span>Manda um aviso agora.</span></div>
+        <div class="oa"><button type="button" class="btn" data-act="news-notify-test">${ic("send")}Testar</button></div></li>` : ""}` : ""}
+      </ul>
+    </section>`;
+  }
+  async function loadNewsTargets() {
+    if (newsTargets || !newsOn()) return;
+    try { newsTargets = (await API.get("api/news/targets")).targets || []; } catch { newsTargets = []; }
+    const sel = $('#view [data-input="news-notify"]');
+    if (sel) sel.innerHTML = newsNotifyOptions();
+  }
+  function moreOptions() {
+    return `${moreNewsOptions()}
     <section class="panel" id="p-zones">
       <h2>${secIc("pin")}Zonas</h2>
       <p class="lead">Partes de um cômodo, como Estante ou Rack da TV.</p>
@@ -1484,6 +1516,7 @@
 
   async function loadDataPanels() {
     const tab = moreTab(base.tab);
+    if (tab === "opcoes") loadNewsTargets();
     const bslot = tab === "dados" ? $('#view [data-slot="backups"]') : null;
     const aslot = tab === "integracoes" ? $('#view [data-slot="ai-panel"]') : null;
     if (bslot) try {
@@ -2021,7 +2054,7 @@
       sheet.onRouteClose = leaveItem;
       sheet.onClose = () => { sheet = null; stopItemNews(); INEWS.id = null; };
     }
-    if (aiOn()) loadItemNews(it);
+    if (newsOn()) loadItemNews(it);
   }
   function leaveItem() {
     if (inAppNavs > 0) history.back();
@@ -2062,7 +2095,7 @@
           ${it.createdAt ? `<dt>Cadastrado</dt><dd>${esc(dateTime(it.createdAt))}${by(it.createdBy)}</dd>` : ""}
           ${it.updatedAt && it.updatedAt !== it.createdAt ? `<dt>Alterado</dt><dd>${esc(dateTime(it.updatedAt))}${by(it.updatedBy)}</dd>` : ""}
         </dl>
-        ${aiOn() ? `<div class="inews" data-slot="item-news" aria-live="polite">${itemNewsHtml(it)}</div>` : ""}
+        ${newsOn() ? `<div class="inews" data-slot="item-news" aria-live="polite">${itemNewsHtml(it)}</div>` : ""}
       </div>
       <div class="dlg-f">
         <button type="button" class="btn danger" data-act="item-delete" data-id="${esc(it.id)}" aria-label="Excluir">${lbl("trash", "Excluir")}</button>
@@ -2450,10 +2483,8 @@
     const v = S.voice, engines = (v && v.engines) || [], sel = (v && v.selected) || "";
     // quem transcreve é a fala para texto; o assistente de voz só diz qual é o padrão (o nome dele não é quem transcreve)
     const using = v && v.ready ? `Transcreve com ${esc(v.name || v.engine)} (${esc(v.language || "pt-BR")})${!sel && v.assistant ? `, do assistente ${esc(v.assistant)}` : ""}.` : "";
-    // com Usar IA desligada o Falar continua: quem transcreve é a fala para texto, e o próprio app separa os itens
-    const split = aiOn() ? "" : " Sem IA, o app separa os itens pelas vírgulas.";
-    slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status ${v && v.ready ? "ok" : "bad"}"><i></i>${v && v.ready ? (aiOn() ? "Pronto para ouvir" : "Pronto para ouvir, sem IA") : v ? "Sem fala para texto" : "Verificando…"}</span></b>
-        <span>${v && v.ready ? `${using}${v.missing ? " A escolhida saiu do Home Assistant: usando o padrão." : ""}${split}` : esc((v && v.reason) || "")}</span></div>
+    slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status ${v && v.ready ? "ok" : "bad"}"><i></i>${v && v.ready ? "Pronto para ouvir" : v ? "Sem fala para texto" : "Verificando…"}</span></b>
+        <span>${v && v.ready ? `${using}${v.missing ? " A escolhida saiu do Home Assistant: usando o padrão." : ""}` : esc((v && v.reason) || "")}</span></div>
       <div class="oa"><button class="btn" data-act="voice-refresh">${ic("refresh")}Verificar de novo</button></div></li>
       ${engines.length ? `<li><div class="ot"><b id="voice-stt-l">Fala para texto</b><span>Padrão do Home Assistant usa a do assistente de voz preferido.</span></div>
         <div class="oa"><select class="select" data-input="voice-stt" aria-labelledby="voice-stt-l">
@@ -2461,9 +2492,9 @@
           ${engines.map((e) => `<option value="${esc(e.id)}"${e.id === sel ? " selected" : ""}>${esc(e.name)}</option>`).join("")}
         </select></div></li>` : ""}</ul>`;
   }
-  const voiceReady = () => !!(S.voice && S.voice.ready);
+  const voiceReady = () => aiOn() && !!(S.voice && S.voice.ready); // com Usar IA desligada, o Falar some junto
   const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-  // sem IA: separa o que foi dito pelas vírgulas, pontos e "e". Um pedaço que é só valor ("2.000 reais", "500")
+  // sem uma IA que responda (ligada, mas sem entidade): separa o que foi dito pelas vírgulas, pontos e "e". Um pedaço que é só valor ("2.000 reais", "500")
   // vira o valor do item anterior; "TV Samsung R$ 3.000" fica TV Samsung com 3.000. Valor por extenso
   // ("dois mil reais", "três mil", "mil e duzentos reais") vira número antes; "duas luminárias" fica como está.
   const VALUE_WORDS = new Set(("uns umas um uma cerca de por vale valor custou paguei mais ou menos aproximadamente uns e r$ reais real mil centavos " +
@@ -2625,10 +2656,10 @@
   // ------------------------------------------------------------------ catalogar foto com IA (vários itens); também a revisão do Falar
   async function openCatalog({ room = null, file = null, voice = false } = {}) {
     if (!D.rooms.length) { toast("Crie um cômodo antes."); openRoomNew(); return; }
-    if (!voice && !aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return; }
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return; }
     if (!voice && !(await needAi())) return;
     const zonesUse = zonesOn();
-    const useAi = voice ? aiOn() && !!(await aiStatus()).ready : true;
+    const useAi = voice ? !!(await aiStatus()).ready : true; // IA ligada mas sem entidade que responda: o app separa sozinho
     const C = { step: voice ? "voice" : file ? "ready" : "photo", room: room && D.roomById.has(room) ? room : lastRoom(), zone: "", hint: "", file, uploading: false, results: [], keep: true, entity: "", error: null, raw: "", busy: false, token: 0,
       voice, heard: "", rec: "off", secs: 0, level: 0, note: "" };
     let rec = null, recTimer = null;
@@ -3102,8 +3133,9 @@
     const opts = [
       ["item", "plus", "Adicionar item", "Com foto e valor, preenchendo os campos"],
       aiOn() && ["catalog", "scan", "Catalogar foto com IA", "A IA lista vários itens de uma foto"],
-      voiceReady() && ["voice", "mic", "Falar os itens", `Diga o que tem e quanto vale; ${aiOn() ? "a IA separa os itens" : "o app separa os itens"}`],
+      voiceReady() && ["voice", "mic", "Falar os itens", "Diga o que tem e quanto vale; a IA separa os itens"],
     ].filter(Boolean);
+    if (opts.length === 1) { openEditor({ room: rid }); return; } // sem IA e sem Falar: direto no item, sem um menu de uma linha só
     const entry = openDialog({
       cls: "modal narrow", label: "Adicionar",
       html: `<div class="dlg"><div class="dlg-h"><h2>Adicionar</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
@@ -3359,6 +3391,10 @@
       case "news-all": startNewsAll(); break;
       case "news-cancel": cancelNewsAll(); break;
       case "news-clear": clearNews(); break;
+      case "news-notify-test":
+        b.disabled = true;
+        API.post("api/news/notify-test", { target: S.settings.news_notify }).then(() => toast("Aviso enviado"), fail).finally(() => { b.disabled = false; });
+        break;
       case "news-open": { const it = D.itemById.get(b.dataset.id); if (it) openNews(it); break; }
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }
       case "ai-refresh": { const slot = $('#view [data-slot="ai-panel"]'); if (slot) { slot.innerHTML = `<p class="muted">Verificando…</p>`; renderAiPanel(slot, await aiStatus(true)); } break; }
@@ -3421,8 +3457,18 @@
       try { await API.put("api/settings", { ai_search: t.value }); S.settings.ai_search = t.value; aiCache.at = 0; toast("IA para buscar fotos atualizada"); }
       catch (er) { fail(er); }
     }
-    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on") {
-      const key = k === "ai-on" ? "ai" : k === "zones-on" ? "zones" : "ha_sensors", on = t.checked;
+    else if (k === "news-every" || k === "news-notify") {
+      const key = k === "news-every" ? "news_every" : "news_notify", val = k === "news-every" ? +t.value : t.value;
+      try {
+        await API.put("api/settings", { [key]: val });
+        S.settings[key] = val;
+        renderView(false);
+        toast(key === "news_every" ? (val ? `Conferir sozinho: ${NEWS_EVERY.find(([d]) => d === val)[1].toLowerCase()}` : "Conferir sozinho desligado")
+          : val ? "Aviso das novidades ligado" : "Sem aviso das novidades");
+      } catch (er) { fail(er); renderView(false); }
+    }
+    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on") {
+      const key = k === "ai-on" ? "ai" : k === "zones-on" ? "zones" : k === "news-on" ? "news" : "ha_sensors", on = t.checked;
       t.disabled = true;
       try {
         await API.put("api/settings", { [key]: on });
@@ -3431,6 +3477,7 @@
         renderView(false);
         toast(key === "ai" ? (on ? "IA ligada" : "IA desligada: os botões de IA ficaram escondidos")
           : key === "ha_sensors" ? (on ? "Sensor criado no Home Assistant" : "Sensores desligados: o sensor saiu do Home Assistant")
+          : key === "news" ? (on ? "Novidades ligadas" : "Novidades desligadas")
           : on ? "Zonas ligadas" : "Zonas desligadas: as zonas gravadas continuam guardadas");
       } catch (er) { t.checked = !on; fail(er); }
       finally { t.disabled = false; }
@@ -3497,6 +3544,19 @@
   }, { passive: true });
   document.addEventListener("touchcancel", () => { swipe = null; }, { passive: true });
   window.addEventListener("hashchange", () => { onRoute(); });
+  // No Home Assistant, o painel do app (/app/<app>/novidades, o link do aviso) passa o resto do endereço por mensagem:
+  // o aviso das novidades abre direto nelas. Cada endereço conta uma vez (a mesma mensagem volta quando a largura muda).
+  if (window.parent !== window && !PREVIEW) {
+    let haPath = null;
+    window.addEventListener("message", (e) => {
+      if (e.source !== window.parent || !e.data || e.data.type !== "home-assistant/properties") return;
+      const p = String((e.data.route && e.data.route.path) || "").replace(/\/+$/, "");
+      if (p === haPath) return;
+      haPath = p;
+      if (p === "/novidades") nav("#/novidades");
+    });
+    try { window.parent.postMessage({ type: "home-assistant/subscribe-properties" }, "*"); } catch { /* fora do Home Assistant */ }
+  }
 
   // atualização quando outro aparelho mexer no inventário
   async function checkRev() {

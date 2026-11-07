@@ -1,7 +1,7 @@
 """Falar com o Home Assistant de mentira de verdade (microfone de mentira do Chromium): o áudio vai para a fala para
 texto do assistente preferido, no idioma dele; a fala para texto escolhida em Integrações; a escolhida que saiu do
 Home Assistant; erros da fala para texto; "Não ouvi nada" com áudio curto; a IA separa os itens (e o cômodo dito);
-resposta da IA fora do formato; sem IA, o app separa sozinho."""
+resposta da IA fora do formato; sem uma IA que responda, o app separa sozinho; com Usar IA desligada, o Falar some."""
 import json
 
 from e2e_lib import OVERFLOW, FakeHA, main
@@ -141,16 +141,30 @@ async def body(r, p):
     await pg.click('[data-r="1"]')
     await ctx.close()
 
-    # -- sem IA: a fala para texto continua, e o app separa pelas vírgulas
-    r.api("PUT", "api/settings", {"ai": False})
+    # -- IA ligada, mas sem uma IA no Home Assistant que responda: a fala para texto continua, e o app separa pelas vírgulas
+    ai_states = [s for s in ha.states if s["entity_id"].startswith("ai_task.")]
+    ha.states = [s for s in ha.states if not s["entity_id"].startswith("ai_task.")]
     n_ai = len(ha.calls("POST", "/core/api/services/ai_task/generate_data"))
     ctx, pg = await r.page(b, "cel", "light", accent="verde", perms=["microphone"])
     await speak()
     await pg.wait_for_selector(".found li", timeout=15000)
     found = await pg.evaluate("[...document.querySelectorAll('.found li')].map(li => [li.querySelector('.fname').value, li.querySelector('[data-rf=value]').value])")
-    r.eq(found, [["Sofá cinza", "2.000"], ["Televisão de 50 polegadas", "1.500"]], "sem IA: o Home Assistant transcreve e o app separa, com os valores falados")
+    r.eq(found, [["Sofá cinza", "2.000"], ["Televisão de 50 polegadas", "1.500"]], "sem IA que responda: o Home Assistant transcreve e o app separa, com os valores falados")
     r.eq(len(ha.calls("POST", "/core/api/services/ai_task/generate_data")), n_ai, "sem chamar a IA")
     await r.shot(pg, "sem-ia")
+    await ctx.close()
+    ha.states += ai_states
+
+    # -- Usar IA desligada: o Falar some junto, e o servidor recusa o áudio sem mandar para a fala para texto
+    r.api("PUT", "api/settings", {"ai": False})
+    n_stt = len(stt_posts(ha))
+    ctx, pg = await r.page(b, "cel", "light", accent="verde", perms=["microphone"])
+    await r.open(pg, "#/", ".tag")
+    r.eq(await pg.locator(".mic-top").count(), 0, "IA desligada: sem o microfone no alto")
+    st, _, out = r.app.request("POST", "api/voice", raw=b"\x01\x00" * 16000, headers={"Content-Type": "application/octet-stream"})
+    r.eq((st, out.get("error")), (409, "A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."), "o servidor recusa o Falar")
+    r.eq(len(stt_posts(ha)), n_stt, "sem mandar o áudio para a fala para texto")
+    r.api("PUT", "api/settings", {"ai": True})
     await ctx.close()
     await b.close()
     ha.stop()

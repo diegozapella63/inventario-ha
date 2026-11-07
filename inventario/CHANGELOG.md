@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.30.0
+
+- **Mais > Configurações > Opções > Novidades**:
+  - **Usar novidades** liga e desliga o recurso. Desligadas, as novidades somem do menu Mais e da ficha do item.
+  - **Conferir sozinho**: toda semana, a cada 15 dias ou todo mês, o app confere os eletrônicos sem você pedir.
+  - **Avisar**: quando essa conferência acha algo novo, chega um aviso no celular escolhido (ou na notificação do Home Assistant): "Novidades em 3 itens. Toque para abrir." Tocar abre o InventarIA direto em Novidades. **Testar** manda um aviso na hora.
+- Com **Usar IA** desligada, o **Falar** também some: o microfone no alto e "Falar os itens" em Adicionar. Sem IA e sem Falar, **Adicionar** abre direto o item novo.
+
 ## 1.29.0
 
 - **Mais > Sobre**, a última linha do menu: quem faz o app (**CorrerIA Code**, desenvolvimento de softwares, e por que esse nome), os apps da família (CronologIA, ResolvIA, GerencIA, InventarIA, EconomIA e MemorIA), cada um com uma linha e o link para o GitHub, e o botão **Meu GitHub**. O InventarIA aparece marcado com a versão instalada.

@@ -5,7 +5,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | Camada | Onde | Como rodar | O que confere |
 |---|---|---|---|
 | Unitários | `tests/unit/test_*.py` | `tests/run.sh unit` | cada parte do servidor (`inventario/app/server.py`) importada direto, sem Home Assistant: valores, quantidades, códigos, itens e cômodos, categorias, armazenamento, fotos, backups e versões, importar e exportar, IA (prompts, respostas, uso, sensor, configurações), Falar, fotos da internet, novidades, Conversar, integração com os outros apps |
-| Integração | `tests/integration/test_*.py` | `tests/run.sh integration` | o servidor de verdade (processo próprio, portas livres) pelo HTTP: todas as rotas, segurança (Ingress, chave da integração), envios cortados e em partes, concorrência, e a conversa com um Home Assistant de mentira (`fake_ha.py`: estados, `ai_task`, `conversation`, fala para texto, WebSocket do Assist) e uma loja de mentira (`fixtures/site`) |
+| Integração | `tests/integration/test_*.py` | `tests/run.sh integration` | o servidor de verdade (processo próprio, portas livres) pelo HTTP: todas as rotas, segurança (Ingress, chave da integração), envios cortados e em partes, concorrência, e a conversa com um Home Assistant de mentira (`fake_ha.py`: estados, `ai_task`, `conversation`, fala para texto, avisos no celular, WebSocket do Assist) e uma loja de mentira (`fixtures/site`) |
 | Visuais | `tests/e2e/e2e_*.py` | `tests/e2e/run.sh` | as telas no Chromium (Playwright), como celular de 320 e 384 px, tablet e computador, claro e escuro: clica, digita, confere o que aparece e grava capturas de tela |
 
 `tests/run.sh` roda as duas primeiras (só Python 3.12 ou mais novo, sem instalar nada; uns 2 minutos). Os visuais precisam de `pip install playwright && python -m playwright install chromium`; `E2E_JOBS=4 tests/e2e/run.sh` roda quatro de cada vez (uns 10 minutos). As capturas ficam em `$E2E_TMP/shots` e a saída de cada teste em `$E2E_TMP/logs`; no GitHub, no artefato **capturas-e-saidas** de cada execução.
@@ -44,14 +44,15 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | `e2e_organizar` | setas nas pontas, ordem gravada, Início, barra lateral, relatório e outro aparelho |
 | `e2e_zonas` | zonas ligadas do começo ao fim: sugestões, a última zona do cômodo, subtotais, relatório, desligar |
 | `e2e_desfazer` | Desfazer em excluir, mover, foto e dados da internet; avisos empilhados e com janela aberta |
-| `e2e_catalogar_falar` | Catalogar foto com IA de ponta a ponta; Falar com microfone de mentira, com e sem IA; microfone bloqueado |
+| `e2e_catalogar_falar` | Catalogar foto com IA de ponta a ponta; Falar com microfone de mentira; IA desligada: sem Falar e Adicionar direto no item; microfone bloqueado |
 | `e2e_preencher_ia` | Preencher com IA no cadastro: o que preenche, o que fica, sem foto, IA desligada |
 | `e2e_ia_falhas` | a IA falhando (cota, fora do formato, erro, nada) no Catalogar, no Preencher e na busca; Home Assistant fora do ar |
-| `e2e_falar_ha` | Falar com o Home Assistant de mentira: fala para texto escolhida, erros, áudio curto, idioma |
+| `e2e_falar_ha` | Falar com o Home Assistant de mentira: fala para texto escolhida, erros, áudio curto, idioma; sem uma IA que responda, o app separa; IA desligada, o Falar some e o servidor recusa |
 | `e2e_camera` | câmera dentro do app no Android, várias fotos, Voltar, sem câmera, navegador do celular, computador |
 | `e2e_internet` | Buscar na internet: fotos e dados do produto na ficha e no editor, Desfazer, sem fotos, sem busca, IA desligada |
 | `e2e_novidades` | Novidades na própria ficha: só as 3 mais recentes, tipos, datas, fontes, boato, guardadas ao abrir de novo, Buscar de novo, fechar no meio, erro, IA desligada |
 | `e2e_novidades_todos` | Novidades (no menu Mais): o mesmo equipamento em vários cômodos numa linha só, só Eletrônicos, sem escolher categorias, item de outra categoria fora da lista, conferir todos com a IA escolhendo, andamento, Parar, deixados de fora, Limpar com confirmação, aba some sem IA |
+| `e2e_novidades_ajustes` | Opções > Novidades: Usar novidades, Conferir sozinho, Avisar (os celulares do Home Assistant), Testar o aviso, seleções 280×44 alinhadas; desligadas, somem do menu e da ficha; IA desligada, o painel some; o link do aviso abre o app em Novidades (mensagem do painel do Home Assistant) |
 | `e2e_conversar` | Conversar: botão ao lado do microfone, ideias, Enter, resposta formatada, da ficha, erro, ditar, computador, IA desligada |
 | `e2e_graficos` | Mais > Gráficos: números do alto, cômodos e categorias do maior para o menor, faixas de valor, itens mais valiosos, mês a mês (tocar mostra o valor), cada linha abre a sua tela, 320 px e computador |
 | `e2e_mais` | o menu Mais (Gráficos, Novidades, Categorias, Relatório, Configurações, Sobre), Voltar, endereços antigos; Configurações: abas, botões 280×44 alinhados, exportar CSV/JSON/ZIP, backup e restaurar, versões, importar |

@@ -9,7 +9,7 @@
   const catsOf = (d) => { if (!Array.isArray(d.cats) || !d.cats.length) d.cats = clone(DEF_CATS); return d.cats; };
   const CATS = { has: (k) => ST.data && catsOf(ST.data).some((c) => c.id === k) };
   const foldName = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const ST = { data: null, rev: 1, blobs: new Map(), jobs: new Map(), settings: { ai_entity: "", ai_search: "", ai: true, zones: false, ha_sensors: false, voice_stt: "" },
+  const ST = { data: null, rev: 1, blobs: new Map(), jobs: new Map(), settings: { ai_entity: "", ai_search: "", ai: true, zones: false, ha_sensors: false, voice_stt: "", news: true, news_every: 0, news_notify: "" },
     news: { itens: {}, triagem: {}, ultima: null } };
   const now = () => new Date().toISOString();
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -109,7 +109,7 @@
     if (method === "GET" && path === "api/data") {
       const st = ST.settings;
       return { ...clone(d), rev: ST.rev, version: "%%V%%", user: null, features: { ai: true, share: false },
-        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true } };
+        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "" } };
     }
     if (method === "GET" && path === "api/rev") return { rev: ST.rev };
     if (method === "POST" && path === "api/items") {
@@ -236,7 +236,7 @@
       return { ready: true, engine: (sel || STT[0]).id, language: "pt-BR", name: (sel || STT[0]).name, assistant: sel ? "" : "Assistente de exemplo",
         engines: clone(STT), selected: ST.settings.voice_stt || "", missing: false };
     }
-    if (method === "POST" && path === "api/voice") { await wait(900); return { text: SPEECH, engine: "stt.exemplo", name: STT[0].name }; }
+    if (method === "POST" && path === "api/voice") { aiOff(); await wait(900); return { text: SPEECH, engine: "stt.exemplo", name: STT[0].name }; }
     if (method === "POST" && path === "api/ai/text") { aiOff(); await wait(1600); return { items: clone(SPOKEN), room: "", example: true }; }
     if (method === "POST" && path === "api/web-photos") {
       aiOff();
@@ -360,6 +360,8 @@
       }
       return { items, entity: "ai_task.exemplo", example: true };
     }
+    if (method === "GET" && path === "api/news/targets") return { targets: [{ id: "mobile_app_celular_de_exemplo", name: "Celular de Exemplo" }] };
+    if (method === "POST" && path === "api/news/notify-test") return { ok: true, example: true };
     if (path === "api/settings") { if (method === "PUT") Object.assign(ST.settings, body); return { ...ST.settings }; }
     if (path === "api/backups") fail(OFF + "os backups vão para a pasta share/inventario.");
     if (path === "api/history") {

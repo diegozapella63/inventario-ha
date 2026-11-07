@@ -6,6 +6,8 @@ Responde o que o InventarIA usa do Home Assistant, e guarda cada pedido para os 
 - GET/POST/DELETE /core/api/states/<entidade> o sensor de uso da IA
 - POST /core/api/services/ai_task/generate_data?return_response
 - POST /core/api/services/conversation/process?return_response
+- GET  /core/api/services                     serviços (os celulares em notify.mobile_app_*)
+- POST /core/api/services/notify/<celular>    aviso no celular; persistent_notification/create: aviso do Home Assistant
 - GET  /core/api/stt/<entidade>               idiomas da fala para texto
 - POST /core/api/stt/<entidade>               áudio para texto (exige o cabeçalho escrito "X-Speech-Content", como o Supervisor)
 - WS   /core/websocket                        auth + assist_pipeline/pipeline/list
@@ -65,6 +67,8 @@ class FakeHA:
         self.token = token
         self.media_root = media_root
         self.states = [dict(s) for s in DEFAULT_STATES]
+        self.phones = ["mobile_app_celular_da_ana", "mobile_app_tablet_da_sala"]  # notify.mobile_app_* (inventados)
+        self.notify_status = 200
         self.pipelines = json.loads(json.dumps(DEFAULT_PIPELINES))
         self.stt_text = "Sofá cinza, dois mil reais. Televisão de 50 polegadas, mil e quinhentos reais."
         self.stt_status = 200
@@ -118,6 +122,9 @@ class FakeHA:
                     eid = unquote(path.rsplit("/", 1)[1])
                     st = next((s for s in fake.states if s["entity_id"] == eid), None)
                     return self._send(200, st) if st else self._send(404, {"message": "Entity not found."})
+                if path == "/core/api/services":
+                    return self._send(200, [{"domain": "notify", "services": {**{p: {} for p in fake.phones}, "notify": {}, "persistent_notification": {}}},
+                                            {"domain": "light", "services": {"turn_on": {}}}])
                 if path.startswith("/core/api/stt/"):
                     eid = unquote(path.rsplit("/", 1)[1])
                     return self._send(200, {"languages": STT_LANGS.get(eid, ["pt-BR"]), "formats": ["wav"], "codecs": ["pcm"],
@@ -173,6 +180,8 @@ class FakeHA:
                         fake.requests[-1]["attachments_present"] = seen
                     data = fake.ai_reply(kind, body)
                     return self._send(200, {"changed_states": [], "service_response": {"data": data}})
+                if path.startswith("/core/api/services/notify/") or path == "/core/api/services/persistent_notification/create":
+                    return self._send(fake.notify_status, [] if fake.notify_status == 200 else {"message": "falhou"})
                 if path == "/core/api/services/conversation/process":
                     if fake.ai_error:
                         return self._send(fake.ai_error[0], {"message": fake.ai_error[1]})

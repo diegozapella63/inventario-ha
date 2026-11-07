@@ -44,7 +44,8 @@ class Dados(ServerCase):
         d = self.app.ok("GET", "api/data", headers={"X-Remote-User-Display-Name": "Diego"})
         self.assertEqual((len(d["rooms"]), len(d["items"]), len(d["cats"])), (6, 38, 13))
         self.assertEqual(d["user"], "Diego")
-        self.assertEqual(d["settings"], {"ai_entity": "", "ai_search": "", "voice_stt": "", "ai": True, "zones": False, "ha_sensors": False})
+        self.assertEqual(d["settings"], {"ai_entity": "", "ai_search": "", "voice_stt": "", "ai": True, "zones": False, "ha_sensors": False,
+                                         "news": True, "news_every": 0, "news_notify": ""})
         self.assertEqual(d["features"], {"ai": False, "share": True}, "sem Home Assistant, sem IA")
         self.assertRegex(d["version"], r"^\d+\.\d+\.\d+$")
         self.assertEqual(self.app.ok("GET", "api/rev")["rev"], d["rev"])

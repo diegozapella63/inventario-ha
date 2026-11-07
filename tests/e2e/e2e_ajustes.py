@@ -86,14 +86,14 @@ async def body(r, p):
         time.sleep(0.2)
     r.check(ha.state(SENSOR) is None, "desligar tira o sensor do Home Assistant")
 
-    # Usar IA desligada: some o que usa IA, o Falar continua sem IA
+    # Usar IA desligada: some o que usa IA, e o Falar junto
     await pg.click('label.switch:has([data-input="ai-on"])')
     await pg.locator(".toast", has_text="IA desligada").wait_for(timeout=8000)
     r.check(r.data()["settings"]["ai"] is False, "Usar IA desligada fica gravada")
     for sel, label in (("[data-input=ai-entity]", "IA para ler fotos"), ("#p-usage", "Uso da IA"), ("#p-sensors", "Sensores"), ('[data-act="catalog"]', "Catalogar no alto")):
         r.eq(await pg.locator(sel).count(), 0, f"IA desligada: sem {label}")
-    await pg.wait_for_function("(e => e && e.textContent.includes('sem IA'))(document.querySelector('[data-slot=voice-panel] .status'))", timeout=8000)
-    r.check("Sem IA, o app separa os itens pelas vírgulas." in await pg.text_content('[data-slot="voice-panel"]'), "Falar continua, sem IA")
+    r.eq(await pg.locator("#p-voice").count(), 0, "IA desligada: sem o Falar")
+    r.check("Os botões de IA e o Falar ficam escondidos." in await pg.text_content("#p-ai"), "e diz que o Falar some junto")
     await r.shot(pg, "ia-desligada", full_page=True)
     n = len(ha.calls("POST", "/core/api/services"))
     await pg.click('label.switch:has([data-input="ai-on"])')

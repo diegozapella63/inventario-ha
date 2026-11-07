@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.29.0"
+VERSION = "1.30.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -1057,6 +1057,32 @@ def sensors_enabled() -> bool:
 def need_ai_on():
     if not ai_enabled():
         raise ApiError(409, "A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações.")
+
+
+# -- Novidades nas Configurações (Opções): ligar e desligar, conferir sozinho de tempos em tempos e avisar no celular
+NEWS_EVERY = (0, 7, 15, 30)  # dias; 0 = só quando a pessoa pede
+NOTIFY_RE = re.compile(r"mobile_app_[a-z0-9_]+")
+NEWS_TICK = max(1, int(os.environ.get("INV_NEWS_TICK") or 1800))  # de quanto em quanto tempo o app olha se está na hora (s)
+
+
+def news_enabled() -> bool:
+    return STORE.settings.get("news") is not False
+
+
+def need_news_on():
+    need_ai_on()
+    if not news_enabled():
+        raise ApiError(409, "As novidades estão desligadas. Para usar, ligue em Mais > Configurações > Opções.")
+
+
+def news_every() -> int:
+    v = STORE.settings.get("news_every")
+    return v if v in NEWS_EVERY and not isinstance(v, bool) else 0
+
+
+def news_notify_target() -> str:
+    t = str(STORE.settings.get("news_notify") or "")
+    return t if t == "persistent" or NOTIFY_RE.fullmatch(t) else ""
 
 
 # -- uso da IA: o Home Assistant não devolve tokens nem custo, então o app conta as chamadas (como no EconomIA)
@@ -2300,7 +2326,7 @@ def _news_job_run(jid: str, name: str, details: str, entity: str, iid: str = "")
 
 
 def news_job_start(body: dict) -> dict:
-    need_ai_on()
+    need_news_on()
     it = STORE.item(str(body.get("item") or ""))
     if not it:
         raise ApiError(404, "Item não encontrado.")
@@ -2461,6 +2487,7 @@ def ai_triage(items: list[dict]) -> set[str]:
 def _news_batch_run(jid: str):
     job = WEB_JOBS[jid]
     done = found = errors = 0
+    novos = []  # equipamentos com alguma novidade que não estava guardada (para o aviso)
     try:
         cats = news_cats()
         cands = [i for i in STORE.sorted_items() if i.get("cat") in cats]
@@ -2476,7 +2503,8 @@ def _news_batch_run(jid: str):
                 for i in todo_tri:
                     d["triagem"][i["id"]] = {"sig": item_sig(i), "conferir": i["id"] in chosen}
                 write_json_atomic(NEWS_FILE, d)
-        fresh = time.time() - NEWS_FRESH_DAYS * 86400
+        # sozinho, de tempos em tempos: confere de novo o que tem mais tempo que o intervalo (menos um dia de folga)
+        fresh = time.time() - (max(1, news_every() - 1) if job.get("auto") else NEWS_FRESH_DAYS) * 86400
         sel = [i for i in cands if (d["triagem"].get(i["id"]) or {}).get("conferir")]
 
         def checked_at(i):
@@ -2522,11 +2550,14 @@ def _news_batch_run(jid: str):
                 continue
             if job.get("cleared"):  # Limpar novidades no meio: nada mais é gravado
                 return
+            if news_new_entries((news_read()["itens"].get(it["id"]) or {}).get("news"), res):
+                novos.append(it["name"])
             for m in members:
                 news_save_result(m["id"], res)
             done += 1
             found += 1 if res["novidades"] else 0
-        summary = {"selecionados": len(groups), "conferidos": done, "com_novidades": found, "em_dia": len(groups) - len(todo), "erros": errors}
+        summary = {"selecionados": len(groups), "conferidos": done, "com_novidades": found, "em_dia": len(groups) - len(todo), "erros": errors,
+                   "novos": len(novos)}
         if job.get("cleared"):
             return
         with NEWS_LOCK:
@@ -2534,6 +2565,11 @@ def _news_batch_run(jid: str):
             d["ultima"] = {"at": now_iso(), **summary}
             write_json_atomic(NEWS_FILE, d)
         job.update(stage="done", msg="", summary=summary, progress={"feitos": done, "total": len(todo), "atual": ""})
+        if job.get("auto") and novos and news_notify_target():
+            try:
+                send_news_notice(len(novos))
+            except ApiError as e:
+                log.warning("aviso das novidades: %s", e.msg)
     except ApiError as e:
         msg = e.msg
         if done:
@@ -2544,8 +2580,104 @@ def _news_batch_run(jid: str):
         job.update(stage="error", msg="Não deu para conferir agora. Tente de novo em instantes.")
 
 
-def news_batch_start() -> dict:
-    need_ai_on()
+def news_new_entries(before, after) -> list[dict]:
+    """As novidades de agora que não estavam na busca anterior (pela fonte ou pelo título)."""
+    seen = set()
+    for n in ((before or {}).get("novidades") or []) if isinstance(before, dict) else []:
+        if isinstance(n, dict):
+            seen.add(str(n.get("fonte") or "")); seen.add(fold(str(n.get("titulo") or "")))
+    return [n for n in (after or {}).get("novidades") or [] if n.get("fonte") not in seen and fold(n.get("titulo") or "") not in seen]
+
+
+def ingress_path() -> str | None:
+    """O endereço do app dentro do Home Assistant (/app/<slug>, desde o 2026.2), pelo nome da máquina ("a1b2c3d4-inventario")."""
+    h = socket.gethostname()
+    return f"/app/{h.replace('-', '_', 1)}" if re.fullmatch(r"[a-z0-9]+-inventario", h) else None
+
+
+def news_notice(n: int, test: bool = False) -> dict:
+    """O aviso: "Novidades em 3 itens. Toque para abrir.", que abre o InventarIA em Novidades (o Home Assistant passa o
+    "/novidades" para a tela por mensagem, e a tela vai para #/novidades)."""
+    link = f"{ingress_path()}/novidades" if ingress_path() else None
+    msg = f"Novidades em {n} {'item' if n == 1 else 'itens'}. Toque para abrir."
+    return {"title": "InventarIA" + (" (teste)" if test else ""), "message": msg, "link": link}
+
+
+def send_news_notice(n: int, target: str | None = None, test: bool = False):
+    target = target or news_notify_target()
+    note = news_notice(n, test)
+    if AI_MOCK and not SUPERVISOR_TOKEN and (target == "persistent" or NOTIFY_RE.fullmatch(target or "")):
+        log.info("aviso simulado para %s: %s", target, note["message"])  # dev/run.sh: sem Home Assistant
+        return
+    if target == "persistent":
+        msg = note["message"].replace("Toque para abrir.", f"[Abrir as novidades]({note['link']})" if note["link"] else "").strip()
+        ha_request("POST", "/services/persistent_notification/create",
+                   {"title": note["title"], "message": msg, "notification_id": "inventaria_novidades"}, timeout=15)
+    elif NOTIFY_RE.fullmatch(target or ""):
+        data = {"tag": "inventaria-novidades", "group": "inventaria", "channel": "Novidades"}
+        if note["link"]:
+            data.update(url=note["link"], clickAction=note["link"])
+        ha_request("POST", f"/services/notify/{target}", {"title": note["title"], "message": note["message"], "data": data}, timeout=15)
+    else:
+        raise ApiError(400, "Escolha onde avisar.")
+
+
+def phone_name(svc: str) -> str:
+    """mobile_app_celular_da_ana → "Celular da Ana"."""
+    small = {"da", "de", "do", "das", "dos", "e"}
+    ws = svc[len("mobile_app_"):].split("_")
+    return " ".join(w if i and w in small else w.capitalize() for i, w in enumerate(ws) if w)
+
+
+def notify_targets() -> list[dict]:
+    """Os celulares que recebem avisos (notify.mobile_app_*), com um nome legível."""
+    if AI_MOCK and not SUPERVISOR_TOKEN:
+        return [{"id": "mobile_app_celular_de_teste", "name": "Celular de Teste"}]
+    if not SUPERVISOR_TOKEN:
+        return []
+    out = []
+    for dom in ha_request("GET", "/services", timeout=15) or []:
+        if isinstance(dom, dict) and dom.get("domain") == "notify":
+            for svc in sorted((dom.get("services") or {}).keys()):
+                if NOTIFY_RE.fullmatch(svc):
+                    out.append({"id": svc, "name": phone_name(svc)})
+    return out
+
+
+def news_auto_due(now: float) -> bool:
+    """Está na hora de conferir sozinho? Pela última conferência que terminou; depois de uma tentativa que deu erro,
+    espera 6 horas para não gastar a IA à toa."""
+    every = news_every()
+    if not every or not news_enabled() or not ai_enabled():
+        return False
+    d = news_read()
+
+    def ts(v):
+        try:
+            return datetime.fromisoformat(v).timestamp() if v else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+    return now - ts((d.get("ultima") or {}).get("at")) >= every * 86400 - 3600 and now - ts(d.get("auto_tentativa")) >= 6 * 3600
+
+
+def news_auto_loop():
+    while True:
+        time.sleep(NEWS_TICK)
+        try:
+            if (SUPERVISOR_TOKEN or AI_MOCK) and news_auto_due(time.time()):
+                with NEWS_LOCK:
+                    d = news_read()
+                    d["auto_tentativa"] = now_iso()
+                    write_json_atomic(NEWS_FILE, d)
+                news_batch_start(auto=True)
+        except ApiError as e:
+            log.info("novidades sozinho: %s", e.msg)
+        except Exception:  # noqa: BLE001
+            log.exception("novidades sozinho")
+
+
+def news_batch_start(auto: bool = False) -> dict:
+    need_news_on()
     if not SUPERVISOR_TOKEN and not AI_MOCK:
         raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
     with WEB_LOCK:
@@ -2557,7 +2689,7 @@ def news_batch_start() -> dict:
         raise ApiError(400, "A categoria Eletrônicos foi excluída: crie de novo em Mais > Categorias.")
     jid = secrets.token_hex(8)
     with WEB_LOCK:
-        WEB_JOBS[jid] = {"stage": "busy", "msg": "Começando…", "results": [], "at": time.time(), "kind": "lote",
+        WEB_JOBS[jid] = {"stage": "busy", "msg": "Começando…", "results": [], "at": time.time(), "kind": "lote", "auto": auto,
                          "progress": {"feitos": 0, "total": 0, "atual": ""}}
     threading.Thread(target=_news_batch_run, args=(jid,), daemon=True).start()
     return {"id": jid}
@@ -2943,7 +3075,8 @@ def r_data(h, query):
         out = STORE.public()
     out.update({"version": VERSION, "user": h.user(),
                 "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai_search": STORE.settings.get("ai_search") or "",
-                             "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "ha_sensors": sensors_enabled()},
+                             "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "ha_sensors": sensors_enabled(),
+                             "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target()},
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
     h.send_json(out)
 
@@ -3042,7 +3175,9 @@ def r_voice_status(h, query):
 
 
 def r_voice(h, query):
-    h.send_json(voice_text(h.read_raw(VOICE_MAX + 1024)))
+    pcm = h.read_raw(VOICE_MAX + 1024)
+    need_ai_on()  # com Usar IA desligada, o Falar some junto
+    h.send_json(voice_text(pcm))
 
 
 def r_ai_text(h, query):
@@ -3103,7 +3238,7 @@ def r_news_status(h, jid, query):
 
 
 def r_news_overview(h, query):
-    need_ai_on()
+    need_news_on()
     iid = (query.get("item") or [""])[0]
     h.send_json(news_of(iid) if iid else news_overview())
 
@@ -3115,6 +3250,19 @@ def r_news_clear(h, query):
 def r_news_all(h, query):
     h.read_body()
     h.send_json(news_batch_start(), 202)
+
+
+def r_news_targets(h, query):
+    h.send_json({"targets": notify_targets()})
+
+
+def r_news_notify_test(h, query):
+    body = h.read_body()
+    target = str(body.get("target") or news_notify_target())
+    if target != "persistent" and not NOTIFY_RE.fullmatch(target):
+        raise ApiError(400, "Escolha onde avisar.")
+    send_news_notice(2, target, test=True)
+    h.send_json({"ok": True})
 
 
 def r_news_cancel(h, jid, query):
@@ -3142,11 +3290,20 @@ def r_settings_put(h, query):
             if e and not re.fullmatch(rx, e):
                 raise ApiError(400, msg)
             upd[key] = e
-    for key in ("ai", "zones", "ha_sensors"):
+    for key in ("ai", "zones", "ha_sensors", "news"):
         if key in body:
             if not isinstance(body[key], bool):
                 raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
             upd[key] = body[key]
+    if "news_every" in body:
+        if isinstance(body["news_every"], bool) or body["news_every"] not in NEWS_EVERY:
+            raise ApiError(400, "Escolha de quanto em quanto tempo conferir.")
+        upd["news_every"] = int(body["news_every"])
+    if "news_notify" in body:
+        t = str(body.get("news_notify") or "")
+        if t and t != "persistent" and not NOTIFY_RE.fullmatch(t):
+            raise ApiError(400, "Escolha onde avisar.")
+        upd["news_notify"] = t
     with STORE.lock:
         STORE.settings.update(upd)
         STORE.save_settings()
@@ -3431,6 +3588,8 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/news", r_news_start),
     ("DELETE", r"/api/news", r_news_clear),
     ("POST", r"/api/news/all", r_news_all),
+    ("GET", r"/api/news/targets", r_news_targets),
+    ("POST", r"/api/news/notify-test", r_news_notify_test),
     ("GET", r"/api/news/([a-f0-9]{16})", r_news_status),
     ("DELETE", r"/api/news/([a-f0-9]{16})", r_news_cancel),
     ("GET", r"/api/settings", r_settings_get),
@@ -3456,6 +3615,7 @@ def main():
     cleanup_uploads()
     web_jobs_cleanup(max_age=0)
     threading.Thread(target=usage_sensor_loop, daemon=True).start()
+    threading.Thread(target=news_auto_loop, daemon=True).start()
     threading.Thread(target=conexao_loop, daemon=True).start()
     srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     srv.daemon_threads = True

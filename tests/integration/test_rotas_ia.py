@@ -286,7 +286,7 @@ class SimuladaSemResposta(IaCase):
 
 
 class Desligada(IaCase):
-    """Usar IA desligado: nada chama a IA, o servidor recusa com 409; o Falar (só fala para texto) continua."""
+    """Usar IA desligado: nada chama a IA, o servidor recusa com 409; o Falar some junto (recusa também)."""
 
     @classmethod
     def setUpClass(cls):
@@ -322,9 +322,11 @@ class Desligada(IaCase):
         self.assertTrue(self.app.ok("GET", "api/ai/status")["ready"], "a tela precisa saber se dá para ligar")
         self.assertEqual(self.app.get("api/ai/usage")[0], 200)
 
-    def test_falar_continua_sem_ia(self):
-        self.assertTrue(self.app.ok("GET", "api/voice/status")["ready"])
-        self.assertTrue(self.app.ok("POST", "api/voice", raw=PCM, headers=OCTET)["text"])
+    def test_falar_recusa(self):
+        self.assertTrue(self.app.ok("GET", "api/voice/status")["ready"], "o estado continua respondendo")
+        self.erro("POST", "api/voice", None, 409, DESLIGADA, raw=PCM, headers=OCTET)
+        st, _, out = self.app.request("GET", "api/rev")
+        self.assertEqual(st, 200, "o áudio recusado não atrapalha o próximo pedido na mesma conexão")
 
     def test_recusas_nao_contam_no_uso(self):
         antes = self.uso()["today"]["calls"]

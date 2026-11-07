@@ -1,4 +1,4 @@
-"""Catalogar foto com IA (enviar, ler, revisar, adicionar, guardar a foto no cômodo, Outra foto) e Falar (microfone de mentira, com e sem IA)."""
+"""Catalogar foto com IA (enviar, ler, revisar, adicionar, guardar a foto no cômodo, Outra foto) e Falar (microfone de mentira); com a IA desligada, o Falar some."""
 import os
 
 from e2e_lib import OVERFLOW, helpers, main
@@ -139,34 +139,19 @@ async def body(r, p):
     r.eq(await pg.locator("dialog[open]").count(), 0, "Cancelar enquanto ouve fecha sem perguntar")
     await ctx.close()
 
-    # -- Falar sem IA: o app separa pelas vírgulas, sem chamar a IA
+    # -- IA desligada: o Falar some junto (sem o microfone no alto); Adicionar vai direto para o item
     r.api("PUT", "api/settings", {"ai": False})
-    n0 = r.api("GET", "api/ai/usage")["today"]["calls"]
     ctx, pg = await r.page(b, "cel", "light", accent="verde", perms=["microphone"])
-    reqs = []
-    pg.on("request", lambda q: reqs.append(q.url) if "api/ai/" in q.url and "usage" not in q.url and "status" not in q.url else None)
     await r.open(pg, "#/", ".tag")
     r.eq(await pg.locator('[data-act="catalog"]').count(), 0, "IA desligada: sem Catalogar")
+    r.eq(await pg.locator(".mic-top, .chat-top").count(), 0, "IA desligada: sem o microfone e sem Conversar no alto")
     await pg.click(".tabbar .plus")
-    await pg.wait_for_selector("[data-go]")
-    gos = await pg.evaluate("[...document.querySelectorAll('[data-go]')].map(b => b.dataset.go)")
-    r.check("catalog" not in gos and "item" in gos and "voice" in gos, f"Adicionar: item e Falar, sem Catalogar ({gos})")
+    await pg.wait_for_selector("dialog.modal .form", timeout=4000)
+    r.eq(await pg.locator("[data-go]").count(), 0, "Adicionar abre o item direto, sem um menu de uma linha só")
+    r.check("Novo item" in await pg.text_content("dialog.modal h2"), "o item novo")
     await r.shot(pg, "adicionar-sem-ia")
-    await pg.click('[data-go="voice"]')
-    await pg.wait_for_selector(".voice.on", timeout=8000)
-    r.check("Sem IA, o app separa pelas vírgulas" in await pg.text_content(".voice-note"), "avisa que separa pelas vírgulas")
-    await pg.wait_for_timeout(800)
-    await pg.click('[data-ct="done"]')
-    await pg.wait_for_selector(".found li", timeout=15000)
-    found = await pg.evaluate("[...document.querySelectorAll('.found li')].map(li => [li.querySelector('.fname').value, li.querySelector('[data-rf=value]').value])")
-    r.eq(found, [["Sofá cinza de três lugares", "2.000"], ["Televisão Samsung de 55 polegadas", "3.000"], ["Duas luminárias de chão", ""]],
-         "separa pelas vírgulas e pontos, com os valores falados")
-    r.check("Sem IA" in await pg.text_content(".inote"), "nota: confira nomes e valores")
-    await r.shot(pg, "falar-sem-ia")
-    await pg.click('.dlg-f [data-ct="cancel"]')
-    await pg.click('[data-r="1"]')
-    r.eq(reqs, [], "sem IA, a tela não chamou a IA")
-    r.eq(r.api("GET", "api/ai/usage")["today"]["calls"], n0, "nenhuma chamada de IA contada")
+    await pg.click('dialog.modal .dlg-h [data-ed="cancel"]')
+    await pg.wait_for_timeout(300)
     r.api("PUT", "api/settings", {"ai": True})
     await ctx.close()
 
