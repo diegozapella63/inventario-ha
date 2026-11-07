@@ -288,7 +288,7 @@ class Consultas(UnitBase):
         self.store.settings["ai_entity"] = "ai_task.x"
         out = self.store.public()
         self.assertEqual(set(out), {"rev", "updatedAt", "rooms", "items", "cats"})
-        self.assertEqual((out["rev"], len(out["rooms"]), len(out["items"]), len(out["cats"])), (self.store.data["rev"], 6, 38, 13))
+        self.assertEqual((out["rev"], len(out["rooms"]), len(out["items"]), len(out["cats"])), (self.store.data["rev"], 6, 38, 15))
 
     def test_publico_sem_data_de_atualizacao(self):
         self.store.data.pop("updatedAt")

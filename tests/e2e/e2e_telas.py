@@ -3,13 +3,14 @@ nada passa da largura (o Chrome do celular encolheria a página), as janelas cab
 de baixo visíveis, e nenhum texto de botão fica cortado."""
 from e2e_lib import main
 
-PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/graficos", "#/novidades", "#/categorias", "#/config", "#/config/integracoes", "#/config/aparencia", "#/config/opcoes", "#/sobre"]
+PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/bens", "#/graficos", "#/novidades", "#/categorias", "#/config", "#/config/integracoes", "#/config/aparencia", "#/config/opcoes", "#/sobre"]
 
 # (nome, endereço, como abrir, seletor que aparece)
 DIALOGS = [
     ("ficha", "#/i/sal-001", None, "dialog.sheet h1"),
     ("adicionar", "#/", ".tabbar .plus", "[data-go]"),
     ("item-novo", "#/c/escritorio", '.rhead-actions [data-act="item-new"]', "#f-name"),
+    ("bem-novo", "#/bens", '.mscreen [data-act="item-new"]', "#f-name"),
     ("editar-item", "#/i/esc-001", 'dialog.sheet [data-act="item-edit"].primary', "#f-name"),
     ("catalogar", "#/c/quarto", '.rhead-actions [data-act="catalog"]', '[data-ct="upload"]'),
     ("falar", "#/", ".mic-top", ".voice"),
@@ -73,7 +74,7 @@ async def body(r, p):
             for name, h, opener, wait in DIALOGS:
                 if name in ("falar", "adicionar") and size == "pc":  # no computador: botões no alto, sem a barra de baixo
                     continue
-                await r.open(pg, h, ".tag, .sbar, .rooms, .more-tabs, .report, .rhead, #p-cats, dialog[open]")
+                await r.open(pg, h, ".tag, .sbar, .rooms, .more-tabs, .report, .rhead, #p-cats, .mscreen, dialog[open]")
                 if opener:
                     await pg.locator(opener).first.click()
                 await pg.wait_for_selector(wait, timeout=8000)

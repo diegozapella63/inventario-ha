@@ -86,7 +86,7 @@ async def body(r, p):
     await pg.click(".tabbar .plus")
     await pg.click('[data-go="item"]')
     await pg.wait_for_selector("#f-room")
-    r.eq(await pg.evaluate("[...document.querySelectorAll('#f-room option')].map(o => o.value)"), want, "cadastro: os cômodos na ordem nova")
+    r.eq(await pg.evaluate("[...document.querySelectorAll('#f-room option')].map(o => o.value)"), want + ["@bens"], "cadastro: os cômodos na ordem nova (e Bens no fim)")
     await pg.click('[data-ed="cancel"]')
     await pg.wait_for_selector("#f-room", state="detached")
 

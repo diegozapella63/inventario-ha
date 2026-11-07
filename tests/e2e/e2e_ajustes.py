@@ -221,7 +221,7 @@ async def body(r, p):
 
     await r.open(pg, "#/categorias", "#p-cats")
     r.eq((await pg.text_content(".page-title")).strip(), "Categorias", "Categorias numa tela própria")
-    r.eq((await pg.text_content("#p-cats .opts li .ot b")).strip(), "13 categorias", "13 categorias de início")
+    r.eq((await pg.text_content("#p-cats .opts li .ot b")).strip(), "15 categorias", "15 categorias de início")
     r.eq(await pg.locator('#p-cats [data-act="cat-del"][data-cat="outros"]').count(), 0, "Outros não se exclui")
     await pg.click('[data-act="cat-new"]')
     await pg.wait_for_selector("#cn-name")
@@ -232,7 +232,7 @@ async def body(r, p):
     await pg.locator(".toast", has_text="Ferramentas").wait_for(timeout=5000)
     cat = next((c for c in r.data()["cats"] if c["name"] == "Ferramentas"), None)
     r.check(cat is not None, f"categoria nova gravada ({cat})")
-    r.eq((await pg.text_content("#p-cats .opts li .ot b")).strip(), "14 categorias", "e conta na lista")
+    r.eq((await pg.text_content("#p-cats .opts li .ot b")).strip(), "16 categorias", "e conta na lista")
     await pg.click('[data-act="cat-new"]')
     await pg.fill("#cn-name", "móveis")
     await pg.click("dialog [data-ok]")

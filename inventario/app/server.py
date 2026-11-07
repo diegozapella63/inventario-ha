@@ -44,7 +44,7 @@ from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.30.0"
+VERSION = "1.31.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -75,8 +75,9 @@ CATS = {
     "eletronicos": "Eletrônicos", "moveis": "Móveis", "decoracao": "Decoração e arte",
     "colecao": "Colecionáveis", "cozinha": "Cozinha e bar", "texteis": "Tapetes e têxteis",
     "plantas": "Plantas", "livros": "Livros e jogos", "pets": "Pets", "saude": "Saúde",
-    "vestuario": "Roupas e calçados", "utilidades": "Utilidades", "outros": "Outros",
+    "vestuario": "Roupas e calçados", "utilidades": "Utilidades", "imoveis": "Imóveis", "veiculos": "Veículos", "outros": "Outros",
 }
+BENS_CATS = ("imoveis", "veiculos")  # os bens fora de casa (casa, terreno, carro); o resto vai em Outros
 SAFE_CAT = re.compile(r"[a-z0-9][a-z0-9_-]{0,40}")
 SAFE_FILE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,150}\.(?:jpe?g|png|webp)")
 SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,80}")
@@ -600,8 +601,37 @@ class Store:
     def _unique_code(self, wanted: str, skip_id=None) -> str:
         return free_code(wanted, {r["code"] for r in self.data["rooms"] if r["id"] != skip_id})
 
+    def bens_room(self) -> dict | None:
+        """A área Bens: o que não fica dentro de casa (casa, terreno, carro). É um "cômodo" do sistema, fora da lista de cômodos."""
+        return next((r for r in self.data["rooms"] if r.get("kind") == "bens"), None)
+
+    def _ensure_bens(self) -> dict:
+        room = self.bens_room()
+        if room:
+            return room
+        ids = {r["id"] for r in self.data["rooms"]}
+        rid, n = "bens", 2
+        while rid in ids:
+            rid, n = f"bens-{n}", n + 1
+        room = {"id": rid, "code": self._unique_code("BEN"), "name": "Bens", "kind": "bens",
+                "order": max([r.get("order", 0) for r in self.data["rooms"]] or [0]) + 1, "cover": 0, "photos": [], "updatedAt": now_iso()}
+        self.data["rooms"].append(room)
+        # Imóveis e Veículos na lista de categorias da casa (a lista editada não tinha): só acrescenta, nada muda nos itens
+        cats = self.cats()
+        missing = [{"id": c, "name": CATS[c]} for c in BENS_CATS if not any(x["id"] == c for x in cats)]
+        if missing and self.data.get("cats"):
+            at = next((i for i, c in enumerate(cats) if c["id"] == "outros"), len(cats))
+            self.data["cats"] = cats[:at] + missing + cats[at:]
+        self._normalize_order()
+        self.save()
+        return room
+
     def create_room(self, body: dict) -> dict:
         with self.lock:
+            if body.get("kind") == "bens":  # a área Bens: criada na primeira vez, depois devolve a mesma
+                return self._ensure_bens()
+            if body.get("kind"):
+                raise ApiError(400, "Tipo de cômodo inválido.")
             name = text(body.get("name"), 60, "nome do cômodo", required=True)
             rid = slug(name)
             ids = {r["id"] for r in self.data["rooms"]}
@@ -611,10 +641,11 @@ class Store:
                 n += 1
             code_in = text(body.get("code"), 4, "código") or name
             geral = self.room("geral")
+            house = [r.get("order", 0) for r in self.data["rooms"] if r.get("kind") != "bens"]
             room = {
                 "id": rid, "code": self._unique_code(code_in), "name": name,
-                # novos cômodos entram no fim da lista, antes de "Geral"
-                "order": (geral.get("order", 0) - 0.5) if geral else max([r.get("order", 0) for r in self.data["rooms"]] or [0]) + 1,
+                # novos cômodos entram no fim da lista, antes de "Geral" (e a área Bens fica sempre depois de todos)
+                "order": (geral.get("order", 0) - 0.5) if geral else max(house or [0]) + 1,
                 "cover": 0, "photos": [], "updatedAt": now_iso(),
             }
             self.data["rooms"].append(room)
@@ -682,7 +713,7 @@ class Store:
             return self.data["rooms"]
 
     def _normalize_order(self):
-        self.data["rooms"].sort(key=lambda r: r.get("order", 0))
+        self.data["rooms"].sort(key=lambda r: (r.get("kind") == "bens", r.get("order", 0)))
         for n, r in enumerate(self.data["rooms"]):
             r["order"] = n
 
@@ -3121,7 +3152,7 @@ def r_item_delete(h, iid, query):
 
 def r_room_create(h, query):
     room = STORE.create_room(h.read_body())
-    h.send_json({"room": room, "rooms": STORE.data["rooms"], "rev": STORE.data["rev"]}, 201)
+    h.send_json({"room": room, "rooms": STORE.data["rooms"], "cats": STORE.cats(), "rev": STORE.data["rev"]}, 201)
 
 
 def r_room_update(h, rid, query):
@@ -3537,7 +3568,8 @@ def r_integracao_comodos(h, query):
         conta = {}
         for it in STORE.data.get("items") or []:
             conta[it.get("room")] = conta.get(it.get("room"), 0) + 1
-        out = [{"id": r["id"], "nome": r.get("name") or r["id"], "codigo": r.get("code") or "", "itens": conta.get(r["id"], 0)} for r in rooms]
+        out = [{"id": r["id"], "nome": r.get("name") or r["id"], "codigo": r.get("code") or "", "itens": conta.get(r["id"], 0),
+                **({"tipo": "bens"} if r.get("kind") == "bens" else {})} for r in rooms]  # Bens: o que fica fora de casa
     h.send_json({"versao": VERSION, "comodos": out})
 
 

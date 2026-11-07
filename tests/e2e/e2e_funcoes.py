@@ -73,7 +73,7 @@ async def body(r, p):
 
     # categorias da casa
     r.eq(await ev("() => { __f.applyCats([{id: 'a', name: 'A'}, {id: 'outros', name: 'Outros'}]); const c = __f.cats(); __f.applyCats(null); return [c, __f.cats().length]; }"),
-         [[["a", "A"], ["outros", "Outros"]], 13], "categorias da casa e volta para a padrão")
+         [[["a", "A"], ["outros", "Outros"]], 15], "categorias da casa e volta para a padrão")
     await ctx.close()
     await b.close()
 

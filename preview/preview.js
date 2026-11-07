@@ -5,7 +5,7 @@
   window.INV_PREVIEW = true;
   const DEF_CATS = [["eletronicos", "Eletrônicos"], ["moveis", "Móveis"], ["decoracao", "Decoração e arte"], ["colecao", "Colecionáveis"], ["cozinha", "Cozinha e bar"],
     ["texteis", "Tapetes e têxteis"], ["plantas", "Plantas"], ["livros", "Livros e jogos"], ["pets", "Pets"], ["saude", "Saúde"], ["vestuario", "Roupas e calçados"],
-    ["utilidades", "Utilidades"], ["outros", "Outros"]].map(([id, name]) => ({ id, name }));
+    ["utilidades", "Utilidades"], ["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["outros", "Outros"]].map(([id, name]) => ({ id, name }));
   const catsOf = (d) => { if (!Array.isArray(d.cats) || !d.cats.length) d.cats = clone(DEF_CATS); return d.cats; };
   const CATS = { has: (k) => ST.data && catsOf(ST.data).some((c) => c.id === k) };
   const foldName = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -175,6 +175,16 @@
         return { moved, cats: clone(cats), rev: bump() };
       }
     }
+    if (method === "POST" && path === "api/rooms" && body.kind === "bens") { // a área Bens (fora de casa): criada uma vez
+      let r = d.rooms.find((x) => x.kind === "bens");
+      if (!r) {
+        r = { id: room(d, "bens") ? "bens-2" : "bens", code: d.rooms.some((x) => x.code === "BEN") ? "BEN2" : "BEN", name: "Bens", kind: "bens", order: d.rooms.length, cover: 0, photos: [], updatedAt: now() };
+        d.rooms.push(r);
+        const cats = catsOf(d), at = cats.findIndex((c) => c.id === "outros");
+        for (const [id, name] of [["imoveis", "Imóveis"], ["veiculos", "Veículos"]]) if (!cats.some((c) => c.id === id)) cats.splice(at < 0 ? cats.length : at, 0, { id, name });
+      }
+      return { room: clone(r), rooms: clone(d.rooms), cats: clone(catsOf(d)), rev: bump() };
+    }
     if (method === "POST" && path === "api/rooms") {
       const name = String(body.name || "").trim();
       if (!name) fail("Dê um nome ao cômodo.");
@@ -185,13 +195,13 @@
       const geral = room(d, "geral");
       const r = { id, code, name, order: geral ? geral.order - 0.5 : d.rooms.length, cover: 0, photos: [], updatedAt: now() };
       d.rooms.push(r);
-      d.rooms.sort((a, b) => a.order - b.order).forEach((x, i) => { x.order = i; });
+      d.rooms.sort((a, b) => (a.kind === "bens") - (b.kind === "bens") || a.order - b.order).forEach((x, i) => { x.order = i; });
       return { room: clone(r), rooms: clone(d.rooms), rev: bump() };
     }
     if (method === "POST" && path === "api/rooms/order") {
       const pos = new Map((body.ids || []).map((id, i) => [id, i]));
       d.rooms.forEach((r) => { r.order = pos.has(r.id) ? pos.get(r.id) : 999; });
-      d.rooms.sort((a, b) => a.order - b.order).forEach((x, i) => { x.order = i; });
+      d.rooms.sort((a, b) => (a.kind === "bens") - (b.kind === "bens") || a.order - b.order).forEach((x, i) => { x.order = i; });
       return { rooms: clone(d.rooms), rev: bump() };
     }
     if ((m = path.match(/^api\/rooms\/([^/]+)\/photos$/)) && method === "POST") {

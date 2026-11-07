@@ -1,0 +1,154 @@
+"""Bens (Mais > Bens): o que tem valor e fica fora de casa (casa, terreno, carro). A área é criada com o primeiro bem;
+Imóveis, Veículos e Outros com o total de cada; conta no patrimônio do Início, nos gráficos e na busca; fora da lista de
+cômodos; no relatório, numa seção à parte (o total da casa não muda); a ficha, Mover para Bens e o tema claro e o 320 px."""
+from e2e_lib import OVERFLOW, main
+
+
+def txt(s):
+    return " ".join((s or "").replace("\xa0", " ").split())
+
+
+async def body(r, p):
+    r.start(search=False)
+    d0 = r.data()
+    house_total = sum(float(i["value"] or 0) for i in d0["items"])
+    n_house = len(d0["items"])
+    b = await r.browser(p)
+    ctx, pg = await r.page(b, "cel", "dark", accent="turquesa")
+
+    # -- o menu Mais começa por Bens; sem nenhum, o convite
+    await r.open(pg, "#/mais", ".menu-list")
+    rows = await pg.evaluate("[...document.querySelectorAll('.menu-row b')].map(b => b.textContent)")
+    r.eq(rows[0], "Bens", "Bens é a primeira linha do menu Mais")
+    await pg.click('.menu-row[href="#/bens"]')
+    await pg.wait_for_selector(".mscreen .empty", timeout=5000)
+    r.eq(txt(await pg.text_content(".page-title")), "Bens", "a tela Bens, com ‹ Mais no alto")
+    r.eq(txt(await pg.text_content(".mscreen .empty h2")), "Nenhum bem ainda", "sem bens: o convite")
+    r.check(not any(x.get("kind") == "bens" for x in r.data()["rooms"]), "a área Bens só é criada com o primeiro bem")
+    r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
+    await r.shot(pg, "vazio")
+
+    # -- o primeiro bem, pelo botão da tela
+    await pg.click('.mscreen [data-act="item-new"]')
+    await pg.wait_for_selector("#f-name")
+    r.eq(txt(await pg.text_content("dialog.modal .dlg-h h2")), "Novo bem", "a janela diz Novo bem")
+    opts = await pg.evaluate("[...document.querySelectorAll('#f-room option')].map(o => o.textContent)")
+    r.check(opts[-1] == "Bens" and await pg.evaluate("document.querySelector('#f-room').selectedOptions[0].textContent") == "Bens",
+            f"Bens no fim da lista de cômodos, já escolhido ({opts[-3:]})")
+    cats = await pg.evaluate("[...document.querySelectorAll('#f-cat option')].map(o => o.value)")
+    r.check("imoveis" in cats and "veiculos" in cats, "as categorias Imóveis e Veículos")
+    await pg.fill("#f-name", "Apartamento na praia")
+    await pg.select_option("#f-cat", "imoveis")
+    await pg.fill("#f-value", "450.000")
+    await r.shot(pg, "novo-bem")
+    await pg.click('[data-ed="save"]')
+    await pg.locator(".toast", has_text="Bem adicionado").wait_for(timeout=8000)
+    d = r.data()
+    bens = [x for x in d["rooms"] if x.get("kind") == "bens"]
+    r.check(len(bens) == 1 and bens[0]["code"] == "BEN" and bens[0]["name"] == "Bens", f"a área Bens foi criada, com o código BEN ({bens})")
+    ben = bens[0]["id"]
+    apto = next(i for i in d["items"] if i["name"] == "Apartamento na praia")
+    r.check(apto["room"] == ben and apto["cat"] == "imoveis" and apto["value"] == 450000, "o bem foi gravado em Bens, como Imóveis, com o valor")
+    r.check(d["rooms"][-1]["id"] == ben, "Bens fica depois de todos os cômodos")
+    r.api("POST", "api/items", {"room": ben, "name": "Carro hatch 2020", "cat": "veiculos", "value": 60000})
+    r.api("POST", "api/items", {"room": ben, "name": "Barco inflável", "cat": "outros", "value": 3000})
+    r.api("POST", "api/rooms", {"name": "Garagem", "code": "GAR"})
+    order = [x["name"] for x in r.data()["rooms"]]
+    r.eq(order[-2:], ["Garagem", "Bens"], "um cômodo novo entra antes de Bens")
+    bens_total = 450000 + 60000 + 3000
+
+    # -- a tela Bens: Imóveis, Veículos e Outros, cada um com o total
+    await r.open(pg, "#/bens", ".mscreen.bens .zone")
+    groups = await pg.evaluate("[...document.querySelectorAll('.bens .zone')].map(z => [z.querySelector('h3').textContent, [...z.querySelectorAll('.nm')].map(n => n.textContent)])")
+    r.eq(groups, [["Imóveis", ["Apartamento na praia"]], ["Veículos", ["Carro hatch 2020"]], ["Outros", ["Barco inflável"]]], "Imóveis, Veículos e Outros")
+    r.eq(txt(await pg.text_content(".page-sub")), "3 bens, R$ 513.000", "quantos bens e o total, no alto")
+    r.check("Outros" in txt(await pg.text_content(".bens .zone:last-child .irow .z")), "em Outros, cada um diz a categoria")
+    r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
+    await r.shot(pg, "lista", full_page=True)
+
+    # -- Início: o patrimônio soma os bens; Bens tem a sua lista e não entra em Cômodos
+    await r.open(pg, "#/", ".tag")
+    r.eq(txt(await pg.text_content(".tag-sub")), f"{n_house} itens em 7 cômodos e 3 bens", "a etiqueta diz quantos itens, cômodos e bens")
+    val = int("".join(ch for ch in await pg.text_content(".tag-value") if ch.isdigit()))
+    r.eq(val, round(house_total + bens_total), "o patrimônio soma a casa e os bens")
+    r.eq(await pg.evaluate("[...document.querySelectorAll('#home-bens .nm')].map(n => n.textContent)"),
+         ["Apartamento na praia", "Carro hatch 2020", "Barco inflável"], "Início: Bens, do maior para o menor")
+    r.check("Bens" not in await pg.evaluate("[...document.querySelectorAll('.rows .rn')].map(n => n.firstChild.textContent)"), "Bens não aparece entre os cômodos")
+    r.check("Bens" not in txt(await pg.text_content(".facts")).split("Maior cômodo")[1].split("Último")[0], "nem como Maior cômodo")
+    await r.shot(pg, "inicio", full_page=True)
+    await pg.click('#home-bens a.aside')
+    await pg.wait_for_selector(".mscreen.bens", timeout=5000)
+    r.check(pg.url.endswith("#/bens"), "Ver todos abre Bens")
+
+    # -- Cômodos: sem Bens, com o total da casa
+    await r.open(pg, "#/comodos", ".rooms")
+    r.check("Bens" not in txt(await pg.text_content("#view .rooms")), "a aba Cômodos não tem Bens")
+    r.check(f"{n_house} itens" in txt(await pg.text_content(".page-sub")), "e conta só os itens da casa")
+
+    # -- a ficha de um bem
+    await r.open(pg, f"#/i/{apto['id']}", "dialog.sheet h1")
+    r.check("Onde" in txt(await pg.text_content("dialog.sheet .facts, dialog.sheet dl")), "a ficha diz Onde: Bens")
+    await pg.click('dialog.sheet a[href="#/bens"]')
+    await pg.wait_for_selector(".mscreen.bens", timeout=5000)
+    r.check(True, "e o link leva para Bens")
+
+    # -- busca: o filtro tem Bens
+    await r.open(pg, "#/buscar", ".sbar")
+    rooms = await pg.evaluate("[...document.querySelectorAll('[data-input=\"search-room\"] option')].map(o => o.textContent)")
+    r.eq(rooms[-1], "Bens", "na busca, Bens é o último filtro de cômodo")
+    await pg.select_option('[data-input="search-room"]', ben)
+    await pg.wait_for_timeout(300)
+    r.eq(len(await pg.query_selector_all("#results .irow")), 3, "e mostra os 3 bens")
+
+    # -- Mover um item para Bens, e Desfazer
+    await r.open(pg, "#/i/sal-007", "dialog.sheet h1")
+    await pg.click('dialog.sheet [data-act="item-move"]')
+    await pg.wait_for_selector("#mv-room")
+    r.eq((await pg.evaluate("[...document.querySelectorAll('#mv-room option')].map(o => o.textContent)"))[-1], "Bens", "Mover: Bens no fim")
+    await pg.select_option("#mv-room", ben)
+    await pg.click("dialog.modal [data-ok]")
+    await pg.locator(".toast", has_text="Movido para Bens").wait_for(timeout=5000)
+    r.eq(next(i for i in r.data()["items"] if i["id"] == "sal-007")["room"], ben, "o item foi para Bens")
+    await pg.locator(".toast button", has_text="Desfazer").click()
+    await pg.wait_for_timeout(600)
+    r.eq(next(i for i in r.data()["items"] if i["id"] == "sal-007")["room"], "sala", "Desfazer volta para a sala")
+    await ctx.close()
+
+    # -- relatório: a casa como antes; Bens numa seção à parte, com o total dele
+    ctx, pg = await r.page(b, "pc", "light", accent="verde")
+    await r.open(pg, "#/relatorio", ".report")
+    boxes = await pg.evaluate("[...document.querySelectorAll('.rtotal > div')].map(d => [d.querySelector('span').textContent, d.querySelector('b').textContent.replace(/\\s/g, ' ')])")
+    r.eq([x[0] for x in boxes], ["Na casa", "Itens", "Cômodos", "Bens"], "no alto: na casa, itens, cômodos e bens")
+    r.eq(boxes[1][1], str(n_house), "os itens da casa")
+    r.eq(txt(boxes[3][1]), "R$ 513.000", "o total dos bens")
+    foot = txt(await pg.text_content(".report > .rtable tfoot"))
+    r.check(foot.replace(" ", "").startswith(f"Total{n_house}R$") and "513.000" not in foot, f"o total da casa não muda com os bens ({foot})")
+    r.check("Bens" not in txt(await pg.text_content(".report > .rtable tbody")), "Bens fora da tabela dos cômodos")
+    last = pg.locator(".rep-room").last
+    r.eq(await last.get_attribute("class"), "rep-room rep-bens", "a seção Bens é a última")
+    tf = txt(await last.locator("tfoot").text_content())
+    r.check("Total dos bens" in tf and "513.000" in tf, f"com o total dos bens ({tf})")
+    await r.shot(pg, "relatorio", full_page=True)
+
+    # -- gráficos: Bens entra, com link
+    await r.open(pg, "#/graficos", ".kpis")
+    r.eq(txt(await pg.text_content("#g-rooms h2")), "Cômodos e bens", "o gráfico vira Cômodos e bens")
+    r.eq(await pg.locator('#g-rooms a[href="#/bens"]').count(), 1, "com Bens, que abre a tela Bens")
+    r.check("e 3 bens" in txt(await pg.text_content(".kpis")), "os números do alto dizem quantos bens")
+    await r.shot(pg, "graficos", full_page=True)
+    await r.open(pg, "#/bens", ".mscreen.bens")
+    r.check(await pg.evaluate(OVERFLOW), "Bens no computador, sem rolagem para o lado")
+    await r.shot(pg, "lista-pc", full_page=True)
+    await ctx.close()
+
+    # -- 320 px, claro
+    ctx, pg = await r.page(b, "estreito", "light", accent="coral")
+    for h, w in (("#/bens", ".mscreen.bens"), ("#/", ".tag")):
+        await r.open(pg, h, w)
+        r.check(await pg.evaluate(OVERFLOW), f"320 px, {h}: nada passa da largura")
+    await r.shot(pg, "estreito", full_page=True)
+    await ctx.close()
+    await b.close()
+
+
+main("bens", body)

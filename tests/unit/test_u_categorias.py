@@ -26,7 +26,7 @@ class Padrao(Base):
         a = S.default_cats()
         a[0]["name"] = "Mudou"
         a.pop()
-        self.assertEqual((S.default_cats()[0]["name"], len(S.default_cats())), ("Eletrônicos", 13))
+        self.assertEqual((S.default_cats()[0]["name"], len(S.default_cats())), ("Eletrônicos", 15))
 
     def test_ids_validos_e_sem_repeticao(self):
         ids = [c["id"] for c in S.default_cats()]
@@ -130,7 +130,7 @@ class Criar(Base):
     def test_primeira_criacao_grava_a_lista_padrao_inteira(self):
         self.assertNotIn("cats", self.store.data)
         self.store.create_cat({"name": "Oficina"})
-        self.assertEqual(len(self.store.data["cats"]), 14)
+        self.assertEqual(len(self.store.data["cats"]), 16)
 
     def test_nome_recusado_nao_grava(self):
         rev = self.store.data["rev"]

@@ -9,7 +9,7 @@
     ["eletronicos", "Eletrônicos"], ["moveis", "Móveis"], ["decoracao", "Decoração e arte"],
     ["colecao", "Colecionáveis"], ["cozinha", "Cozinha e bar"], ["texteis", "Tapetes e têxteis"],
     ["plantas", "Plantas"], ["livros", "Livros e jogos"], ["pets", "Pets"], ["saude", "Saúde"],
-    ["vestuario", "Roupas e calçados"], ["utilidades", "Utilidades"], ["outros", "Outros"],
+    ["vestuario", "Roupas e calçados"], ["utilidades", "Utilidades"], ["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["outros", "Outros"],
   ];
   let CATS = DEFAULT_CATS, CAT = Object.fromEntries(CATS);
   function applyCats(list) {
@@ -103,7 +103,7 @@
   const ALL_TABS = [["dados", "Dados", "archive"], ["integracoes", "Integrações", "plug"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
   const moreTabs = () => ALL_TABS;
   const moreTab = (t) => (ALL_TABS.some(([k]) => k === t) ? t : ALL_TABS[0][0]);
-  const IN_MORE = ["menu", "charts", "news", "cats", "data", "report", "about"]; // telas que ficam embaixo de Mais
+  const IN_MORE = ["menu", "bens", "charts", "news", "cats", "data", "report", "about"]; // telas que ficam embaixo de Mais
   function applyAccent(a) {
     if (a === "amarelo") delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = a;
@@ -152,10 +152,17 @@
   let firstHome = true;
   let focusSearch = false;
 
+  // Bens: o que tem valor e fica fora de casa (casa, terreno, carro). Uma área do sistema (kind "bens"), fora da lista
+  // de cômodos: conta no patrimônio, nos gráficos e na busca; o relatório mostra à parte.
+  const BENS_NEW = "@bens"; // a área ainda não existe: é criada ao gravar o primeiro bem
+  const BENS_GROUPS = [["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["", "Outros"]];
+  const bensGroup = (it) => (it.cat === "imoveis" || it.cat === "veiculos" ? it.cat : "");
   function derive() {
-    const rooms = [...S.rooms].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const roomById = new Map(rooms.map((r) => [r.id, r]));
-    const byRoom = new Map(rooms.map((r) => [r.id, []]));
+    const all = [...S.rooms].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const bens = all.find((r) => r.kind === "bens") || null;
+    const rooms = all.filter((r) => r !== bens);
+    const roomById = new Map(all.map((r) => [r.id, r]));
+    const byRoom = new Map(all.map((r) => [r.id, []]));
     const photoItems = new Map();
     const catTotals = new Map();
     let total = 0;
@@ -178,11 +185,23 @@
     const files = new Set();
     for (const it of S.items) for (const p of it.photos || []) files.add(p);
     for (const r of rooms) for (const p of r.photos || []) files.add(p.file);
-    D = { rooms, roomById, byRoom, roomTotals, catTotals, photoItems, total, photoCount: files.size, itemById: new Map(S.items.map((i) => [i.id, i])) };
+    const bensItems = bens ? byRoom.get(bens.id) || [] : [], bensTotal = bens ? roomTotals.get(bens.id) || 0 : 0;
+    D = { rooms, allRooms: all, bens, bensItems, bensTotal, houseTotal: total - bensTotal, houseCount: S.items.length - bensItems.length,
+      roomById, byRoom, roomTotals, catTotals, photoItems, total, photoCount: files.size, itemById: new Map(S.items.map((i) => [i.id, i])) };
+  }
+  const isBens = (rid) => rid === BENS_NEW || (!!D.bens && rid === D.bens.id);
+  // as opções de cômodo de um item: os cômodos e, no fim, Bens
+  const roomOptions = (sel) => [...D.rooms, D.bens || { id: BENS_NEW, name: "Bens" }]
+    .map((r) => `<option value="${esc(r.id)}"${r.id === sel ? " selected" : ""}>${esc(r.name)}</option>`).join("");
+  async function realRoom(rid) { // "@bens": cria a área Bens (uma vez) e devolve o id dela
+    if (rid !== BENS_NEW) return rid;
+    const res = await API.post("api/rooms", { kind: "bens" });
+    setRev(res.rev); S.rooms = res.rooms; if (res.cats) { S.cats = res.cats; applyCats(res.cats); } derive();
+    return res.room.id;
   }
   const tagOf = (it) => `${D.roomById.get(it.room)?.code || "ITM"}-${String(it.seq || 0).padStart(3, "0")}`;
   const zonesOf = (rid) => [...new Set((D.byRoom.get(rid) || []).map((i) => i.zone).filter(Boolean))];
-  const lastRoom = () => { const r = LS.get("lastRoom", null); return D.roomById.has(r) ? r : D.rooms[0]?.id || ""; };
+  const lastRoom = () => { const r = LS.get("lastRoom", null); return D.rooms.some((x) => x.id === r) ? r : D.rooms[0]?.id || ""; };
   function upsertItem(it) { const i = S.items.findIndex((x) => x.id === it.id); if (i >= 0) S.items[i] = it; else S.items.push(it); }
   function removeItem(id) { S.items = S.items.filter((x) => x.id !== id); }
   function upsertRoom(r) { const i = S.rooms.findIndex((x) => x.id === r.id); if (i >= 0) S.rooms[i] = r; else S.rooms.push(r); }
@@ -387,7 +406,8 @@
     const parts = path.split("/").filter(Boolean).map((p) => { try { return decodeURIComponent(p); } catch { return p; } });
     const q = Object.fromEntries(new URLSearchParams(qs));
     switch (parts[0]) {
-      case "c": return { name: "room", id: parts[1], q };
+      case "c": return D && D.bens && parts[1] === D.bens.id ? { name: "bens", q } : { name: "room", id: parts[1], q };
+      case "bens": return { name: "bens", q };
       case "i": return { name: "item", id: parts[1], q };
       case "buscar": return { name: "search", q };
       case "relatorio": return { name: "report", q };
@@ -420,6 +440,7 @@
       case "news": return "#/novidades";
       case "cats": return "#/categorias";
       case "charts": return "#/graficos";
+      case "bens": return "#/bens";
       case "about": return "#/sobre";
       case "data": { const t = moreTab(r.tab); return t === ALL_TABS[0][0] ? "#/config" : `#/config/${t}`; }
       default: return "#/";
@@ -442,7 +463,7 @@
         location.replace(rendered ? hashOf(base) : "#/");
         return;
       }
-      if (!rendered) { base = { name: "room", id: it.room, q: {} }; renderView(true); }
+      if (!rendered) { base = isBens(it.room) ? { name: "bens", q: {} } : { name: "room", id: it.room, q: {} }; renderView(true); }
       showItemSheet(it);
       return;
     }
@@ -484,11 +505,11 @@
 
   function viewTitle(r) {
     if (r.name === "room") return D.roomById.get(r.id)?.name || "Cômodo";
-    return { home: "Início", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", charts: "Gráficos", news: "Novidades", cats: "Categorias", data: "Configurações", about: "Sobre" }[r.name] || "InventarIA";
+    return { home: "Início", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", bens: "Bens", charts: "Gráficos", news: "Novidades", cats: "Categorias", data: "Configurações", about: "Sobre" }[r.name] || "InventarIA";
   }
   // Topo de cada tela, igual nos apps da família (EconomIA, ResolvIA): nome do app com "IA" na cor
   // do app, saudação ao usuário do Home Assistant e o título grande da tela.
-  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", menu: "data", charts: "data", news: "data", cats: "data", data: "data", report: "data", about: "data" };
+  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", menu: "data", bens: "data", charts: "data", news: "data", cats: "data", data: "data", report: "data", about: "data" };
   function renderTop() {
     const el = $("#topbar");
     const r = base;
@@ -496,7 +517,8 @@
     const up = r.name === "room" ? ["#/comodos", "Cômodos"] : IN_MORE.includes(r.name) && r.name !== "menu" ? ["#/mais", "Mais"] : null;
     const title = r.name === "room" || r.name === "report" ? "" : viewTitle(r);
     const sub = r.name === "rooms" && D.rooms.length
-      ? `${plural(D.rooms.length, "cômodo", "cômodos")}, ${plural(S.items.length, "item", "itens")}, ${money(D.total)}`
+      ? `${plural(D.rooms.length, "cômodo", "cômodos")}, ${plural(D.houseCount, "item", "itens")}, ${money(D.houseTotal)}`
+      : r.name === "bens" && D.bensItems.length ? `${plural(D.bensItems.length, "bem", "bens")}, ${money(D.bensTotal)}`
       : r.name === "data" ? `${plural(S.items.length, "item", "itens")} e ${plural(D.photoCount, "foto", "fotos")} no inventário` : "";
     el.innerHTML = `
       <div class="mh-row">
@@ -533,6 +555,7 @@
         case "news": html = `<div class="mscreen">${moreNews()}</div>`; break;
         case "cats": html = `<div class="mscreen">${viewCats()}</div>`; break;
         case "charts": html = viewCharts(); break;
+        case "bens": html = viewBens(); break;
         case "data": html = viewData(); break;
         case "about": html = viewAbout(); break;
         default: html = viewHome();
@@ -611,6 +634,7 @@
     const room = D.roomById.get(it.room);
     let where;
     if (mode === "room") where = it.details ? hl(snippet(it.details), toks) : "";
+    else if (mode === "bens") where = esc(CAT[it.cat] || "Outros");
     else where = hl([room?.name, zonesOn() ? it.zone : ""].filter(Boolean).join(", "), toks);
     const qty = qtyClean(it.qty);
     return `<li><a class="irow" href="#/i/${encodeURIComponent(it.id)}">
@@ -628,7 +652,7 @@
       <span class="rn">${esc(r.name)}<small>${plural(n, "item", "itens")}</small></span>
       <span class="rv">${moneyR(v)}</span>
       <span class="bar"><i style="width:${max > 0 ? ((v / max) * 100).toFixed(2) : 0}%"></i></span>
-      <span class="pct">${pctFmt(pct(v, D.total))}</span></a></li>`;
+      <span class="pct">${pctFmt(pct(v, D.houseTotal))}</span></a></li>`;
   }
 
   // -- início
@@ -668,7 +692,7 @@
             <div class="tag-body">
               <p class="tag-label">Patrimônio</p>
               <p class="tag-value"><span class="cur">R$</span>${numTxt(Math.round(D.total))}</p>
-              <p class="tag-sub">${plural(n, "item", "itens")} em ${plural(D.rooms.length, "cômodo", "cômodos")}</p>
+              <p class="tag-sub">${plural(D.houseCount, "item", "itens")} em ${plural(D.rooms.length, "cômodo", "cômodos")}${D.bensItems.length ? ` e ${plural(D.bensItems.length, "bem", "bens")}` : ""}</p>
             </div>
           </div>
         </div>
@@ -679,7 +703,7 @@
       </form>
       <dl class="facts">
         ${top ? `<div><dt>${secIc("gem")}Mais valioso</dt><dd><a href="#/i/${encodeURIComponent(top.id)}">${esc(top.name)}</a></dd><dd class="fv">${money(top.value)}</dd></div>` : ""}
-        ${bigRoom ? `<div><dt>${secIc("pie")}Maior cômodo</dt><dd><a href="#/c/${encodeURIComponent(bigRoom.id)}">${esc(bigRoom.name)}</a></dd><dd class="fv">${pctFmt(pct(maxRoom, D.total))}</dd></div>` : ""}
+        ${bigRoom ? `<div><dt>${secIc("pie")}Maior cômodo</dt><dd><a href="#/c/${encodeURIComponent(bigRoom.id)}">${esc(bigRoom.name)}</a></dd><dd class="fv">${pctFmt(pct(maxRoom, D.houseTotal))}</dd></div>` : ""}
         ${last ? `<div><dt>${secIc("clock")}Último cadastro</dt><dd><a href="#/i/${encodeURIComponent(last.id)}">${esc(last.name)}</a></dd><dd class="fv muted">${esc(ago(last.createdAt))}</dd></div>` : ""}
         <div><dt>${secIc("images")}Fotos</dt><dd>${plural(D.photoCount, "foto guardada", "fotos guardadas")}</dd><dd class="fv"></dd></div>
       </dl>
@@ -689,6 +713,10 @@
       <div class="sec-h"><h2>${secIc("rooms")}Cômodos</h2><button type="button" class="btn ghost sm" data-act="room-new">${ic("plus", "sm")}Novo cômodo</button></div>
       <ul class="rows">${D.rooms.map((r) => roomRow(r, maxRoom)).join("")}</ul>
     </section>
+    ${D.bensItems.length ? `<section class="sec" id="home-bens">
+      <div class="sec-h"><h2>${secIc("home")}Bens</h2><a class="aside" href="#/bens">Ver todos</a></div>
+      <ul class="ilist">${[...D.bensItems].sort((a, b) => (+b.value || 0) - (+a.value || 0)).slice(0, 5).map((it) => itemRow(it, { mode: "bens" })).join("")}</ul>
+    </section>` : ""}
     <section class="sec">
       <div class="sec-h"><h2>${secIc("clock")}Cadastrados recentemente</h2><a class="aside" href="#/buscar?ord=new">Ver todos</a></div>
       <ul class="ilist">${recent.map((it) => itemRow(it)).join("")}</ul>
@@ -710,7 +738,7 @@
         <div class="rhead-name"><span class="mt lg">${esc(r.code)}</span><h1>${esc(r.name)}</h1>
           <div class="stats"><span><b>${int(list.length)}</b> ${list.length === 1 ? "item" : "itens"}</span>${zonesOn() ? `<span><b>${int(zones.size)}</b> ${zones.size === 1 ? "zona" : "zonas"}</span>` : ""}<span><b>${int(photos.length)}</b> ${photos.length === 1 ? "foto" : "fotos"}</span></div>
         </div>
-        <div class="rhead-val"><div class="big">${moneyR(total)}</div><div class="small">${pctFmt(pct(total, D.total))} do patrimônio</div></div>
+        <div class="rhead-val"><div class="big">${moneyR(total)}</div><div class="small">${pctFmt(pct(total, D.houseTotal))} ${D.bensItems.length ? "da casa" : "do patrimônio"}</div></div>
       </div>
       <div class="rhead-actions">
         <button type="button" class="btn primary" data-act="item-new" data-room="${esc(id)}" aria-label="Adicionar item">${ic("plus")}<span>Adicionar<span class="lbl-x"> item</span></span></button>
@@ -752,6 +780,23 @@
       <div class="zone-h"><h3>${hl(z, toks)}</h3><span class="zs">${plural(its.length, "item", "itens")}<b>${moneyR(its.reduce((s, i) => s + (+i.value || 0), 0))}</b></span></div>
       <ul class="ilist">${its.map((it) => itemRow(it, { toks, mode: "room" })).join("")}</ul></section>`).join("");
   }
+  // -- Bens (Mais > Bens): Imóveis, Veículos e Outros, cada grupo com o total
+  function viewBens() {
+    const rid = D.bens ? D.bens.id : BENS_NEW;
+    const add = `<button type="button" class="btn primary" data-act="item-new" data-room="${esc(rid)}">${ic("plus")}Adicionar bem</button>`;
+    if (!D.bensItems.length) {
+      return `<div class="mscreen"><div class="empty">${emptyMark()}<h2>Nenhum bem ainda</h2>
+        <p>Casa, apartamento, terreno, carro, moto: o que tem valor e fica fora de casa.</p><div class="acts">${add}</div></div></div>`;
+    }
+    const groups = BENS_GROUPS.map(([k, name]) => [name, D.bensItems.filter((it) => bensGroup(it) === k).sort((a, b) => (+b.value || 0) - (+a.value || 0))])
+      .filter(([, its]) => its.length);
+    return `<div class="mscreen bens">
+      <div class="bens-acts">${add}</div>
+      ${groups.map(([name, its]) => `<section class="zone">
+        <div class="zone-h"><h3>${esc(name)}</h3><span class="zs">${plural(its.length, "bem", "bens")}<b>${moneyR(its.reduce((t, i) => t + (+i.value || 0), 0))}</b></span></div>
+        <ul class="ilist">${its.map((it) => itemRow(it, { mode: name === "Outros" ? "bens" : "room" })).join("")}</ul></section>`).join("")}
+    </div>`;
+  }
   function matches(it, toks) {
     const room = D.roomById.get(it.room);
     const hay = norm(`${it.name} ${it.details} ${zonesOn() ? it.zone : ""} ${room?.name || ""} ${tagOf(it)} ${CAT[it.cat] || ""}`);
@@ -769,7 +814,7 @@
       </form>
       <div class="sfilters">
         <select class="select" data-input="search-room" aria-label="Cômodo"><option value="">Todos os cômodos</option>
-          ${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === q.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select>
+          ${(D.bens ? [...D.rooms, D.bens] : D.rooms).map((r) => `<option value="${esc(r.id)}"${r.id === q.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select>
         <select class="select" data-input="search-cat" aria-label="Categoria"><option value="">Todas as categorias</option>
           ${CATS.map(([k, v]) => `<option value="${k}"${k === q.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
         <select class="select ord" data-input="search-ord" aria-label="Ordenar">
@@ -831,6 +876,7 @@
   // -- relatório
   function viewReport() {
     const withPhotos = LS.get("reportPhotos", true);
+    const nb = D.bensItems.length > 0; // os bens (fora de casa) vêm numa seção à parte, com o total deles
     const now = new Date();
     return `
     <div class="rep-tools no-print">
@@ -841,23 +887,24 @@
       <h1>Inventário da casa</h1>
       <p class="rmeta">Gerado em ${esc(dfLong.format(now))}. Valores em reais.</p>
       <div class="rtotal">
-        <div><span>Patrimônio</span><b>${money(D.total)}</b></div>
-        <div><span>Itens</span><b>${int(S.items.length)}</b></div>
+        <div><span>${nb ? "Na casa" : "Patrimônio"}</span><b>${money(D.houseTotal)}</b></div>
+        <div><span>Itens</span><b>${int(D.houseCount)}</b></div>
         <div><span>Cômodos</span><b>${int(D.rooms.length)}</b></div>
+        ${nb ? `<div><span>Bens</span><b>${money(D.bensTotal)}</b></div>` : ""}
       </div>
       <table class="rtable"><thead><tr><th>Cômodo</th><th class="r">Itens</th><th class="r">Valor</th><th class="r">Parte</th></tr></thead>
-        <tbody>${D.rooms.map((r) => { const v = D.roomTotals.get(r.id) || 0; return `<tr><td><span class="c">${esc(r.code)}</span> ${esc(r.name)}</td><td class="r">${int((D.byRoom.get(r.id) || []).length)}</td><td class="r">${money(v)}</td><td class="r">${pctFmt(pct(v, D.total))}</td></tr>`; }).join("")}</tbody>
-        <tfoot><tr><td>Total</td><td class="r">${int(S.items.length)}</td><td class="r">${money(D.total)}</td><td class="r">100%</td></tr></tfoot></table>
-      ${D.rooms.filter((r) => (D.byRoom.get(r.id) || []).length).map((r) => {
+        <tbody>${D.rooms.map((r) => { const v = D.roomTotals.get(r.id) || 0; return `<tr><td><span class="c">${esc(r.code)}</span> ${esc(r.name)}</td><td class="r">${int((D.byRoom.get(r.id) || []).length)}</td><td class="r">${money(v)}</td><td class="r">${pctFmt(pct(v, D.houseTotal))}</td></tr>`; }).join("")}</tbody>
+        <tfoot><tr><td>Total</td><td class="r">${int(D.houseCount)}</td><td class="r">${money(D.houseTotal)}</td><td class="r">100%</td></tr></tfoot></table>
+      ${[...D.rooms, ...(nb ? [D.bens] : [])].filter((r) => (D.byRoom.get(r.id) || []).length).map((r) => {
         const its = D.byRoom.get(r.id) || [];
-        const zc = zonesOn();
-        return `<section class="rep-room"><h2><span class="mt">${esc(r.code)}</span>${esc(r.name)}</h2>
-          <p class="rs">${plural(its.length, "item", "itens")}, ${money(D.roomTotals.get(r.id) || 0)}</p>
+        const bens = r === D.bens, zc = zonesOn() && !bens;
+        return `<section class="rep-room${bens ? " rep-bens" : ""}"><h2><span class="mt">${esc(r.code)}</span>${esc(r.name)}</h2>
+          <p class="rs">${bens ? `${plural(its.length, "bem", "bens")} fora de casa` : plural(its.length, "item", "itens")}, ${money(D.roomTotals.get(r.id) || 0)}</p>
           <table class="rtable"><thead><tr>${withPhotos ? '<th class="t"><span class="sr">Foto</span></th>' : ""}<th>Código</th><th>Item</th>${zc ? "<th>Zona</th>" : ""}<th class="r">Qtd.</th><th class="r">Valor</th></tr></thead><tbody>
           ${its.map((it) => `<tr>${withPhotos ? `<td class="t">${it.photos && it.photos[0] ? `<img src="${esc(src(it.photos[0]))}" alt="" width="44" height="44">` : ""}</td>` : ""}
             <td class="c">${esc(tagOf(it))}</td><td>${esc(it.name)}${it.details ? `<span class="d">${esc(snippet(it.details, 140))}</span>` : ""}${withPhotos && it.photos && it.photos[0] && (it.photoSrc || {})[it.photos[0]] ? `<span class="d">Foto ilustrativa, de ${esc(siteOf(it.photoSrc[it.photos[0]]))}</span>` : ""}</td>
             ${zc ? `<td>${esc(it.zone || "")}</td>` : ""}<td class="r">${esc(qtyClean(it.qty))}</td><td class="r">${money(it.value)}</td></tr>`).join("")}
-          </tbody><tfoot><tr>${withPhotos ? "<td></td>" : ""}<td colspan="${zc ? 4 : 3}">Subtotal</td><td class="r">${money(D.roomTotals.get(r.id) || 0)}</td></tr></tfoot></table></section>`;
+          </tbody><tfoot><tr>${withPhotos ? "<td></td>" : ""}<td colspan="${zc ? 4 : 3}">${bens ? "Total dos bens" : "Subtotal"}</td><td class="r">${money(D.roomTotals.get(r.id) || 0)}</td></tr></tfoot></table></section>`;
       }).join("")}
       <p class="rep-foot">Feito com o InventarIA, no Home Assistant.</p>
     </article>`;
@@ -904,6 +951,7 @@
   // -- Mais: um menu com o que não cabe na barra (Novidades, Relatório), Configurações e, por último, Sobre
   function viewMenu() {
     const rows = [
+      ["#/bens", "home", "Bens", "Casa, terreno, carro: o que fica fora de casa."],
       ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
       newsOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
       ["#/categorias", "grid", "Categorias", "Criar, renomear e excluir."],
@@ -966,7 +1014,7 @@
   const BANDS = [[0, 100, "até 100"], [100, 500, "100–500"], [500, 1000, "500–1 mil"], [1000, 5000, "1–5 mil"], [5000, Infinity, "5 mil+"]];
   function chartData() {
     const total = D.total;
-    const rooms = D.rooms.map((r) => ({ r, v: D.roomTotals.get(r.id) || 0, n: (D.byRoom.get(r.id) || []).length })).filter((x) => x.n).sort((a, b) => b.v - a.v || b.n - a.n);
+    const rooms = D.allRooms.map((r) => ({ r, v: D.roomTotals.get(r.id) || 0, n: (D.byRoom.get(r.id) || []).length })).filter((x) => x.n).sort((a, b) => b.v - a.v || b.n - a.n);
     const cats = [...D.catTotals].map(([k, t]) => ({ k, name: CAT[k] || "Outros", v: t.value, n: t.count })).sort((a, b) => b.v - a.v || b.n - a.n);
     const items = [...S.items].sort((a, b) => (+b.value || 0) - (+a.value || 0));
     const valued = items.filter((i) => +i.value > 0);
@@ -1009,20 +1057,21 @@
     const stat = (label, value, sub = "") => `<div class="kpi"><span>${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
     const bmax = Math.max(...c.bands.map((b) => b.n), 1);
     const zero = c.items.length - c.valued.length;
-    const roomRows = c.rooms.map((x) => ({ href: `#/c/${encodeURIComponent(x.r.id)}`, tag: `<span class="mt soft">${esc(x.r.code)}</span>`, name: x.r.name, sub: plural(x.n, "item", "itens"), v: x.v, share: pctTxt(x.v, T) }));
+    const roomRows = c.rooms.map((x) => ({ href: x.r === D.bens ? "#/bens" : `#/c/${encodeURIComponent(x.r.id)}`, tag: `<span class="mt soft">${esc(x.r.code)}</span>`, name: x.r.name,
+      sub: x.r === D.bens ? plural(x.n, "bem", "bens") : plural(x.n, "item", "itens"), v: x.v, share: pctTxt(x.v, T) }));
     const catRows = c.cats.map((x) => ({ href: `#/buscar?cat=${encodeURIComponent(x.k)}&ord=val`, name: x.name, sub: plural(x.n, "item", "itens"), v: x.v, share: pctTxt(x.v, T) }));
     const topRows = c.items.slice(0, 10).filter((i) => +i.value > 0).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: D.roomById.get(i.room)?.name || "", v: +i.value || 0, share: pctTxt(+i.value || 0, T) }));
     const lead = (t) => `<p class="lead">${t}</p>`;
     return `<div class="mscreen charts">
     <div class="kpis">
       ${stat("Patrimônio", moneyR(T))}
-      ${stat("Itens", int(c.items.length), plural(c.rooms.length, "cômodo", "cômodos"))}
+      ${stat("Itens", int(c.items.length), `${plural(D.rooms.length, "cômodo", "cômodos")}${D.bensItems.length ? ` e ${plural(D.bensItems.length, "bem", "bens")}` : ""}`)}
       ${stat("Valor médio", moneyR(c.valued.length ? T / c.valued.length : 0), "por item com valor")}
       ${stat("Com foto", pctTxt(c.photos, c.items.length), `${int(c.photos)} de ${int(c.items.length)}`)}
     </div>
     <div class="chart-pair">
     <section class="panel" id="g-rooms">
-      <h2>${secIc("rooms")}Cômodos</h2>
+      <h2>${secIc("rooms")}${D.bensItems.length ? "Cômodos e bens" : "Cômodos"}</h2>
       ${c.rooms.length > 1 ? lead(c.half === 1 ? `${esc(c.rooms[0].r.name)} tem ${pctTxt(c.rooms[0].v, T)} do patrimônio.` : `${int(c.half)} cômodos somam metade do patrimônio.`) : ""}
       ${hbars(roomRows)}
     </section>
@@ -2087,7 +2136,7 @@
         ${it.details ? `<p class="idet">${esc(it.details)}</p>` : ""}
         ${it.flag ? `<p class="inote">${ic("info")}<span>${esc(it.flag)}</span></p>` : ""}
         <dl class="props">
-          <dt>Cômodo</dt><dd><a href="#/c/${encodeURIComponent(room.id)}"><span class="mt soft">${esc(room.code)}</span><span class="rnm">${esc(room.name)}</span></a></dd>
+          <dt>${room.kind === "bens" ? "Onde" : "Cômodo"}</dt><dd><a href="${room.kind === "bens" ? "#/bens" : `#/c/${encodeURIComponent(room.id)}`}"><span class="mt soft">${esc(room.code)}</span><span class="rnm">${esc(room.name)}</span></a></dd>
           ${zonesOn() ? `<dt>Zona</dt><dd>${esc(it.zone || "Sem zona")}</dd>` : ""}
           <dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
           <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>
@@ -2137,7 +2186,7 @@
       html: `<div class="dlg"><div class="dlg-h"><h2>Mover item</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-mv><div class="form">
           <p class="muted" style="margin:0">${esc(it.name)}</p>
-          <div class="field"><label for="mv-room">Para o cômodo</label><select id="mv-room" class="select" name="room">${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === it.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select>
+          <div class="field"><label for="mv-room">Para o cômodo</label><select id="mv-room" class="select" name="room">${roomOptions(it.room)}</select>
             ${zones ? "" : `<p class="help">Em outro cômodo, o item ganha um código novo.</p>`}</div>
           ${zones ? `<div class="field"><label for="mv-zone">Zona</label><input id="mv-zone" class="input" name="zone" list="mv-zones" value="${esc(it.zone || "")}" autocomplete="off"><datalist id="mv-zones">${zonesFor(it.room)}</datalist>
             <p class="help">Em outro cômodo, o item ganha um código novo.</p></div>` : ""}
@@ -2152,7 +2201,7 @@
       // sem zonas, a zona do cômodo antigo não vai junto (ela não faria sentido no cômodo novo)
       const zone = zones ? form.zone.value : "";
       try {
-        const res = await API.put(`api/items/${encodeURIComponent(it.id)}`, { room: form.room.value, zone, _base: it.updatedAt });
+        const res = await API.put(`api/items/${encodeURIComponent(it.id)}`, { room: await realRoom(form.room.value), zone, _base: it.updatedAt });
         setRev(res.rev); upsertItem(res.item); derive(); requestClose(entry, { force: true }); refreshAll();
         const before = { room: it.room, zone: it.zone || "", seq: it.seq };
         toast(res.item.room !== it.room ? `Movido para ${D.roomById.get(res.item.room)?.name}` : "Zona atualizada", { action: "Desfazer", onAction: async () => {
@@ -2171,7 +2220,7 @@
   function openEditor({ item = null, dup = null, room = null, zone = null, photos = null } = {}) {
     if (!D.rooms.length) { toast("Crie um cômodo antes de adicionar itens."); openRoomNew(); return; }
     const from = item || dup || {};
-    const rid = from.room || (room && D.roomById.has(room) ? room : lastRoom());
+    const rid = from.room || (room && (D.roomById.has(room) || room === BENS_NEW) ? room : lastRoom());
     const F = {
       id: item ? item.id : null, base: item ? item.updatedAt : null,
       name: from.name || "", details: from.details || "", room: rid,
@@ -2182,8 +2231,8 @@
       source: item ? item.source || "manual" : dup ? dup.source || "manual" : "manual",
       dirty: !!(dup || (photos && photos.length)), busy: false, uploading: 0, aiBusy: false, hint: "",
     };
-    const title = item ? "Editar item" : dup ? "Duplicar item" : "Novo item";
-    const roomField = `<div class="field"><label for="f-room">Cômodo</label><select id="f-room" class="select" name="room">${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === F.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>`;
+    const title = item ? "Editar item" : dup ? "Duplicar item" : isBens(rid) ? "Novo bem" : "Novo item";
+    const roomField = `<div class="field"><label for="f-room">Cômodo</label><select id="f-room" class="select" name="room">${roomOptions(F.room)}</select></div>`;
     const zoneField = `<div class="field"><label for="f-zone">Zona</label><input id="f-zone" class="input" name="zone" list="f-zones" maxlength="120" value="${esc(F.zone)}" placeholder="Ex.: Estante, Bancada"><datalist id="f-zones"></datalist></div>`;
     const entry = openDialog({
       cls: "modal", label: title,
@@ -2347,6 +2396,7 @@
       const body = { name, details: F.details.trim(), room: F.room, zone, cat: F.cat || "outros", qty: F.qty.trim() || "1", value, photos: F.photos, photoSrc: F.photoSrc, flag: F.flag.trim(), source: F.source };
       setBusy(true);
       try {
+        body.room = F.room = await realRoom(F.room); // o primeiro bem cria a área Bens
         const res = F.id
           ? await API.put(`api/items/${encodeURIComponent(F.id)}`, { ...body, _base: F.base })
           : await API.post("api/items", body);
@@ -2362,7 +2412,7 @@
           F.dirty = false;
           requestClose(entry, { force: true });
           if (F.id) toast("Alterações salvas");
-          else toast("Item adicionado", { action: "Ver", onAction: () => nav(`#/i/${encodeURIComponent(res.item.id)}`) });
+          else toast(isBens(res.item.room) ? "Bem adicionado" : "Item adicionado", { action: "Ver", onAction: () => nav(`#/i/${encodeURIComponent(res.item.id)}`) });
         }
       } catch (e) {
         if (e.status === 409 && e.data && e.data.item) {
@@ -3129,6 +3179,7 @@
 
   function openAddMenu() {
     const rid = base.name === "room" ? base.id : null;
+    if (base.name === "bens") { openEditor({ room: D.bens?.id || BENS_NEW }); return; } // em Bens, Adicionar é um bem (sem foto do cômodo nem Falar)
     // Novo cômodo fica na aba Cômodos; aqui só o que entra no inventário
     const opts = [
       ["item", "plus", "Adicionar item", "Com foto e valor, preenchendo os campos"],
@@ -3346,7 +3397,7 @@
     const item = b.dataset.id ? D.itemById.get(b.dataset.id) : null;
     switch (act) {
       case "add-menu": openAddMenu(); break;
-      case "item-new": openEditor({ room: b.dataset.room || (base.name === "room" ? base.id : null) }); break;
+      case "item-new": openEditor({ room: b.dataset.room || (base.name === "room" ? base.id : base.name === "bens" ? D.bens?.id || BENS_NEW : null) }); break;
       case "catalog": openCatalog({ room: b.dataset.room || (base.name === "room" ? base.id : null) }); break;
       case "room-new": openRoomNew(); break;
       case "cat-new": openCatName(); break;

@@ -40,7 +40,7 @@ class CriarComodo(ComodosCase):
     def test_responde_201_com_o_comodo_a_lista_e_a_revisao(self):
         st, _, out = self.app.post("api/rooms", {"name": "Garagem"})
         self.addCleanup(self.app.delete, f"api/rooms/{out['room']['id']}")
-        self.assertEqual((st, set(out)), (201, {"room", "rooms", "rev"}))
+        self.assertEqual((st, set(out)), (201, {"room", "rooms", "cats", "rev"}))
         self.assertIn(out["room"], out["rooms"])
         self.assertEqual(out["rev"], self.rev())
 

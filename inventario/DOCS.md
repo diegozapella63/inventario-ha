@@ -26,7 +26,13 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - **Conversar**: o balão ao lado do microfone abre uma conversa com a IA, a qualquer momento, sobre o que está na tela ou qualquer outro assunto. Veja [Conversar](#conversar).
 - **Buscar na internet**: num item sem foto (ou no editor do item), a IA procura o produto no fabricante e nas lojas e o app mostra as fotos encontradas para você escolher. Na mesma busca, a IA traz nome, detalhes, categoria e valor do produto para preencher o item. Veja [Fotos da internet](#fotos-da-internet).
 - **Buscar**: por nome, marca ou detalhe, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome, data ou código.
-- **Mais** é um menu: **Gráficos**, **Novidades** (com a IA ligada), **Categorias**, **Relatório para seguro**, **Configurações** e **Sobre**. Cada um abre a sua tela, com **‹ Mais** no alto para voltar.
+- **Mais** é um menu: **Bens**, **Gráficos**, **Novidades** (com a IA ligada), **Categorias**, **Relatório para seguro**, **Configurações** e **Sobre**. Cada um abre a sua tela, com **‹ Mais** no alto para voltar.
+- **Bens** (Mais > Bens) guarda o que tem valor e fica fora de casa: casa, apartamento, terreno, carro, moto.
+  - **Adicionar bem** abre o cadastro de sempre, já com **Bens** no lugar do cômodo; o código dos bens é BEN (BEN-001, BEN-002…).
+  - A lista separa **Imóveis**, **Veículos** e **Outros**, cada um com o total. As categorias Imóveis e Veículos entram na lista de categorias com o primeiro bem.
+  - Um item da casa também pode ir para Bens pelo **Mover**, e um bem pode voltar para um cômodo do mesmo jeito.
+  - Os bens contam no patrimônio do Início (a etiqueta diz quantos), nos gráficos, na busca e na conversa com a IA, mas ficam fora da lista de cômodos.
+  - No relatório, vêm numa seção à parte, no fim, com o total deles; o total da casa não muda.
 - **Gráficos** (Mais > Gráficos): o patrimônio, quantos itens, o valor médio e quantos têm foto; os cômodos e as categorias que mais valem, do maior para o menor, com o valor e a parte do total; quantos itens há em cada faixa de valor; os 10 itens mais valiosos; e, quando há itens de mais de um mês, o patrimônio mês a mês pela data de cadastro (toque no gráfico para ver o valor de cada mês, ou **Ver mês a mês** para a tabela). Tocar numa linha abre o cômodo, a busca da categoria ou a ficha do item.
 - **Categorias** (Mais > Categorias): renomeie, crie ou exclua categorias; cada uma mostra quantos itens tem. Os itens de uma categoria excluída vão para Outros, que não pode ser excluída. As categorias ficam no inventário: entram no backup, na exportação e nas versões, valem para todos os aparelhos, e a IA passa a usar as novas.
 - **Relatório para seguro** (Mais > Relatório para seguro; no computador, também na barra lateral): o patrimônio, a tabela dos cômodos e os itens de cada um, com código, foto, quantidade e valor, pronto para imprimir ou salvar em PDF. **Mostrar fotos** desmarcado deixa o relatório só com o texto.
@@ -146,7 +152,8 @@ A ligação é automática, sem nada para configurar aqui: o InventarIA grava `s
 
 - **ResolvIA** (2.28.0 ou mais novo): liga uma tarefa a um cômodo daqui e, a partir da 2.29.0, a um ou mais itens (um equipamento, um móvel…). Ligue lá, em **Mais > Configurações > Integrações > InventarIA** (**Usar cômodos** e **Usar equipamentos**, desligados de início).
 - **CronologIA**: recebe os cômodos e os itens pelo ResolvIA. As tarefas mostram o cômodo e o equipamento, e o **Novo > Tarefa** pede os dois.
-- **GerencIA** (1.19.0 ou mais novo): soma os valores dos itens no patrimônio, como **Bens da casa**. Lê o valor e a data em que ele mudou e deprecia por categoria (eletrônicos perdem mais rápido que móveis, por exemplo). Dá para desligar lá, em **Mais > Integrações > Bens no InventarIA**.
+- **Bens** aparece para os outros apps ao lado dos cômodos, com os bens como itens: no ResolvIA e na CronologIA, uma tarefa pode ser ligada ao carro ou à casa da praia.
+- **GerencIA** (1.19.0 ou mais novo): soma os valores dos itens e dos bens no patrimônio, como **Bens da casa** (imóveis não perdem valor; veículos perdem 15% ao ano, e dá para mudar lá). Lê o valor e a data em que ele mudou e deprecia por categoria (eletrônicos perdem mais rápido que móveis, por exemplo). Dá para desligar lá, em **Mais > Integrações > Bens no InventarIA**.
 
 ## Atualizar o app
 

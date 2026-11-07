@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.31.0
+
+- **Mais > Bens**: casa, apartamento, terreno, carro, moto, tudo o que tem valor e fica fora de casa.
+  - **Adicionar bem** abre o cadastro de sempre.
+  - A lista separa **Imóveis**, **Veículos** e **Outros**, cada um com o total. As categorias Imóveis e Veículos são novas.
+  - Os bens entram no patrimônio do Início, que ganha uma lista **Bens**, nos gráficos e na busca. Ficam fora da lista de cômodos.
+  - No **relatório para seguro**, os bens vêm numa seção à parte, no fim, com o total deles. O total da casa não muda.
+  - **Mover** leva um item para Bens, e Desfazer traz de volta.
+- No ResolvIA e na CronologIA, **Bens** aparece ao lado dos cômodos, e uma tarefa pode ser ligada a um bem. O GerencIA soma os bens no patrimônio: imóveis não perdem valor e veículos perdem 15% ao ano.
+- No Início e em Cômodos, a parte de cada cômodo é a do que está dentro de casa.
+
 ## 1.30.0
 
 - **Mais > Configurações > Opções > Novidades**:

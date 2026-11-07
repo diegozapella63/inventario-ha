@@ -393,7 +393,7 @@ class Importar(DadosCase):
         self.app.ok("POST", "api/import", {"data": casa(cats=[{"id": "ferramentas", "name": "Ferramentas"}, {"id": "Inválida!", "name": "x"}])})
         self.assertEqual(self.app.data()["cats"], [{"id": "ferramentas", "name": "Ferramentas"}, {"id": "outros", "name": "Outros"}])
         self.app.ok("POST", "api/import", {"data": casa(cats=[{"id": "Inválida!", "name": "x"}])})
-        self.assertEqual(len(self.app.data()["cats"]), 13)
+        self.assertEqual(len(self.app.data()["cats"]), 15)
         self.assertNotIn("cats", self.app.stored())
 
     def test_deixa_versao_com_motivo_importar(self):

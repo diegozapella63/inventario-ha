@@ -1,4 +1,4 @@
-"""Mais é um menu (Gráficos, Novidades, Categorias, Relatório, Configurações, Sobre), com Voltar e os endereços antigos; Mais > Configurações > Dados: abas,
+"""Mais é um menu (Bens, Gráficos, Novidades, Categorias, Relatório, Configurações, Sobre), com Voltar e os endereços antigos; Mais > Configurações > Dados: abas,
 exportar (CSV, JSON, ZIP), backup na pasta share, versões anteriores, importar; botões do mesmo tamanho e alinhados."""
 import csv
 import io
@@ -30,8 +30,8 @@ async def body(r, p):
     await pg.wait_for_selector(".menu-list")
     r.eq((await pg.text_content(".page-title")).strip(), "Mais", "a aba Mais abre um menu")
     rows = await pg.evaluate("[...document.querySelectorAll('.menu-row')].map(a => [a.querySelector('b').textContent, a.getAttribute('href')])")
-    r.eq(rows, [["Gráficos", "#/graficos"], ["Novidades", "#/novidades"], ["Categorias", "#/categorias"], ["Relatório para seguro", "#/relatorio"], ["Configurações", "#/config"], ["Sobre", "#/sobre"]],
-         "com Gráficos, Novidades, Categorias, Relatório, Configurações e, por último, Sobre")
+    r.eq(rows, [["Bens", "#/bens"], ["Gráficos", "#/graficos"], ["Novidades", "#/novidades"], ["Categorias", "#/categorias"], ["Relatório para seguro", "#/relatorio"], ["Configurações", "#/config"], ["Sobre", "#/sobre"]],
+         "com Bens, Gráficos, Novidades, Categorias, Relatório, Configurações e, por último, Sobre")
     r.eq(await pg.locator("#view .more-tabs").count(), 0, "sem as abas de configurações no menu")
     r.eq(await pg.get_attribute('.tabbar a[data-tab="data"]', "aria-current"), "page", "a aba Mais fica marcada")
     hs = await pg.evaluate("[...document.querySelectorAll('.menu-row')].map(a => Math.round(a.getBoundingClientRect().height))")

@@ -55,7 +55,7 @@ class Valores(UnitBase):
 class Categorias(UnitBase):
     def test_lista_padrao(self):
         cats = S.default_cats()
-        self.assertEqual(len(cats), 13)
+        self.assertEqual(len(cats), 15)
         self.assertEqual(cats[-1], {"id": "outros", "name": "Outros"})
         self.assertEqual(self.store.cats(), cats, "sem categorias gravadas, vale a lista padrão")
 

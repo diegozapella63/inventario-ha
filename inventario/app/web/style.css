@@ -1148,3 +1148,9 @@ dialog.camera::backdrop { background: #000; }
 .cam-done:disabled { background: rgba(255, 255, 255, 0.18); color: rgba(255, 255, 255, 0.6); }
 .cam-flash { position: absolute; inset: 0; background: #fff; pointer-events: none; animation: camflash 0.35s ease-out both; }
 @keyframes camflash { from { opacity: 0.85; } to { opacity: 0; } }
+
+/* Bens (Mais > Bens): o botão no alto, à direita, e os grupos como as zonas de um cômodo */
+.bens-acts { display: flex; justify-content: flex-end; margin-top: 22px; }
+.bens-acts .btn { min-width: 220px; }
+@media (max-width: 560px) { .bens-acts .btn { width: 100%; } }
+.bens .zone:first-of-type { margin-top: 18px; }
