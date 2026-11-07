@@ -1,6 +1,6 @@
 """Ajustes das novidades (Mais > Configurações > Opções): Usar novidades, Conferir sozinho, Avisar (os celulares do Home
-Assistant) e Testar o aviso; desligadas, somem do menu Mais e da ficha; IA desligada, o painel some; o link do aviso
-(/app/<app>/novidades) abre o app direto em Novidades, pela mensagem do painel do Home Assistant."""
+Assistant) e Testar o aviso, os dois só com Conferir sozinho ligado; desligadas, somem do menu Mais e da ficha; IA desligada,
+o painel some; o link do aviso (/app/<app>/novidades) abre o app direto em Novidades, pela mensagem do painel do Home Assistant."""
 from e2e_lib import OVERFLOW, FakeHA, main
 
 PHONE = "mobile_app_celular_da_ana"
@@ -18,16 +18,26 @@ async def body(r, p):
     ha = FakeHA()
     r.start(search=False, ha=ha)
     b = await r.browser(p)
+    # de início, Conferir sozinho: Não. O aviso vem só dessa conferência: sem ela, Avisar e Testar não aparecem
+    ctx, pg = await r.page(b, "cel", "dark", accent="laranja")
+    await r.open(pg, "#/config/opcoes", "#p-news-opts")
+    r.eq((await pg.text_content("#p-news-opts h2")).strip(), "Novidades", "o painel Novidades em Opções")
+    r.check(await pg.is_checked('[data-input="news-on"]'), "ligadas de início")
+    r.eq(await pg.input_value('[data-input="news-every"]'), "0", "Conferir sozinho: Não, de início")
+    r.eq(await pg.locator('[data-input="news-notify"], [data-act="news-notify-test"]').count(), 0,
+         "Conferir sozinho: Não, sem Avisar nem Testar (nada avisaria)")
+    r.check("avis" not in (await pg.text_content("#p-news-opts")).lower(), "nenhum texto fala de aviso")
+    await r.shot(pg, "sem-conferir", full_page=True)
+    await ctx.close()
+
+    r.api("PUT", "api/settings", {"news_every": 7})
     for size, scheme, accent in (("cel", "dark", "laranja"), ("cel", "light", "azul"), ("pc", "light", "verde")):
         ctx, pg = await r.page(b, size, scheme, accent=accent)
         await r.open(pg, "#/config/opcoes", "#p-news-opts")
         await pg.wait_for_function(f"{OPTS}.length > 2", timeout=8000)
         if size == "cel" and scheme == "dark":
-            r.eq((await pg.text_content("#p-news-opts h2")).strip(), "Novidades", "o painel Novidades em Opções")
-            r.check(await pg.is_checked('[data-input="news-on"]'), "ligadas de início")
-            r.eq(await pg.input_value('[data-input="news-every"]'), "0", "Conferir sozinho: Não, de início")
             r.eq(await pg.evaluate(OPTS), ["Não avisar", "Notificação do Home Assistant", "Celular da Ana", "Tablet da Sala"],
-                 "Avisar: nada, a notificação do Home Assistant ou um dos celulares")
+                 "com Conferir sozinho, Avisar: nada, a notificação do Home Assistant ou um dos celulares")
             r.eq(await pg.locator('[data-act="news-notify-test"]').count(), 0, "sem aviso escolhido, sem Testar")
         sz = await pg.evaluate("[...document.querySelectorAll('#p-news-opts .oa > .select')].map(e => { const b = e.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height), Math.round(b.right)]; })")
         r.check(len({x[0] for x in sz}) == 1 and len({x[2] for x in sz}) == 1 and all(x[1] == 44 for x in sz),
@@ -35,14 +45,17 @@ async def body(r, p):
         r.check(await pg.evaluate(OVERFLOW), f"{size} {scheme}: sem rolagem para o lado")
         await r.shot(pg, f"opcoes-{size}-{scheme}", full_page=True)
         await ctx.close()
+    r.api("PUT", "api/settings", {"news_every": 0})
 
-    # escolher: grava na hora
+    # escolher: grava na hora; Conferir sozinho traz o Avisar
     ctx, pg = await r.page(b, "cel", "dark", accent="laranja")
     await r.open(pg, "#/config/opcoes", "#p-news-opts")
-    await pg.wait_for_function(f"{OPTS}.length > 2", timeout=8000)
+    r.eq(await pg.locator('[data-input="news-notify"]').count(), 0, "Não: sem Avisar")
     await pg.select_option('[data-input="news-every"]', "7")
     await pg.locator(".toast", has_text="Conferir sozinho: toda semana").wait_for(timeout=5000)
     r.eq(r.data()["settings"]["news_every"], 7, "Toda semana fica gravado")
+    await pg.wait_for_function(f"{OPTS}.length > 2", timeout=8000)
+    r.check(True, "Toda semana: o Avisar aparece, com os celulares")
     await pg.select_option('[data-input="news-notify"]', PHONE)
     await pg.locator(".toast", has_text="Aviso das novidades ligado").wait_for(timeout=5000)
     r.eq(r.data()["settings"]["news_notify"], PHONE, "o celular fica gravado")
@@ -62,6 +75,15 @@ async def body(r, p):
     await pg.reload()
     await pg.wait_for_selector("#p-news-opts", timeout=8000)
     r.eq(await pg.input_value('[data-input="news-every"]'), "7", "ao abrir de novo, continua Toda semana")
+
+    # Conferir sozinho de volta para Não: Avisar e Testar somem, e o celular escolhido fica guardado
+    await pg.select_option('[data-input="news-every"]', "0")
+    await pg.locator(".toast", has_text="Conferir sozinho desligado").wait_for(timeout=5000)
+    r.eq(await pg.locator('[data-input="news-notify"], [data-act="news-notify-test"]').count(), 0, "Não de novo: Avisar e Testar somem")
+    r.eq(r.data()["settings"]["news_notify"], PHONE, "o celular escolhido continua guardado")
+    await pg.select_option('[data-input="news-every"]', "7")
+    await pg.locator('[data-act="news-notify-test"]').wait_for(timeout=5000)
+    r.eq(await pg.input_value('[data-input="news-notify"]'), PHONE, "Toda semana de novo: volta o Avisar com o mesmo celular, e o Testar")
 
     # desligar: somem do menu Mais, do endereço e da ficha
     await pg.click('label.switch:has([data-input="news-on"])')

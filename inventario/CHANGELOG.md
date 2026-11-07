@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.31.1
+
+- **Opções > Novidades**: **Avisar** e **Testar** só aparecem com **Conferir sozinho** ligado. Com "Não", nada avisaria.
+- **Mais**: o Relatório para seguro só diz "com fotos" quando **Mostrar fotos** está marcado.
+
 ## 1.31.0
 
 - **Mais > Bens**: casa, apartamento, terreno, carro, moto, tudo o que tem valor e fica fora de casa.

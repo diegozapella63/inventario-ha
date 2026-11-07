@@ -955,7 +955,7 @@
       ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
       newsOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
       ["#/categorias", "grid", "Categorias", "Criar, renomear e excluir."],
-      ["#/relatorio", "report", "Relatório para seguro", "Por cômodo, com fotos. Imprime ou salva em PDF."],
+      ["#/relatorio", "report", "Relatório para seguro", `Por cômodo${LS.get("reportPhotos", true) ? ", com fotos" : ""}. Imprime ou salva em PDF.`], // sem Mostrar fotos, não promete fotos
       ["#/config", "gear", "Configurações", "Dados e backup, integrações, aparência e opções."],
       ["#/sobre", "info", "Sobre", "CorrerIA Code, os apps e o GitHub."],
     ].filter(Boolean);
@@ -1454,6 +1454,7 @@
     if (cur && !list.some(([k]) => k === cur)) list.push([cur, cur.replace(/^mobile_app_/, "").replace(/_/g, " ")]); // o celular saiu do Home Assistant
     return list.map(([k, v]) => `<option value="${esc(k)}"${k === cur ? " selected" : ""}>${esc(v)}</option>`).join("");
   }
+  // Avisar (e Testar) só com Conferir sozinho: o aviso vem só dessa conferência; com "Não", nada avisaria
   function moreNewsOptions() {
     if (!aiOn()) return "";
     const on = newsOn(), every = +S.settings.news_every || 0;
@@ -1464,10 +1465,10 @@
         <div class="oa">${switchHtml("news-on", on, "news-h")}</div></li>
       ${on ? `<li><div class="ot"><b>Conferir sozinho</b><span>A IA confere os eletrônicos de tempos em tempos.</span></div>
         <div class="oa"><select class="select" data-input="news-every" aria-label="Conferir sozinho">${NEWS_EVERY.map(([k, v]) => `<option value="${k}"${k === every ? " selected" : ""}>${v}</option>`).join("")}</select></div></li>
-      <li><div class="ot"><b>Avisar</b><span>Quando a conferência sozinha achar novidade.</span></div>
+      ${every ? `<li><div class="ot"><b>Avisar</b><span>Quando a conferência sozinha achar novidade.</span></div>
         <div class="oa"><select class="select" data-input="news-notify" aria-label="Avisar">${newsNotifyOptions()}</select></div></li>
       ${S.settings.news_notify ? `<li><div class="ot"><b>Testar o aviso</b><span>Manda um aviso agora.</span></div>
-        <div class="oa"><button type="button" class="btn" data-act="news-notify-test">${ic("send")}Testar</button></div></li>` : ""}` : ""}
+        <div class="oa"><button type="button" class="btn" data-act="news-notify-test">${ic("send")}Testar</button></div></li>` : ""}` : ""}` : ""}
       </ul>
     </section>`;
   }

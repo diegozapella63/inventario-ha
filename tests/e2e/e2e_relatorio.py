@@ -1,9 +1,11 @@
-"""Relatório para seguro: totais, cômodos na ordem, fotos liga/desliga, zonas e a impressão (PDF)."""
+"""Relatório para seguro: totais, cômodos na ordem, fotos liga/desliga (e o menu Mais só diz "com fotos" com elas ligadas),
+zonas e a impressão (PDF)."""
 import os
 
 from e2e_lib import TMP, main
 
 PRINT = "window.__printed = 0; window.print = () => { window.__printed++; };"
+MENU_REP = "document.querySelector('.menu-row[href=\"#/relatorio\"] .mb > span').textContent"
 
 
 async def body(r, p):
@@ -33,7 +35,14 @@ async def body(r, p):
     await pg.reload()
     await pg.wait_for_selector(".report")
     r.check(not await pg.is_checked('[data-input="rep-photos"]'), "a escolha fica para a próxima vez")
+    # o menu Mais só diz "com fotos" quando o relatório mostra as fotos
+    await r.open(pg, "#/mais", ".menu-list")
+    r.eq(await pg.evaluate(MENU_REP), "Por cômodo. Imprime ou salva em PDF.", "sem fotos, a linha do menu Mais não promete fotos")
+    await r.open(pg, "#/relatorio", ".report")
     await pg.check('[data-input="rep-photos"]')
+    await r.open(pg, "#/mais", ".menu-list")
+    r.eq(await pg.evaluate(MENU_REP), "Por cômodo, com fotos. Imprime ou salva em PDF.", "com fotos, a linha do menu Mais diz com fotos")
+    await r.open(pg, "#/relatorio", ".report")
 
     # imprimir
     await pg.click('[data-act="print"]')

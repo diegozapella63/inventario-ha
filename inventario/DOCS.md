@@ -119,7 +119,7 @@ Na ficha do item, **Novidades** pede à IA de busca (a mesma da busca de fotos, 
 - Em **Mais > Configurações > Opções > Novidades**:
   - **Usar novidades** liga e desliga tudo: desligadas, somem do menu Mais e da ficha, e nada é conferido.
   - **Conferir sozinho** (Não, Toda semana, A cada 15 dias ou Todo mês) faz o app conferir os eletrônicos sozinho, do mesmo jeito do botão **Conferir novidades**. Quando a conferência dá erro, como cota da IA esgotada, o app tenta de novo em 6 horas.
-  - **Avisar** escolhe onde chega o aviso quando essa conferência acha algo novo: um dos celulares com o app do Home Assistant ou a notificação do próprio Home Assistant. O aviso diz "Novidades em 3 itens. Toque para abrir." e, ao tocar, abre o InventarIA em Novidades. **Testar** manda um aviso na hora.
+  - **Avisar** (aparece com **Conferir sozinho** ligado) escolhe onde chega o aviso quando essa conferência acha algo novo: um dos celulares com o app do Home Assistant ou a notificação do próprio Home Assistant. O aviso diz "Novidades em 3 itens. Toque para abrir." e, ao tocar, abre o InventarIA em Novidades. **Testar** manda um aviso na hora.
 - Quanto mais o nome do item tiver marca e modelo, como na nota fiscal, melhor a busca. O app mostra como a IA identificou o produto.
 
 ## Conversar

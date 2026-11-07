@@ -52,7 +52,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | `e2e_internet` | Buscar na internet: fotos e dados do produto na ficha e no editor, Desfazer, sem fotos, sem busca, IA desligada |
 | `e2e_novidades` | Novidades na própria ficha: só as 3 mais recentes, tipos, datas, fontes, boato, guardadas ao abrir de novo, Buscar de novo, fechar no meio, erro, IA desligada |
 | `e2e_novidades_todos` | Novidades (no menu Mais): o mesmo equipamento em vários cômodos numa linha só, só Eletrônicos, sem escolher categorias, item de outra categoria fora da lista, conferir todos com a IA escolhendo, andamento, Parar, deixados de fora, Limpar com confirmação, aba some sem IA |
-| `e2e_novidades_ajustes` | Opções > Novidades: Usar novidades, Conferir sozinho, Avisar (os celulares do Home Assistant), Testar o aviso, seleções 280×44 alinhadas; desligadas, somem do menu e da ficha; IA desligada, o painel some; o link do aviso abre o app em Novidades (mensagem do painel do Home Assistant) |
+| `e2e_novidades_ajustes` | Opções > Novidades: Usar novidades, Conferir sozinho, Avisar (os celulares do Home Assistant) e Testar o aviso, os dois só com Conferir sozinho ligado, seleções 280×44 alinhadas; desligadas, somem do menu e da ficha; IA desligada, o painel some; o link do aviso abre o app em Novidades (mensagem do painel do Home Assistant) |
 | `e2e_bens` | Mais > Bens: vazio, o primeiro bem cria a área (BEN, no fim), Imóveis/Veículos/Outros com totais, patrimônio do Início, fora de Cômodos, ficha, busca, Mover e Desfazer, relatório à parte, gráficos, 320 px e computador |
 | `e2e_conversar` | Conversar: botão ao lado do microfone, ideias, Enter, resposta formatada, da ficha, erro, ditar, computador, IA desligada |
 | `e2e_graficos` | Mais > Gráficos: números do alto, cômodos e categorias do maior para o menor, faixas de valor, itens mais valiosos, mês a mês (tocar mostra o valor), cada linha abre a sua tela, 320 px e computador |
@@ -63,7 +63,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | `e2e_importar_partes` | backup em partes, só fotos, cancelar no meio, progresso |
 | `e2e_ajustes` | Integrações com o Home Assistant de mentira (IA, Falar, uso, sensor, Usar IA), Aparência (tema, as 10 cores e a Cor do dia: ligada de início, a cor de cada dia, a virada da meia-noite, escolher uma cor desliga), Opções (zonas), Categorias (tela própria) |
 | `e2e_uso_ia` | painel Uso da IA: dias, barras, tipos, últimas chamadas, links do provedor |
-| `e2e_relatorio` | totais, ordem, fotos, zonas, impressão e PDF |
+| `e2e_relatorio` | totais, ordem, fotos (o menu Mais só diz "com fotos" com elas ligadas), zonas, impressão e PDF |
 | `e2e_navegacao` | abas, arrastar para o lado, Voltar, endereços que não existem, atualização vinda de outro aparelho |
 | `e2e_teclado` | N, /, Esc, Ctrl+Enter, setas, Tab preso na janela, foco de volta, Enter nos formulários |
 | `e2e_acessibilidade` | nomes dos botões de ícone, aria-current, janelas com nome, imagens com alt, abas e chaves |
