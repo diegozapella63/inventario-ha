@@ -28,7 +28,7 @@ Depois disso, tudo o que você muda fica salvo no app. Atualizar ou reiniciar o 
 - **Buscar**: por nome, marca ou detalhe, sem se preocupar com acentos. Filtre por cômodo e categoria e ordene por valor, nome, data ou código.
 - **Mais** é um menu: **Bens**, **Gráficos**, **Novidades** (com a IA ligada), **Categorias**, **Relatório para seguro**, **Configurações** e **Sobre**. Cada um abre a sua tela, com **‹ Mais** no alto para voltar.
 - **Bens** (Mais > Bens) guarda o que tem valor e fica fora de casa: casa, apartamento, terreno, carro, moto.
-  - **Adicionar bem** abre o cadastro de sempre, já com **Bens** no lugar do cômodo; o código dos bens é BEN (BEN-001, BEN-002…).
+  - **Adicionar bem** abre o cadastro sem **Cômodo** e sem **Categoria**: só o **Tipo** (Imóvel, Veículo ou Outro). O código dos bens é BEN (BEN-001, BEN-002…).
   - A lista separa **Imóveis**, **Veículos** e **Outros**, cada um com o total. As categorias Imóveis e Veículos entram na lista de categorias com o primeiro bem.
   - Um item da casa também pode ir para Bens pelo **Mover**, e um bem pode voltar para um cômodo do mesmo jeito.
   - Os bens contam no patrimônio do Início (a etiqueta diz quantos), nos gráficos, na busca e na conversa com a IA, mas ficam fora da lista de cômodos.

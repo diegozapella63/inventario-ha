@@ -2245,7 +2245,13 @@
       source: item ? item.source || "manual" : dup ? dup.source || "manual" : "manual",
       dirty: !!(dup || (photos && photos.length)), busy: false, uploading: 0, aiBusy: false, hint: "",
     };
-    const title = item ? "Editar item" : dup ? "Duplicar item" : isBens(rid) ? "Novo bem" : "Novo item";
+    // um bem (casa, terreno, carro) não tem cômodo, zona nem a lista de categorias da casa: só o tipo (Imóvel, Veículo
+    // ou Outro, os grupos de Mais > Bens). Para levar um bem a um cômodo, Mover.
+    const bem = isBens(rid), what = bem ? "bem" : "item";
+    const title = item ? `Editar ${what}` : dup ? `Duplicar ${what}` : `Novo ${what}`;
+    const saveLbl = F.id ? "Salvar alterações" : `Salvar ${what}`;
+    const otherCat = BENS_GROUPS.some(([k]) => k && k === F.cat) ? "outros" : F.cat || "outros"; // Outro guarda a categoria de um item que veio de um cômodo
+    const tipoBtns = () => BENS_GROUPS.map(([k, name]) => { const on = (k || "") === bensGroup(F); return `<button type="button" data-ed="tipo" data-v="${k}" aria-pressed="${on}">${{ imoveis: "Imóvel", veiculos: "Veículo" }[k] || "Outro"}</button>`; }).join("");
     const roomField = `<div class="field"><label for="f-room">Cômodo</label><select id="f-room" class="select" name="room">${roomOptions(F.room)}</select></div>`;
     const zoneField = `<div class="field"><label for="f-zone">Zona</label><input id="f-zone" class="input" name="zone" list="f-zones" maxlength="120" value="${esc(F.zone)}" placeholder="Ex.: Estante, Bancada"><datalist id="f-zones"></datalist></div>`;
     const entry = openDialog({
@@ -2257,11 +2263,12 @@
             <div class="field"><span class="lbl">Fotos</span><div class="phs" data-slot="photos"></div>
               ${COARSE ? "" : `<p class="help">Também dá para arrastar ou colar (Ctrl+V).</p>`}</div>
             ${aiOn() ? `<div class="aibox" data-slot="ai"></div>` : ""}
-            <div class="field"><label for="f-name">Nome</label><input id="f-name" class="input" name="name" maxlength="200" value="${esc(F.name)}" placeholder="Ex.: Cafeteira Nespresso Inissia" enterkeyhint="next">
+            <div class="field"><label for="f-name">Nome</label><input id="f-name" class="input" name="name" maxlength="200" value="${esc(F.name)}" placeholder="${bem ? "Ex.: Apartamento na praia" : "Ex.: Cafeteira Nespresso Inissia"}" enterkeyhint="next">
               <p class="err" data-err="name" hidden></p></div>
-            <div class="field"><label for="f-details">Detalhes</label><textarea id="f-details" class="textarea" name="details" rows="3" maxlength="4000" placeholder="Marca, modelo, cor, tamanho e estado">${esc(F.details)}</textarea></div>
-            ${zonesOn() ? `<div class="row2">${roomField}${zoneField}</div>` : roomField}
-            <div class="field"><label for="f-cat">Categoria</label><select id="f-cat" class="select" name="cat"><option value="">Escolha a categoria</option>${CATS.map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>
+            <div class="field"><label for="f-details">Detalhes</label><textarea id="f-details" class="textarea" name="details" rows="3" maxlength="4000" placeholder="${bem ? "Endereço, modelo, ano e estado" : "Marca, modelo, cor, tamanho e estado"}">${esc(F.details)}</textarea></div>
+            ${bem ? `<div class="field"><span class="lbl" id="f-tipo-l">Tipo</span><div class="seg tipo" role="group" aria-labelledby="f-tipo-l" data-slot="tipo">${tipoBtns()}</div></div>`
+              : `${zonesOn() ? `<div class="row2">${roomField}${zoneField}</div>` : roomField}
+            <div class="field"><label for="f-cat">Categoria</label><select id="f-cat" class="select" name="cat"><option value="">Escolha a categoria</option>${CATS.map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`}
             <div class="row3">
               <div class="field"><label for="f-qty">Quantidade</label><input id="f-qty" class="input" name="qty" maxlength="30" value="${esc(F.qty)}" inputmode="text"></div>
               <div class="field"><label for="f-value">Valor total</label><div class="money"><input id="f-value" class="input" name="value" inputmode="decimal" value="${esc(F.value)}" placeholder="0"></div>
@@ -2276,7 +2283,7 @@
           ${F.id ? "" : `<button type="button" class="btn" data-ed="again">Salvar e adicionar outro</button>`}
           <span class="grow"></span>
           <button type="button" class="btn ghost hide-narrow" data-ed="cancel">Cancelar</button>
-          <button type="button" class="btn primary" data-ed="save">${F.id ? "Salvar alterações" : "Salvar item"}</button>
+          <button type="button" class="btn primary" data-ed="save">${saveLbl}</button>
         </div></div>`,
       guard: async () => !F.dirty || confirmBox({ title: "Descartar o que foi preenchido?", ok: "Descartar", cancel: "Continuar editando", danger: true }),
     });
@@ -2328,7 +2335,7 @@
       F.busy = on;
       $$('[data-ed="save"], [data-ed="again"]', dlg).forEach((b) => { b.disabled = on; });
       const b = $('[data-ed="save"]', dlg);
-      b.innerHTML = on ? `<span class="spin"></span>Salvando` : F.id ? "Salvar alterações" : "Salvar item";
+      b.innerHTML = on ? `<span class="spin"></span>Salvando` : saveLbl;
     };
 
     renderZones(); renderPhotos(); renderUnit();
@@ -2389,7 +2396,9 @@
       finally { F.aiBusy = false; if (document.contains(dlg)) renderAi(); }
     }
     function fill() {
-      form.name.value = F.name; form.details.value = F.details; form.cat.value = CAT[F.cat] ? F.cat : "";
+      form.name.value = F.name; form.details.value = F.details;
+      if (form.cat) form.cat.value = CAT[F.cat] ? F.cat : "";
+      if (bem) slot("tipo").innerHTML = tipoBtns();
       form.qty.value = F.qty; form.value.value = F.value; form.flag.value = F.flag;
       if (form.zone) form.zone.value = F.zone;
       renderUnit(); fieldErr("name", ""); fieldErr("value", "");
@@ -2444,6 +2453,7 @@
       if (!b) return;
       const act = b.dataset.ed;
       if (act === "cancel") requestClose(entry);
+      else if (act === "tipo") { F.cat = b.dataset.v || otherCat; F.dirty = true; slot("tipo").innerHTML = tipoBtns(); }
       else if (act === "save") save(false);
       else if (act === "again") save(true);
       else if (act === "upload") pickFiles(addFiles);

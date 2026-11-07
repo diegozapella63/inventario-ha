@@ -1154,3 +1154,6 @@ dialog.camera::backdrop { background: #000; }
 .bens-acts .btn { min-width: 220px; }
 @media (max-width: 560px) { .bens-acts .btn { width: 100%; } }
 .bens .zone:first-of-type { margin-top: 18px; }
+/* o tipo de um bem (Imóvel, Veículo, Outro): três botões do mesmo tamanho */
+.seg.tipo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 440px); }
+.seg.tipo button { height: 40px; padding: 0 6px; }

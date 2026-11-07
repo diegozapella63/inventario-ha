@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.32.1
+
+- **Novo bem** e **Editar bem**: sem **Cômodo** e sem **Categoria**. No lugar, só o **Tipo**: Imóvel, Veículo ou Outro. Um item que veio de um cômodo pelo **Mover** fica em Outro e guarda a categoria que tinha. O botão diz **Salvar bem**.
+
 ## 1.32.0
 
 - **Opções > Novidades > Avisar**: agora você escolhe a **pessoa** (ou **Todos**), não o aparelho, como no ResolvIA e na CronologIA. O aviso vai para os celulares ligados a ela no Home Assistant (**Configurações > Pessoas**). Quem não tem celular ligado aparece como "sem celular". Saiu a opção Notificação do Home Assistant.
