@@ -48,7 +48,7 @@ import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.38.4"
+VERSION = "1.39.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -597,6 +597,56 @@ class Store:
             it.update(new)
             self.save()
             return it
+
+    def update_items(self, changes, user) -> list[dict]:
+        """Vários itens de uma vez (Buscar › Selecionar: o cômodo, a categoria ou a zona, e o Desfazer): [{id, room?, seq?,
+        zone?, cat?}], cada um com o que muda. Tudo ou nada, gravado uma vez. Em outro cômodo, o item ganha o próximo
+        número de lá (ou o seq pedido, no Desfazer, se estiver livre), como no Mover."""
+        if not isinstance(changes, list) or not changes:
+            raise ApiError(400, "Escolha os itens.")
+        if len(changes) > 2000:
+            raise ApiError(400, "No máximo 2000 itens de uma vez.")
+        with self.lock:
+            cats, plan, seen = self.cat_map(), [], set()
+            for ch in changes:
+                if not isinstance(ch, dict):
+                    raise ApiError(400, "Item inválido.")
+                it = self.item(ch.get("id"))
+                if not it:
+                    raise ApiError(404, "Um dos itens não existe mais. Atualize a página.")
+                if it["id"] in seen:
+                    continue
+                seen.add(it["id"])
+                new = {}
+                if "room" in ch and ch["room"] != it["room"]:
+                    room = self.room(ch["room"])
+                    if not room:
+                        raise ApiError(400, "Escolha um cômodo que exista.")
+                    new["room"] = room["id"]
+                if "cat" in ch:
+                    if ch["cat"] not in cats:
+                        raise ApiError(400, "Escolha uma categoria que exista.")
+                    new["cat"] = ch["cat"]
+                if "zone" in ch:
+                    new["zone"] = text(ch["zone"], 120, "zona")
+                plan.append((it, new, ch.get("seq")))
+            t, out = now_iso(), []
+            for it, new, want in plan:
+                if "room" in new:
+                    used = {i.get("seq") for i in self.data["items"] if i["room"] == new["room"]}
+                    seq = want if isinstance(want, int) and not isinstance(want, bool) and want > 0 and want not in used else self.next_seq(new["room"])
+                    self._retire_seq(it)
+                    it["room"], it["seq"] = new["room"], seq
+                for k in ("cat", "zone"):
+                    if k in new:
+                        it[k] = new[k]
+                if new:
+                    it["updatedAt"] = t
+                    if user:
+                        it["updatedBy"] = user
+                out.append(it)
+            self.save()
+            return out
 
     def delete_item(self, iid: str) -> dict:
         with self.lock:
@@ -3294,6 +3344,11 @@ def r_item_create(h, query):
     h.send_json({"item": it, "rev": STORE.data["rev"]}, 201)
 
 
+def r_items_bulk(h, query):
+    items = STORE.update_items(h.read_body().get("items"), h.user())
+    h.send_json({"items": items, "rev": STORE.data["rev"]})
+
+
 def r_items_batch(h, query):
     body = h.read_body()
     bodies = body.get("items") or []
@@ -3858,6 +3913,7 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/integracao/ferramentas", r_ferramentas_usar),
     ("POST", r"/api/items", r_item_create),
     ("POST", r"/api/items/batch", r_items_batch),
+    ("POST", r"/api/items/bulk", r_items_bulk),
     ("PUT", r"/api/items/([A-Za-z0-9_-]+)", r_item_update),
     ("DELETE", r"/api/items/([A-Za-z0-9_-]+)", r_item_delete),
     ("POST", r"/api/cats", r_cat_create),

@@ -5,7 +5,7 @@ from e2e_lib import main
 
 PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/bens", "#/graficos", "#/novidades", "#/categorias", "#/config", "#/config/integracoes", "#/config/aparencia", "#/config/opcoes", "#/sobre"]
 
-# (nome, endereço, como abrir, seletor que aparece)
+# (nome, endereço, como abrir (um seletor ou vários, um depois do outro), seletor que aparece)
 DIALOGS = [
     ("ficha", "#/i/sal-001", None, "dialog.sheet h1"),
     ("adicionar", "#/", ".tabbar .plus", "[data-go]"),
@@ -23,6 +23,8 @@ DIALOGS = [
     ("excluir-item", "#/i/var-001", 'dialog.sheet [data-act="item-delete"]', '[data-r="1"]'),
     ("novidades", "#/i/sal-007", 'dialog.sheet [data-act="item-news"]', ".news li"),
     ("conversar", "#/c/sala", ".chat-top", "dialog.chat .chat-ideas"),
+    ("selecionar", "#/buscar", ['[data-act="sel-start"]', '[data-act="sel-toggle"]'], ".selbar"),
+    ("mudar-varios", "#/buscar", ['[data-act="sel-start"]', '[data-act="sel-toggle"]', '.selbar [data-kind="room"]'], "#bk-v"),
 ]
 
 CHECK = """() => {
@@ -75,8 +77,9 @@ async def body(r, p):
                 if name in ("falar", "adicionar") and size == "pc":  # no computador: botões no alto, sem a barra de baixo
                     continue
                 await r.open(pg, h, ".tag, .sbar, .rooms, .more-tabs, .report, .rhead, #p-cats, .mscreen, dialog[open]")
-                if opener:
-                    await pg.locator(opener).first.click()
+                for o in opener if isinstance(opener, list) else [opener] if opener else []:
+                    await pg.locator(o).first.click()
+                    await pg.wait_for_timeout(150)
                 await pg.wait_for_selector(wait, timeout=8000)
                 await pg.wait_for_timeout(350)
                 bad = await pg.evaluate(CHECK)

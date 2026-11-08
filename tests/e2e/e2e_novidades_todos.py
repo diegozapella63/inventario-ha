@@ -95,6 +95,29 @@ async def body(r, p):
     r.check("Geladeira frost free inox" not in todos and "Smart TV 55 polegadas" in todos, "e não entra na lista: só eletrônicos")
     r.eq(await pg.locator("#view .chip").count(), 0, "e continua sem escolher categorias")
 
+    # um item que deixa de ser eletrônico sai da lista: muda a categoria pela ficha (Ver item › Editar) e volta
+    rows = pg.locator("#p-news-list > div > .nlist .nrow")
+    alvo = None
+    for k in range(await rows.count()):
+        b_, nm = (await rows.nth(k).locator("b").text_content()).strip(), await rows.nth(k).locator(".nm").text_content()
+        if b_ != "Smart TV 55 polegadas" and "cômodos" not in nm:
+            alvo = b_
+            break
+    await rows.filter(has_text=alvo).first.click()
+    await pg.wait_for_selector("dialog.modal [data-item]", timeout=6000)
+    await pg.click("dialog.modal [data-item]")
+    await pg.wait_for_selector('dialog.sheet [data-act="item-edit"]', timeout=4000)
+    await pg.click('dialog.sheet .acts [data-act="item-edit"], dialog.sheet [data-act="item-edit"].primary')
+    await pg.wait_for_selector("#f-cat")
+    await pg.select_option("#f-cat", "moveis")
+    await pg.click('[data-ed="save"]')
+    await pg.wait_for_selector("#f-cat", state="detached", timeout=6000)
+    await pg.go_back()
+    await pg.wait_for_selector("dialog.sheet", state="detached", timeout=4000)
+    await pg.wait_for_timeout(500)
+    todos = await pg.evaluate("[...document.querySelectorAll('#p-news-list .nrow b')].map(b => b.textContent)")
+    r.check(alvo not in todos and "Smart TV 55 polegadas" in todos, f"deixou de ser eletrônico: sai das Novidades ({alvo})")
+
     # Limpar novidades, com confirmação
     await pg.wait_for_selector("#p-news-list .nlist .nrow", timeout=8000)
     clear = pg.locator('[data-act="news-clear"]')

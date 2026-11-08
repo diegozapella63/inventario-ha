@@ -494,5 +494,20 @@ class Lote(ItensCase):
         self.assertEqual(len(self.app.data()["items"]), n)
 
 
+
+class VariosDeUmaVez(ItensCase):
+    """POST /api/items/bulk (Buscar › Selecionar): o cômodo, a categoria ou a zona de vários itens, tudo ou nada."""
+
+    def test_muda_e_desfaz(self):
+        rev = self.app.data()["rev"]
+        out = self.app.ok("POST", "api/items/bulk", {"items": [{"id": "sal-001", "cat": "moveis"}, {"id": "sal-002", "room": "varanda", "zone": ""}]})
+        self.assertGreater(out["rev"], rev)
+        self.assertEqual([(i["id"], i["cat"] if i["id"] == "sal-001" else i["room"]) for i in out["items"]], [("sal-001", "moveis"), ("sal-002", "varanda")])
+        st, _, err = self.app.post("api/items/bulk", {"items": [{"id": "sal-001", "cat": "outros"}, {"id": "nao-existe"}]})
+        self.assertEqual((st, err.get("error")), (404, "Um dos itens não existe mais. Atualize a página."))
+        self.assertEqual(next(i for i in self.app.data()["items"] if i["id"] == "sal-001")["cat"], "moveis", "nada mudou")
+        self.assertEqual(self.app.post("api/items/bulk", {"items": []})[0], 400)
+
+
 if __name__ == "__main__":
     unittest.main()

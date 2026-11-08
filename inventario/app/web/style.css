@@ -644,6 +644,27 @@ div.croom:hover { background: none; }
 @media (max-width: 356px) { .sfilters, .sfilters.n4, .sfilters.n2 { grid-template-columns: 1fr; } .sfilters.n3 .ord { grid-column: auto; } } /* 320 px: uma por linha, nada cortado */
 .ssum { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 18px 0 8px; padding: 0 6px; color: var(--muted); font-size: 15px; }
 .ssum b { color: var(--ink); font: 600 19px/1 var(--font-c); }
+/* Buscar › Selecionar: marcar vários e mudar o cômodo, a categoria ou a zona de uma vez */
+.ssum .sel-go { margin: -8px auto -8px -2px; align-self: center; }
+.ssum.sel { align-items: center; }
+.ssum.sel .check { flex: 1; min-width: 0; color: var(--ink); font-weight: 600; }
+.ssum.sel .btn { margin: -8px -6px -8px 0; }
+button.irow { width: 100%; font: inherit; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.irow.selr[aria-pressed="true"] { background: var(--tag-soft); }
+.irow.selr:disabled { opacity: 0.45; cursor: default; }
+.irow .tw { position: relative; display: block; width: 56px; height: 56px; }
+.irow .pk { position: absolute; left: -6px; top: -6px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--surface); border: 2px solid var(--line-2); color: transparent; }
+.irow .pk .ic { width: 15px; height: 15px; stroke-width: 3; }
+.irow.selr[aria-pressed="true"] .pk { background: var(--tag); border-color: var(--surface); color: var(--tag-ink); }
+.selbar { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 5; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+  margin: 12px -6px 0; padding: 10px 6px; background: var(--paper); border-top: 1px solid var(--line); }
+.selbar.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.selbar .btn { min-width: 0; padding: 0 8px; }
+.ssum.sel .check { white-space: nowrap; }
+@media (max-width: 360px) { .ssum.sel b { display: none; } }
+@media (max-width: 440px) { .selbar.n3 .btn .ic { display: none; } }
+@media (min-width: 1000px) { .selbar { bottom: 0; } }
 .more { display: flex; justify-content: center; padding: 18px 0; }
 
 /* ---------- vazio, carregando, erro */

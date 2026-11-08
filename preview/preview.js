@@ -124,6 +124,28 @@
       if (rp && room(d, rp.room) && !room(d, rp.room).photos.some((p) => p.file === rp.file)) room(d, rp.room).photos.push({ file: rp.file, label: rp.label || "" });
       return { items: clone(created), rooms: clone(d.rooms), rev: bump() };
     }
+    if (method === "POST" && path === "api/items/bulk") { // Buscar › Selecionar: vários de uma vez, tudo ou nada
+      const plan = (body.items || []).map((ch) => {
+        const it = d.items.find((i) => i.id === ch.id);
+        if (!it) fail("Um dos itens não existe mais. Atualize a página.", 404);
+        if ("room" in ch && ch.room !== it.room && !room(d, ch.room)) fail("Escolha um cômodo que exista.");
+        if ("cat" in ch && !CATS.has(ch.cat)) fail("Escolha uma categoria que exista.");
+        return [it, ch];
+      });
+      if (!plan.length) fail("Escolha os itens.");
+      const t = now();
+      for (const [it, ch] of plan) {
+        if ("room" in ch && ch.room !== it.room) {
+          const used = new Set(d.items.filter((i) => i.room === ch.room).map((i) => i.seq));
+          it.seq = ch.seq && !used.has(ch.seq) ? ch.seq : nextSeq(d, ch.room);
+          it.room = ch.room;
+        }
+        if ("cat" in ch) it.cat = ch.cat;
+        if ("zone" in ch) it.zone = String(ch.zone || "").trim();
+        it.updatedAt = t;
+      }
+      return { items: clone(plan.map(([it]) => it)), rev: bump() };
+    }
     if ((m = path.match(/^api\/items\/([^/]+)$/))) {
       const it = d.items.find((i) => i.id === decodeURIComponent(m[1]));
       if (!it) fail("Este item não existe mais.", 404);

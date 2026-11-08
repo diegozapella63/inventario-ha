@@ -550,6 +550,7 @@
     let html;
     if (navigated) roomsOrganize = false;
     try {
+      if (base.name !== "search") SEL = null;
       switch (base.name) {
         case "room": html = viewRoom(base.id); break;
         case "search": html = viewSearch(base.q); break;
@@ -569,6 +570,7 @@
       html = `<div class="empty"><h2>Algo deu errado nesta tela</h2><p>${esc(e.message)}</p><div class="acts"><a class="btn" href="#/">Voltar ao início</a></div></div>`;
     }
     view.innerHTML = html;
+    if (SEL) { const all = $('#view [data-input="sel-all"]'); if (all) all.indeterminate = !!all.dataset.mixed; }
     rendered = key;
     renderSide();
     renderTop();
@@ -633,7 +635,7 @@
   }
 
   // -- linhas reutilizáveis
-  function itemRow(it, { toks = [], mode = "global" } = {}) {
+  function itemRow(it, { toks = [], mode = "global", pick = null } = {}) {
     const ph = it.photos && it.photos[0];
     const room = D.roomById.get(it.room);
     let where;
@@ -641,12 +643,13 @@
     else if (mode === "bens") where = esc(CAT[it.cat] || "Outros");
     else where = hl([room?.name, zonesOn() ? it.zone : ""].filter(Boolean).join(", "), toks);
     const qty = qtyClean(it.qty);
-    return `<li><a class="irow" href="#/i/${encodeURIComponent(it.id)}">
-      ${ph ? `<img class="thumb" src="${esc(src(ph))}" alt="" loading="lazy" decoding="async" width="56" height="56">` : `<span class="thumb">${ic("tag")}</span>`}
+    const thumb = ph ? `<img class="thumb" src="${esc(src(ph))}" alt="" loading="lazy" decoding="async" width="56" height="56">` : `<span class="thumb">${ic("tag")}</span>`;
+    const inner = `${pick === null ? thumb : `<span class="tw">${thumb}<span class="pk" aria-hidden="true">${ic("check", "sm")}</span></span>`}
       <span class="ib"><span class="nm">${hl(it.name, toks)}</span>
         <span class="meta"><span class="mt soft">${esc(tagOf(it))}</span>${where ? `<span class="z">${where}</span>` : ""}</span></span>
-      <span class="iv"><span class="val">${money(it.value)}</span>${qty !== "1" ? `<span class="qty">${esc(qtyShort(it.qty))}</span>` : ""}</span>
-    </a></li>`;
+      <span class="iv"><span class="val">${money(it.value)}</span>${qty !== "1" ? `<span class="qty">${esc(qtyShort(it.qty))}</span>` : ""}</span>`;
+    if (pick !== null) return `<li><button type="button" class="irow selr" data-act="sel-toggle" data-id="${esc(it.id)}" aria-pressed="${pick === true}"${pick === "off" ? " disabled" : ""}>${inner}</button></li>`;
+    return `<li><a class="irow" href="#/i/${encodeURIComponent(it.id)}">${inner}</a></li>`;
   }
   function roomRow(r, max) {
     const v = D.roomTotals.get(r.id) || 0;
@@ -871,17 +874,98 @@
         ${filtered ? `<div class="acts"><button class="btn" data-act="search-reset">Limpar filtros</button></div>` : ""}</div>`;
     }
     const shown = list.slice(0, searchLimit);
-    return `<div class="ssum"><span>${plural(list.length, "item", "itens")}</span><b>${moneyR(sum)}</b></div>
-      <ul class="ilist">${shown.map((it) => itemRow(it, { toks })).join("")}</ul>
-      ${list.length > shown.length ? `<div class="more"><button class="btn" data-act="more-results">Mostrar mais ${int(Math.min(120, list.length - shown.length))}</button></div>` : ""}`;
+    const pickable = list.filter((i) => !isBens(i.room)); // os bens não têm cômodo nem categoria: ficam de fora
+    if (SEL) { const ok = new Set(pickable.map((i) => i.id)); for (const id of [...SEL]) if (!ok.has(id)) SEL.delete(id); } // só o que está na lista
+    const more = list.length > shown.length ? `<div class="more"><button class="btn" data-act="more-results">Mostrar mais ${int(Math.min(120, list.length - shown.length))}</button></div>` : "";
+    if (!SEL) {
+      return `<div class="ssum"><span>${plural(list.length, "item", "itens")}</span>${pickable.length ? `<button type="button" class="btn ghost sm sel-go" data-act="sel-start">${ic("checks", "sm")}Selecionar</button>` : ""}<b>${moneyR(sum)}</b></div>
+      <ul class="ilist">${shown.map((it) => itemRow(it, { toks })).join("")}</ul>${more}`;
+    }
+    const n = SEL.size, all = n > 0 && n === pickable.length;
+    const selSum = pickable.reduce((s, i) => s + (SEL.has(i.id) ? +i.value || 0 : 0), 0);
+    return `<div class="ssum sel"><label class="check"><input type="checkbox" data-input="sel-all"${all ? " checked" : ""}${n && !all ? ' data-mixed="1"' : ""}> ${n ? plural(n, "selecionado", "selecionados") : "Selecionar todos"}</label>
+        ${n ? `<b>${moneyR(selSum)}</b>` : ""}<button type="button" class="btn ghost sm" data-act="sel-end">Cancelar</button></div>
+      <ul class="ilist">${shown.map((it) => itemRow(it, { toks, pick: isBens(it.room) ? "off" : SEL.has(it.id) })).join("")}</ul>${more}
+      <div class="selbar${zonesOn() ? " n3" : ""}" role="toolbar" aria-label="Mudar os selecionados">
+        <button type="button" class="btn" data-act="sel-change" data-kind="room"${n ? "" : " disabled"}>${ic("rooms")}Cômodo</button>
+        <button type="button" class="btn" data-act="sel-change" data-kind="cat"${n ? "" : " disabled"}>${ic("tag")}Categoria</button>
+        ${zonesOn() ? `<button type="button" class="btn" data-act="sel-change" data-kind="zone"${n ? "" : " disabled"}>${ic("pin")}Zona</button>` : ""}</div>`;
   }
+  // Buscar › Selecionar: marcar vários itens e mudar de uma vez o cômodo, a categoria ou a zona (com Desfazer).
+  // A seleção vale só para o que está na lista (mudou o filtro, sai o que sumiu); o Voltar do celular sai do Selecionar.
+  let SEL = null;
+  function selRender() {
+    const el = $("#results");
+    if (el && base.name === "search") el.innerHTML = resultsHtml(base.q);
+    const all = $('#view [data-input="sel-all"]');
+    if (all) all.indeterminate = !!all.dataset.mixed;
+  }
+  function selStart() {
+    SEL = new Set();
+    try { history.pushState({ ...(history.state || {}), invSel: 1 }, ""); } catch { /* sem histórico */ }
+    selRender();
+  }
+  function selEnd() {
+    if (history.state && history.state.invSel) { history.back(); return; } // o popstate abaixo sai
+    SEL = null; selRender();
+  }
+  window.addEventListener("popstate", () => { if (SEL && !(history.state && history.state.invSel) && !stack.length) { SEL = null; selRender(); } });
+  function selChange(kind) {
+    const its = [...SEL].map((id) => D.itemById.get(id)).filter((i) => i && !isBens(i.room));
+    if (!its.length) return;
+    const n = plural(its.length, "item", "itens");
+    const same = (k) => { const v = new Set(its.map((i) => i[k] || "")); return v.size === 1 ? [...v][0] : null; };
+    const cur = same(kind);
+    const zl = [...new Set(its.flatMap((i) => zonesOf(i.room)))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    const title = { room: "Mudar o cômodo", cat: "Mudar a categoria", zone: "Mudar a zona" }[kind];
+    const field = kind === "room"
+      ? `<div class="field"><label for="bk-v">Cômodo</label><select id="bk-v" class="select">${cur === null ? '<option value="" selected disabled>Escolha o cômodo</option>' : ""}${roomOptions(cur)}</select>
+          <p class="help">Em outro cômodo, o item ganha um código novo${zonesOn() ? " e fica sem zona" : ""}.</p></div>`
+      : kind === "cat"
+        ? `<div class="field"><label for="bk-v">Categoria</label><select id="bk-v" class="select">${cur === null ? '<option value="" selected disabled>Escolha a categoria</option>' : ""}${CATS.map(([k, v]) => `<option value="${k}"${k === cur ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`
+        : `<div class="field"><label for="bk-v">Zona</label><input id="bk-v" class="input" list="bk-zones" value="${esc(cur || "")}" placeholder="Sem zona" maxlength="120" autocomplete="off">
+          <datalist id="bk-zones">${zl.map((z) => `<option value="${esc(z)}">`).join("")}</datalist></div>`;
+    const entry = openDialog({
+      cls: "modal narrow", label: title,
+      html: `<div class="dlg"><div class="dlg-h"><h2>${title}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <form class="dlg-b" data-bk><div class="form"><p class="muted" style="margin:0">${n}</p>${field}</div></form>
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok>Mudar ${n}</button></div></div>`,
+    });
+    const dlg = entry.dlg;
+    let busy = false;
+    const go = async () => {
+      if (busy) return;
+      const v = $("#bk-v", dlg).value;
+      if (kind !== "zone" && !v) { toast(kind === "room" ? "Escolha o cômodo." : "Escolha a categoria.", { error: true }); return; }
+      busy = true;
+      try {
+        const to = kind === "room" ? await realRoom(v) : kind === "zone" ? v.trim() : v;
+        const change = kind === "room" ? { room: to, zone: "" } : { [kind]: to };
+        const todo = its.filter((i) => (kind === "room" ? i.room !== to : (i[kind] || "") !== to));
+        if (!todo.length) { requestClose(entry, { force: true }); toast(kind === "room" ? `Já estão em ${D.roomById.get(to)?.name || "este cômodo"}.` : "Nada mudou."); return; }
+        const before = todo.map((i) => ({ id: i.id, room: i.room, seq: i.seq, zone: i.zone || "", cat: i.cat }));
+        const res = await API.post("api/items/bulk", { items: todo.map((i) => ({ id: i.id, ...change })) });
+        setRev(res.rev); res.items.forEach(upsertItem); derive(); requestClose(entry, { force: true }); refreshAll();
+        const m = plural(res.items.length, "item", "itens");
+        const msg = kind === "room" ? `${m} em ${D.roomById.get(to)?.name || "outro cômodo"}` : kind === "cat" ? `${m} em ${CAT[to] || "outra categoria"}` : to ? `${m} na zona ${to}` : `${m} sem zona`;
+        toast(msg, { action: "Desfazer", onAction: async () => {
+          try { const back = await API.post("api/items/bulk", { items: before }); setRev(back.rev); back.items.forEach(upsertItem); derive(); refreshAll(); }
+          catch (er) { fail(er); }
+        } });
+      } catch (e) { fail(e); }
+      finally { busy = false; }
+    };
+    $("[data-bk]", dlg).addEventListener("submit", (e) => { e.preventDefault(); go(); });
+    dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); if (e.target.closest("[data-ok]")) go(); });
+  }
+
   function updateSearch(patch) {
     base.q = { ...base.q, ...patch };
     if (!base.q.q && base.q.ord === "rel") delete base.q.ord;
     try { history.replaceState(history.state, "", hashOf(base)); } catch { /* sem histórico */ }
     rendered = hashOf(base);
     searchLimit = 120;
-    $("#results").innerHTML = resultsHtml(base.q);
+    selRender();
     const ordSel = $('#view [data-input="search-ord"]');
     if (ordSel) ordSel.value = base.q.ord || (base.q.q ? "rel" : "val"); // digitar passa para Mais relevantes: a seleção diz o mesmo
     const clear = $('#view [data-act="search-clear"]');
@@ -3572,7 +3656,11 @@
       case "sheet-close": if (sheet) requestClose(sheet); break;
       case "search-clear": { const inp = $('#view [data-input="search-q"]'); if (inp) { inp.value = ""; inp.focus(); } updateSearch({ q: "" }); break; }
       case "search-reset": base.q = { q: base.q.q || "" }; renderView(false); try { history.replaceState(history.state, "", hashOf(base)); } catch { /* ok */ } break;
-      case "more-results": searchLimit += 120; $("#results").innerHTML = resultsHtml(base.q); break;
+      case "more-results": searchLimit += 120; selRender(); break;
+      case "sel-start": selStart(); break;
+      case "sel-end": selEnd(); break;
+      case "sel-toggle": { const id = b.dataset.id; if (SEL) { if (SEL.has(id)) SEL.delete(id); else SEL.add(id); selRender(); } break; }
+      case "sel-change": if (SEL && SEL.size) selChange(b.dataset.kind); break;
       case "export": download(b.dataset.kind); break;
       case "backup-create": createBackup(b); break;
       case "backup-restore": restoreBackup(b.dataset.name); break;
@@ -3640,6 +3728,9 @@
       base.q = { ...base.q, tipo: t.value, ...(tipoBens(t.value) ? { room: "", cat: "" } : {}) };
       try { history.replaceState(history.state, "", hashOf(base)); } catch { /* sem histórico */ }
       searchLimit = 120; renderView(false);
+    }
+    else if (k === "sel-all") { // todos os da lista (os que já apareceram e os que vêm com Mostrar mais)
+      if (SEL) { const ids = searchItems(base.q).list.filter((i) => !isBens(i.room)).map((i) => i.id); SEL = new Set(t.checked ? ids : []); selRender(); }
     }
     else if (k === "search-room") updateSearch({ room: t.value });
     else if (k === "search-cat") updateSearch({ cat: t.value });

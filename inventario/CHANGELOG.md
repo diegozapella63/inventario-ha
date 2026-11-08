@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.39.0
+
+- **Buscar › Selecionar**: muda vários itens de uma vez. Toque nos itens, ou em **Selecionar todos** para a lista inteira, e embaixo em **Cômodo**, **Categoria** ou **Zona** (com as zonas ligadas). O aviso tem **Desfazer**. Em outro cômodo, cada item ganha um código novo e fica sem zona. Os bens ficam de fora. O Voltar do celular ou **Cancelar** saem do Selecionar.
+- **Mais › Novidades**: um item que deixa de ser eletrônico sai da lista na hora.
+
 ## 1.38.4
 
 - Corrigido: no **Editar item** e no **Mover**, o **Cômodo** e a **Categoria** não mudavam. A janela das opções abria atrás da janela do item e não recebia o toque. Agora abre por cima, e o Voltar do celular fecha só ela.
