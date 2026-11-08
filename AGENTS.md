@@ -19,6 +19,8 @@ inventario/CHANGELOG.md       o que mudou em cada versão (o HA mostra ao atuali
 inventario/DOCS.md            manual do usuário (aba Documentação no HA)
 inventario/app/server.py      servidor HTTP (Python, só biblioteca padrão): dados, fotos, IA, backups, integração
 inventario/app/web/           a tela: index.html, app.js (JavaScript puro, sem build), style.css, fontes
+inventario/app/relatorio.py   o Relatório para seguro em PDF (Baixar PDF): os números, os gráficos e os cômodos
+inventario/app/pdf.py         PDF feito à mão (Helvetica, A4, fotos JPG): o mesmo arquivo do GerencIA; ao mudar, copie para lá
 inventario/app/web/selectsheet.js  as caixas de seleção no visual do app: arquivo igual em todos os apps (no ResolvIA e
                               no CronologIA, frontend/src/selectsheet.js); ao mudar, copie para os outros
 inventario/seed/              ponto de partida vazio (LEIA-ME); nunca coloque dados reais aqui
@@ -92,6 +94,7 @@ Este repositório é público e tem **só código**. O inventário real (itens, 
 - Avisos no celular (`notify.mobile_app_*`) abrem o app pelo link `/app/<app>/<caminho>`: o painel do Home Assistant (2026.2 ou mais novo) carrega a tela no começo e passa o caminho por mensagem (`home-assistant/subscribe-properties` e `home-assistant/properties`, no fim do app.js), e a tela vai para a rota. Hoje só `/novidades`.
 - Celular primeiro (390 px; nada pode passar da largura nem em 320 px); tema claro e escuro; as 10 cores do app.
 - Quando o dono pede "igual ao ResolvIA" ou "como no CronologIA", abra o código do outro app (repositórios acima) e siga o mesmo jeito: textos, botões, câmera, Falar, uso da IA, menu Mais e abas de Configurações.
+- Relatórios (a página e o PDF, iguais em todos os apps): o cabeçalho dos apps (cartão com a faixa na cor do app, o ícone, Inventar**IA** · o que é o app, o título, a contagem e quando; a hora só ali, sem o nome da casa), os números, os gráficos da tela Gráficos e, no fim, a marca da CorrerIA Code como no **Sobre** (o raio no quadrado inclinado na cor do app, Correr**IA** Code e DESENVOLVIMENTO DE SOFTWARES); no PDF, a marca e o número da página no pé de cada página. O app do Home Assistant no Android não imprime: o PDF é feito pelo servidor e baixado (**Baixar PDF**).
 - Exemplos e capturas sempre de uma casa inventada: nunca itens, fotos ou valores reais do dono.
 
 ## Conversa com o dono

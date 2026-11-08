@@ -78,8 +78,7 @@ async def body(r, p):
     # -- vale para o relatório, a busca e o cadastro
     await r.open(pg, "#/relatorio", ".report")
     rep = await pg.evaluate("[...document.querySelectorAll('.rep-room h2')].map(h => h.lastChild.textContent)")
-    tab = await pg.evaluate("[...document.querySelectorAll('.report > .rtable tbody tr td:first-child')].map(e => e.textContent.trim().split(' ').slice(1).join(' '))")
-    r.check(rep == tab == [NAMES[k] for k in want], f"relatório: o resumo e as seções na ordem nova ({rep[:2]})")
+    r.check(rep == [NAMES[k] for k in want], f"relatório: as seções na ordem nova ({rep[:2]})")
     await r.open(pg, "#/buscar", ".sbar")
     opts = await pg.evaluate("[...document.querySelectorAll('[data-input=search-room] option')].map(o => o.value).slice(1)")
     r.eq(opts, want, "Buscar: os cômodos do filtro na ordem nova")

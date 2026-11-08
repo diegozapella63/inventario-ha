@@ -192,9 +192,11 @@ async def body(r, p):
     r.eq([x[0] for x in boxes], ["Na casa", "Itens", "Cômodos", "Bens"], "no alto: na casa, itens, cômodos e bens")
     r.eq(boxes[1][1], str(n_house), "os itens da casa")
     r.eq(txt(boxes[3][1]), "R$ 513.000", "o total dos bens")
-    foot = txt(await pg.text_content(".report > .rtable tfoot"))
-    r.check(foot.replace(" ", "").startswith(f"Total{n_house}R$") and "513.000" not in foot, f"o total da casa não muda com os bens ({foot})")
-    r.check("Bens" not in txt(await pg.text_content(".report > .rtable tbody")), "Bens fora da tabela dos cômodos")
+    # 1.36: os gráficos da tela Gráficos: os cômodos sem a área Bens (a casa não muda com eles); os bens no gráfico deles
+    rooms = txt(await pg.text_content("#rg-rooms"))
+    r.check("Bens" not in rooms and "513.000" not in rooms, f"Bens fora do gráfico dos cômodos ({rooms[:80]})")
+    r.check("513.000" not in txt(await pg.text_content(".rtotal > div:first-child")), "o total da casa não muda com os bens")
+    r.check(await pg.locator("#rg-bens .hbar").count() >= 1, "os bens no gráfico deles")
     last = pg.locator(".rep-room").last
     r.eq(await last.get_attribute("class"), "rep-room rep-bens", "a seção Bens é a última")
     tf = txt(await last.locator("tfoot").text_content())

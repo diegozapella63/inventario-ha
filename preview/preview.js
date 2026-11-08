@@ -62,7 +62,7 @@
   window.INV_PHOTO_STORE = (name, full, thumb) => { ST.blobs.set(name, { photos: URL.createObjectURL(full), thumbs: URL.createObjectURL(thumb) }); };
   window.INV_PHOTO_URL = (f, kind) => { const b = ST.blobs.get(f); return b ? b[kind] || b.photos : null; };
   window.INV_EXPORT = () => OFF + "este botão baixa o arquivo para o seu computador.";
-  window.INV_PRINT = OFF + "este botão abre a impressão, onde dá para salvar em PDF.";
+  window.INV_PRINT = OFF + "este botão baixa o relatório em PDF.";
 
   // Falar na prévia: sem microfone, um "gravador" de mentira e um exemplo do que alguém falou
   const SPEECH = "Cafeteira Nespresso vermelha, uns quinhentos reais. Liquidificador Philips Walita, duzentos reais. E duas almofadas cinzas de veludo.";

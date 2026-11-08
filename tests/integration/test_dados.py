@@ -23,6 +23,17 @@ def send_in_parts(app, data: bytes, name="backup.zip", chunk=None):
 
 
 class Exportar(ServerCase):
+    def test_relatorio_em_pdf(self):
+        """1.36.0: Mais > Relatório > Baixar PDF: o arquivo feito pelo servidor, com as fotos (ou sem), na cor do app."""
+        st, h, raw = self.app.get("api/relatorio.pdf?fotos=1&cor=%23b48cf6&tinta=%237f56bb")
+        self.assertEqual(st, 200)
+        self.assertEqual(h["Content-Type"], "application/pdf")
+        self.assertRegex(h["Content-Disposition"], r'attachment; filename="inventario-\d{4}-\d{2}-\d{2}\.pdf"')
+        self.assertTrue(raw.startswith(b"%PDF-") and b"/Subtype /Image" in raw)
+        st, _, raw = self.app.get("api/relatorio.pdf?fotos=0&cor=red")
+        self.assertEqual(st, 200)
+        self.assertNotIn(b"/Subtype /Image", raw)
+
     def test_planilha_json_e_zip(self):
         st, h, raw = self.app.get("api/export.csv")
         self.assertEqual(st, 200)

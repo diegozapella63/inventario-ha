@@ -886,28 +886,57 @@
     if (clear) clear.hidden = !base.q.q;
   }
 
-  // -- relatório
+  // -- relatório: o padrão dos relatórios dos apps (o do ResolvIA e do GerencIA): o cabeçalho (a faixa na cor do app, o
+  // ícone, o app, o título, a contagem e quando), os números, os gráficos da tela Gráficos, um cômodo depois do outro e, no
+  // fim, a marca da CorrerIA Code (como no Mais > Sobre). Baixar PDF: o servidor faz o mesmo relatório como arquivo (o
+  // app do Home Assistant no Android não imprime a página).
+  const RAIO = "M13 2L3 14L12 14L11 22L21 10L12 10Z";
+  const MARCA = `<footer class="marca"><span class="raio" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${RAIO}"/></svg></span><span><b class="nome">Correr<i>IA</i> Code</b><small>desenvolvimento de softwares</small></span></footer>`;
+  function reportPdfHref(withPhotos) {
+    const cs = getComputedStyle(document.documentElement);
+    const hex = (v) => (/^#[0-9a-f]{6}$/i.test((v || "").trim()) ? v.trim() : "");
+    const q = new URLSearchParams({ fotos: withPhotos ? "1" : "0" });
+    if (hex(cs.getPropertyValue("--a"))) q.set("cor", hex(cs.getPropertyValue("--a")));
+    if (hex(cs.getPropertyValue("--a-text"))) q.set("tinta", hex(cs.getPropertyValue("--a-text")));
+    return `api/relatorio.pdf?${q}`;
+  }
   function viewReport() {
     const withPhotos = LS.get("reportPhotos", true);
     const nb = D.bensItems.length > 0; // os bens (fora de casa) vêm numa seção à parte, com o total deles
     const now = new Date();
+    const p2 = (n) => String(n).padStart(2, "0");
+    const when = `${p2(now.getDate())}/${p2(now.getMonth() + 1)}/${now.getFullYear()} às ${p2(now.getHours())}:${p2(now.getMinutes())}`;
+    const day = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}`;
+    // os gráficos da tela Gráficos: cômodos, categorias, faixas de valor, os mais valiosos e os bens
+    const c = D.items.length ? chartData() : null, T = D.houseTotal;
+    const bmax = c ? Math.max(...c.bands.map((b) => b.n), 1) : 1;
+    const graf = (id, icon, title, body) => `<section class="rep-g" id="rg-${id}"><h2>${secIc(icon)}${title}</h2>${body}</section>`;
+    const charts = c ? [
+      c.rooms.length && graf("rooms", "rooms", "Cômodos", hbars(c.rooms.map((x) => ({ href: `#/c/${encodeURIComponent(x.r.id)}`, tag: `<span class="mt soft">${esc(x.r.code)}</span>`, name: x.r.name, sub: plural(x.n, "item", "itens"), v: x.v, share: pctTxt(x.v, T) })))),
+      c.cats.length && graf("cats", "grid", "Categorias", hbars(c.cats.map((x) => ({ href: `#/buscar?cat=${encodeURIComponent(x.k)}&ord=val`, name: x.name, sub: plural(x.n, "item", "itens"), v: x.v, share: pctTxt(x.v, T) })))),
+      c.valued.length && graf("bands", "bars", "Faixas de valor", `<div class="bands" role="list" aria-label="Itens por faixa de valor, em reais">
+        ${c.bands.map((b) => `<div class="band" role="listitem" aria-label="${esc(`${b.label} reais: ${plural(b.n, "item", "itens")}, ${moneyR(b.v)} no total`)}">
+          <span class="bd-bar"><span class="bd-n">${int(b.n)}</span><i style="height:${b.n ? Math.max(3, (b.n / bmax) * 100).toFixed(1) : 0}%"></i></span>
+          <span class="bd-l">${esc(b.label)}</span><span class="bd-v">${b.n ? moneyK(b.v) : "–"}</span></div>`).join("")}</div>
+        ${c.items.length - c.valued.length ? `<p class="muted bands-cap">${plural(c.items.length - c.valued.length, "item está", "itens estão")} sem valor.</p>` : ""}`),
+      c.valued.length && graf("top", "gem", "Itens mais valiosos", hbars(c.valued.slice(0, 10).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: D.roomById.get(i.room)?.name || "", v: +i.value || 0, share: pctTxt(+i.value || 0, T) })))),
+      nb && graf("bens", "home", "Bens", hbars(c.bens.slice(0, 10).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: { imoveis: "Imóvel", veiculos: "Veículo" }[i.cat] || CAT[i.cat] || "Outro", v: +i.value || 0, share: pctTxt(+i.value || 0, D.bensTotal) })))),
+    ].filter(Boolean) : [];
     return `
     <div class="rep-tools no-print">
-      <label class="check"><input type="checkbox" data-input="rep-photos"${withPhotos ? " checked" : ""}> Mostrar fotos</label>
-      <button type="button" class="btn primary" data-act="print">${ic("printer")}Imprimir ou salvar PDF</button>
+      <label class="btn rep-fotos"><input type="checkbox" role="switch" data-input="rep-photos"${withPhotos ? " checked" : ""}><span>Mostrar fotos</span></label>
+      <a class="btn primary" data-act="rep-pdf" href="${esc(reportPdfHref(withPhotos))}" download="inventario-${day}.pdf">${ic("download")}Baixar PDF</a>
     </div>
     <article class="report">
-      <h1>Inventário da casa</h1>
-      <p class="rmeta">Gerado em ${esc(dfLong.format(now))}. Valores em reais.</p>
+      <header class="rcab">${APP_ICON}<div><div class="rapp"><span class="wm">Inventar<b>IA</b></span> · inventário da casa</div>
+        <h1>Relatório para seguro</h1><p class="rmeta">${plural(D.houseCount, "item", "itens")} em ${plural(D.rooms.length, "cômodo", "cômodos")} · ${when}</p></div></header>
       <div class="rtotal">
-        <div><span>${nb ? "Na casa" : "Patrimônio"}</span><b>${money(D.houseTotal)}</b></div>
+        <div><span>${nb ? "Na casa" : "Patrimônio"}</span><b>${moneyR(D.houseTotal)}</b></div>
         <div><span>Itens</span><b>${int(D.houseCount)}</b></div>
         <div><span>Cômodos</span><b>${int(D.rooms.length)}</b></div>
-        ${nb ? `<div><span>Bens</span><b>${money(D.bensTotal)}</b></div>` : ""}
+        ${nb ? `<div><span>Bens</span><b>${moneyR(D.bensTotal)}</b></div>` : ""}
       </div>
-      <table class="rtable"><thead><tr><th>Cômodo</th><th class="r">Itens</th><th class="r">Valor</th><th class="r">Parte</th></tr></thead>
-        <tbody>${D.rooms.map((r) => { const v = D.roomTotals.get(r.id) || 0; return `<tr><td><span class="c">${esc(r.code)}</span> ${esc(r.name)}</td><td class="r">${int((D.byRoom.get(r.id) || []).length)}</td><td class="r">${money(v)}</td><td class="r">${pctFmt(pct(v, D.houseTotal))}</td></tr>`; }).join("")}</tbody>
-        <tfoot><tr><td>Total</td><td class="r">${int(D.houseCount)}</td><td class="r">${money(D.houseTotal)}</td><td class="r">100%</td></tr></tfoot></table>
+      ${charts.length ? `<div class="rep-graf">${charts.join("")}</div>` : ""}
       ${[...D.rooms, ...(nb ? [D.bens] : [])].filter((r) => (D.byRoom.get(r.id) || []).length).map((r) => {
         const its = D.byRoom.get(r.id) || [];
         const bens = r === D.bens, zc = zonesOn() && !bens;
@@ -919,7 +948,8 @@
             ${zc ? `<td>${esc(it.zone || "")}</td>` : ""}<td class="r">${esc(qtyClean(it.qty))}</td><td class="r">${money(it.value)}</td></tr>`).join("")}
           </tbody><tfoot><tr>${withPhotos ? "<td></td>" : ""}<td colspan="${zc ? 4 : 3}">${bens ? "Total dos bens" : "Subtotal"}</td><td class="r">${money(D.roomTotals.get(r.id) || 0)}</td></tr></tfoot></table></section>`;
       }).join("")}
-      <p class="rep-foot">Feito com o InventarIA, no Home Assistant.</p>
+      ${D.items.length ? "" : `<p class="muted">Nenhum item cadastrado.</p>`}
+      ${MARCA}
     </article>`;
   }
 
@@ -968,7 +998,7 @@
       ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
       newsOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
       ["#/categorias", "grid", "Categorias", "Criar, renomear e excluir."],
-      ["#/relatorio", "report", "Relatório para seguro", `Por cômodo${LS.get("reportPhotos", true) ? ", com fotos" : ""}. Imprime ou salva em PDF.`], // sem Mostrar fotos, não promete fotos
+      ["#/relatorio", "report", "Relatório para seguro", `Por cômodo, com ${LS.get("reportPhotos", true) ? "fotos e " : ""}gráficos. Baixa em PDF.`], // sem Mostrar fotos, não promete fotos
       ["#/config", "gear", "Configurações", "Dados e backup, integrações, aparência e opções."],
       ["#/sobre", "info", "Sobre", "CorrerIA Code, os apps e o GitHub."],
     ].filter(Boolean);
@@ -3520,6 +3550,7 @@
       case "chat": openChat(); break;
       case "voice-refresh": { const slot = $('#view [data-slot="voice-panel"]'); if (slot) slot.innerHTML = `<p class="muted">Verificando…</p>`; await loadVoice(true); if (slot && document.contains(slot)) renderVoicePanel(slot); break; }
       case "print": if (window.INV_PRINT) toast(window.INV_PRINT); else window.print(); break;
+      case "rep-pdf": if (window.INV_PRINT) { e.preventDefault(); toast(window.INV_PRINT); } break;
       case "retry": boot(); break;
       default: break;
     }

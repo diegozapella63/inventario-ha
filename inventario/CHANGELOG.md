@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.36.0
+
+- **Relatório para seguro** no padrão dos relatórios dos apps (como o do ResolvIA e o do GerencIA): no alto, um cabeçalho com o ícone, o app, o título, quantos itens e cômodos e quando; depois os números, os gráficos da tela **Gráficos** (cômodos, categorias, faixas de valor, os itens mais valiosos e, com bens, os bens) e um cômodo depois do outro. No fim, a marca da **CorrerIA Code**, como no **Mais > Sobre**.
+- **Baixar PDF** no lugar do Imprimir: o app do Home Assistant no celular não imprimia a página. O PDF é feito pelo app, com o mesmo relatório (com as fotos, ou sem elas com **Mostrar fotos** desmarcado), na cor do app e com o número de cada página.
+
 ## 1.35.0
 
 - **Caixas de seleção** (os filtros da busca, cômodo e categoria do item, Mover, a IA usada, Fala para texto, Conferir sozinho, Avisar) abrem uma janela no visual do app, de baixo para cima, com as opções em linhas e a atual marcada na cor do app, no tema claro ou escuro, e não mais a janela padrão do celular, como nos outros apps da família. O Voltar do celular, o X ou tocar fora fecham só ela.

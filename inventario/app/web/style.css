@@ -1042,11 +1042,28 @@ dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; 
 .toast button:hover { background: rgba(255, 255, 255, 0.08); }
 @keyframes toastin { from { transform: translateY(12px); opacity: 0; } }
 
-/* ---------- relatório */
-.rep-tools { display: flex; align-items: center; gap: 16px; justify-content: space-between; flex-wrap: wrap; padding: 14px 0 0; }
-.report { margin-top: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: clamp(18px, 4vw, 44px); }
-.report h1 { margin: 0; font: 700 38px/1 var(--font-c); }
-.report .rmeta { margin: 8px 0 0; color: var(--muted); }
+/* ---------- relatório: o padrão dos relatórios dos apps (cabeçalho com a faixa na cor do app; no fim, a marca da CorrerIA Code) */
+.rep-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 14px 0 0; max-width: 560px; }
+.rep-tools .btn { justify-content: center; min-width: 0; }
+.rep-fotos { gap: 10px; cursor: pointer; }
+.rep-fotos input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink); flex: none; }
+.report { margin-top: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: clamp(16px, 4vw, 40px); }
+.rcab { display: flex; align-items: center; gap: 14px; background: var(--surface-2); border: 1px solid var(--line); border-left: 6px solid var(--a); border-radius: 16px; padding: 16px 18px; }
+.rcab .app-ic { width: 52px; height: 52px; flex: none; color: var(--ink); }
+.rcab .rapp { font: 600 13.5px/1.2 var(--font); color: var(--muted); }
+.rcab .wm { font: 700 19px/1 var(--font-c); color: var(--ink); letter-spacing: 0.01em; }
+.rcab .wm b { color: var(--tag-text); }
+.report h1 { margin: 4px 0; font: 700 30px/1.05 var(--font-c); }
+.report .rmeta { margin: 0; color: var(--muted); font-size: 13.5px; }
+.rep-graf { display: grid; gap: 8px 48px; margin-top: 18px; }
+@media (min-width: 900px) { .rep-graf { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; } }
+.rep-g h2 { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; font: 600 22px/1.2 var(--font-c); }
+.marca { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--line); }
+.marca .raio { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 11px; background: var(--a); transform: rotate(-8deg); box-shadow: 0 8px 18px -10px var(--a); }
+.marca .raio svg { width: 19px; height: 19px; fill: var(--tag-ink); }
+.marca .nome { display: block; font: 700 20px/1 var(--font-c); color: var(--ink); }
+.marca .nome i { font-style: normal; color: var(--tag-text); }
+.marca small { display: block; margin-top: 4px; color: var(--muted); font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
 .report .rtotal { display: flex; gap: 28px; flex-wrap: wrap; margin: 22px 0 6px; }
 .report .rtotal div { display: grid; gap: 2px; }
 .report .rtotal span { color: var(--muted); font-size: 14px; }
@@ -1070,7 +1087,6 @@ dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; 
 .rep-room { margin-top: 36px; }
 .rep-room h2 { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 24px/1.2 var(--font-c); }
 .rep-room .rs { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
-.rep-foot { margin-top: 30px; color: var(--muted); font-size: 13px; }
 
 @media print {
   @page { size: A4; margin: 14mm 12mm; }
@@ -1081,6 +1097,8 @@ dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; 
   .view { padding: 0; max-width: none; }
   .report { border: 0; padding: 0; margin: 0; border-radius: 0; }
   .rep-room { break-before: page; }
+  .rep-g, .marca { break-inside: avoid; }
+  .marca .raio { box-shadow: none; }
   .rtable tr { break-inside: avoid; }
   .rtable thead { display: table-header-group; }
   a { text-decoration: none; }

@@ -64,7 +64,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | `e2e_importar_partes` | backup em partes, só fotos, cancelar no meio, progresso |
 | `e2e_ajustes` | Integrações com o Home Assistant de mentira (IA, Falar, uso, sensor, Usar IA), Aparência (tema, as 10 cores e a Cor do dia: ligada de início, a cor de cada dia, a virada da meia-noite, escolher uma cor desliga), Opções (zonas), Categorias (tela própria) |
 | `e2e_uso_ia` | painel Uso da IA: dias, barras, tipos, últimas chamadas, links do provedor |
-| `e2e_relatorio` | totais, ordem, fotos (o menu Mais só diz "com fotos" com elas ligadas), zonas, impressão e PDF |
+| `e2e_relatorio` | o padrão dos relatórios dos apps: o cabeçalho (o app, o título, a contagem e quando), os números, os gráficos da tela Gráficos (as partes somam 100%), os cômodos na ordem da casa, as fotos liga/desliga (e o menu Mais só diz "com fotos" com elas ligadas), Baixar PDF (o arquivo do servidor, com as fotos ou sem, na cor do app; não abre a impressão), Mostrar fotos e Baixar PDF do mesmo tamanho, a marca da CorrerIA Code no fim, zonas e a impressão do navegador |
 | `e2e_navegacao` | abas, arrastar para o lado, Voltar, endereços que não existem, atualização vinda de outro aparelho |
 | `e2e_teclado` | N, /, Esc, Ctrl+Enter, setas, Tab preso na janela, foco de volta, Enter nos formulários |
 | `e2e_acessibilidade` | nomes dos botões de ícone, aria-current, janelas com nome, imagens com alt, abas e chaves |

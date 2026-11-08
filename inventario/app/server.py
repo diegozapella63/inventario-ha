@@ -41,10 +41,12 @@ import zlib
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
+
+import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.35.0"
+VERSION = "1.36.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -3440,6 +3442,28 @@ def r_settings_put(h, query):
     h.send_json(STORE.settings)
 
 
+def r_relatorio_pdf(h, query):
+    """Mais > Relatório > Baixar PDF: o relatório para seguro como arquivo (o app do Home Assistant no Android não imprime
+    a página). fotos=0 sem as fotos (o Mostrar fotos da tela); cor e tinta: a cor do app e a do texto em destaque."""
+    um = lambda k, padrao="": (query.get(k) or [padrao])[0]  # noqa: E731
+    fotos = um("fotos", "1") != "0"
+    with STORE.lock:
+        rooms, items = visible_data()
+        d = relatorio.dados(json.loads(json.dumps(rooms)), json.loads(json.dumps(items)), STORE.cat_map(), zonas=zones_enabled(), fotos=fotos)
+
+    def ler(nome):
+        if not nome or not SAFE_FILE.fullmatch(nome):
+            return None
+        for pasta in (THUMBS_DIR, PHOTOS_DIR):
+            p = os.path.join(pasta, nome)
+            if os.path.isfile(p) and os.path.getsize(p) <= 8 * 1024 * 1024:
+                with open(p, "rb") as f:
+                    return f.read()
+        return None
+    body = relatorio.gerar_pdf(d, cor=um("cor"), tinta=um("tinta"), ler_foto=ler)
+    return h.send_bytes(200, body, "application/pdf", {"Content-Disposition": f'attachment; filename="{relatorio.nome_arquivo(d)}"', "Cache-Control": "no-store"})
+
+
 def r_export(h, kind, query):
     day = datetime.now().strftime("%Y-%m-%d")
     if kind == "csv":
@@ -3724,6 +3748,7 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/settings", r_settings_get),
     ("PUT", r"/api/settings", r_settings_put),
     ("GET", r"/api/export\.(csv|json|zip)", r_export),
+    ("GET", r"/api/relatorio\.pdf", r_relatorio_pdf),
     ("GET", r"/api/backups", r_backups),
     ("POST", r"/api/backups", r_backup_create),
     ("POST", r"/api/backups/restore", r_backup_restore),
