@@ -101,11 +101,11 @@ async def body(r, p):
     await pg.locator(".uso-bar").nth(1).click()
     r.eq(" ".join((await pg.text_content(".uso-cap")).split()), f"{label(day(5, now))}: 0 chamadas.", "um dia sem uso: 0 chamadas")
     r.eq(await pg.evaluate("[...document.querySelectorAll('.uso-tipos li')].map(l => l.textContent.trim())"),
-         ["Preencher com IA 6", "Catalogar foto 4", "Buscar foto na internet 3", "Falar 2"], "os tipos dos 7 dias, do mais usado ao menos")
+         ["Preencher com IA 6", "Catalogar itens 4", "Buscar foto na internet 3", "Falar 2"], "os tipos dos 7 dias, do mais usado ao menos")
     r.eq(await pg.evaluate("document.querySelector('.uso-ult').open"), False, "Últimas chamadas começa fechado")
     await pg.click(".uso-ult summary")
     rows = await pg.evaluate("[...document.querySelectorAll('.uso-ult li')].map(li => [li.querySelector('b').textContent, li.querySelector('span').textContent, (li.querySelector('.r-erro') || {}).textContent || '', li.querySelector('.t').textContent])")
-    r.eq([x[:3] for x in rows], [["Preencher com IA", "OpenAI AI Task", ""], ["Catalogar foto", "OpenAI AI Task", "cota excedida"],
+    r.eq([x[:3] for x in rows], [["Preencher com IA", "OpenAI AI Task", ""], ["Catalogar itens", "OpenAI AI Task", "cota excedida"],
                                 ["Buscar foto na internet", "OpenAI AI Task", "sem busca na web"], ["Falar", "OpenAI AI Task", "fora do formato"],
                                 ["Preencher com IA", "OpenAI AI Task", "erro"]], "últimas chamadas: o tipo, a IA pelo nome e o que deu errado")
     hm = lambda t: time.strftime("%H:%M", time.localtime(t))  # noqa: E731
@@ -162,7 +162,7 @@ async def body(r, p):
     r.eq(tile, ["6", "1 vez sem cota"], "e uma sem cota: a cota aparece no lugar do erro")
     await pg.click(".uso-ult summary")
     first = await pg.evaluate("[...document.querySelector('.uso-ult li').children].map(e => e.textContent.trim()).slice(0, 3)")
-    r.eq(first, ["Catalogar foto", "Padrão do Home Assistant", "cota excedida"], "a última chamada fica em primeiro, com a IA padrão")
+    r.eq(first, ["Catalogar itens", "Padrão do Home Assistant", "cota excedida"], "a última chamada fica em primeiro, com a IA padrão")
     await pg.evaluate("document.querySelector('#p-usage').scrollIntoView()")
     await r.shot(pg, "uso-computador")
     await ctx.close()

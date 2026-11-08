@@ -1,4 +1,4 @@
-"""Catalogar foto com IA (enviar, ler, revisar, adicionar, guardar a foto no cômodo, Outra foto) e Falar (microfone de mentira); com a IA desligada, o Falar some."""
+"""Catalogar itens com IA (enviar, ler, revisar, adicionar, guardar a foto no cômodo, Outra foto) e Falar (microfone de mentira); com a IA desligada, o Falar some."""
 import os
 
 from e2e_lib import OVERFLOW, helpers, main

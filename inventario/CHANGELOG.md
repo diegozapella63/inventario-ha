@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.36.3
+
+- **+ Adicionar**: **Adicionar bem** passa para o fim, porque é a única opção que mexe com bens. **Catalogar foto com IA** passa a se chamar **Catalogar itens com IA**, aqui, nos cômodos e no Uso da IA. Fica claro o que é item e o que é bem.
+- Saíram textos que não precisavam estar ali: "Usada nas novidades" em Eletrônicos e "Vale para todos os aparelhos" em Categorias, Usar IA, Usar bens e Usar zonas.
+
 ## 1.36.2
 
 - **Relatório › Baixar PDF** funciona no app do Home Assistant no celular: o PDF vai para a pasta Downloads (aparece nas notificações), com o aviso **Baixando o PDF…**.

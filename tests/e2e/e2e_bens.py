@@ -136,8 +136,8 @@ async def body(r, p):
     await r.open(pg, "#/", ".tag")
     await pg.click(".tabbar .plus")
     await pg.wait_for_selector("[data-go]", timeout=4000)
-    r.eq(await pg.evaluate("[...document.querySelectorAll('[data-go]')].map(b => b.dataset.go)"), ["item", "bem", "catalog", "voice"],
-         "Adicionar: item, bem, catalogar e falar")
+    r.eq(await pg.evaluate("[...document.querySelectorAll('[data-go]')].map(b => b.dataset.go)"), ["item", "catalog", "voice", "bem"],
+         "Adicionar: item, catalogar e falar, e o bem por último")
     await r.shot(pg, "adicionar-menu")
     await pg.click('[data-go="bem"]')
     await pg.wait_for_selector("#f-name")

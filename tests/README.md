@@ -44,7 +44,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | `e2e_organizar` | setas nas pontas, ordem gravada, Início, barra lateral, relatório e outro aparelho |
 | `e2e_zonas` | zonas ligadas do começo ao fim: sugestões, a última zona do cômodo, subtotais, relatório, desligar |
 | `e2e_desfazer` | Desfazer em excluir, mover, foto e dados da internet; avisos empilhados e com janela aberta |
-| `e2e_catalogar_falar` | Catalogar foto com IA de ponta a ponta; Falar com microfone de mentira; IA desligada: sem Falar e Adicionar direto no item; microfone bloqueado |
+| `e2e_catalogar_falar` | Catalogar itens com IA de ponta a ponta; Falar com microfone de mentira; IA desligada: sem Falar e Adicionar direto no item; microfone bloqueado |
 | `e2e_preencher_ia` | Preencher com IA no cadastro: o que preenche, o que fica, sem foto, IA desligada |
 | `e2e_ia_falhas` | a IA falhando (cota, fora do formato, erro, nada) no Catalogar, no Preencher e na busca; Home Assistant fora do ar |
 | `e2e_falar_ha` | Falar com o Home Assistant de mentira: fala para texto escolhida, erros, áudio curto, idioma; sem uma IA que responda, o app separa (e o Adicionar e o painel Falar dizem isso); IA desligada, o Falar some e o servidor recusa |

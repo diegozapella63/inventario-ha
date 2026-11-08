@@ -46,7 +46,7 @@ import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.36.2"
+VERSION = "1.36.3"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -1147,7 +1147,7 @@ def news_notify_target() -> str:
 USAGE_LOCK = threading.Lock()
 USAGE_DAYS = 120
 USAGE_SENSOR = "sensor.inventaria_ia_hoje"
-USAGE_KINDS = ("foto", "catalogo", "busca", "fala")  # Preencher com IA, Catalogar foto, Buscar foto na internet, Falar
+USAGE_KINDS = ("foto", "catalogo", "busca", "fala")  # Preencher com IA, Catalogar itens, Buscar foto na internet, Falar
 _usage_sensor = {"day": None, "checked": 0.0}
 
 

@@ -75,7 +75,7 @@ async def body(r, p):
         ("mover", "#/i/sal-002", 'dialog.sheet [data-act="item-move"]', "#mv-room", "Mover item"),
         ("excluir", "#/i/sal-002", 'dialog.sheet [data-act="item-delete"]', '[data-r="1"]', "Excluir este item?"),
         ("adicionar", "#/", ".tabbar .plus", "[data-go]", "Adicionar"),
-        ("catalogar", "#/c/quarto", '.rhead-actions [data-act="catalog"]', '[data-ct="upload"]', "Catalogar foto com IA"),
+        ("catalogar", "#/c/quarto", '.rhead-actions [data-act="catalog"]', '[data-ct="upload"]', "Catalogar itens com IA"),
         ("editar cômodo", "#/c/sala", '.rhead-actions [data-act="room-edit"]', "#re-name", "Editar cômodo"),
         ("nova categoria", "#/categorias", '[data-act="cat-new"]', "#cn-name", "Nova categoria"),
         ("versões", "#/config", '[data-act="versions"]', "dialog .dlg-b", "Versões anteriores"),

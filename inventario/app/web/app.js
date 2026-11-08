@@ -528,7 +528,7 @@
         ${aiOn() ? `<button type="button" class="chat-top" data-act="chat" aria-label="Conversar com a IA" title="Conversar">${ic("chat")}</button>` : ""}
         ${voiceReady() ? `<button type="button" class="mic-top" data-act="voice" aria-label="Falar: adicionar itens falando" title="Falar">${ic("mic")}</button>` : ""}
         ${r.name !== "room" ? `<div class="top-actions">
-          ${aiOn() ? `<button type="button" class="btn wide" data-act="catalog">${ic("scan")}Catalogar foto com IA</button>` : ""}
+          ${aiOn() ? `<button type="button" class="btn wide" data-act="catalog">${ic("scan")}Catalogar itens com IA</button>` : ""}
           <button type="button" class="btn primary wide" data-act="item-new">${ic("plus")}Adicionar item</button></div>` : ""}
       </div>
       ${up ? `<a class="uplink" href="${up[0]}">${ic("back", "sm")}${up[1]}</a>` : ""}
@@ -744,7 +744,7 @@
       </div>
       <div class="rhead-actions">
         <button type="button" class="btn primary" data-act="item-new" data-room="${esc(id)}" aria-label="Adicionar item">${ic("plus")}<span>Adicionar<span class="lbl-x"> item</span></span></button>
-        ${aiOn() ? `<button type="button" class="btn" data-act="catalog" data-room="${esc(id)}" aria-label="Catalogar foto com IA">${ic("scan")}<span class="lbl">Catalogar foto com IA</span><span class="lbl-short">Catalogar</span></button>` : ""}
+        ${aiOn() ? `<button type="button" class="btn" data-act="catalog" data-room="${esc(id)}" aria-label="Catalogar itens com IA">${ic("scan")}<span class="lbl">Catalogar itens com IA</span><span class="lbl-short">Catalogar</span></button>` : ""}
         <button type="button" class="btn ghost" data-act="room-edit" data-room="${esc(id)}" aria-label="Editar cômodo">${ic("edit")}<span class="lbl">Editar cômodo</span></button>
       </div>
     </section>
@@ -765,7 +765,7 @@
     if (!all.length) {
       return `<div class="empty">${emptyMark()}<h2>Nenhum item aqui ainda</h2>
         <div class="acts"><button class="btn primary" data-act="item-new" data-room="${esc(id)}">${ic("plus")}Adicionar item</button>
-        ${aiOn() ? `<button class="btn" data-act="catalog" data-room="${esc(id)}">${ic("scan")}Catalogar foto com IA</button>` : ""}</div></div>`;
+        ${aiOn() ? `<button class="btn" data-act="catalog" data-room="${esc(id)}">${ic("scan")}Catalogar itens com IA</button>` : ""}</div></div>`;
     }
     const toks = tokens(roomFilter[id] || "");
     const list = toks.length ? all.filter((it) => matches(it, toks)) : all;
@@ -1360,7 +1360,7 @@
     <section class="panel" id="p-ai">
       <h2>${secIc("scan")}IA do Home Assistant</h2>
       <p class="lead">A IA configurada no Home Assistant: Claude, OpenAI, Gemini ou Ollama.</p>
-      <ul class="opts"><li><div class="ot"><b id="ai-on-h">Usar IA</b><span>${on ? "Ler fotos, catalogar e buscar na internet." : "Os botões de IA e o Falar ficam escondidos."} Vale para todos os aparelhos.</span></div>
+      <ul class="opts"><li><div class="ot"><b id="ai-on-h">Usar IA</b><span>${on ? "Ler fotos, catalogar e buscar na internet." : "Os botões de IA e o Falar ficam escondidos."}</span></div>
         <div class="oa">${switchHtml("ai-on", on, "ai-on-h")}</div></li></ul>
       ${on ? `<div data-slot="ai-panel"><p class="muted">Verificando…</p></div>` : ""}
     </section>
@@ -1385,7 +1385,7 @@
 
   // -- uso da IA (igual ao do EconomIA): hoje, 7 dias e o mês, gráfico por dia e as últimas chamadas
   let usageData = null, usageSel = null;
-  const USAGE_KIND = { foto: "Preencher com IA", catalogo: "Catalogar foto", busca: "Buscar foto na internet", fala: "Falar", novidades: "Novidades", triagem: "Escolher equipamentos", chat: "Conversar" };
+  const USAGE_KIND = { foto: "Preencher com IA", catalogo: "Catalogar itens", busca: "Buscar foto na internet", fala: "Falar", novidades: "Novidades", triagem: "Escolher equipamentos", chat: "Conversar" };
   const USAGE_RES = { ok: "", cota: "cota excedida", formato: "fora do formato", sem_busca: "sem busca na web", erro: "erro" };
   const WEEKDAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1549,13 +1549,13 @@
     <section class="panel" id="p-bens">
       <h2>${secIc("home")}Bens</h2>
       <p class="lead">Casa, terreno, carro: o que fica fora de casa.</p>
-      <ul class="opts"><li><div class="ot"><b id="bens-h">Usar bens</b><span>Vale para todos os aparelhos. Desligar não apaga os bens.</span></div>
+      <ul class="opts"><li><div class="ot"><b id="bens-h">Usar bens</b><span>Desligar não apaga os bens.</span></div>
         <div class="oa">${switchHtml("bens-on", bensOn(), "bens-h")}</div></li></ul>
     </section>
     <section class="panel" id="p-zones">
       <h2>${secIc("pin")}Zonas</h2>
       <p class="lead">Partes de um cômodo, como Estante ou Rack da TV.</p>
-      <ul class="opts"><li><div class="ot"><b id="zones-h">Usar zonas</b><span>Vale para todos os aparelhos. Desligar não apaga as zonas.</span></div>
+      <ul class="opts"><li><div class="ot"><b id="zones-h">Usar zonas</b><span>Desligar não apaga as zonas.</span></div>
         <div class="oa">${switchHtml("zones-on", zonesOn(), "zones-h")}</div></li></ul>
     </section>`;
   }
@@ -1564,12 +1564,12 @@
     return `
     <section class="panel" id="p-cats">
       <ul class="opts cats">
-        <li><div class="ot"><b>${plural(CATS.length, "categoria", "categorias")}</b><span>Valem para todos os aparelhos.</span></div>
+        <li><div class="ot"><b>${plural(CATS.length, "categoria", "categorias")}</b></div>
           <div class="oa"><button type="button" class="btn" data-act="cat-new">${ic("plus")}Nova categoria</button></div></li>
         ${CATS.map(([k, v]) => {
           const n = D.catTotals.get(k)?.count || 0;
-          // Eletrônicos é a categoria das novidades: fica sempre, com o mesmo nome
-          if (k === "eletronicos") return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}. Usada nas novidades.</span></div></li>`;
+          // Eletrônicos é a categoria das novidades: fica sempre, com o mesmo nome (sem Renomear nem Excluir)
+          if (k === "eletronicos") return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}</span></div></li>`;
           return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}</span></div>
             <div class="oa"><button type="button" class="btn icon" data-act="cat-edit" data-cat="${esc(k)}" aria-label="Renomear ${esc(v)}">${ic("edit")}</button>
               ${k === "outros" ? `<span class="cat-keep" aria-hidden="true"></span>` : `<button type="button" class="btn icon danger" data-act="cat-del" data-cat="${esc(k)}" aria-label="Excluir ${esc(v)}">${ic("trash")}</button>`}</div></li>`;
@@ -2803,7 +2803,7 @@
       voice, heard: "", rec: "off", secs: 0, level: 0, note: "" };
     let rec = null, recTimer = null;
     const stopRec = () => { clearInterval(recTimer); if (rec) rec.cancel(); rec = null; };
-    const title = voice ? "Falar" : "Catalogar foto com IA";
+    const title = voice ? "Falar" : "Catalogar itens com IA";
     const entry = openDialog({
       cls: "modal wide", label: title,
       html: `<div class="dlg"><div class="dlg-h"><h2>${title}</h2><button type="button" class="btn ghost icon" data-ct="cancel" aria-label="Fechar">${ic("close")}</button></div>
@@ -3010,7 +3010,7 @@
       else if (act === "mic") { if (C.rec === "on") finishRec(); else if (C.rec === "off") startRec(); }
       else if (act === "done") finishRec();
       else if (act === "upload") pickFiles(setFile, { multiple: false });
-      else if (act === "camera") camera(setFile, { title: "Catalogar foto" });
+      else if (act === "camera") camera(setFile, { title: "Catalogar itens" });
       else if (act === "change") { C.file = null; C.step = "photo"; render(); }
       else if (act === "roomphoto") { const [f] = await roomPhotoPicker(C.room); if (f) { C.file = f; C.keep = false; C.step = "ready"; render(); } }
       else if (act === "read") read();
@@ -3277,9 +3277,9 @@
     // Novo cômodo fica na aba Cômodos; aqui só o que entra no inventário
     const opts = [
       ["item", "plus", "Adicionar item", "Com foto e valor, preenchendo os campos"],
-      bensOn() && ["bem", "home", "Adicionar bem", "Casa, terreno, carro: o que fica fora de casa"],
-      aiOn() && ["catalog", "scan", "Catalogar foto com IA", "A IA lista vários itens de uma foto"],
+      aiOn() && ["catalog", "scan", "Catalogar itens com IA", "A IA lista vários itens de uma foto"],
       voiceReady() && ["voice", "mic", "Falar os itens", `Diga o que tem e quanto vale; ${voiceSplit(st)}`],
+      bensOn() && ["bem", "home", "Adicionar bem", "Casa, terreno, carro: o que fica fora de casa"], // por último: o único que é bem, não item
     ].filter(Boolean);
     if (opts.length === 1) { openEditor({ room: rid }); return; } // sem IA e sem Falar: direto no item, sem um menu de uma linha só
     const entry = openDialog({
