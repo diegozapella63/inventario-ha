@@ -29,6 +29,7 @@ import shutil
 import socket
 import ssl
 import struct
+import sys
 import tempfile
 import threading
 import time
@@ -42,11 +43,12 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 
+import ferramentas
 import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.36.3"
+VERSION = "1.37.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -3122,10 +3124,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def dispatch(self, method):
         self._body_read = False
+        self._erro = "error"
         try:
             url = urlparse(self.path)
             path = unquote(url.path)
-            if path.startswith("/api/integracao/"):
+            if path == "/api/integracao/ferramentas":
+                # o CorrerIA (WhatsApp, Claude e Gemini), com a chave de share/inventario/correria.json; os erros em {"erro"}
+                self._erro = "erro"
+                if not (correria_enabled() and CORRERIA.autorizado(self.headers, marcar=False)):
+                    raise ApiError(401, "Chave inválida ou CorrerIA desligado no InventarIA.")
+            elif path.startswith("/api/integracao/"):
                 # outros apps do Home Assistant (ResolvIA) chegam pela rede interna, com a chave de share/inventario
                 if not CONEXAO.autorizado(self.headers):
                     raise ApiError(401, "Chave inválida.")
@@ -3144,13 +3152,13 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(404, "Endereço não encontrado.")
         except ApiError as e:
             self.drain()
-            self.send_json({"error": e.msg, **e.extra}, e.status)
+            self.send_json({self._erro: e.msg, **e.extra}, e.status)
         except (BrokenPipeError, ConnectionResetError):
             self.close_connection = True
         except Exception as e:  # noqa: BLE001
             log.exception("Erro em %s %s", method, self.path)
             self.drain()
-            self.send_json({"error": f"Erro interno: {e}"}, 500)
+            self.send_json({self._erro: f"Erro interno: {e}"}, 500)
 
     def drain(self):
         if not self._body_read and self.command in ("POST", "PUT", "DELETE"):
@@ -3205,13 +3213,15 @@ def r_data(h, query):
     out.update({"version": VERSION, "user": h.user(),
                 "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai_search": STORE.settings.get("ai_search") or "",
                              "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "bens": bens_enabled(), "ha_sensors": sensors_enabled(),
-                             "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target()},
+                             "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target(), "correria": correria_enabled()},
+                "correria_uso": correria_uso() if correria_enabled() else None,
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
     h.send_json(out)
 
 
 def r_rev(h, query):
-    h.send_json({"rev": STORE.data.get("rev")})
+    # correria_uso: a tela mostra quando o CorrerIA usou as ferramentas por último (uma leitura não muda a rev)
+    h.send_json({"rev": STORE.data.get("rev"), "correria_uso": correria_uso() if correria_enabled() else None})
 
 
 def r_health(h, query):
@@ -3418,7 +3428,7 @@ def r_settings_put(h, query):
             if e and not re.fullmatch(rx, e):
                 raise ApiError(400, msg)
             upd[key] = e
-    for key in ("ai", "zones", "ha_sensors", "news", "bens"):
+    for key in ("ai", "zones", "ha_sensors", "news", "bens", "correria"):
         if key in body:
             if not isinstance(body[key], bool):
                 raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
@@ -3437,6 +3447,8 @@ def r_settings_put(h, query):
         STORE.save_settings()
     if "voice_stt" in upd:
         _voice_cache["at"] = 0.0
+    if "correria" in upd:  # grava ou apaga share/inventario/correria.json na hora
+        correria_publicar()
     if "ha_sensors" in upd or "ai" in upd:  # cria ou tira o sensor na hora
         threading.Thread(target=publish_usage_sensor if sensors_enabled() and ai_enabled() else remove_usage_sensor, daemon=True).start()
     h.send_json(STORE.settings)
@@ -3609,14 +3621,25 @@ def r_history_restore(h, query):
 
 # ---------------------------------------------------------------- outros apps
 
+def write_private(path: str, text: str) -> None:
+    """Um arquivo que só o dono lê (600) desde o primeiro byte: as chaves e os arquivos com a chave na pasta share."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.chmod(path, 0o600)  # se já existia com outra permissão
+
+
 class Conexao:
     """Deixa os outros apps da família (ResolvIA) lerem os cômodos, como o GerencIA faz com as contas:
     share/inventario/integracao.json tem o endereço deste app na rede interna dos apps e uma chave;
-    eles chamam /api/integracao/* com essa chave. Só leitura."""
+    eles chamam /api/integracao/* com essa chave. Só leitura.
+    nome separa as conexões, cada uma com a sua chave (integracao: os outros apps; correria: o CorrerIA, em
+    share/inventario/correria.json); campos vai no começo do arquivo."""
 
-    def __init__(self):
-        self.arq_chave = os.path.join(DATA_DIR, "integracao.key")
-        self.arq_share = os.path.join(SHARE_DIR, "integracao.json")
+    def __init__(self, nome="integracao", campos=None):
+        self.arq_chave = os.path.join(DATA_DIR, f"{nome}.key")
+        self.arq_share = os.path.join(SHARE_DIR, f"{nome}.json")
+        self.campos = campos if campos is not None else {"app": "InventarIA"}
         self._chave = None
         self.ultimo = None
 
@@ -3630,10 +3653,8 @@ class Conexao:
             self._chave = ""
         if len(self._chave) < 32:
             self._chave = secrets.token_urlsafe(32)
-            os.makedirs(DATA_DIR, exist_ok=True)
-            with open(self.arq_chave, "w", encoding="utf-8") as f:
-                f.write(self._chave)
-            os.chmod(self.arq_chave, 0o600)
+            os.makedirs(os.path.dirname(self.arq_chave), exist_ok=True)
+            write_private(self.arq_chave, self._chave)
         return self._chave
 
     def endereco(self):
@@ -3647,26 +3668,29 @@ class Conexao:
             ip = None
         return f"http://{host}:{PORT}", ip
 
-    def publicar(self):
+    def publicar(self, ligado=True):
+        """Grava o arquivo que o outro app lê (atômico, só o dono lê) ou, desligado, apaga."""
         try:
+            if not ligado:
+                if os.path.exists(self.arq_share):
+                    os.remove(self.arq_share)
+                return
             url, ip = self.endereco()
-            corpo = {"app": "InventarIA", "versao": VERSION, "url": url, "ip_url": f"http://{ip}:{PORT}" if ip else None,
+            corpo = {**self.campos, "versao": VERSION, "url": url, "ip_url": f"http://{ip}:{PORT}" if ip else None,
                      "chave": self.chave(), "gravado_em": datetime.now().isoformat(timespec="seconds")}
             os.makedirs(SHARE_DIR, exist_ok=True)
             tmp = self.arq_share + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(corpo, f, ensure_ascii=False, indent=1)
-            os.chmod(tmp, 0o600)
+            write_private(tmp, json.dumps(corpo, ensure_ascii=False, indent=1))
             os.replace(tmp, self.arq_share)
         except OSError as e:
             log.warning("Conexão com outros apps: não consegui gravar %s (%s)", self.arq_share, e)
 
-    def autorizado(self, headers) -> bool:
+    def autorizado(self, headers, marcar=True) -> bool:
         h = headers.get("Authorization") or ""
         if not h.startswith("Bearer "):
             return False
         ok = hmac.compare_digest(h[7:].strip().encode(), self.chave().encode())
-        if ok:
+        if ok and marcar:
             self.ultimo = {"app": (headers.get("X-App") or "outro app")[:40], "em": now_iso()}
         return ok
 
@@ -3674,11 +3698,69 @@ class Conexao:
 CONEXAO = Conexao()
 
 
+# O CorrerIA (o contato no WhatsApp e o servidor MCP do Claude e do Gemini) usa as ferramentas daqui (ferramentas.py): lê e
+# grava o inventário. Só com Mais > Configurações > Integrações > CorrerIA ligado (desligado de início; não depende da IA,
+# porque quem pensa é a IA do CorrerIA, o Claude ou o Gemini): grava share/inventario/correria.json com uma chave própria
+# (/data/correria.key); desligado, o arquivo some e a rota responde 401.
+CORRERIA_ASSUNTO = "inventário da casa: cômodos, itens com valor, categorias e os bens (casa, terreno, carro)"
+
+
+def correria_conexao() -> Conexao:
+    return Conexao("correria", {"app": "inventario", "nome": "InventarIA", "assunto": CORRERIA_ASSUNTO,
+                                "ferramentas": "/api/integracao/ferramentas"})
+
+
+CORRERIA = correria_conexao()
+
+
+def correria_enabled() -> bool:
+    return STORE.settings.get("correria") is True
+
+
+def correria_uso() -> dict | None:
+    """O último uso das ferramentas ({app: o cliente, como Claude, em, nome: a ferramenta}), para a tela mostrar quando foi.
+    Fica num arquivo: continua valendo depois de reiniciar ou atualizar o app."""
+    u = read_json_ok(os.path.join(DATA_DIR, "correria_uso.json"))
+    return u if isinstance(u, dict) and u.get("em") else None
+
+
+def correria_publicar():
+    CORRERIA.publicar(correria_enabled())
+
+
 def conexao_loop():
     # regravado a cada 15 minutos: um arquivo velho quer dizer que o InventarIA parou ou saiu
     while True:
         CONEXAO.publicar()
+        correria_publicar()
         time.sleep(15 * 60)
+
+
+def r_ferramentas_lista(h, query):
+    h.send_json({"versao": VERSION, "instrucoes": ferramentas.instrucoes(sys.modules[__name__]), "ferramentas": ferramentas.lista()})
+
+
+def r_ferramentas_usar(h, query):
+    """Uma ferramenta chamada pelo CorrerIA: {nome, argumentos, pessoa, cliente} → {texto}. As de gravar passam pelo Store
+    (a rev sobe, a versão automática, a tela atualiza sozinha). 400: argumento inválido (a IA lê e tenta de novo)."""
+    corpo = h.read_body()
+    nome = str(corpo.get("nome") or "")
+    cliente = " ".join(str(corpo.get("cliente") or "").split())[:40] or "CorrerIA"
+    pessoa = corpo.get("pessoa") if isinstance(corpo.get("pessoa"), dict) else {}
+    try:
+        write_json_atomic(os.path.join(DATA_DIR, "correria_uso.json"), {"app": cliente, "em": now_iso(), "nome": nome[:40]})
+    except OSError:
+        pass
+    try:
+        texto = ferramentas.chamar(sys.modules[__name__], nome, corpo.get("argumentos"), pessoa, cliente)
+    except LookupError as e:
+        raise ApiError(404, str(e)) from None
+    except ferramentas.ErroFerramenta as e:
+        raise ApiError(400, str(e)) from None
+    if ferramentas.POR_NOME[nome]["grava"]:
+        quem = " ".join(str(pessoa.get("nome") or "").split())[:40]
+        log.info("CorrerIA: %s%s %s → %s", cliente, f" ({quem})" if quem else "", nome, texto.split("\n")[0][:160])
+    h.send_json({"texto": texto})
 
 
 def r_integracao_comodos(h, query):
@@ -3713,6 +3795,8 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/health", r_health),
     ("GET", r"/api/integracao/comodos", r_integracao_comodos),
     ("GET", r"/api/integracao/itens", r_integracao_itens),
+    ("GET", r"/api/integracao/ferramentas", r_ferramentas_lista),
+    ("POST", r"/api/integracao/ferramentas", r_ferramentas_usar),
     ("POST", r"/api/items", r_item_create),
     ("POST", r"/api/items/batch", r_items_batch),
     ("PUT", r"/api/items/([A-Za-z0-9_-]+)", r_item_update),

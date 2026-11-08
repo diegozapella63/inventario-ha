@@ -124,7 +124,7 @@ async def body(r, p):
     await r.open(pg, "#/config/integracoes", ".more-tabs")
     await pg.wait_for_timeout(500)
     names = await pg.evaluate("[...document.querySelectorAll('[role=switch]')].map(i => (document.getElementById(i.getAttribute('aria-labelledby')) || {}).textContent)")
-    r.eq(names, ["Usar IA", "Criar os sensores"], "Integrações: Usar IA e Criar os sensores são chaves com nome")
+    r.eq(names, ["Usar IA", "Criar os sensores", "Usar com o CorrerIA"], "Integrações: Usar IA, Criar os sensores e Usar com o CorrerIA são chaves com nome")
     await r.open(pg, "#/config/aparencia", ".more-tabs")
     look = await pg.evaluate("""[document.querySelector('.seg.themes').getAttribute('role'), [...document.querySelectorAll('[data-act=theme]')].map(b => b.getAttribute('aria-pressed')),
       document.querySelector('.swatches').getAttribute('role'), document.getElementById(document.querySelector('.swatches').getAttribute('aria-labelledby')).textContent.trim()]""")

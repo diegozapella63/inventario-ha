@@ -415,7 +415,7 @@ button.chip { font: inherit; font-size: 14.5px; text-align: left; }
 .uso-ult li b { color: var(--ink); font-weight: 600; }
 .uso-ult li .r-erro { color: var(--danger); font-weight: 600; }
 .uso-ult li .t { flex-basis: 100%; font-size: 13px; }
-#p-usage .help { margin: 10px 0 0; max-width: 64ch; font-size: 14px; line-height: 1.5; color: var(--muted); }
+#p-usage .help, #p-correria .help { margin: 10px 0 0; max-width: 64ch; font-size: 14px; line-height: 1.5; color: var(--muted); }
 #p-usage .help a { color: var(--ink-2); }
 @media (prefers-reduced-motion: reduce) { .uso-bar i, .uso-ult summary .ic { transition: none; } }
 

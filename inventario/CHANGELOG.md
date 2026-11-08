@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.37.0
+
+- **Mais > Configurações > Integrações > CorrerIA**: nova chave **Usar com o CorrerIA**, desligada de início. Ligada, o InventarIA aparece no app **CorrerIA**, e o WhatsApp, o Claude e o Gemini passam a ler e mudar o inventário: o resumo da casa, buscar e ver itens, cadastrar, editar, mover e apagar itens e criar cômodos. Não depende do **Usar IA**, porque quem pensa é a IA de lá.
+- Embaixo da chave aparece quem usou por último e quando, como "Claude usou hoje às 9:41".
+- O que muda pelo CorrerIA aparece na tela sozinho. Na ficha, o item cadastrado assim mostra a origem **Pelo CorrerIA** e quem cadastrou.
+- Nada de fotos, backups ou configurações pelo CorrerIA. As fotos continuam pela tela do app.
+
 ## 1.36.3
 
 - **+ Adicionar**: **Adicionar bem** passa para o fim, porque é a única opção que mexe com bens. **Catalogar foto com IA** passa a se chamar **Catalogar itens com IA**, aqui, nos cômodos e no Uso da IA. Fica claro o que é item e o que é bem.

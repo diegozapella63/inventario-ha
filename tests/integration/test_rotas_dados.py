@@ -60,8 +60,8 @@ class DadosDaCasa(DadosCase):
         d, s = self.app.data(), self.app.stored()
         self.assertEqual((d["rev"], d["updatedAt"]), (s["rev"], s["updatedAt"]))
 
-    def test_rev_responde_so_a_revisao(self):
-        self.assertEqual(self.app.ok("GET", "api/rev"), {"rev": self.app.stored()["rev"]})
+    def test_rev_responde_so_a_revisao_e_o_uso_do_correria(self):
+        self.assertEqual(self.app.ok("GET", "api/rev"), {"rev": self.app.stored()["rev"], "correria_uso": None})
 
     def test_versao_igual_na_saude_nos_dados_na_pagina_e_no_config_yaml(self):
         with open(os.path.join(ROOT, "config.yaml"), encoding="utf-8") as f:

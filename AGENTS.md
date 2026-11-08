@@ -20,6 +20,7 @@ inventario/DOCS.md            manual do usuário (aba Documentação no HA)
 inventario/app/server.py      servidor HTTP (Python, só biblioteca padrão): dados, fotos, IA, backups, integração
 inventario/app/web/           a tela: index.html, app.js (JavaScript puro, sem build), style.css, fontes
 inventario/app/relatorio.py   o Relatório do inventário em PDF (Baixar PDF): os números, os gráficos e os cômodos
+inventario/app/ferramentas.py as ferramentas do CorrerIA (WhatsApp, Claude e Gemini): a lista e as regras; grava pelo Store do server.py
 inventario/app/pdf.py         PDF feito à mão (Helvetica, A4, fotos JPG): o mesmo arquivo do GerencIA; ao mudar, copie para lá
 inventario/app/web/selectsheet.js  as caixas de seleção no visual do app: arquivo igual em todos os apps (no ResolvIA e
                               no CronologIA, frontend/src/selectsheet.js); ao mudar, copie para os outros
@@ -79,6 +80,7 @@ Este repositório é público e tem **só código**. O inventário real (itens, 
   - `GET /api/integracao/comodos` → `{versao, comodos: [{id, nome, codigo, itens, tipo?}]}` (`tipo: "bens"` na área Bens, sempre a última)
   - `GET /api/integracao/itens` → `{versao, itens: [{id, nome, comodo, zona, categoria, valor, valor_em}], categorias: {id: nome}}` (até 2000 itens)
 - Quem lê: o **ResolvIA** (cômodos e equipamentos das tarefas) e o **GerencIA** (bens da casa, pelo `valor` e pela data `valor_em`, que muda quando o valor muda). Mudar esse formato exige mudar os outros apps junto.
+- **CorrerIA → InventarIA** (o contrato é o mesmo para todos os apps da família; ver o AGENTS.md do CorrerIA): com **Mais > Configurações > Integrações > CorrerIA** ligado (`settings.correria`, desligado de início, sem depender do Usar IA), este app grava `share/inventario/correria.json` (`app: "inventario"`, `nome`, `assunto`, `url`, `ip_url`, `chave`, `versao`, `ferramentas`, `gravado_em`; 600, atômico; chave própria em `/data/correria.key`, separada da de `integracao.json`); desligado, o arquivo some e a rota responde 401 (`{"erro"}`; chave comparada em tempo constante). `GET /api/integracao/ferramentas` → `{versao, instrucoes, ferramentas: [{nome, titulo, descricao, entrada (JSON Schema), grava, apaga}]}`; `POST` `{nome, argumentos, pessoa, cliente}` → `{texto}` (400 `{erro}` dizendo o que vale; 404 ferramenta desconhecida). As ferramentas (`ferramentas.py`): `resumo`, `buscar_itens`, `ver_item` (pelo id ou pelo código, SAL-003), `cadastrar_itens`, `editar_item`, `mover_itens`, `apagar_item`, `novo_comodo`; gravam pelo `Store` (o número do item, `valueAt`, versões automáticas, `createdBy`/`updatedBy` = a pessoa), com `source: "correria"` (a ficha diz **Pelo CorrerIA**), e respeitam Usar zonas e Usar bens (`visible_data()`). Nada de fotos, backups ou configurações. O último uso (`{app: o cliente, em, nome}`) fica em `/data/correria_uso.json` e vai para a tela em `/api/data` e `/api/rev` (`correria_uso`). Testes: `tests/unit/test_u_ferramentas.py`, `tests/integration/test_correria.py` e `tests/e2e/e2e_correria.py`.
 
 ## Como o dono gosta (interface)
 

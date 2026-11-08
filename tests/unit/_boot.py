@@ -48,6 +48,7 @@ def reset_store():
     server.WEB_JOBS.clear()
     server._usage_sensor.update(day=None, checked=0.0)
     server.CONEXAO = server.Conexao()
+    server.CORRERIA = server.correria_conexao()
 
 
 class UnitBase(unittest.TestCase):

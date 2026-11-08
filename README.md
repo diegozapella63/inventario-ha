@@ -43,6 +43,7 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 - **Exportar** em CSV, JSON ou ZIP com fotos, **backup** na pasta `share/inventario` e versões automáticas a cada 10 minutos de uso.
 - **Importar backup** pelo celular, inclusive dividido em partes.
 - **Nos outros apps da casa**: o [ResolvIA](https://github.com/diegozapella63/resolvia-ha) liga tarefas a cômodos e itens daqui (e o [CronologIA](https://github.com/diegozapella63/cronologia-ha) mostra nas tarefas), e o [GerencIA](https://github.com/diegozapella63/gerencia-ha) soma os itens no patrimônio, como bens. Eles só leem: nada muda aqui.
+- **Pelo WhatsApp, pelo Claude e pelo Gemini**, com o [CorrerIA](https://github.com/diegozapella63/correria-ha) (se você ligar): ver o resumo, buscar, cadastrar, editar, mover e apagar itens, com as mesmas regras da tela.
 - **Celular e computador**: no celular, arrastar para o lado troca de aba; no computador, barra lateral com os cômodos e atalhos de teclado.
 - **Tema claro e escuro** e **cor do app**: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza, ou a **Cor do dia**, que muda todo dia.
 - **Sobre** (no fim do menu Mais): quem faz o app e os outros apps da família, cada um com o link para o GitHub.

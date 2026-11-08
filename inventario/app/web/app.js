@@ -16,7 +16,7 @@
     CATS = Array.isArray(list) && list.length ? list.map((c) => [c.id, c.name]) : DEFAULT_CATS;
     CAT = Object.fromEntries(CATS);
   }
-  const SOURCES = { foto: "Catalogado por foto", informado: "Valor informado", ia: "Leitura por IA", voz: "Cadastro por voz", manual: "Cadastro manual" };
+  const SOURCES = { foto: "Catalogado por foto", informado: "Valor informado", ia: "Leitura por IA", voz: "Cadastro por voz", manual: "Cadastro manual", correria: "Pelo CorrerIA" };
   const ORDERS = [["rel", "Mais relevantes"], ["val", "Maior valor"], ["valasc", "Menor valor"], ["az", "Nome, de A a Z"], ["new", "Mais recentes"], ["code", "Código"]];
   const PREVIEW = !!window.INV_PREVIEW;
   const COARSE = window.matchMedia("(pointer: coarse)").matches;
@@ -158,6 +158,7 @@
   const BENS_GROUPS = [["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["", "Outros"]];
   const bensGroup = (it) => (it.cat === "imoveis" || it.cat === "veiculos" ? it.cat : "");
   const bensOn = () => S.settings.bens !== false; // Mais > Configurações > Opções > Usar bens (desligar não apaga)
+  const correriaOn = () => S.settings.correria === true; // Mais > Configurações > Integrações > CorrerIA (desligado de início)
   function derive() {
     const sorted = [...S.rooms].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const area = sorted.find((r) => r.kind === "bens") || null, bens = bensOn() ? area : null;
@@ -257,6 +258,7 @@
     Object.assign(S, {
       rooms: d.rooms || [], items: d.items || [], rev: d.rev || 0, updatedAt: d.updatedAt, user: d.user || null,
       version: d.version || "", features: d.features || {}, settings: d.settings || {}, loaded: true, error: null, stale: false,
+      correriaUso: d.correria_uso || null,
     });
     applyCats(d.cats);
     derive();
@@ -1380,7 +1382,23 @@
         ? '<span class="codepath">sensor.inventaria_ia_hoje</span>, com as chamadas de IA de hoje.'
         : "As chamadas de IA de hoje, para painéis e automações."}</span></div>
         <div class="oa">${switchHtml("sensors-on", sensorsOn(), "sensors-h")}</div></li></ul>
-    </section>` : ""}`;
+    </section>` : ""}
+    <section class="panel" id="p-correria">
+      <h2>${secIc("flash")}CorrerIA</h2>
+      <ul class="opts"><li><div class="ot"><b id="correria-h">Usar com o CorrerIA</b><span>${correriaOn()
+        ? "Ligado: pelo WhatsApp, o Claude e o Gemini leem e mudam o inventário."
+        : "Para o WhatsApp, o Claude e o Gemini lerem e mudarem o inventário."}</span></div>
+        <div class="oa">${switchHtml("correria-on", correriaOn(), "correria-h")}</div></li></ul>
+      ${correriaOn() ? `<p class="help" data-slot="correria-uso">${esc(correriaUsoTxt())}</p>` : ""}
+    </section>`;
+  }
+  // CorrerIA (o contato no WhatsApp e o servidor MCP do Claude e do Gemini) usa as ferramentas do servidor (ferramentas.py),
+  // sem a IA daqui: não depende do Usar IA. A linha diz quem usou por último (o cliente do último pedido) e quando.
+  function correriaUsoTxt() {
+    const u = S.correriaUso, d = u && u.em ? new Date(u.em) : null;
+    if (!d || Number.isNaN(d.getTime())) return "Ainda não foi usado. Conecte no app CorrerIA.";
+    const k = ymd(d), dia = k === ymd(new Date()) ? "hoje" : k === ymd(new Date(Date.now() - 864e5)) ? "ontem" : `em ${ddmm(k)}`;
+    return `${u.app || "CorrerIA"} usou ${dia} às ${d.toLocaleTimeString("pt-BR", { hour: "numeric", minute: "2-digit" })}.`;
   }
 
   // -- uso da IA (igual ao do EconomIA): hoje, 7 dias e o mês, gráfico por dia e as últimas chamadas
@@ -3632,8 +3650,8 @@
           : val ? `Avisar: ${val === "todos" ? "todos" : (newsPeople || []).find((x) => x.id === val)?.name || "ligado"}` : "Sem aviso das novidades");
       } catch (er) { fail(er); renderView(false); }
     }
-    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on" || k === "bens-on") {
-      const key = { "ai-on": "ai", "zones-on": "zones", "news-on": "news", "bens-on": "bens" }[k] || "ha_sensors", on = t.checked;
+    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on" || k === "bens-on" || k === "correria-on") {
+      const key = { "ai-on": "ai", "zones-on": "zones", "news-on": "news", "bens-on": "bens", "correria-on": "correria" }[k] || "ha_sensors", on = t.checked;
       t.disabled = true;
       try {
         await API.put("api/settings", { [key]: on });
@@ -3645,6 +3663,7 @@
           : key === "ha_sensors" ? (on ? "Sensor criado no Home Assistant" : "Sensores desligados: o sensor saiu do Home Assistant")
           : key === "news" ? (on ? "Novidades ligadas" : "Novidades desligadas")
           : key === "bens" ? (on ? "Bens ligados" : "Bens desligados: os bens gravados continuam guardados")
+          : key === "correria" ? (on ? "CorrerIA ligado" : "CorrerIA desligado")
           : on ? "Zonas ligadas" : "Zonas desligadas: as zonas gravadas continuam guardadas");
       } catch (er) { t.checked = !on; fail(er); }
       finally { t.disabled = false; }
@@ -3730,6 +3749,11 @@
     if (document.hidden || !S.loaded || PREVIEW) return;
     try {
       const r = await API.get("api/rev");
+      if (r && "correria_uso" in r) { // o CorrerIA leu algo (uma leitura não muda a rev): a linha de Integrações diz quando
+        S.correriaUso = r.correria_uso || null;
+        const el = $('#view [data-slot="correria-uso"]');
+        if (el) el.textContent = correriaUsoTxt();
+      }
       if (r && r.rev !== S.rev) {
         if (stack.some((m) => !m.routed)) { S.stale = true; return; }
         await loadData();
