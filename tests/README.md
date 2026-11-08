@@ -59,6 +59,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | `e2e_mais` | o menu Mais (Bens, Gráficos, Novidades, Categorias, Relatório, Configurações, Sobre), Voltar, endereços antigos; Configurações: abas, botões 280×44 alinhados, exportar CSV/JSON/ZIP, backup e restaurar, versões, importar |
 | `e2e_sobre` | Mais > Sobre, a última linha do menu: CorrerIA Code, por que CorrerIA, os sete apps (cada um para o seu GitHub, com o IA em destaque e uma linha; o InventarIA com "Este app" e a versão), Meu GitHub, os 8 links abrindo fora, Voltar e ‹ Mais de volta ao menu, 320 e 390 px e computador, claro e escuro |
 | `e2e_selecao` | as caixas de seleção (`web/selectsheet.js`, igual nos outros apps): tocar abre a janela do app (não a do celular), título, opções, a atual marcada, cores do app no claro e no escuro; escolher filtra a busca e grava a IA; Voltar, X e tocar fora fecham só ela; numa tela de Configurações, o Voltar seguinte é o do app; no computador, no meio e pelo teclado |
+| `e2e_selecao_janela` | As caixas de seleção dentro de uma janela (Editar item, Mover): a folha das opções abre por cima, muda o valor pelo toque e pelo clique; o Voltar e o Esc fecham só a folha |
 | `e2e_backups` | lista de backups, restaurar um antigo, pasta share indisponível |
 | `e2e_versoes` | versões anteriores: nenhuma, várias, os motivos, restaurar cada uma |
 | `e2e_importar_partes` | backup em partes, só fotos, cancelar no meio, progresso |

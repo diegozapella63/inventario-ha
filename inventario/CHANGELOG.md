@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.38.4
+
+- Corrigido: no **Editar item** e no **Mover**, o **Cômodo** e a **Categoria** não mudavam. A janela das opções abria atrás da janela do item e não recebia o toque. Agora abre por cima, e o Voltar do celular fecha só ela.
+
 ## 1.38.3
 
 - **Mais › Sobre**: a CorrerIA agora é descrita como o chat com todos os apps (pergunte e peça, também pelo WhatsApp).

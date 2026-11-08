@@ -25,6 +25,8 @@
   const STYLE = `
 select:not([multiple]){pointer-events:none}
 .ss-wrap{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:flex-end;justify-content:center;font-family:var(--ss-font);-webkit-tap-highlight-color:transparent}
+dialog.ss-wrap{width:auto;height:auto;max-width:none;max-height:none;margin:0;padding:0;border:0;background:transparent;color:inherit;overflow:visible}
+dialog.ss-wrap::backdrop{background:transparent}
 .ss-back{position:absolute;inset:0;background:var(--ss-scrim);opacity:0;transition:opacity .18s}
 .ss-sheet{position:relative;width:100%;max-width:560px;max-height:min(72vh,640px);display:flex;flex-direction:column;background:var(--ss-bg);color:var(--ss-fg);border-radius:28px 28px 0 0;box-shadow:0 -8px 32px rgba(0,0,0,.25);transform:translateY(100%);transition:transform .2s cubic-bezier(.2,.8,.2,1);padding-bottom:env(safe-area-inset-bottom)}
 .ss-wrap.out{pointer-events:none}
@@ -136,9 +138,22 @@ select:not([multiple]){pointer-events:none}
     return "";
   }
 
+  // a box inside a modal window (<dialog> opened with showModal: on top of everything, the rest of the page inert)
+  function inModal(sel) {
+    const d = sel.closest ? sel.closest("dialog") : null;
+    if (!d || !d.open) return false;
+    try {
+      return d.matches(":modal");
+    } catch {
+      return true;
+    }
+  }
+
   function open(sel) {
     if (cur || !sel || sel.disabled || sel.multiple) return;
-    const wrap = document.createElement("div");
+    // in a modal window, the sheet is a modal window too: only then is it on top of it and gets the touches
+    const modal = inModal(sel);
+    const wrap = document.createElement(modal ? "dialog" : "div");
     wrap.className = "ss-wrap";
     for (const [k, v] of Object.entries(look(sel))) wrap.style.setProperty(k, v);
     const title = titleOf(sel);
@@ -178,11 +193,21 @@ select:not([multiple]){pointer-events:none}
     wrap.append(back, sheet);
     document.body.appendChild(wrap);
     cur = { sel, wrap, pending: null, closing: false };
+    if (modal) {
+      try {
+        wrap.showModal();
+      } catch {}
+      wrap.addEventListener("cancel", (e) => {
+        e.preventDefault();
+        close();
+      });
+    }
     back.addEventListener("click", () => close());
     sheet.querySelector(".ss-x").addEventListener("click", () => close());
     wrap.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        e.stopPropagation(); // only the sheet closes, not the window under it
         close();
       } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         const opts = [...list.querySelectorAll(".ss-opt:not(:disabled)")];
@@ -216,6 +241,7 @@ select:not([multiple]){pointer-events:none}
     const finish = () => {
       if (cur !== done) return;
       cur = null;
+      if (done.wrap.open) done.wrap.close(); // out of the top layer: the box under it can take the focus again
       done.wrap.classList.remove("in");
       done.wrap.classList.add("out");
       setTimeout(() => done.wrap.remove(), 220);
