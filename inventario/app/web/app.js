@@ -1018,7 +1018,7 @@
     ["InventarIA", "inventario-ha", "package", "Inventário da casa: cômodos, itens e valores."],
     ["EconomIA", "economia-ha", "receipt", "Lista de compras com o melhor preço perto de casa."],
     ["MemorIA", "memoria-ha", "book", "Cadernos de anotação que abrem na hora certa."],
-    ["CorrerIA", "correria-ha", "chat", "O contato no WhatsApp: os apps respondem por lá."],
+    ["CorrerIA", "correria-ha", "chat", "Pergunte e peça a qualquer app, no chat ou no WhatsApp."],
   ];
   const wordmark = (n) => `<span class="ab-wm">${esc(n.slice(0, -2))}<span>${esc(n.slice(-2))}</span></span>`; // o "IA" na cor do app, sem quebrar o nome
   const outLink = (href, body, cls) => `<a class="${cls}" href="${href}" target="_blank" rel="noopener">${body}</a>`;

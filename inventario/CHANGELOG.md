@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.38.3
+
+- **Mais › Sobre**: a CorrerIA agora é descrita como o chat com todos os apps (pergunte e peça, também pelo WhatsApp).
+
 ## 1.38.2
 
 - **Mais › Novidades**: a janela das novidades de um item ganha **Ver item**, que abre a ficha dele. O Voltar do celular volta para as Novidades. O **Fechar** saiu: o X no alto e o Voltar fecham.
