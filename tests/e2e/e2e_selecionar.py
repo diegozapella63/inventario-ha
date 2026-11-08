@@ -84,6 +84,19 @@ async def body(r, p):
     await pg.wait_for_timeout(400)
     r.check(await pg.locator(".selbar").count() == 0 and await pg.locator('[data-act="sel-start"]').count() == 1, "o Voltar sai do Selecionar")
     r.check("#/buscar" in pg.url, "e fica no Buscar")
+
+    # segurar o dedo num item (o contextmenu do celular) começa o Selecionar com ele marcado, sem abrir a ficha
+    await r.open(pg, "#/buscar?cat=moveis", ".ssum")
+    primeiro = await pg.locator("#results a.irow").first.get_attribute("href")
+    await pg.locator("#results a.irow").first.click(button="right")
+    await pg.wait_for_selector(".selbar")
+    r.eq(await pg.evaluate(PRESSED), [primeiro.split("/")[-1]], "segurar: começa o Selecionar com o item marcado")
+    r.check("#/i/" not in pg.url, "e não abre a ficha")
+    await pg.locator(".irow.selr").nth(1).click(button="right")
+    await pg.wait_for_timeout(300)
+    r.eq(len(await pg.evaluate(PRESSED)), 1, "já selecionando, segurar não muda nada (o toque marca)")
+    await pg.click('[data-act="sel-end"]')
+    await pg.wait_for_timeout(300)
     await ctx.close()
 
     # zonas ligadas: Zona de vários (e tirar a zona); celular estreito sem passar da largura
@@ -127,6 +140,9 @@ async def body(r, p):
     ctx, pg = await r.page(b, "cel", "light")
     await r.open(pg, "#/buscar?q=carro", ".ssum")
     r.eq(await pg.locator('[data-act="sel-start"]').count(), 0, "só bens na lista: sem Selecionar")
+    await pg.locator("#results a.irow").first.click(button="right")
+    await pg.wait_for_timeout(300)
+    r.eq(await pg.locator(".selbar").count(), 0, "segurar um bem não começa o Selecionar")
     await r.open(pg, "#/buscar", ".ssum")
     await pg.click('[data-act="sel-start"]')
     await pg.wait_for_selector(".selbar")

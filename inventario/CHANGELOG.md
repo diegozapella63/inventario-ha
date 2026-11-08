@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.39.1
+
+- **Buscar**: segurar o dedo num item começa o **Selecionar** com ele marcado, como no ResolvIA.
+
 ## 1.39.0
 
 - **Buscar › Selecionar**: muda vários itens de uma vez. Toque nos itens, ou em **Selecionar todos** para a lista inteira, e embaixo em **Cômodo**, **Categoria** ou **Zona** (com as zonas ligadas). O aviso tem **Desfazer**. Em outro cômodo, cada item ganha um código novo e fica sem zona. Os bens ficam de fora. O Voltar do celular ou **Cancelar** saem do Selecionar.

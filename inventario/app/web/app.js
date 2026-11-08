@@ -900,11 +900,24 @@
     const all = $('#view [data-input="sel-all"]');
     if (all) all.indeterminate = !!all.dataset.mixed;
   }
-  function selStart() {
-    SEL = new Set();
+  function selStart(first = null) {
+    SEL = new Set(first ? [first] : []);
     try { history.pushState({ ...(history.state || {}), invSel: 1 }, ""); } catch { /* sem histórico */ }
     selRender();
   }
+  // segurar o dedo num item do Buscar começa o Selecionar com ele marcado, como no ResolvIA (no celular, segurar é o
+  // contextmenu; o menu do link não abre)
+  document.addEventListener("contextmenu", (e) => {
+    if (base.name !== "search") return;
+    const row = e.target.closest && e.target.closest("#results .irow");
+    if (!row) return;
+    const id = row.dataset.id || decodeURIComponent((row.getAttribute("href") || "").split("/").pop());
+    const it = D.itemById.get(id);
+    if (!it || isBens(it.room)) return;
+    e.preventDefault();
+    try { navigator.vibrate && navigator.vibrate(12); } catch { /* sem vibração */ }
+    if (!SEL) selStart(id); // já selecionando, o toque marca e desmarca
+  });
   function selEnd() {
     if (history.state && history.state.invSel) { history.back(); return; } // o popstate abaixo sai
     SEL = null; selRender();

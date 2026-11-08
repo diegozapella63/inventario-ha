@@ -649,6 +649,7 @@ div.croom:hover { background: none; }
 .ssum.sel { align-items: center; }
 .ssum.sel .check { flex: 1; min-width: 0; color: var(--ink); font-weight: 600; }
 .ssum.sel .btn { margin: -8px -6px -8px 0; }
+#results .irow { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } /* segurar o dedo começa o Selecionar */
 button.irow { width: 100%; font: inherit; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .irow.selr[aria-pressed="true"] { background: var(--tag-soft); }
 .irow.selr:disabled { opacity: 0.45; cursor: default; }
