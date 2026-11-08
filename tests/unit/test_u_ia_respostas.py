@@ -48,10 +48,13 @@ class InstrucoesCatalogo(UnitBase):
         self.assertIn("Ignore paredes, piso, tomadas, interruptores, embalagens vazias", p)
         self.assertIn("Junte objetos iguais num item só, com a quantidade.", p)
 
-    def test_catalogo_sem_comodo_nao_traz_comodo_nem_itens(self):
+    def test_catalogo_sem_comodo_lista_a_casa_para_a_ia_escolher(self):
         p = S.ai_prompt("multi", None, "")
         self.assertNotIn("Cômodo:", p)
-        self.assertNotIn("Itens já cadastrados", p)
+        self.assertNotIn("Itens já cadastrados neste cômodo", p)
+        self.assertIn("Cômodos da casa (id = nome):\n- sala = Sala de estar. Itens já cadastrados: " + "; ".join(SALA_POR_VALOR) + ".", p)
+        self.assertIn('Responda também "room", ao lado de "items": o id do cômodo que a foto mostra', p)
+        self.assertIn('{"room":"","items":[', p)
 
     def test_catalogo_lista_os_itens_do_mais_caro_para_o_mais_barato(self):
         p = S.ai_prompt("multi", self.store.room("sala"), "")
@@ -94,9 +97,11 @@ class InstrucoesCatalogo(UnitBase):
 class InstrucoesFala(UnitBase):
     def test_fala_lista_os_seis_comodos_na_ordem_da_casa(self):
         p = S.ai_prompt("voice", None, "", "um sofá")
-        self.assertIn("Cômodos da casa (id = nome): sala = Sala de estar; cozinha = Cozinha; quarto = Quarto; "
-                      "escritorio = Escritório; lavanderia = Lavanderia; varanda = Varanda.", p)
-        self.assertIn('responda também "room" com o id desse cômodo', p)
+        linhas = [ln.split(".")[0] for ln in p.split("Cômodos da casa (id = nome):\n")[1].split("\n\n")[0].splitlines()]
+        self.assertEqual(linhas, ["- sala = Sala de estar", "- cozinha = Cozinha", "- quarto = Quarto", "- escritorio = Escritório",
+                                  "- lavanderia = Lavanderia", "- varanda = Varanda"])
+        self.assertIn('- "room": o id do cômodo onde o item fica', p)
+        self.assertIn("geladeira na cozinha", p, "sem cômodo escolhido, a IA escolhe pelo objeto")
 
     def test_fala_em_casa_sem_comodos_nao_pede_o_comodo(self):
         self.store.data["rooms"] = []
@@ -245,9 +250,9 @@ class ItensLimpos(UnitBase):
         self.assertEqual(len(out), 1, "o item devia ter passado")
         return out[0]
 
-    def test_saida_tem_sempre_os_oito_campos(self):
+    def test_saida_tem_sempre_os_nove_campos(self):
         out = self.limpa({"name": "Banco", "preco": 10, "marca": "X", "serial": "abc"})
-        self.assertEqual(sorted(out), ["cat", "confidence", "details", "existing", "name", "qty", "value", "zone"], "campos a mais ficam de fora")
+        self.assertEqual(sorted(out), ["cat", "confidence", "details", "existing", "name", "qty", "room", "value", "zone"], "campos a mais ficam de fora")
 
     def test_nome_vazio_so_espacos_ou_ausente_sai(self):
         out = S.clean_ai_items({"items": [{"name": ""}, {"name": "   "}, {"name": None}, {"details": "sem nome"}, {"name": "Banco"}]}, None)

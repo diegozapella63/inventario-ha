@@ -93,7 +93,8 @@ class Simulada(IaCase):
         out = self.app.ok("POST", "api/ai/identify", {"file": "sala-1.jpg", "mode": "single", "room": "sala"})
         self.assertEqual(out["entity"], "ai_task.simulado")
         self.assertEqual(len(out["items"]), 1)
-        self.assertEqual(set(out["items"][0]), {"name", "details", "cat", "qty", "value", "zone", "existing", "confidence"})
+        self.assertEqual(set(out["items"][0]), {"name", "details", "cat", "qty", "value", "zone", "room", "existing", "confidence"})
+        self.assertEqual((out["items"][0]["room"], out["room"]), ("sala", "sala"), "o cômodo de onde abriu")
         self.assertEqual(out["items"][0]["name"], "Luminária de mesa articulada preta")
 
     def test_modo_desconhecido_vira_catalogar_e_conta_no_uso(self):
@@ -127,6 +128,16 @@ class Simulada(IaCase):
         self.assertEqual(out["room"], "")
         self.assertEqual([(i["name"], i["value"], i["qty"]) for i in out["items"]],
                          [("Sofá cinza de três lugares", 2000, "1"), ("Televisão Samsung 55 polegadas", 3000, "1"), ("Luminária de chão", 300, "2")])
+        self.assertEqual([i["room"] for i in out["items"]], ["sala", "sala", ""], "a IA (simulada) põe cada item no seu cômodo; a luminária fica para a pessoa")
+
+    def test_sem_comodo_a_ia_escolhe_e_o_escolhido_vale(self):
+        out = self.app.ok("POST", "api/ai/identify", {"file": "escritorio-1.jpg", "mode": "multi"})
+        self.assertEqual(out["room"], "escritorio", "sem cômodo, a IA (simulada) diz o da foto")
+        self.assertEqual({i["room"] for i in out["items"]}, {"escritorio"})
+        out = self.app.ok("POST", "api/ai/identify", {"file": "escritorio-1.jpg", "mode": "multi", "room": "quarto"})
+        self.assertEqual({i["room"] for i in out["items"]} | {out["room"]}, {"quarto"}, "o cômodo escolhido vale")
+        out = self.app.ok("POST", "api/ai/text", {"text": "um sofá e uma luminária", "room": "quarto"})
+        self.assertEqual([i["room"] for i in out["items"]], ["sala", "sala", "quarto"], "na fala, o cômodo dito vale; o resto vai para o escolhido")
 
     def test_texto_falado_conta_como_fala(self):
         antes = self.uso()["today"]["kinds"].get("fala", 0)

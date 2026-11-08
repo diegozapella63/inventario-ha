@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.38.0
+
+- **Falar** não pergunta mais o cômodo: a IA conhece os cômodos da casa e põe cada item no seu, pelo que você falou ("na sala", "e na cozinha a batedeira") ou pelo objeto (a geladeira vai para a cozinha). Na hora de conferir, cada item mostra o cômodo; o que a IA não souber vem com **Qual cômodo?** para você escolher. O **Cômodo** do alto muda todos de uma vez.
+- **Catalogar itens com IA**: fora de um cômodo, o **Cômodo** vem em **A IA escolhe**, e a IA reconhece o cômodo pela foto. Se não souber, você escolhe na hora de conferir.
+- **+ Adicionar** na aba **Cômodos** e dentro de um cômodo mostra só o que é item: **Adicionar bem** fica no Início e nas outras telas.
+
 ## 1.37.0
 
 - **Mais > Configurações > Integrações > CorrerIA**: nova chave **Usar com o CorrerIA**, desligada de início. Ligada, o InventarIA aparece no app **CorrerIA**, e o WhatsApp, o Claude e o Gemini passam a ler e mudar o inventário: o resumo da casa, buscar e ver itens, cadastrar, editar, mover e apagar itens e criar cômodos. Não depende do **Usar IA**, porque quem pensa é a IA de lá.

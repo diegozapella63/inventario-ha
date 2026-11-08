@@ -646,7 +646,7 @@ class ItensFalados(Base):
         S.ai_from_speech({"text": "  sofá cinza de dois mil  "})
         instr = self.instrucoes()
         self.assertTrue(instr.endswith("O que a pessoa falou:\nsofá cinza de dois mil"))
-        self.assertIn("Cômodos da casa (id = nome): sala = Sala de estar; cozinha = Cozinha;", instr)
+        self.assertIn("Cômodos da casa (id = nome):\n- sala = Sala de estar.", instr)
         self.assertEqual(self.ha.calls("POST", "/core/api/services/ai_task")[-1]["body"]["task_name"], "InventarIA: itens falados")
 
     def test_comodo_escolhido_vai_nas_instrucoes(self):

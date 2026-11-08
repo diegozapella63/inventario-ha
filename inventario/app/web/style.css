@@ -822,8 +822,8 @@ details.more-fields .form { margin-top: 14px; }
 .found .fcheck { width: 22px; height: 22px; margin: 10px 0 0; accent-color: var(--ink); }
 .found .fbody { display: grid; gap: 8px; min-width: 0; }
 .found .frow { display: grid; grid-template-columns: minmax(0, 1fr) 76px 120px; gap: 8px; }
-.found .frow2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
-.found .frow2.one { grid-template-columns: minmax(0, 1fr); }
+.found .frow2 { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+.select.need { border-color: var(--warn-edge); background-color: var(--warn-soft); }
 .found .input, .found .select { height: 38px; font-size: 15px; }
 .found .money .input { font-size: 16px; padding-left: 34px; }
 .found .money::before { left: 10px; font-size: 14px; }
@@ -834,7 +834,7 @@ details.more-fields .form { margin-top: 14px; }
 @media (max-width: 560px) {
   .found .frow { grid-template-columns: 1fr 1fr; }
   .found .frow .fname { grid-column: span 2; }
-  .found .frow2 { grid-template-columns: 1fr; }
+  .found .frow2 { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }
 }
 
 /* visualizador de fotos */

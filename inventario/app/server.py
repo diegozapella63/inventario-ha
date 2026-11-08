@@ -48,7 +48,7 @@ import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.37.0"
+VERSION = "1.38.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -1342,6 +1342,25 @@ Responda somente com JSON válido, sem markdown e sem texto antes ou depois, nes
 {{"items":[{{"name":"","details":"","cat":"","qty":"1","value":0,"zone":"","existing":"","confidence":"media"}}]}}"""
 
 
+def ai_house() -> list[tuple[dict, list[dict]]]:
+    """Os cômodos da casa (sem a área Bens, que não é cômodo) e os itens de cada um, do mais caro para o mais barato."""
+    with STORE.lock:
+        rooms = [r for r in STORE.data["rooms"] if r.get("kind") != "bens"]
+        its = list(STORE.data["items"])
+    return [(r, sorted((i for i in its if i["room"] == r["id"]), key=lambda i: -(i.get("value") or 0))) for r in rooms]
+
+
+def ai_room_id(v) -> str:
+    """O cômodo que a IA respondeu (o id ou o nome) se for um cômodo da casa, ou "" (a pessoa escolhe na revisão)."""
+    v = v.strip() if isinstance(v, str) else ""
+    if not v:
+        return ""
+    with STORE.lock:
+        rooms = [r for r in STORE.data["rooms"] if r.get("kind") != "bens"]
+    r = next((r for r in rooms if r["id"] == v), None) or next((r for r in rooms if r["name"].casefold() == v.casefold()), None)
+    return r["id"] if r else ""
+
+
 def ai_prompt(mode: str, room: dict | None, hint: str, spoken: str = "") -> str:
     cats = ", ".join(f"{k} ({v})" for k, v in STORE.cat_map().items())
     parts = ["Você ajuda a catalogar o inventário de uma casa no Brasil, para controle de patrimônio e seguro."]
@@ -1361,14 +1380,22 @@ def ai_prompt(mode: str, room: dict | None, hint: str, spoken: str = "") -> str:
     use_zones = zones_enabled()
     if not use_zones:  # zonas desligadas: a IA nem pergunta onde fica o item
         rules = "\n".join(ln for ln in rules.splitlines() if not ln.startswith('- "zone"')).replace('"zone":"",', "")
+    # o cômodo: quem fala pode citar um cômodo para cada item; sem cômodo escolhido, a IA escolhe (a da foto, pelo que ela mostra);
+    # se não der para saber, "" e a pessoa escolhe na revisão
+    house = ai_house() if mode != "single" else []
+    if mode == "voice" and house:
+        guess = ('o cômodo onde esse objeto claramente fica (ex.: geladeira na cozinha); "" se não der para saber com segurança' if not room
+                 else '""')
+        rules = rules.replace('- "existing"', '- "room": o id do cômodo onde o item fica, da lista de cômodos abaixo: o que a pessoa disse '
+                              f'para ele (ou para todos); se ela não disse, {guess}.\n- "existing"', 1).replace('"existing":""', '"room":"","existing":""')
+    elif mode != "single" and house and not room:
+        rules += ('\nResponda também "room", ao lado de "items": o id do cômodo que a foto mostra, da lista de cômodos abaixo, '
+                  'se der para reconhecer com segurança pelos móveis e objetos; senão "".')
+        rules = rules.replace('{"items":[', '{"room":"","items":[')
     parts.append(rules)
-    if mode == "voice":
-        with STORE.lock:
-            rooms = [(r["id"], r["name"]) for r in STORE.data["rooms"]]
-        if rooms:
-            parts.append("Cômodos da casa (id = nome): " + "; ".join(f"{i} = {n}" for i, n in rooms) + ". Se a pessoa disse em que cômodo "
-                         'estão os itens, responda também "room" com o id desse cômodo, ao lado de "items"; se não disse, "room": "".')
     if room:
+        if mode == "voice" and house:
+            parts.append("Cômodos da casa (id = nome): " + "; ".join(f"{r['id']} = {r['name']}" for r, _ in house) + ".")
         with STORE.lock:
             its = [i for i in STORE.data["items"] if i["room"] == room["id"]]
             zones = sorted({i.get("zone") for i in its if i.get("zone")})
@@ -1378,6 +1405,17 @@ def ai_prompt(mode: str, room: dict | None, hint: str, spoken: str = "") -> str:
             parts.append("Zonas já usadas neste cômodo (prefira uma delas): " + "; ".join(zones) + ".")
         if names and mode != "single":
             parts.append("Itens já cadastrados neste cômodo: " + "; ".join(names) + ".")
+    elif house:
+        lines = []
+        for r, its in house:
+            ln = f"- {r['id']} = {r['name']}."
+            zones = sorted({i.get("zone") for i in its if i.get("zone")})
+            if zones and use_zones:
+                ln += " Zonas: " + "; ".join(zones) + "."
+            if its:
+                ln += " Itens já cadastrados: " + "; ".join(i["name"] for i in its[:60]) + "."
+            lines.append(ln)
+        parts.append("Cômodos da casa (id = nome):\n" + "\n".join(lines))
     if hint:
         parts.append(f"Dica de quem está cadastrando: {hint}")
     if spoken:
@@ -1406,16 +1444,23 @@ def extract_json(raw) -> dict:
     raise ApiError(502, "Não deu para entender a resposta da IA. Tente de novo.", raw=s[:2000])
 
 
-def clean_ai_items(parsed, room: dict | None) -> list[dict]:
+def clean_ai_items(parsed, room: dict | None, per_item: bool = False) -> list[dict]:
+    """Os itens que a IA devolveu, limpos. "room": o cômodo escolhido; sem ele, o que a IA disse (na fala, um para cada item;
+    na foto, o da foto); "" se ninguém soube (a pessoa escolhe na revisão)."""
     items = parsed.get("items") if isinstance(parsed, dict) else parsed
     if isinstance(parsed, dict) and items is None and parsed.get("name"):
         items = [parsed]
     if not isinstance(items, list):
         raise ApiError(502, "A IA não devolveu itens. Tente de novo.")
-    names = set()
-    if room:
-        with STORE.lock:
-            names = {i["name"] for i in STORE.data["items"] if i["room"] == room["id"]}
+    fixed = room["id"] if room else ""
+    top = ai_room_id(parsed.get("room")) if isinstance(parsed, dict) else ""
+    names: dict[str, set] = {}
+    with STORE.lock:
+        bens = {r["id"] for r in STORE.data["rooms"] if r.get("kind") == "bens"}
+        for i in STORE.data["items"]:
+            if i["room"] not in bens:
+                names.setdefault(i["room"], set()).add(i["name"])
+    house = set().union(*names.values()) if names else set()
     out = []
     for raw in items[:25]:
         if not isinstance(raw, dict):
@@ -1429,18 +1474,25 @@ def clean_ai_items(parsed, room: dict | None) -> list[dict]:
             value = 0
         conf = str(raw.get("confidence") or "").lower().replace("é", "e")
         existing = str(raw.get("existing") or "").strip()
+        rid = (ai_room_id(raw.get("room")) or top or fixed) if per_item else (fixed or top)
         out.append({
             "name": name, "details": str(raw.get("details") or "").strip()[:1000],
             "cat": raw.get("cat") if isinstance(raw.get("cat"), str) and raw.get("cat") in STORE.cat_map() else "outros",
             "qty": str(raw.get("qty") or "1").strip()[:30] or "1", "value": value,
-            "zone": str(raw.get("zone") or "").strip()[:120],
-            "existing": existing if existing in names else "",
+            "zone": str(raw.get("zone") or "").strip()[:120], "room": rid,
+            "existing": existing if existing in (names.get(rid, set()) if rid else house) else "",
             "confidence": conf if conf in ("alta", "media", "baixa") else "media",
         })
     return out
 
 
-MOCK_RESULT = {"items": [
+def common_room(items: list[dict]) -> str:
+    """O cômodo de todos os itens, se for um só; senão ""."""
+    rooms = {i.get("room") or "" for i in items}
+    return rooms.pop() if len(rooms) == 1 else ""
+
+
+MOCK_RESULT = {"room": "escritorio", "items": [
     {"name": "Luminária de mesa articulada preta", "details": "Luminária de braço articulado em metal preto com cúpula cônica.",
      "cat": "decoracao", "qty": "1", "value": 90, "zone": "Mesa", "existing": "", "confidence": "alta"},
     {"name": "Caneca de cerâmica branca", "details": "Caneca lisa de cerâmica branca, cerca de 300 ml.",
@@ -1450,13 +1502,19 @@ MOCK_RESULT = {"items": [
 ]}
 
 
+def ai_fixed_room(body: dict) -> dict | None:
+    """O cômodo que a pessoa escolheu (ou de onde abriu), se for um cômodo da casa; sem ele, a IA escolhe."""
+    r = STORE.room(body.get("room")) if isinstance(body.get("room"), str) and body.get("room") else None
+    return r if r and r.get("kind") != "bens" else None
+
+
 def ai_identify(body: dict) -> dict:
     need_ai_on()
     file = body.get("file") or ""
     if not photo_exists(file):
         raise ApiError(400, "Envie uma foto antes de pedir a leitura por IA.")
     mode = "single" if body.get("mode") == "single" else "multi"
-    room = STORE.room(body.get("room")) if body.get("room") else None
+    room = ai_fixed_room(body)
     hint = text(body.get("hint"), 300, "dica")
     prompt = ai_prompt(mode, room, hint)
     entity = photo_entity()
@@ -1468,7 +1526,8 @@ def ai_identify(body: dict) -> dict:
             if mode == "single":
                 res = {"items": MOCK_RESULT["items"][:1]}
             call.answer(res)
-        return {"items": clean_ai_items(res, room), "entity": "ai_task.simulado"}
+        items = clean_ai_items(res, room)
+        return {"items": items, "room": common_room(items), "entity": "ai_task.simulado"}
     tmp_dir = os.path.join(MEDIA_ROOT, AI_TMP_REL)
     if not os.path.isdir(MEDIA_ROOT):
         raise ApiError(500, "A pasta media não está disponível para o app.")
@@ -1502,7 +1561,8 @@ def ai_identify(body: dict) -> dict:
         except ApiError:
             call.result = "formato"
             raise
-    return {"items": clean_ai_items(parsed, room), "entity": entity or "padrão do Home Assistant"}
+    items = clean_ai_items(parsed, room)
+    return {"items": items, "room": common_room(items), "entity": entity or "padrão do Home Assistant"}
 
 
 # ---------------------------------------------------------------------------
@@ -1521,10 +1581,10 @@ _voice_cache = {"at": 0.0, "value": None}
 MOCK_SPEECH = "Sofá cinza de três lugares, uns dois mil reais. Televisão Samsung de 55 polegadas, três mil. E duas luminárias de chão."
 MOCK_VOICE_RESULT = {"room": "", "items": [
     {"name": "Sofá cinza de três lugares", "details": "Sofá de tecido cinza, três lugares.", "cat": "moveis", "qty": "1", "value": 2000,
-     "zone": "", "existing": "", "confidence": "alta"},
+     "zone": "", "room": "sala", "existing": "", "confidence": "alta"},
     {"name": "Televisão Samsung 55 polegadas", "details": "Smart TV Samsung de 55 polegadas.", "cat": "eletronicos", "qty": "1", "value": 3000,
-     "zone": "Eletrônicos", "existing": "", "confidence": "alta"},
-    {"name": "Luminária de chão", "details": "", "cat": "decoracao", "qty": "2", "value": 300, "zone": "", "existing": "", "confidence": "media"},
+     "zone": "Eletrônicos", "room": "sala", "existing": "", "confidence": "alta"},
+    {"name": "Luminária de chão", "details": "", "cat": "decoracao", "qty": "2", "value": 300, "zone": "", "room": "", "existing": "", "confidence": "media"},
 ]}
 
 
@@ -1732,7 +1792,7 @@ def ai_from_speech(body: dict) -> dict:
     """O que foi dito vira itens: a IA separa nome, detalhes, categoria, quantidade e valor (o dito vale mais que a estimativa)."""
     need_ai_on()
     spoken = text(body.get("text"), 4000, "texto", required=True)
-    room = STORE.room(body.get("room")) if body.get("room") else None
+    room = ai_fixed_room(body)
     prompt = ai_prompt("voice", room, "", spoken)
     entity = photo_entity()
     with AiCall("fala", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
@@ -1750,9 +1810,8 @@ def ai_from_speech(body: dict) -> dict:
         except ApiError:
             call.result = "formato"
             raise
-    rid = str(parsed.get("room") or "") if isinstance(parsed, dict) else ""
-    rid = rid if STORE.room(rid) else ""
-    return {"items": clean_ai_items(parsed, room or STORE.room(rid)), "room": rid}
+    items = clean_ai_items(parsed, room, per_item=True)
+    return {"items": items, "room": common_room(items)}
 
 
 # ---------------------------------------------------------------------------

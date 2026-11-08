@@ -4,7 +4,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 
 | Camada | Onde | Como rodar | O que confere |
 |---|---|---|---|
-| Unitários | `tests/unit/test_*.py` | `tests/run.sh unit` | cada parte do servidor (`inventario/app/server.py`) importada direto, sem Home Assistant: valores, quantidades, códigos, itens e cômodos, categorias, armazenamento, fotos, backups e versões, importar e exportar, IA (prompts, respostas, uso, sensor, configurações), Falar, fotos da internet, novidades, Conversar, integração com os outros apps, as ferramentas do CorrerIA (`test_u_ferramentas.py`: cada leitura e gravação, os erros, zonas e bens, a chave e o arquivo próprios) |
+| Unitários | `tests/unit/test_*.py` | `tests/run.sh unit` | cada parte do servidor (`inventario/app/server.py`) importada direto, sem Home Assistant: valores, quantidades, códigos, itens e cômodos, categorias, armazenamento, fotos, backups e versões, importar e exportar, IA (prompts, respostas, uso, sensor, configurações; o cômodo que a IA escolhe em `test_u_ia_comodo.py`), Falar, fotos da internet, novidades, Conversar, integração com os outros apps, as ferramentas do CorrerIA (`test_u_ferramentas.py`: cada leitura e gravação, os erros, zonas e bens, a chave e o arquivo próprios) |
 | Integração | `tests/integration/test_*.py` | `tests/run.sh integration` | o servidor de verdade (processo próprio, portas livres) pelo HTTP: todas as rotas, segurança (Ingress, chave da integração, chave do CorrerIA e `/api/integracao/ferramentas` em `test_correria.py`), envios cortados e em partes, concorrência, e a conversa com um Home Assistant de mentira (`fake_ha.py`: estados, `ai_task`, `conversation`, fala para texto, avisos no celular, WebSocket do Assist) e uma loja de mentira (`fixtures/site`) |
 | Visuais | `tests/e2e/e2e_*.py` | `tests/e2e/run.sh` | as telas no Chromium (Playwright), como celular de 320 e 384 px, tablet e computador, claro e escuro: clica, digita, confere o que aparece e grava capturas de tela |
 
@@ -44,7 +44,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | `e2e_organizar` | setas nas pontas, ordem gravada, Início, barra lateral, relatório e outro aparelho |
 | `e2e_zonas` | zonas ligadas do começo ao fim: sugestões, a última zona do cômodo, subtotais, relatório, desligar |
 | `e2e_desfazer` | Desfazer em excluir, mover, foto e dados da internet; avisos empilhados e com janela aberta |
-| `e2e_catalogar_falar` | Catalogar itens com IA de ponta a ponta; Falar com microfone de mentira; IA desligada: sem Falar e Adicionar direto no item; microfone bloqueado |
+| `e2e_catalogar_falar` | Catalogar itens com IA de ponta a ponta (sem cômodo, a IA escolhe o da foto); Falar com microfone de mentira (cada item no seu cômodo; sem cômodo, nada é gravado); Adicionar nos cômodos sem Adicionar bem; IA desligada: sem Falar e Adicionar direto no item; microfone bloqueado |
 | `e2e_preencher_ia` | Preencher com IA no cadastro: o que preenche, o que fica, sem foto, IA desligada |
 | `e2e_ia_falhas` | a IA falhando (cota, fora do formato, erro, nada) no Catalogar, no Preencher e na busca; Home Assistant fora do ar |
 | `e2e_falar_ha` | Falar com o Home Assistant de mentira: fala para texto escolhida, erros, áudio curto, idioma; sem uma IA que responda, o app separa (e o Adicionar e o painel Falar dizem isso); IA desligada, o Falar some e o servidor recusa |

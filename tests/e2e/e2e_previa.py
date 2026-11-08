@@ -58,6 +58,8 @@ async def body(r, p):
     await pg.click('[data-ct="mic"]')
     await pg.wait_for_selector(".found li", timeout=10000)
     r.check(await pg.locator(".found li").count() >= 2, "Falar: itens de exemplo para conferir")
+    r.eq(await pg.evaluate("[...document.querySelectorAll('.found [data-rf=room]')].map(s => s.value)"), ["cozinha", "cozinha", ""],
+         "a IA de exemplo põe cada item no seu cômodo")
     await r.shot(pg, "falar")
     await pg.click('.dlg-f [data-ct="cancel"]')
     await pg.click('[data-r="1"]')

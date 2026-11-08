@@ -34,7 +34,8 @@ class Instrucoes(UnitBase):
     def test_fala_lista_os_comodos_e_o_valor_dito_vale_mais(self):
         p = S.ai_prompt("voice", None, "", "sofá dois mil reais")
         self.assertIn("use exatamente esse valor", p)
-        self.assertIn("sala = Sala de estar; cozinha = Cozinha", p)
+        self.assertIn("- sala = Sala de estar.", p)
+        self.assertIn("- cozinha = Cozinha.", p)
         self.assertTrue(p.endswith("O que a pessoa falou:\nsofá dois mil reais"))
 
     def test_categorias_da_casa_entram_nas_instrucoes(self):
@@ -75,8 +76,10 @@ class RespostaDaIA(UnitBase):
     def test_existing_so_vale_para_o_comodo(self):
         out = S.clean_ai_items({"items": [{"name": "X", "existing": "Sofá de 3 lugares cinza-azulado"}]}, self.store.room("cozinha"))
         self.assertEqual(out[0]["existing"], "")
+        out = S.clean_ai_items({"room": "cozinha", "items": [{"name": "X", "existing": "Sofá de 3 lugares cinza-azulado"}]}, None)
+        self.assertEqual(out[0]["existing"], "", "a IA pôs na cozinha: o sofá da sala não conta")
         out = S.clean_ai_items({"items": [{"name": "X", "existing": "Sofá de 3 lugares cinza-azulado"}]}, None)
-        self.assertEqual(out[0]["existing"], "")
+        self.assertEqual(out[0]["existing"], "Sofá de 3 lugares cinza-azulado", "sem cômodo, a IA viu a casa toda")
 
     def test_formatos_aceitos(self):
         self.assertEqual(len(S.clean_ai_items([{"name": "A"}, {"name": "B"}], None)), 2, "lista solta")

@@ -2817,7 +2817,9 @@
     if (!voice && !(await needAi())) return;
     const zonesUse = zonesOn();
     const useAi = voice ? !!(await aiStatus()).ready : true; // IA ligada mas sem entidade que responda: o app separa sozinho
-    const C = { step: voice ? "voice" : file ? "ready" : "photo", room: room && D.roomById.has(room) ? room : lastRoom(), zone: "", hint: "", file, uploading: false, results: [], keep: true, entity: "", error: null, raw: "", busy: false, token: 0,
+    const house = (rid) => D.rooms.some((r) => r.id === rid); // a área Bens não é cômodo
+    // o cômodo de onde abriu; sem ele, a IA escolhe (e, se não souber, a pessoa escolhe na revisão)
+    const C = { step: voice ? "voice" : file ? "ready" : "photo", room: room && house(room) ? room : "", zone: "", hint: "", file, uploading: false, results: [], keep: true, entity: "", error: null, raw: "", busy: false, token: 0,
       voice, heard: "", rec: "off", secs: 0, level: 0, note: "" };
     let rec = null, recTimer = null;
     const stopRec = () => { clearInterval(recTimer); if (rec) rec.cancel(); rec = null; };
@@ -2831,8 +2833,16 @@
     });
     const dlg = entry.dlg;
     const body = $('[data-slot="body"]', dlg), foot = $('[data-slot="foot"]', dlg);
-    const roomName = () => D.roomById.get(C.room)?.name || "";
-    const roomSelect = (label) => `<div class="field"><label for="c-room">${label}</label><select id="c-room" class="select" data-ct-in="room">${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === C.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>`;
+    const roomName = (rid = C.room) => D.roomById.get(rid)?.name || "";
+    const roomOpts = (sel, first) => (first ? `<option value="${first[0]}"${sel === first[0] ? " selected" : ""}>${first[1]}</option>` : "")
+      + D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === sel ? " selected" : ""}>${esc(r.name)}</option>`).join("");
+    // na revisão, o cômodo de todos (com "Cada item no seu" quando a IA pôs em cômodos diferentes)
+    const shared = () => { const set = new Set(C.results.map((r) => r.room || "")); return set.size === 1 ? [...set][0] : "*"; };
+    const reviewRoom = () => {
+      const sel = shared();
+      return `<div class="field"><label for="c-room">Cômodo</label><select id="c-room" class="select${sel === "" ? " need" : ""}" data-ct-in="room">${roomOpts(sel, sel === "*" ? ["*", "Cada item no seu"] : sel === "" ? ["", "Escolha o cômodo"] : null)}</select></div>`;
+    };
+    const perItem = () => C.voice && C.results.length > 1; // quem fala pode citar um cômodo para cada item
     const heardBox = () => (C.heard ? `<p class="heard">${ic("mic", "sm")}<span>“${esc(C.heard)}”</span></p>` : "");
 
     function render() {
@@ -2843,7 +2853,6 @@
             <div class="voice-state" aria-live="polite">${on ? `<b>Ouvindo…</b> <span class="voice-time">${clock(C.secs)}</span>` : C.rec === "starting" ? "Abrindo o microfone…" : "Toque no microfone e fale"}</div>
             <p class="voice-hint">${on ? "Toque de novo quando terminar." : "Ex.: “Sofá cinza, dois mil reais. TV Samsung de 55 polegadas, três mil.”"}</p>
           </div>
-          <div class="form" style="margin-top:8px">${roomSelect("Vai para o cômodo")}</div>
           ${C.error ? `<div class="formerr" style="margin-top:14px">${esc(C.error)}</div>` : ""}
           <p class="voice-note">${useAi ? "" : "Sem IA, o app separa pelas vírgulas. "}Até 2 minutos.${PREVIEW ? " Na prévia, o microfone não grava: entra um exemplo." : ""}</p>`;
         foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
@@ -2864,7 +2873,7 @@
                 ${hasRoomPhotos ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="roomphoto">${ic("images", "lg")}Foto do cômodo</button>` : ""}`}
               </div>${COARSE ? "" : `<p class="help" style="margin:0">Também dá para arrastar ou colar (Ctrl+V).</p>`}`}
           <div class="${zonesUse ? "row2" : ""}">
-            ${roomSelect("Cômodo")}
+            <div class="field"><label for="c-room">Cômodo</label><select id="c-room" class="select" data-ct-in="room">${roomOpts(C.room, ["", "A IA escolhe"])}</select></div>
             ${zonesUse ? `<div class="field"><label for="c-zone">Zona (opcional)</label><input id="c-zone" class="input" data-ct-in="zone" list="c-zones" value="${esc(C.zone)}" placeholder="Deixe vazio para a IA sugerir" autocomplete="off">
               <datalist id="c-zones">${zonesOf(C.room).map((z) => `<option value="${esc(z)}">`).join("")}</datalist></div>` : ""}
           </div>
@@ -2884,26 +2893,27 @@
         foot.innerHTML = `<button type="button" class="btn" data-ct="back">${ic(C.voice ? "mic" : "back", "sm")}${C.voice ? "Falar de novo" : "Voltar"}</button><span class="grow"></span><button type="button" class="btn primary" data-ct="read">${ic("refresh")}Tentar de novo</button>`;
       } else if (C.step === "review") {
         const on = C.results.filter((r) => r.on).length;
-        const zones = zonesOf(C.room);
+        const all = shared(), each = perItem();
+        const zl = [...new Set(C.results.map((r) => r.room).filter(Boolean))]; // uma lista de zonas para cada cômodo
         body.innerHTML = `${C.voice ? heardBox() : ""}<div style="display:flex;gap:14px;align-items:center;margin-bottom:16px">
             ${C.file ? `<img src="${esc(src(C.file))}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:8px;flex:none">` : ""}
-            <div><b style="font:600 21px/1.2 var(--font-c)">${C.results.length ? plural(C.results.length, "item encontrado", "itens encontrados") : "Nenhum item encontrado"}</b>
-            <div class="muted" style="font-size:14px">Em ${esc(roomName())}</div></div></div>
-          ${C.voice ? `<div class="form" style="margin:0 0 14px">${roomSelect("Cômodo")}</div>` : ""}
+            <b style="font:600 21px/1.2 var(--font-c)">${C.results.length ? plural(C.results.length, "item encontrado", "itens encontrados") : "Nenhum item encontrado"}</b></div>
+          ${C.results.length ? `<div class="form" style="margin:0 0 14px">${reviewRoom()}</div>` : ""}
           ${C.note ? `<p class="inote" style="margin:0 0 14px">${ic("info")}<span>${esc(C.note)}</span></p>` : ""}
           ${C.example ? `<p class="inote" style="margin:0 0 14px">${ic("info")}<span>Exemplo simulado da prévia.</span></p>` : ""}
-          ${C.results.length ? `<datalist id="cr-zones">${zones.map((z) => `<option value="${esc(z)}">`).join("")}</datalist><ul class="found">${C.results.map((r, i) => `<li class="${r.on ? "" : "off"}">
+          ${C.results.length ? `${zonesUse ? zl.map((rid, k) => `<datalist id="cr-zones-${k}">${zonesOf(rid).map((z) => `<option value="${esc(z)}">`).join("")}</datalist>`).join("") : ""}<ul class="found">${C.results.map((r, i) => `<li class="${r.on ? "" : "off"}">
             <input type="checkbox" class="fcheck" data-ri="${i}" data-rf="on"${r.on ? " checked" : ""} aria-label="Adicionar ${esc(r.name)}">
             <div class="fbody">
               <div class="frow"><input class="input fname" data-ri="${i}" data-rf="name" value="${esc(r.name)}" aria-label="Nome">
                 <input class="input" data-ri="${i}" data-rf="qty" value="${esc(r.qty)}" aria-label="Quantidade">
                 <div class="money"><input class="input" data-ri="${i}" data-rf="value" value="${esc(moneyInput(r.value))}" inputmode="decimal" aria-label="Valor total"></div></div>
-              <div class="frow2${zonesUse ? "" : " one"}"><select class="select" data-ri="${i}" data-rf="cat" aria-label="Categoria">${CATS.map(([k, v]) => `<option value="${k}"${k === r.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
-                ${zonesUse ? `<input class="input" data-ri="${i}" data-rf="zone" value="${esc(r.zone)}" list="cr-zones" placeholder="Zona" aria-label="Zona">` : ""}</div>
+              <div class="frow2">${each ? `<select class="select${r.room ? "" : " need"}" data-ri="${i}" data-rf="room" aria-label="Cômodo">${roomOpts(r.room || "", r.room ? null : ["", "Qual cômodo?"])}</select>` : ""}
+                <select class="select" data-ri="${i}" data-rf="cat" aria-label="Categoria">${CATS.map(([k, v]) => `<option value="${k}"${k === r.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
+                ${zonesUse ? `<input class="input" data-ri="${i}" data-rf="zone" value="${esc(r.zone)}"${r.room ? ` list="cr-zones-${zl.indexOf(r.room)}"` : ""} placeholder="Zona" aria-label="Zona">` : ""}</div>
               ${r.details ? `<p class="fdet">${esc(r.details)}</p>` : ""}
               ${r.existing || r.confidence === "baixa" ? `<div class="fflag">${r.existing ? `<span class="pill warn">Parece já cadastrado: ${esc(r.existing)}</span>` : ""}${r.confidence === "baixa" ? `<span class="pill">IA pouco segura, confira</span>` : ""}</div>` : ""}
             </div></li>`).join("")}</ul>
-          ${!C.file || (D.roomById.get(C.room)?.photos || []).some((p) => p.file === C.file) ? "" : `<label class="check" style="margin-top:16px"><input type="checkbox" data-ct-in="keep"${C.keep ? " checked" : ""}> Guardar esta foto nas fotos de ${esc(roomName())}</label>`}`
+          ${!C.file || !house(all) || (D.roomById.get(all)?.photos || []).some((p) => p.file === C.file) ? "" : `<label class="check" style="margin-top:16px"><input type="checkbox" data-ct-in="keep"${C.keep ? " checked" : ""}> Guardar esta foto nas fotos de ${esc(roomName(all))}</label>`}`
           : `<p class="muted">${C.voice ? "Não achei itens no que você falou." : "Nenhum objeto encontrado. Tente uma foto mais próxima ou uma dica."}</p>`}`;
         foot.innerHTML = `<button type="button" class="btn" data-ct="back">${ic(C.voice ? "mic" : "back", "sm")}${C.voice ? "Falar de novo" : "Outra foto"}</button><span class="grow"></span>
           <button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
@@ -2957,10 +2967,11 @@
         if (document.contains(dlg)) render();
       }
     }
+    const pickRoom = (r, res) => [r.room, res.room, C.room].find((x) => x && house(x)) || "";
     async function readSpoken(my = ++C.token) {
       C.note = "";
       if (!useAi) {
-        C.results = splitSpoken(C.heard);
+        C.results = splitSpoken(C.heard).map((r) => ({ ...r, room: C.room }));
         C.note = "Sem IA: separado pelas vírgulas. Confira nomes e valores.";
         C.step = "review"; render();
         return;
@@ -2969,8 +2980,7 @@
       try {
         const res = await API.post("api/ai/text", { text: C.heard, room: C.room });
         if (my !== C.token) return;
-        if (res.room && D.roomById.has(res.room)) C.room = res.room;
-        C.results = (res.items || []).map((r) => ({ ...r, zone: zonesUse ? r.zone || "" : "", on: !r.existing }));
+        C.results = (res.items || []).map((r) => ({ ...r, room: pickRoom(r, res), zone: zonesUse ? r.zone || "" : "", on: !r.existing }));
         C.step = "review";
       } catch (e) {
         if (my !== C.token) return;
@@ -2988,7 +2998,7 @@
         if (my !== C.token) return;
         C.entity = res.entity || "";
         C.example = !!res.example;
-        C.results = (res.items || []).map((r) => ({ ...r, zone: zonesUse ? C.zone || r.zone || "" : "", on: !r.existing }));
+        C.results = (res.items || []).map((r) => ({ ...r, room: pickRoom(r, res), zone: zonesUse ? C.zone || r.zone || "" : "", on: !r.existing }));
         C.step = "review";
       } catch (e) {
         if (my !== C.token) return;
@@ -3001,13 +3011,20 @@
       if (!chosen.length || C.busy) return;
       const bad = chosen.find((r) => !String(r.name).trim() || Number.isNaN(parseMoney(r.value)));
       if (bad) { toast(!String(bad.name).trim() ? "Um dos itens está sem nome." : `Valor inválido em ${bad.name}.`, { error: true }); return; }
+      const lost = chosen.find((r) => !house(r.room));
+      if (lost) {
+        toast(perItem() ? `Escolha o cômodo de ${String(lost.name).trim()}.` : "Escolha o cômodo.", { error: true });
+        $(perItem() ? `[data-ri="${C.results.indexOf(lost)}"][data-rf="room"]` : "#c-room", dlg)?.focus();
+        return;
+      }
+      const one = new Set(chosen.map((r) => r.room)).size === 1 ? chosen[0].room : "";
       C.busy = true;
       const btn = $('[data-ct="add"]', dlg);
       btn.disabled = true; btn.innerHTML = `<span class="spin"></span>Adicionando`;
       try {
         const res = await API.post("api/items/batch", {
-          items: chosen.map((r) => ({ room: C.room, zone: zonesUse ? (r.zone || C.zone || "").trim() : "", name: String(r.name).trim(), details: r.details || "", cat: r.cat, qty: String(r.qty || "1").trim() || "1", value: parseMoney(r.value), photos: C.file ? [C.file] : [], source: C.voice ? "voz" : "ia" })),
-          roomPhoto: C.file && C.keep ? { room: C.room, file: C.file, label: (C.hint || chosen.slice(0, 3).map((r) => String(r.name).trim()).join(", ")).slice(0, 160) } : null,
+          items: chosen.map((r) => ({ room: r.room, zone: zonesUse ? (r.zone || C.zone || "").trim() : "", name: String(r.name).trim(), details: r.details || "", cat: r.cat, qty: String(r.qty || "1").trim() || "1", value: parseMoney(r.value), photos: C.file ? [C.file] : [], source: C.voice ? "voz" : "ia" })),
+          roomPhoto: C.file && C.keep && one ? { room: one, file: C.file, label: (C.hint || chosen.slice(0, 3).map((r) => String(r.name).trim()).join(", ")).slice(0, 160) } : null,
         });
         setRev(res.rev);
         res.items.forEach(upsertItem);
@@ -3016,8 +3033,9 @@
         C.results = [];
         requestClose(entry, { force: true });
         refreshAll();
-        const rid = C.room;
-        toast(`${plural(res.items.length, "item adicionado", "itens adicionados")} em ${D.roomById.get(rid)?.name}`, { action: "Ver", onAction: () => nav(`#/c/${encodeURIComponent(rid)}`) });
+        const n = plural(res.items.length, "item adicionado", "itens adicionados");
+        if (one) toast(`${n} em ${roomName(one)}`, { action: "Ver", onAction: () => nav(`#/c/${encodeURIComponent(one)}`) });
+        else toast(`${n} em ${new Set(chosen.map((r) => r.room)).size} cômodos`);
       } catch (e) { fail(e); C.busy = false; if (document.contains(dlg)) render(); }
     }
     dlg.addEventListener("click", async (e) => {
@@ -3047,7 +3065,12 @@
     });
     dlg.addEventListener("change", (e) => {
       const t = e.target;
-      if (t.dataset.ctIn === "room") { C.room = t.value; if (!(C.voice && C.step === "voice")) render(); }
+      if (t.dataset.ctIn === "room") {
+        if (C.step === "review") { if (house(t.value)) C.results.forEach((r) => { r.room = t.value; }); } // o de todos
+        else C.room = t.value;
+        render();
+      }
+      else if (t.dataset.rf === "room") { C.results[+t.dataset.ri].room = t.value; render(); }
       else if (t.dataset.ctIn === "keep") C.keep = t.checked;
       else if (t.dataset.rf === "on") { C.results[+t.dataset.ri].on = t.checked; render(); }
       else if (t.dataset.rf === "cat") C.results[+t.dataset.ri].cat = t.value;
@@ -3297,7 +3320,7 @@
       ["item", "plus", "Adicionar item", "Com foto e valor, preenchendo os campos"],
       aiOn() && ["catalog", "scan", "Catalogar itens com IA", "A IA lista vários itens de uma foto"],
       voiceReady() && ["voice", "mic", "Falar os itens", `Diga o que tem e quanto vale; ${voiceSplit(st)}`],
-      bensOn() && ["bem", "home", "Adicionar bem", "Casa, terreno, carro: o que fica fora de casa"], // por último: o único que é bem, não item
+      bensOn() && base.name !== "rooms" && !rid && ["bem", "home", "Adicionar bem", "Casa, terreno, carro: o que fica fora de casa"], // por último: o único que é bem, não item; nos cômodos, só itens
     ].filter(Boolean);
     if (opts.length === 1) { openEditor({ room: rid }); return; } // sem IA e sem Falar: direto no item, sem um menu de uma linha só
     const entry = openDialog({

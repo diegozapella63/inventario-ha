@@ -249,7 +249,15 @@
         engines: clone(STT), selected: ST.settings.voice_stt || "", missing: false };
     }
     if (method === "POST" && path === "api/voice") { aiOff(); await wait(900); return { text: SPEECH, engine: "stt.exemplo", name: STT[0].name }; }
-    if (method === "POST" && path === "api/ai/text") { aiOff(); await wait(1600); return { items: clone(SPOKEN), room: "", example: true }; }
+    // a IA escolhe o cômodo de cada item pelo nome dos cômodos da casa (o que não der para saber fica para a pessoa)
+    const guessRoom = (re) => { const r = d.rooms.find((x) => x.kind !== "bens" && re.test(x.name.normalize("NFD").replace(/[\u0300-\u036f]/g, ""))); return r ? r.id : ""; };
+    const fixedRoom = () => (d.rooms.some((x) => x.id === body.room && x.kind !== "bens") ? body.room : "");
+    if (method === "POST" && path === "api/ai/text") {
+      aiOff(); await wait(1600);
+      const items = clone(SPOKEN).map((it, i) => ({ ...it, room: (i < 2 ? guessRoom(/cozinha/i) : "") || fixedRoom() }));
+      const one = new Set(items.map((it) => it.room)).size === 1 ? items[0].room : "";
+      return { items, room: one, example: true };
+    }
     if (method === "POST" && path === "api/web-photos") {
       aiOff();
       const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");
@@ -369,7 +377,9 @@
       } else {
         items = body.mode === "single" ? EXAMPLES.slice(0, 1) : clone(EXAMPLES);
       }
-      return { items, entity: "ai_task.exemplo", example: true };
+      const room = fixedRoom() || (linked.length ? linked[0].room : guessRoom(/escrit|quarto/i));
+      items = items.map((it) => ({ ...it, room }));
+      return { items, room, entity: "ai_task.exemplo", example: true };
     }
     if (method === "GET" && path === "api/news/people") return { people: [{ id: "person.ana", name: "Ana", phone: true }, { id: "person.beto", name: "Beto", phone: true }] };
     if (method === "POST" && path === "api/news/notify-test") return { ok: true, sent: body.who === "todos" ? 2 : 1, example: true };
