@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.38.2
+
+- **Mais › Novidades**: a janela das novidades de um item ganha **Ver item**, que abre a ficha dele. O Voltar do celular volta para as Novidades. O **Fechar** saiu: o X no alto e o Voltar fecham.
+
 ## 1.38.1
 
 - **Mais › Sobre**: a **CorrerIA** (o contato no WhatsApp) entra na lista dos apps.

@@ -2119,7 +2119,7 @@
       html: `<div class="dlg"><div class="dlg-h"><h2>Novidades</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b"><p class="news-of">${esc(it.name)}</p><div data-slot="news" aria-live="polite"></div></div>
         <div class="dlg-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Buscar de novo</button><span class="grow"></span>
-          <button type="button" class="btn primary" data-x>Fechar</button></div></div>`,
+          <button type="button" class="btn primary" data-item>Ver item</button></div></div>`,
       onClose: () => { gen++; clearTimeout(timer); if (job) API.del(`api/news/${job}`).catch(() => {}); job = null; },
     });
     const dlg = entry.dlg, slot = $('[data-slot="news"]', dlg), again = $("[data-again]", dlg);
@@ -2153,6 +2153,7 @@
     }
     dlg.addEventListener("click", (e) => {
       if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
+      if (e.target.closest("[data-item]")) { finalizeThen(entry, () => nav(`#/i/${encodeURIComponent(it.id)}`)); return; } // a ficha do item; o Voltar volta para as Novidades
       if (e.target.closest("[data-again]")) start();
     });
     const my0 = gen;

@@ -59,8 +59,15 @@ async def body(r, p):
     await pg.wait_for_selector("dialog.modal .news li", timeout=4000)
     r.eq(sent, [], "abrir um item mostra o resultado guardado, sem chamar a IA")
     r.check("Buscado hoje" in await pg.text_content(".news-foot"), "com a data")
-    await pg.click("dialog.modal .dlg-h [data-x]")
+    await r.shot(pg, "novidades-do-item")
+    await pg.click("dialog.modal [data-item]")
+    await pg.wait_for_selector("dialog.sheet h1", timeout=4000)
+    r.eq((await pg.text_content("dialog.sheet h1")).strip(), "Smart TV 55 polegadas", "Ver item abre a ficha do item")
+    r.eq(await pg.locator("dialog.modal").count(), 0, "e fecha as Novidades")
+    await pg.go_back()
+    await pg.wait_for_selector("dialog.sheet", state="detached", timeout=4000)
     await pg.wait_for_timeout(300)
+    r.check(pg.url.endswith("#/novidades") and await pg.locator("#p-news-list .nrow").count() > 0, "o Voltar volta para as Novidades")
 
     # os deixados de fora: dá para conferir um por um
     await pg.click(".news-out summary")
