@@ -87,6 +87,25 @@ async def body(r, p):
     r.check(n >= 2, f"o PDF sai com várias páginas ({n})")
     await pg.emulate_media(media="screen")
 
+    # 1.36.1: no Home Assistant a tela fica num quadro, e o app do Home Assistant no Android só baixa o que a página de
+    # cima pede: o Baixar PDF põe o link lá e clica (como o Home Assistant faz com os backups)
+    fctx, fpg = await r.page(b, "cel", "light")
+    await fpg.goto(r.base + "api/rev")
+    await fpg.evaluate("""(u) => { document.documentElement.innerHTML = '<body style="margin:0"><iframe id="ha" src="' + u + '#/relatorio" style="width:384px;height:800px;border:0"></iframe></body>';
+      document.addEventListener('click', (e) => { if (e.target.download) window.__top = [e.target.href, e.target.download, e.target.target]; }, true); }""", r.base)
+    fr = fpg.frame_locator("#ha")
+    await fr.locator('[data-act="rep-pdf"]').wait_for(timeout=15000)
+    async with fpg.expect_download() as dl:
+        await fr.locator('[data-act="rep-pdf"]').click()
+    d2 = await dl.value
+    top = await fpg.evaluate("window.__top")
+    r.check(top and "api/relatorio.pdf?fotos=1" in top[0] and top[1].startswith("inventario-") and top[2] == "_blank", f"num quadro: o link vai para a página de cima ({top})")
+    with open(await d2.path(), "rb") as f:
+        r.check(f.read(5) == b"%PDF-", f"num quadro: o PDF baixa ({d2.suggested_filename})")
+    r.check("Baixando o PDF" in (await fr.locator(".toast").first.inner_text()), "diz que está baixando")
+    r.eq(await fpg.locator("a[download]").count(), 0, "o link da página de cima sai depois")
+    await fctx.close()
+
     # zonas ligadas: coluna Zona; ordem dos cômodos muda junto
     r.api("PUT", "api/settings", {"zones": True})
     r.api("POST", "api/rooms/order", {"ids": ["varanda", "sala", "cozinha", "quarto", "escritorio", "lavanderia"]})

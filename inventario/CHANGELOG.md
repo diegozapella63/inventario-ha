@@ -2,7 +2,11 @@
 
 ## 1.36.1
 
+<<<<<<< Updated upstream
 - O **Relatório para seguro** passa a se chamar **Relatório do inventário**: no menu Mais, na tela e no PDF.
+=======
+- **Relatório › Baixar PDF** funciona no app do Home Assistant no celular: o PDF vai para a pasta Downloads (aparece nas notificações), com o aviso **Baixando o PDF…**.
+>>>>>>> Stashed changes
 
 ## 1.36.0
 

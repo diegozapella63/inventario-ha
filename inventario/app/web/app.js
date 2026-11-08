@@ -3550,7 +3550,20 @@
       case "chat": openChat(); break;
       case "voice-refresh": { const slot = $('#view [data-slot="voice-panel"]'); if (slot) slot.innerHTML = `<p class="muted">Verificando…</p>`; await loadVoice(true); if (slot && document.contains(slot)) renderVoicePanel(slot); break; }
       case "print": if (window.INV_PRINT) toast(window.INV_PRINT); else window.print(); break;
-      case "rep-pdf": if (window.INV_PRINT) { e.preventDefault(); toast(window.INV_PRINT); } break;
+      case "rep-pdf": {
+        if (window.INV_PRINT) { e.preventDefault(); toast(window.INV_PRINT); break; }
+        // a tela fica num quadro da página do Home Assistant, e o app do Home Assistant no Android só baixa o que a página
+        // de cima pede: o link vai para lá e é clicado, como o Home Assistant faz com os backups (mesma origem, pelo
+        // ingress); sem isso (outra origem), o link baixa sozinho
+        try {
+          const d = window.top.document, a = d.createElement("a");
+          a.href = b.href; a.download = b.getAttribute("download") || ""; a.target = "_blank"; a.style.display = "none";
+          d.body.appendChild(a); a.dispatchEvent(new MouseEvent("click")); d.body.removeChild(a);
+          e.preventDefault();
+          toast("Baixando o PDF…");
+        } catch { /* outra origem */ }
+        break;
+      }
       case "retry": boot(); break;
       default: break;
     }
