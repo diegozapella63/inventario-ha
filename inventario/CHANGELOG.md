@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.38.1
+
+- **Mais › Sobre**: a **CorrerIA** (o contato no WhatsApp) entra na lista dos apps.
+
 ## 1.38.0
 
 - **Falar** não pergunta mais o cômodo: a IA conhece os cômodos da casa e põe cada item no seu, pelo que você falou ("na sala", "e na cozinha a batedeira") ou pelo objeto (a geladeira vai para a cozinha). Na hora de conferir, cada item mostra o cômodo; o que a IA não souber vem com **Qual cômodo?** para você escolher. O **Cômodo** do alto muda todos de uma vez.
