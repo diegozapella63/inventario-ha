@@ -1,5 +1,5 @@
 name: InventarIA
-version: "1.36.1"
+version: "1.36.2"
 slug: inventario
 description: Inventário da casa com fotos, valores, relatório em PDF e leitura de fotos por IA.
 arch:
