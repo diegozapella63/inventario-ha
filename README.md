@@ -2,7 +2,7 @@
 
 ![InventarIA](inventario/logo.png)
 
-Um App do Home Assistant para fazer o **inventário da casa**: cômodos, itens, **fotos e valores**, com **relatório para seguro** e **leitura de fotos por IA**, pela integração de IA que você já usa no Home Assistant.
+Um App do Home Assistant para fazer o **inventário da casa**: cômodos, itens, **fotos e valores**, com **relatório em PDF** e **leitura de fotos por IA**, pela integração de IA que você já usa no Home Assistant.
 
 <p align="center">
   <img src="docs/inicio.png" width="24%" alt="Início com a etiqueta do patrimônio e os destaques">
@@ -38,7 +38,7 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 - **Conversar** com a IA a qualquer momento, ao lado do microfone, sobre o que está na tela ou qualquer outro assunto.
 - **Buscar** por nome, marca ou detalhe, sem se importar com acentos, com filtros por cômodo e categoria.
 - **Bens** fora de casa (casa, terreno, carro), separados em Imóveis, Veículos e Outros: contam no patrimônio e vêm à parte no relatório.
-- **Relatório para seguro** por cômodo, com fotos e gráficos, para baixar em PDF.
+- **Relatório do inventário** por cômodo, com fotos e gráficos, para baixar em PDF.
 - **Gráficos**: os cômodos, as categorias e os itens que mais valem, as faixas de valor e o patrimônio mês a mês.
 - **Exportar** em CSV, JSON ou ZIP com fotos, **backup** na pasta `share/inventario` e versões automáticas a cada 10 minutos de uso.
 - **Importar backup** pelo celular, inclusive dividido em partes.

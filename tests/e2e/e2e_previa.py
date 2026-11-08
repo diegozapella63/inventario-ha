@@ -114,7 +114,7 @@ async def body(r, p):
     # Mais é um menu; Configurações: as abas abrem; exportar explica que é prévia
     await pg.goto(r.base + "#/mais")
     await pg.wait_for_selector(".menu-list")
-    r.eq(await pg.evaluate("[...document.querySelectorAll('.menu-row b')].map(b => b.textContent)"), ["Bens", "Gráficos", "Novidades", "Categorias", "Relatório para seguro", "Configurações", "Sobre"],
+    r.eq(await pg.evaluate("[...document.querySelectorAll('.menu-row b')].map(b => b.textContent)"), ["Bens", "Gráficos", "Novidades", "Categorias", "Relatório do inventário", "Configurações", "Sobre"],
          "Mais: o menu")
     await pg.click('.menu-row[href="#/config"]')
     await pg.wait_for_selector(".more-tabs")

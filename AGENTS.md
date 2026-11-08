@@ -1,6 +1,6 @@
 # Instruções para quem for mexer neste repositório (pessoas ou IAs)
 
-InventarIA é um app (add-on) do Home Assistant para o inventário da casa: cômodos (com zonas), itens com fotos, valores e categorias, relatório para seguro, leitura de fotos por IA, fotos da internet, novidades dos produtos, Conversar (chat com a IA) e Falar. Faz parte de uma família de apps do mesmo dono, que conversam entre si pelo Home Assistant:
+InventarIA é um app (add-on) do Home Assistant para o inventário da casa: cômodos (com zonas), itens com fotos, valores e categorias, relatório em PDF, leitura de fotos por IA, fotos da internet, novidades dos produtos, Conversar (chat com a IA) e Falar. Faz parte de uma família de apps do mesmo dono, que conversam entre si pelo Home Assistant:
 
 | App | Repositório | O que é |
 |---|---|---|
@@ -19,7 +19,7 @@ inventario/CHANGELOG.md       o que mudou em cada versão (o HA mostra ao atuali
 inventario/DOCS.md            manual do usuário (aba Documentação no HA)
 inventario/app/server.py      servidor HTTP (Python, só biblioteca padrão): dados, fotos, IA, backups, integração
 inventario/app/web/           a tela: index.html, app.js (JavaScript puro, sem build), style.css, fontes
-inventario/app/relatorio.py   o Relatório para seguro em PDF (Baixar PDF): os números, os gráficos e os cômodos
+inventario/app/relatorio.py   o Relatório do inventário em PDF (Baixar PDF): os números, os gráficos e os cômodos
 inventario/app/pdf.py         PDF feito à mão (Helvetica, A4, fotos JPG): o mesmo arquivo do GerencIA; ao mudar, copie para lá
 inventario/app/web/selectsheet.js  as caixas de seleção no visual do app: arquivo igual em todos os apps (no ResolvIA e
                               no CronologIA, frontend/src/selectsheet.js); ao mudar, copie para os outros

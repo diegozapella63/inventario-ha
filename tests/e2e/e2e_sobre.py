@@ -145,7 +145,7 @@ async def body(r, p):
     ctx, pg = await r.page(b, "cel", "light")
     await r.open(pg, "#/mais", ".menu-list")
     rows = await pg.evaluate("[...document.querySelectorAll('.menu-row b')].map(b => b.textContent)")
-    r.eq(rows, ["Bens", "Gráficos", "Categorias", "Relatório para seguro", "Configurações", "Sobre"], "IA desligada: o Sobre continua no fim do menu")
+    r.eq(rows, ["Bens", "Gráficos", "Categorias", "Relatório do inventário", "Configurações", "Sobre"], "IA desligada: o Sobre continua no fim do menu")
     await ctx.close()
     await b.close()
 

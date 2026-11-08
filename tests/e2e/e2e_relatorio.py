@@ -1,4 +1,4 @@
-"""Relatório para seguro: totais, cômodos na ordem, fotos liga/desliga (e o menu Mais só diz "com fotos" com elas ligadas),
+"""Relatório do inventário: totais, cômodos na ordem, fotos liga/desliga (e o menu Mais só diz "com fotos" com elas ligadas),
 zonas e a impressão (PDF). 1.36.0: o padrão dos relatórios dos apps: o cabeçalho (a faixa na cor do app, o ícone, o app,
 o título, a contagem e quando), os gráficos da tela Gráficos, a marca da CorrerIA Code no fim e Baixar PDF (o servidor faz
 o arquivo, com as fotos ou sem, na cor do app: o app do Home Assistant no Android não imprime a página)."""
@@ -24,7 +24,7 @@ async def body(r, p):
     r.eq(rooms, ["SALSala de estar", "COZCozinha", "QUAQuarto", "ESCEscritório", "LAVLavanderia", "VARVaranda"], "cômodos na ordem da casa")
     # o cabeçalho dos relatórios dos apps
     cab = " ".join((await pg.inner_text(".rcab > div")).split())
-    r.check(cab.startswith("InventarIA · inventário da casa Relatório para seguro 38 itens em 6 cômodos · ") and re.search(r"\d\d/\d\d/\d{4} às \d\d:\d\d$", cab), f"o cabeçalho: o app, o título, a contagem e quando ({cab})")
+    r.check(cab.startswith("InventarIA · inventário da casa Relatório do inventário 38 itens em 6 cômodos · ") and re.search(r"\d\d/\d\d/\d{4} às \d\d:\d\d$", cab), f"o cabeçalho: o app, o título, a contagem e quando ({cab})")
     r.eq(await pg.locator(".rcab svg.app-ic").count(), 1, "o ícone do app no cabeçalho")
     # os gráficos da tela Gráficos
     titulos = [t.strip() for t in await pg.locator(".rep-g h2").all_inner_texts()]

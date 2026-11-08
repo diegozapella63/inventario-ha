@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.36.1
+
+- O **Relatório para seguro** passa a se chamar **Relatório do inventário**: no menu Mais, na tela e no PDF.
+
 ## 1.36.0
 
 - **Relatório para seguro** no padrão dos relatórios dos apps (como o do ResolvIA e o do GerencIA): no alto, um cabeçalho com o ícone, o app, o título, quantos itens e cômodos e quando; depois os números, os gráficos da tela **Gráficos** (cômodos, categorias, faixas de valor, os itens mais valiosos e, com bens, os bens) e um cômodo depois do outro. No fim, a marca da **CorrerIA Code**, como no **Mais > Sobre**.

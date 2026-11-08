@@ -929,7 +929,7 @@
     </div>
     <article class="report">
       <header class="rcab">${APP_ICON}<div><div class="rapp"><span class="wm">Inventar<b>IA</b></span> · inventário da casa</div>
-        <h1>Relatório para seguro</h1><p class="rmeta">${plural(D.houseCount, "item", "itens")} em ${plural(D.rooms.length, "cômodo", "cômodos")} · ${when}</p></div></header>
+        <h1>Relatório do inventário</h1><p class="rmeta">${plural(D.houseCount, "item", "itens")} em ${plural(D.rooms.length, "cômodo", "cômodos")} · ${when}</p></div></header>
       <div class="rtotal">
         <div><span>${nb ? "Na casa" : "Patrimônio"}</span><b>${moneyR(D.houseTotal)}</b></div>
         <div><span>Itens</span><b>${int(D.houseCount)}</b></div>
@@ -998,7 +998,7 @@
       ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
       newsOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
       ["#/categorias", "grid", "Categorias", "Criar, renomear e excluir."],
-      ["#/relatorio", "report", "Relatório para seguro", `Por cômodo, com ${LS.get("reportPhotos", true) ? "fotos e " : ""}gráficos. Baixa em PDF.`], // sem Mostrar fotos, não promete fotos
+      ["#/relatorio", "report", "Relatório do inventário", `Por cômodo, com ${LS.get("reportPhotos", true) ? "fotos e " : ""}gráficos. Baixa em PDF.`], // sem Mostrar fotos, não promete fotos
       ["#/config", "gear", "Configurações", "Dados e backup, integrações, aparência e opções."],
       ["#/sobre", "info", "Sobre", "CorrerIA Code, os apps e o GitHub."],
     ].filter(Boolean);

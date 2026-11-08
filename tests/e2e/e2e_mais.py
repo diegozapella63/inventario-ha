@@ -30,7 +30,7 @@ async def body(r, p):
     await pg.wait_for_selector(".menu-list")
     r.eq((await pg.text_content(".page-title")).strip(), "Mais", "a aba Mais abre um menu")
     rows = await pg.evaluate("[...document.querySelectorAll('.menu-row')].map(a => [a.querySelector('b').textContent, a.getAttribute('href')])")
-    r.eq(rows, [["Bens", "#/bens"], ["Gráficos", "#/graficos"], ["Novidades", "#/novidades"], ["Categorias", "#/categorias"], ["Relatório para seguro", "#/relatorio"], ["Configurações", "#/config"], ["Sobre", "#/sobre"]],
+    r.eq(rows, [["Bens", "#/bens"], ["Gráficos", "#/graficos"], ["Novidades", "#/novidades"], ["Categorias", "#/categorias"], ["Relatório do inventário", "#/relatorio"], ["Configurações", "#/config"], ["Sobre", "#/sobre"]],
          "com Bens, Gráficos, Novidades, Categorias, Relatório, Configurações e, por último, Sobre")
     r.eq(await pg.locator("#view .more-tabs").count(), 0, "sem as abas de configurações no menu")
     r.eq(await pg.get_attribute('.tabbar a[data-tab="data"]', "aria-current"), "page", "a aba Mais fica marcada")

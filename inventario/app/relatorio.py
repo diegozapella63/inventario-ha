@@ -1,4 +1,4 @@
-"""Relatório para seguro em PDF (Mais > Relatório > Baixar PDF): o app do Home Assistant no Android não imprime a página,
+"""Relatório do inventário em PDF (Mais > Relatório > Baixar PDF): o app do Home Assistant no Android não imprime a página,
 então o arquivo é feito aqui e baixado. O mesmo relatório da tela: o cabeçalho dos relatórios dos apps (o do ResolvIA e do
 GerencIA), os números, os gráficos da tela Gráficos (cômodos, categorias, faixas de valor, os mais valiosos e os bens) e um
 cômodo depois do outro, com a foto, o código, o item, a zona (com as zonas ligadas), a quantidade e o valor; no pé de cada
@@ -154,7 +154,7 @@ def gerar_pdf(d, cor="#f5c400", tinta=None, ler_foto=lambda nome: None):
     A = pdf.cor_rgb(cor if re.fullmatch(r"#[0-9a-fA-F]{6}", cor or "") else "#f5c400")
     T = pdf.cor_rgb(tinta) if re.fullmatch(r"#[0-9a-fA-F]{6}", tinta or "") else tuple(c * 0.62 for c in A)
     FG, MUT, LIN, LIN2, CARD = pdf.cor_rgb("#141a22"), pdf.cor_rgb("#5b6573"), pdf.cor_rgb("#e3e7ec"), pdf.cor_rgb("#eef1f4"), pdf.cor_rgb("#f6f7f9")
-    doc = pdf.Documento("Relatório para seguro · InventarIA", "InventarIA")
+    doc = pdf.Documento("Relatório do inventário · InventarIA", "InventarIA")
     M = 40
     W = doc.largura_pagina - 2 * M
     FIM = doc.altura_pagina - 64  # o pé: uma linha e a marca da CorrerIA Code
@@ -174,7 +174,7 @@ def gerar_pdf(d, cor="#f5c400", tinta=None, ler_foto=lambda nome: None):
     def novo():
         doc.nova_pagina()
         y[0] = M
-        doc.texto(M, y[0] + 10, "Relatório para seguro · InventarIA", 9, False, MUT)
+        doc.texto(M, y[0] + 10, "Relatório do inventário · InventarIA", 9, False, MUT)
         y[0] += 26
 
     def cabe(h):
@@ -191,7 +191,7 @@ def gerar_pdf(d, cor="#f5c400", tinta=None, ler_foto=lambda nome: None):
     doc.texto(tx, y[0] + 24, "Inventar", 15, True, FG)
     doc.texto(tx + w1, y[0] + 24, "IA", 15, True, T)
     doc.texto(tx + w1 + pdf.largura("IA", 15, True) + 6, y[0] + 24, "· inventário da casa", 10, False, MUT)
-    doc.texto(tx, y[0] + 52, "Relatório para seguro", 22, True, FG)
+    doc.texto(tx, y[0] + 52, "Relatório do inventário", 22, True, FG)
     doc.texto(tx, y[0] + 72, f"{d['contagem']} · {d['quando']}", 10, False, MUT)
     y[0] += h + 14
 

@@ -46,7 +46,7 @@ import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.36.0"
+VERSION = "1.36.1"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -2868,7 +2868,7 @@ def chat_context(screen: dict) -> str:
         lines.append("Mais valiosos: " + "; ".join(f"{i.get('name')} ({_money(i.get('value'))})" for i in top) + ".")
     view = str(screen.get("view") or "")
     where = {"home": "Início", "search": "Buscar", "rooms": "Cômodos", "room": "um cômodo", "item": "a ficha de um item",
-             "report": "Relatório para seguro", "data": "Mais"}.get(view, "o app")
+             "report": "Relatório do inventário", "data": "Mais"}.get(view, "o app")
     lines.append(f"A pessoa está em: {where}.")
     it = STORE.item(str(screen.get("item") or "")) if screen.get("item") else None
     room = STORE.room(str(screen.get("room") or "")) if screen.get("room") else None
@@ -3443,7 +3443,7 @@ def r_settings_put(h, query):
 
 
 def r_relatorio_pdf(h, query):
-    """Mais > Relatório > Baixar PDF: o relatório para seguro como arquivo (o app do Home Assistant no Android não imprime
+    """Mais > Relatório > Baixar PDF: o relatório do inventário como arquivo (o app do Home Assistant no Android não imprime
     a página). fotos=0 sem as fotos (o Mostrar fotos da tela); cor e tinta: a cor do app e a do texto em destaque."""
     um = lambda k, padrao="": (query.get(k) or [padrao])[0]  # noqa: E731
     fotos = um("fotos", "1") != "0"

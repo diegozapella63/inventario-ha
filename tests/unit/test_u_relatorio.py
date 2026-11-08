@@ -1,4 +1,4 @@
-"""Relatório para seguro em PDF (1.36.0): os números, os gráficos da tela Gráficos, os cômodos na ordem da casa, os bens
+"""Relatório do inventário em PDF (1.36.0): os números, os gráficos da tela Gráficos, os cômodos na ordem da casa, os bens
 por último, as fotos (ou sem elas), o cabeçalho dos relatórios dos apps e a marca da CorrerIA Code no pé; o pdf.py (o
 mesmo do GerencIA) com as fotos JPG e o espaço entre as letras."""
 import json
@@ -99,7 +99,7 @@ class Pdf(unittest.TestCase):
         raw = relatorio.gerar_pdf(d, cor="#b48cf6", tinta="#7f56bb", ler_foto=thumb)
         self.assertTrue(raw.startswith(b"%PDF-1.4") and raw.rstrip().endswith(b"%%EOF"))
         t = textos(raw)
-        for s in ("(Inventar) Tj", "(IA) Tj", "(Relat\xf3rio para seguro) Tj", "(38 itens em 6 c\xf4modos \xb7 07/11/2026 \xe0s 17:05) Tj",
+        for s in ("(Inventar) Tj", "(IA) Tj", "(Relat\xf3rio do invent\xe1rio) Tj", "(38 itens em 6 c\xf4modos \xb7 07/11/2026 \xe0s 17:05) Tj",
                   "(Faixas de valor) Tj", "(Itens mais valiosos) Tj", "(Sala de estar) Tj", "(SAL-001) Tj", "(Subtotal) Tj",
                   "(Correr) Tj", "( Code) Tj", "(DESENVOLVIMENTO DE SOFTWARES) Tj", "0.90 Tc"):
             self.assertIn(s, t)
