@@ -647,8 +647,11 @@ div.croom:hover { background: none; }
 /* Buscar › Selecionar: marcar vários e mudar o cômodo, a categoria ou a zona de uma vez */
 .ssum .sel-go { margin: -8px auto -8px -2px; align-self: center; }
 .ssum.sel { align-items: center; }
-.ssum.sel .check { flex: 1; min-width: 0; color: var(--ink); font-weight: 600; }
-.ssum.sel .btn { margin: -8px -6px -8px 0; }
+.ssum.sel { gap: 8px; }
+.ssum.sel .sel-n { flex: 1; min-width: 0; color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ssum.sel .btn { margin: -8px 0; }
+.ssum.sel .btn.icon { margin-left: -8px; }
+.ssum.sel .btn:last-child { margin-right: -6px; }
 #results .irow { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } /* segurar o dedo começa o Selecionar */
 button.irow { width: 100%; font: inherit; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .irow.selr[aria-pressed="true"] { background: var(--tag-soft); }
@@ -658,13 +661,10 @@ button.irow { width: 100%; font: inherit; text-align: left; background: none; bo
   background: var(--surface); border: 2px solid var(--line-2); color: transparent; }
 .irow .pk .ic { width: 15px; height: 15px; stroke-width: 3; }
 .irow.selr[aria-pressed="true"] .pk { background: var(--tag); border-color: var(--surface); color: var(--tag-ink); }
-.selbar { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 5; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+.selbar { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 5; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px;
   margin: 12px -6px 0; padding: 10px 6px; background: var(--paper); border-top: 1px solid var(--line); }
-.selbar.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .selbar .btn { min-width: 0; padding: 0 8px; }
-.ssum.sel .check { white-space: nowrap; }
 @media (max-width: 360px) { .ssum.sel b { display: none; } }
-@media (max-width: 440px) { .selbar.n3 .btn .ic { display: none; } }
 @media (min-width: 1000px) { .selbar { bottom: 0; } }
 .more { display: flex; justify-content: center; padding: 18px 0; }
 

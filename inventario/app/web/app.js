@@ -570,7 +570,6 @@
       html = `<div class="empty"><h2>Algo deu errado nesta tela</h2><p>${esc(e.message)}</p><div class="acts"><a class="btn" href="#/">Voltar ao início</a></div></div>`;
     }
     view.innerHTML = html;
-    if (SEL) { const all = $('#view [data-input="sel-all"]'); if (all) all.indeterminate = !!all.dataset.mixed; }
     rendered = key;
     renderSide();
     renderTop();
@@ -883,22 +882,18 @@
     }
     const n = SEL.size, all = n > 0 && n === pickable.length;
     const selSum = pickable.reduce((s, i) => s + (SEL.has(i.id) ? +i.value || 0 : 0), 0);
-    return `<div class="ssum sel"><label class="check"><input type="checkbox" data-input="sel-all"${all ? " checked" : ""}${n && !all ? ' data-mixed="1"' : ""}> ${n ? plural(n, "selecionado", "selecionados") : "Selecionar todos"}</label>
-        ${n ? `<b>${moneyR(selSum)}</b>` : ""}<button type="button" class="btn ghost sm" data-act="sel-end">Cancelar</button></div>
+    return `<div class="ssum sel"><button type="button" class="btn ghost icon sm" data-act="sel-end" aria-label="Cancelar seleção">${ic("close")}</button>
+        <span class="sel-n">${n ? plural(n, "selecionado", "selecionados") : "Selecionar"}</span>${n ? `<b>${moneyR(selSum)}</b>` : ""}
+        <button type="button" class="btn ghost sm" data-act="sel-all">${all ? "Nenhum" : "Todos"}</button></div>
       <ul class="ilist">${shown.map((it) => itemRow(it, { toks, pick: isBens(it.room) ? "off" : SEL.has(it.id) })).join("")}</ul>${more}
-      <div class="selbar${zonesOn() ? " n3" : ""}" role="toolbar" aria-label="Mudar os selecionados">
-        <button type="button" class="btn" data-act="sel-change" data-kind="room"${n ? "" : " disabled"}>${ic("rooms")}Cômodo</button>
-        <button type="button" class="btn" data-act="sel-change" data-kind="cat"${n ? "" : " disabled"}>${ic("tag")}Categoria</button>
-        ${zonesOn() ? `<button type="button" class="btn" data-act="sel-change" data-kind="zone"${n ? "" : " disabled"}>${ic("pin")}Zona</button>` : ""}</div>`;
+      <div class="selbar"><button type="button" class="btn primary" data-act="sel-change"${n ? "" : " disabled"}>${ic("edit")}${n ? `Alterar ${plural(n, "item", "itens")}` : "Alterar"}</button></div>`;
   }
-  // Buscar › Selecionar: marcar vários itens e mudar de uma vez o cômodo, a categoria ou a zona (com Desfazer).
-  // A seleção vale só para o que está na lista (mudou o filtro, sai o que sumiu); o Voltar do celular sai do Selecionar.
+  // Buscar › Selecionar: marcar vários itens e alterar de uma vez o cômodo, a categoria e a zona (com Desfazer), como no
+  // ResolvIA. A seleção vale só para o que está na lista (mudou o filtro, sai o que sumiu); o Voltar do celular sai.
   let SEL = null;
   function selRender() {
     const el = $("#results");
     if (el && base.name === "search") el.innerHTML = resultsHtml(base.q);
-    const all = $('#view [data-input="sel-all"]');
-    if (all) all.indeterminate = !!all.dataset.mixed;
   }
   function selStart(first = null) {
     SEL = new Set(first ? [first] : []);
@@ -923,45 +918,67 @@
     SEL = null; selRender();
   }
   window.addEventListener("popstate", () => { if (SEL && !(history.state && history.state.invSel) && !stack.length) { SEL = null; selRender(); } });
-  function selChange(kind) {
+  // Alterar N itens: cada campo começa em Manter (nada muda até escolher outra coisa), como no ResolvIA; dá para mudar o
+  // cômodo, a categoria e a zona juntos. Em outro cômodo, o item ganha um código novo e fica sem zona (ou na zona escolhida).
+  const KEEP = "__manter__", OTHER = "__outra__";
+  function selEdit() {
     const its = [...SEL].map((id) => D.itemById.get(id)).filter((i) => i && !isBens(i.room));
     if (!its.length) return;
-    const n = plural(its.length, "item", "itens");
-    const same = (k) => { const v = new Set(its.map((i) => i[k] || "")); return v.size === 1 ? [...v][0] : null; };
-    const cur = same(kind);
-    const zl = [...new Set(its.flatMap((i) => zonesOf(i.room)))].sort((a, b) => a.localeCompare(b, "pt-BR"));
-    const title = { room: "Mudar o cômodo", cat: "Mudar a categoria", zone: "Mudar a zona" }[kind];
-    const field = kind === "room"
-      ? `<div class="field"><label for="bk-v">Cômodo</label><select id="bk-v" class="select">${cur === null ? '<option value="" selected disabled>Escolha o cômodo</option>' : ""}${roomOptions(cur)}</select>
-          <p class="help">Em outro cômodo, o item ganha um código novo${zonesOn() ? " e fica sem zona" : ""}.</p></div>`
-      : kind === "cat"
-        ? `<div class="field"><label for="bk-v">Categoria</label><select id="bk-v" class="select">${cur === null ? '<option value="" selected disabled>Escolha a categoria</option>' : ""}${CATS.map(([k, v]) => `<option value="${k}"${k === cur ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`
-        : `<div class="field"><label for="bk-v">Zona</label><input id="bk-v" class="input" list="bk-zones" value="${esc(cur || "")}" placeholder="Sem zona" maxlength="120" autocomplete="off">
-          <datalist id="bk-zones">${zl.map((z) => `<option value="${esc(z)}">`).join("")}</datalist></div>`;
+    const n = plural(its.length, "item", "itens"), zOn = zonesOn();
+    const chip = (name, value, label, on = false) => `<label class="chip"><input type="radio" name="${name}" value="${esc(value)}"${on ? " checked" : ""}>${label}</label>`;
+    const zoneChips = (rid) => {
+      const zl = (rid ? zonesOf(rid) : [...new Set(its.flatMap((i) => zonesOf(i.room)))]).sort((a, b) => a.localeCompare(b, "pt-BR"));
+      return chip("bk-zone", KEEP, "Manter", true) + chip("bk-zone", "", "Sem zona") + zl.map((z) => chip("bk-zone", z, esc(z))).join("") + chip("bk-zone", OTHER, "Outra");
+    };
     const entry = openDialog({
-      cls: "modal narrow", label: title,
-      html: `<div class="dlg"><div class="dlg-h"><h2>${title}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
-        <form class="dlg-b" data-bk><div class="form"><p class="muted" style="margin:0">${n}</p>${field}</div></form>
-        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok>Mudar ${n}</button></div></div>`,
+      cls: "modal narrow", label: `Alterar ${n}`,
+      html: `<div class="dlg"><div class="dlg-h"><h2>Alterar ${n}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <form class="dlg-b" data-bk><div class="form">
+          <div class="field" data-f="room"><span class="lbl" id="bk-l-room">Cômodo</span>
+            <div class="chips" role="radiogroup" aria-labelledby="bk-l-room">${chip("bk-room", KEEP, "Manter", true)}${D.rooms.map((r) => chip("bk-room", r.id, esc(r.name))).join("")}</div>
+            <p class="help" id="bk-help" hidden>Em outro cômodo, o item ganha um código novo${zOn ? " e fica sem zona, se não escolher uma" : ""}.</p></div>
+          <div class="field" data-f="cat"><span class="lbl" id="bk-l-cat">Categoria</span>
+            <div class="chips" role="radiogroup" aria-labelledby="bk-l-cat">${chip("bk-cat", KEEP, "Manter", true)}${CATS.map(([k, v]) => chip("bk-cat", k, esc(v))).join("")}</div></div>
+          ${zOn ? `<div class="field" data-f="zone"><span class="lbl" id="bk-l-zone">Zona</span>
+            <div class="chips" id="bk-zones" role="radiogroup" aria-labelledby="bk-l-zone">${zoneChips("")}</div>
+            <input id="bk-zone-new" class="input" placeholder="Nome da zona" maxlength="120" autocomplete="off" aria-label="Nome da zona" hidden></div>` : ""}
+        </div></form>
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok disabled>Aplicar</button></div></div>`,
     });
     const dlg = entry.dlg;
+    const val = (name) => { const r = $(`input[name="${name}"]:checked`, dlg); return r ? r.value : KEEP; };
+    const zoneOf = () => { const z = zOn ? val("bk-zone") : KEEP; return z === OTHER ? $("#bk-zone-new", dlg).value.trim() : z; };
+    const sync = () => {
+      const room = val("bk-room"), z = zOn ? val("bk-zone") : KEEP;
+      $("#bk-help", dlg).hidden = room === KEEP;
+      if (zOn) $("#bk-zone-new", dlg).hidden = z !== OTHER;
+      $("[data-ok]", dlg).disabled = (room === KEEP && val("bk-cat") === KEEP && z === KEEP) || (z === OTHER && !zoneOf());
+    };
+    dlg.addEventListener("change", (e) => {
+      if (zOn && e.target.name === "bk-room") $("#bk-zones", dlg).innerHTML = zoneChips(e.target.value === KEEP ? "" : e.target.value); // as zonas do cômodo novo
+      if (e.target.value === OTHER) setTimeout(() => $("#bk-zone-new", dlg).focus(), 0);
+      sync();
+    });
+    dlg.addEventListener("input", sync);
     let busy = false;
     const go = async () => {
-      if (busy) return;
-      const v = $("#bk-v", dlg).value;
-      if (kind !== "zone" && !v) { toast(kind === "room" ? "Escolha o cômodo." : "Escolha a categoria.", { error: true }); return; }
+      if (busy || $("[data-ok]", dlg).disabled) return;
       busy = true;
       try {
-        const to = kind === "room" ? await realRoom(v) : kind === "zone" ? v.trim() : v;
-        const change = kind === "room" ? { room: to, zone: "" } : { [kind]: to };
-        const todo = its.filter((i) => (kind === "room" ? i.room !== to : (i[kind] || "") !== to));
-        if (!todo.length) { requestClose(entry, { force: true }); toast(kind === "room" ? `Já estão em ${D.roomById.get(to)?.name || "este cômodo"}.` : "Nada mudou."); return; }
-        const before = todo.map((i) => ({ id: i.id, room: i.room, seq: i.seq, zone: i.zone || "", cat: i.cat }));
-        const res = await API.post("api/items/bulk", { items: todo.map((i) => ({ id: i.id, ...change })) });
+        const room = val("bk-room"), cat = val("bk-cat"), zone = zoneOf();
+        const todo = [];
+        for (const i of its) {
+          const c = {};
+          if (room !== KEEP && room !== i.room) { c.room = room; c.zone = zone !== KEEP ? zone : ""; }
+          else if (zone !== KEEP && zone !== (i.zone || "")) c.zone = zone;
+          if (cat !== KEEP && cat !== i.cat) c.cat = cat;
+          if (Object.keys(c).length) todo.push({ id: i.id, ...c });
+        }
+        if (!todo.length) { requestClose(entry, { force: true }); toast("Nada mudou."); return; }
+        const before = todo.map((t) => { const i = D.itemById.get(t.id); return { id: i.id, room: i.room, seq: i.seq, zone: i.zone || "", cat: i.cat }; });
+        const res = await API.post("api/items/bulk", { items: todo });
         setRev(res.rev); res.items.forEach(upsertItem); derive(); requestClose(entry, { force: true }); refreshAll();
-        const m = plural(res.items.length, "item", "itens");
-        const msg = kind === "room" ? `${m} em ${D.roomById.get(to)?.name || "outro cômodo"}` : kind === "cat" ? `${m} em ${CAT[to] || "outra categoria"}` : to ? `${m} na zona ${to}` : `${m} sem zona`;
-        toast(msg, { action: "Desfazer", onAction: async () => {
+        toast(plural(res.items.length, "item alterado", "itens alterados"), { action: "Desfazer", onAction: async () => {
           try { const back = await API.post("api/items/bulk", { items: before }); setRev(back.rev); back.items.forEach(upsertItem); derive(); refreshAll(); }
           catch (er) { fail(er); }
         } });
@@ -3674,7 +3691,11 @@
       case "sel-start": selStart(); break;
       case "sel-end": selEnd(); break;
       case "sel-toggle": { const id = b.dataset.id; if (SEL) { if (SEL.has(id)) SEL.delete(id); else SEL.add(id); selRender(); } break; }
-      case "sel-change": if (SEL && SEL.size) selChange(b.dataset.kind); break;
+      case "sel-change": if (SEL && SEL.size) selEdit(); break;
+      case "sel-all": if (SEL) { // todos os da lista (os que já apareceram e os que vêm com Mostrar mais), ou nenhum
+        const ids = searchItems(base.q).list.filter((i) => !isBens(i.room)).map((i) => i.id);
+        SEL = new Set(ids.length && ids.every((id) => SEL.has(id)) ? [] : ids); selRender();
+      } break;
       case "export": download(b.dataset.kind); break;
       case "backup-create": createBackup(b); break;
       case "backup-restore": restoreBackup(b.dataset.name); break;
@@ -3742,9 +3763,6 @@
       base.q = { ...base.q, tipo: t.value, ...(tipoBens(t.value) ? { room: "", cat: "" } : {}) };
       try { history.replaceState(history.state, "", hashOf(base)); } catch { /* sem histórico */ }
       searchLimit = 120; renderView(false);
-    }
-    else if (k === "sel-all") { // todos os da lista (os que já apareceram e os que vêm com Mostrar mais)
-      if (SEL) { const ids = searchItems(base.q).list.filter((i) => !isBens(i.room)).map((i) => i.id); SEL = new Set(t.checked ? ids : []); selRender(); }
     }
     else if (k === "search-room") updateSearch({ room: t.value });
     else if (k === "search-cat") updateSearch({ cat: t.value });

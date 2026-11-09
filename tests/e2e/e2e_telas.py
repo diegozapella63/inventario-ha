@@ -24,7 +24,7 @@ DIALOGS = [
     ("novidades", "#/i/sal-007", 'dialog.sheet [data-act="item-news"]', ".news li"),
     ("conversar", "#/c/sala", ".chat-top", "dialog.chat .chat-ideas"),
     ("selecionar", "#/buscar", ['[data-act="sel-start"]', '[data-act="sel-toggle"]'], ".selbar"),
-    ("mudar-varios", "#/buscar", ['[data-act="sel-start"]', '[data-act="sel-toggle"]', '.selbar [data-kind="room"]'], "#bk-v"),
+    ("alterar-varios", "#/buscar", ['[data-act="sel-start"]', '[data-act="sel-toggle"]', '.selbar [data-act="sel-change"]'], "dialog.modal [data-bk]"),
 ]
 
 CHECK = """() => {

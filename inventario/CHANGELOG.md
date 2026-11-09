@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.40.0
+
+- **Buscar › Selecionar** como no ResolvIA: embaixo, um botão só, **Alterar N itens**, abre uma janela com **Cômodo**, **Categoria** e **Zona** (com as zonas ligadas). Cada um começa em **Manter**; dá para mudar o cômodo e a categoria juntos. Na zona, as zonas do cômodo aparecem como opções, além de **Sem zona** e **Outra**. No alto, o **X** sai do Selecionar e **Todos** marca a lista inteira (de novo, **Nenhum**). O aviso diz quantos itens foram alterados e tem **Desfazer**.
+
 ## 1.39.4
 
 - **Novidades**: a busca começa pela página de suporte do fabricante, nos downloads, onde ficam os arquivos de firmware e de atualização do sistema com a data, e procura também a página do mesmo modelo em outro país quando a do Brasil não mostra os arquivos. Se a busca ainda não achar, cole o endereço da página de suporte nos **Detalhes** do item: ela é aberta primeiro.

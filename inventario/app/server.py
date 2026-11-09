@@ -48,7 +48,7 @@ import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.39.4"
+VERSION = "1.40.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
