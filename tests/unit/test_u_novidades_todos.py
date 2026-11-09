@@ -357,6 +357,19 @@ class Grupo(UnitBase):
         self.assertEqual(self.key("Caixas de som Bluetooth"), self.key("Caixa de som Bluetooth"))
         self.assertNotEqual(self.key("Smart TV 55 polegadas"), self.key("Smart TV 43 polegadas"))
 
+    def test_cor_e_ordem_nao_separam(self):
+        self.assertEqual(self.key("Amazon Echo Spot (2024) preto"), self.key("Amazon Echo Spot 2024"), "a cor e os parênteses não contam")
+        self.assertEqual(self.key("Echo Spot Amazon 2024 branco"), self.key("Amazon Echo Spot 2024"), "nem a ordem das palavras")
+        self.assertEqual(self.key("Smart TV de 55 polegadas"), self.key("Smart TV 55 polegadas"), "nem as palavras de ligação")
+
+    def test_o_que_muda_o_equipamento_ainda_separa(self):
+        self.assertNotEqual(self.key("Amazon Echo Spot 2024"), self.key("Amazon Echo Spot 2017"), "outro ano, outro modelo")
+        self.assertNotEqual(self.key("Smart TV 55 polegadas Samsung"), self.key("Smart TV 55 polegadas LG"), "outra marca")
+        self.assertNotEqual(self.key("Caixa de som"), self.key("Caixa de som Bluetooth"))
+
+    def test_nome_so_de_cor_fica_como_esta(self):
+        self.assertEqual(self.key("Preto"), "preto")
+
     def test_nome_vazio(self):
         self.assertEqual(self.key(""), "")
 
@@ -410,6 +423,13 @@ class Grupo(UnitBase):
                 time.sleep(0.02)
         self.assertFalse(any("LX20" in x for x in seen), "sem gastar a IA de novo")
         self.assertEqual(server.news_of(b)["news"]["novidades"][0]["titulo"], "Firmware do grupo")
+
+    def test_o_mesmo_noutra_cor_e_uma_linha_so(self):
+        a = self.add("sala", "Amazon Echo Spot (2024) preto")
+        b = self.add("cozinha", "Amazon Echo Spot 2024")
+        g = server.news_overview()["grupos"]
+        self.assertEqual(g[a], g[b], "uma linha só nas Novidades")
+        self.assertEqual(set(server.news_group_ids(a)), {a, b}, "e uma busca só para os dois")
 
     def test_visao_manda_os_grupos(self):
         a = self.add("sala", "Lâmpada inteligente Lumi LX20")

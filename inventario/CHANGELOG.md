@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.39.2
+
+- **Mais › Novidades**: o mesmo eletrônico escrito de jeitos um pouco diferentes vira uma linha só e uma busca só, como "Amazon Echo Spot (2024) preto" e "Amazon Echo Spot 2024". A cor, os parênteses, palavras como "de" e "com" e a ordem das palavras não separam mais. O ano, a marca e o tamanho continuam separando.
+
 ## 1.39.1
 
 - **Buscar**: segurar o dedo num item começa o **Selecionar** com ele marcado, como no ResolvIA.

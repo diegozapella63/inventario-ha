@@ -308,11 +308,15 @@
         { tipo: "lancamento", titulo: "Versão nova pode chegar no próximo ano", resumo: "Sites de tecnologia falam de uma versão nova; o fabricante não confirmou.", data: "", fonte: "https://exemplo.com/rumor", site: "exemplo.com", boato: true },
       ].sort((a, b) => (b.data || "0").localeCompare(a.data || "0")).slice(0, 3) }; // só as 3 mais recentes, como o servidor
     };
-    // o mesmo equipamento em vários cômodos é um só (como news_group_key do servidor)
+    // o mesmo equipamento em vários cômodos (no plural, noutra cor ou noutra ordem) é um só (como news_group_key do servidor)
+    const NOISE = new Set(("de da do das dos com sem e em para pra a o as os na no nas nos and with the of cor preto preta branco branca cinza prata " +
+      "prateado prateada dourado dourada azul azui vermelho vermelha verde rosa roxo roxa lila amarelo amarela laranja bege marrom grafite chumbo " +
+      "vinho creme nude champagne titanio black white silver gray grey gold blue red green pink purple graphite").split(" "));
     const groupKey = (it) => {
       const words = (plain(it.name).match(/[a-z0-9]+(?:-[a-z0-9]+)*/g) || []).map((w) => (w.length > 3 && w.endsWith("s") && !/\d/.test(w) ? w.slice(0, -1) : w));
       const codes = [...new Set(words.filter((w) => w.length >= 3 && /\d/.test(w) && /[a-z]/.test(w)))].sort();
-      return codes.length && words.length ? `${words[0]}|${codes.join(" ")}` : words.join(" ");
+      if (codes.length && words.length) return `${words[0]}|${codes.join(" ")}`;
+      return [...new Set(words.filter((w) => !NOISE.has(w)))].sort().join(" ") || words.join(" ");
     };
     const sameGroup = (it) => d.items.filter((x) => groupKey(x) === groupKey(it));
     const newsJobOf = () => [...ST.jobs.entries()].find(([, j]) => j.lote && !j.done);

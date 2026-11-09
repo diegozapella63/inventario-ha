@@ -48,7 +48,7 @@ import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.39.1"
+VERSION = "1.39.2"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -2528,13 +2528,23 @@ def news_cats() -> list[str]:
     return [c for c in NEWS_CATS if c in cats]
 
 
+# o que não muda o equipamento nas novidades: a cor e as palavras de ligação ("Echo Spot (2024) preto" = "Echo Spot 2024")
+NEWS_NOISE = set("""de da do das dos com sem e em para pra a o as os na no nas nos and with the of cor
+preto preta branco branca cinza prata prateado prateada dourado dourada azul azui vermelho vermelha verde rosa roxo roxa
+lila amarelo amarela laranja bege marrom grafite chumbo vinho creme nude champagne titanio
+black white silver gray grey gold blue red green pink purple graphite""".split())
+
+
 def news_group_key(it: dict) -> str:
-    """O mesmo equipamento em vários cômodos (ou no plural) é um só nas novidades: pelo código do modelo (LX20, K300)
-    e a primeira palavra, no singular; sem código, pelo nome inteiro no singular."""
+    """O mesmo equipamento em vários cômodos (ou no plural, ou noutra cor, ou com as palavras em outra ordem) é um só nas
+    novidades: pelo código do modelo (LX20, K300) e a primeira palavra, no singular; sem código, pelas palavras do nome no
+    singular, sem a cor nem as palavras de ligação, em ordem alfabética."""
     words = [w[:-1] if len(w) > 3 and w.endswith("s") and not re.search(r"\d", w) else w
              for w in re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", fold(it.get("name") or ""))]
     codes = sorted({w for w in words if len(w) >= 3 and re.search(r"\d", w) and re.search(r"[a-z]", w)})
-    return f"{words[0]}|{' '.join(codes)}" if codes and words else " ".join(words)
+    if codes and words:
+        return f"{words[0]}|{' '.join(codes)}"
+    return " ".join(sorted({w for w in words if w not in NEWS_NOISE})) or " ".join(words)
 
 
 def news_group_ids(iid: str) -> list[str]:
