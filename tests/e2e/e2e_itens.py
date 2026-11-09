@@ -50,7 +50,7 @@ async def body(r, p):
     await pg.click('[data-ed="save"]')
     await pg.wait_for_selector("dialog.modal", state="detached", timeout=8000)
     it = r.item_named("Luminária de mesa")
-    r.check(it and (it["value"], it["qty"], it["cat"], it["room"], len(it["photos"]), it["createdBy"]) == (1234.5, "2", "decoracao", "escritorio", 1, "Diego"),
+    r.check(it and (it["value"], it["qty"], it["cat"], it["room"], len(it["photos"]), it["createdBy"]) == (1234.5, "2", "decoracao", "escritorio", 1, "Davi"),
             f"item salvo com tudo ({it and (it['value'], it['qty'], it['cat'], it['room'], len(it['photos']))})")
     toast = await pg.text_content(".toast")
     r.check("Item adicionado" in toast, f"aviso com Ver ({toast.strip()})")

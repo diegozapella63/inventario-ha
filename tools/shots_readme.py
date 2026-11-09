@@ -4,7 +4,7 @@
 Uso: shots_readme.py <url-do-servidor-de-exemplo> <ia.json> <pasta-de-saida>
 O servidor de exemplo é o server.py com INV_SEED=<saída do demo.py>/seed, INV_DEV=1 e INV_AI_MOCK=1, numa porta livre
 (INV_PORT). Liga as zonas no servidor. Celular 390x844 em 2x, tema escuro, cor padrão (amarelo, sem a Cor do dia),
-usuário "Diego".
+usuário "Davi".
 """
 import asyncio
 import json
@@ -29,7 +29,7 @@ async def main():
         b = await p.chromium.launch()
         ctx = await b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, color_scheme="dark",
                                   is_mobile=True, has_touch=True, reduced_motion="reduce",
-                                  extra_http_headers={"X-Remote-User-Display-Name": "Diego"})
+                                  extra_http_headers={"X-Remote-User-Display-Name": "Davi"})
         await ctx.add_init_script("try{localStorage.setItem('inv:accentDaily', 'false')}catch(e){}")
         pg = await ctx.new_page()
         pg.on("pageerror", lambda e: errors.append(str(e)))

@@ -33,10 +33,10 @@ class Itens(UnitBase):
         self.assertApiError(400, self.store.create_items, [{"room": "sala", "name": "X" * 201}], None)
 
     def test_quem_cadastrou(self):
-        it = self.store.create_items([{"room": "sala", "name": "X"}], "Diego")[0]
-        self.assertEqual((it["createdBy"], it["updatedBy"]), ("Diego", "Diego"))
+        it = self.store.create_items([{"room": "sala", "name": "X"}], "Davi")[0]
+        self.assertEqual((it["createdBy"], it["updatedBy"]), ("Davi", "Davi"))
         it = self.store.update_item(it["id"], {"name": "Y"}, "Outra pessoa")
-        self.assertEqual((it["createdBy"], it["updatedBy"]), ("Diego", "Outra pessoa"))
+        self.assertEqual((it["createdBy"], it["updatedBy"]), ("Davi", "Outra pessoa"))
 
     def test_lote_falha_inteiro_se_um_item_e_ruim(self):
         n = len(self.store.data["items"])

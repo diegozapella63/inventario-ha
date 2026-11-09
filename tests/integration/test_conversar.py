@@ -71,11 +71,11 @@ class ComHomeAssistant(unittest.TestCase):
     def test_leva_a_tela_e_o_nome_de_quem_pergunta(self):
         self.ha.ai_reply = lambda kind, payload: "A TV vale R$ 2.300."
         st, _, out = self.app.request("POST", "api/chat", {"messages": conversa("quanto vale?"), "screen": {"view": "item", "item": "sal-007"}},
-                                      headers={"X-Remote-User-Display-Name": "Diego"})
+                                      headers={"X-Remote-User-Display-Name": "Davi"})
         self.assertEqual((st, out["reply"]), (200, "A TV vale R$ 2.300."))
         instr = self.ha.calls("POST", "/core/api/services/ai_task")[-1]["body"]["instructions"]
         self.assertIn("Item na tela: SAL-007 Smart TV 55 polegadas", instr)
-        self.assertIn("da casa de Diego", instr)
+        self.assertIn("da casa de Davi", instr)
 
     def test_conversa_inteira_vai_junto(self):
         self.ha.ai_reply = lambda kind, payload: "ok"

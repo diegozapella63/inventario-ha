@@ -151,7 +151,7 @@ class Lote(UnitBase):
     def test_item_mudado_volta_para_a_ia_escolher(self):
         self.run_batch()
         self.assertFalse(server.news_read()["triagem"][CAIXA]["conferir"])
-        self.store.update_item(CAIXA, {"name": "Smart TV 32 polegadas"}, "Diego")
+        self.store.update_item(CAIXA, {"name": "Smart TV 32 polegadas"}, "Davi")
         self.run_batch()
         self.assertTrue(server.news_read()["triagem"][CAIXA]["conferir"])
 
@@ -374,7 +374,7 @@ class Grupo(UnitBase):
         self.assertEqual(self.key(""), "")
 
     def add(self, room, name):
-        return self.store.create_items([{"room": room, "name": name, "cat": "eletronicos"}], "Diego")[0]["id"]
+        return self.store.create_items([{"room": room, "name": name, "cat": "eletronicos"}], "Davi")[0]["id"]
 
     def test_ids_do_mesmo_grupo(self):
         a = self.add("sala", "Lâmpada inteligente Lumi LX20")

@@ -143,7 +143,7 @@ async def body(r, p):
     r.eq(labels, ["Excluir", "Mover", "Duplicar", "Editar"], "computador: os botões com o nome")
     r.check(await pg.locator(".side, #view").first.is_visible(), "a página continua atrás da ficha")
     props = await pg.evaluate("Object.fromEntries([...document.querySelectorAll('dialog.sheet .props dt')].map(d => [d.textContent, d.nextElementSibling.textContent.trim()]))")
-    r.check(props.get("Cadastrado", "").endswith("por Diego"), f"quem cadastrou aparece ({props.get('Cadastrado')})")
+    r.check(props.get("Cadastrado", "").endswith("por Davi"), f"quem cadastrou aparece ({props.get('Cadastrado')})")
     await r.shot(pg, "pc")
     await pg.click('dialog.sheet [data-act="sheet-close"]')
     await pg.wait_for_selector("dialog.sheet", state="detached", timeout=4000)

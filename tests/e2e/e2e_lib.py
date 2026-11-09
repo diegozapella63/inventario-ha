@@ -102,7 +102,7 @@ class Run:
             b.close = b_close
         return b
 
-    async def page(self, b, size="cel", scheme="dark", accent="amarelo", ua=None, perms=None, init=None, user="Diego", motion="reduce"):
+    async def page(self, b, size="cel", scheme="dark", accent="amarelo", ua=None, perms=None, init=None, user="Davi", motion="reduce"):
         w, h, mobile = SIZES[size]
         ctx = await b.new_context(viewport={"width": w, "height": h}, device_scale_factor=2 if mobile else 1, is_mobile=mobile, has_touch=mobile,
                                   color_scheme=scheme, reduced_motion=motion, user_agent=ua, permissions=perms or [],

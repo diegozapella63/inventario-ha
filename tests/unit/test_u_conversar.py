@@ -31,7 +31,7 @@ class Contexto(UnitBase):
         self.assertIn("Item na tela: SAL-007 Smart TV 55 polegadas | Sala de estar | Eletrônicos | qtd 1 | R$ 2.300", c)
 
     def test_item_com_detalhes(self):
-        self.store.update_item(TV, {"details": "Comprada em 2024, com nota"}, "Diego")
+        self.store.update_item(TV, {"details": "Comprada em 2024, com nota"}, "Davi")
         self.assertIn("Detalhes: Comprada em 2024, com nota", server.chat_context({"view": "item", "item": TV}))
 
     def test_item_leva_as_novidades_conferidas(self):
@@ -105,7 +105,7 @@ class Instrucoes(UnitBase):
         self.assertIn("qualquer outro assunto", server.chat_prompt(msgs("oi"), {}, None))
 
     def test_nome_de_quem_usa(self):
-        self.assertIn("da casa de Diego", server.chat_prompt(msgs("oi"), {}, "Diego"))
+        self.assertIn("da casa de Davi", server.chat_prompt(msgs("oi"), {}, "Davi"))
         self.assertIn("da casa, dentro", server.chat_prompt(msgs("oi"), {}, None))
 
     def test_conversa_na_ordem(self):
@@ -154,7 +154,7 @@ class Pergunta(UnitBase):
     def test_tarefa_de_ia_responde(self):
         ha = self.fake_ha()
         ha.ai_reply = lambda kind, payload: "A sala vale R$ 7.630."
-        res = server.ai_chat({"messages": msgs("quanto vale a sala?"), "screen": {"view": "room", "room": SALA}}, "Diego")
+        res = server.ai_chat({"messages": msgs("quanto vale a sala?"), "screen": {"view": "room", "room": SALA}}, "Davi")
         self.assertEqual(res["reply"], "A sala vale R$ 7.630.")
         body = ha.calls("POST", "/core/api/services/ai_task")[-1]["body"]
         self.assertEqual(body["task_name"], "InventarIA: conversa")

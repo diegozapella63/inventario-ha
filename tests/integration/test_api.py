@@ -41,9 +41,9 @@ class Tela(ServerCase):
 
 class Dados(ServerCase):
     def test_tudo_o_que_a_tela_precisa(self):
-        d = self.app.ok("GET", "api/data", headers={"X-Remote-User-Display-Name": "Diego"})
+        d = self.app.ok("GET", "api/data", headers={"X-Remote-User-Display-Name": "Davi"})
         self.assertEqual((len(d["rooms"]), len(d["items"]), len(d["cats"])), (6, 38, 15))
-        self.assertEqual(d["user"], "Diego")
+        self.assertEqual(d["user"], "Davi")
         self.assertEqual(d["settings"], {"ai_entity": "", "ai_search": "", "voice_stt": "", "ai": True, "zones": False, "ha_sensors": False,
                                          "news": True, "news_every": 0, "news_notify": "", "bens": True, "correria": False})
         self.assertIsNone(d["correria_uso"], "CorrerIA desligado: sem o último uso")
@@ -63,10 +63,10 @@ class Itens(ServerCase):
     def test_ciclo_completo(self):
         foto = self.upload_photo()
         st, _, out = self.app.post("api/items", {"room": "quarto", "name": "Cômoda", "details": "branca", "cat": "moveis", "qty": "1",
-                                                 "value": "1.200,00", "photos": [foto]}, headers={"X-Remote-User-Name": "dessa"})
+                                                 "value": "1.200,00", "photos": [foto]}, headers={"X-Remote-User-Name": "aurora"})
         self.assertEqual(st, 201)
         it = out["item"]
-        self.assertEqual((it["value"], it["photos"], it["createdBy"], it["room"]), (1200, [foto], "dessa", "quarto"))
+        self.assertEqual((it["value"], it["photos"], it["createdBy"], it["room"]), (1200, [foto], "aurora", "quarto"))
         st, _, out = self.app.put(f"api/items/{it['id']}", {"name": "Cômoda de 4 gavetas", "_base": it["updatedAt"]})
         self.assertEqual((st, out["item"]["name"]), (200, "Cômoda de 4 gavetas"))
         time.sleep(1.05)

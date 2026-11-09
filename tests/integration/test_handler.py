@@ -226,10 +226,10 @@ class Usuario(HandlerCase):
         return out["item"]
 
     def test_nome_de_exibicao_vale_mais_que_o_usuario(self):
-        it = self.criar({"X-Remote-User-Display-Name": "Diego Exemplo", "X-Remote-User-Name": "diego"})
-        self.assertEqual((it["createdBy"], it["updatedBy"]), ("Diego Exemplo", "Diego Exemplo"))
-        self.assertEqual(self.app.ok("GET", "api/data", headers={"X-Remote-User-Display-Name": "Diego Exemplo", "X-Remote-User-Name": "diego"})["user"],
-                         "Diego Exemplo")
+        it = self.criar({"X-Remote-User-Display-Name": "Davi Exemplo", "X-Remote-User-Name": "davi"})
+        self.assertEqual((it["createdBy"], it["updatedBy"]), ("Davi Exemplo", "Davi Exemplo"))
+        self.assertEqual(self.app.ok("GET", "api/data", headers={"X-Remote-User-Display-Name": "Davi Exemplo", "X-Remote-User-Name": "davi"})["user"],
+                         "Davi Exemplo")
 
     def test_nome_cortado_em_60(self):
         self.assertEqual(self.criar({"X-Remote-User-Display-Name": "N" * 80})["createdBy"], "N" * 60)

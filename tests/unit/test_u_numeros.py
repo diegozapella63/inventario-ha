@@ -9,7 +9,7 @@ class NumeroNaoVolta(UnitBase):
         return max(i["seq"] for i in self.items_in(rid))
 
     def novo(self, rid="sala", name="Item novo"):
-        return self.store.create_items([{"room": rid, "name": name}], "Diego")[0]
+        return self.store.create_items([{"room": rid, "name": name}], "Davi")[0]
 
     def test_excluir_o_ultimo_nao_devolve_o_numero(self):
         it = self.novo()
@@ -21,7 +21,7 @@ class NumeroNaoVolta(UnitBase):
     def test_mover_o_ultimo_para_outro_comodo_nao_devolve_o_numero(self):
         it = self.novo()
         seq = it["seq"]
-        self.store.update_item(it["id"], {"room": "cozinha"}, "Diego")
+        self.store.update_item(it["id"], {"room": "cozinha"}, "Davi")
         self.assertEqual(self.novo()["seq"], seq + 1)
 
     def test_o_comodo_guarda_o_maior_numero_usado(self):
@@ -32,7 +32,7 @@ class NumeroNaoVolta(UnitBase):
     def test_desfazer_volta_o_item_com_o_mesmo_numero_e_id(self):
         it = self.novo()
         apagado = self.store.delete_item(it["id"])
-        volta = self.store.create_items([dict(apagado)], "Diego", restore=True)[0]
+        volta = self.store.create_items([dict(apagado)], "Davi", restore=True)[0]
         self.assertEqual((volta["id"], volta["seq"]), (it["id"], it["seq"]))
 
     def test_comodo_sem_lastseq_continua_do_maior_item(self):
@@ -43,7 +43,7 @@ class NumeroNaoVolta(UnitBase):
     def test_lote_desfeito_nao_deixa_numero_guardado(self):
         antes = self.store.next_seq("sala")
         with self.assertRaises(self.S.ApiError):
-            self.store.create_items([{"room": "sala", "name": "a"}, {"room": "sala", "name": ""}], "Diego")
+            self.store.create_items([{"room": "sala", "name": "a"}, {"room": "sala", "name": ""}], "Davi")
         self.assertEqual(self.store.next_seq("sala"), antes)
 
     def test_lastseq_vai_para_a_gravacao(self):
