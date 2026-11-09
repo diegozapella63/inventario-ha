@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.39.4
+
+- **Novidades**: a busca começa pela página de suporte do fabricante, nos downloads, onde ficam os arquivos de firmware e de atualização do sistema com a data, e procura também a página do mesmo modelo em outro país quando a do Brasil não mostra os arquivos. Se a busca ainda não achar, cole o endereço da página de suporte nos **Detalhes** do item: ela é aberta primeiro.
+
 ## 1.39.3
 
 - **Mais › Novidades**: um item dos **Deixados de fora pela IA** que você conferiu sobe para a lista, com o que foi achado, e passa a entrar nas próximas conferências. Antes ele ficava embaixo, como se não tivesse sido conferido.

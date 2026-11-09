@@ -32,6 +32,19 @@ class Instrucoes(UnitBase):
     def test_pede_a_busca_na_web(self):
         self.assertIn("Use a busca na web agora", server.news_prompt("Lâmpada", ""))
 
+    def test_comeca_pela_pagina_de_suporte_do_fabricante(self):
+        """1.39.4: o firmware fica nos downloads da página de suporte (às vezes só na do mesmo modelo em outro país)."""
+        p = server.news_prompt("TV Exemplo 50 polegadas XY50", "")
+        self.assertIn("Comece pela página de suporte do fabricante", p)
+        self.assertIn("cada arquivo de firmware ou de atualização do sistema", p)
+        self.assertIn("procure a do mesmo modelo em outro país", p)
+        self.assertNotIn("Abra primeiro", p, "sem endereço nos detalhes")
+
+    def test_endereco_nos_detalhes_abre_primeiro(self):
+        p = server.news_prompt("TV Exemplo", "Comprada em 2024. Suporte: https://exemplo.com/suporte/XY50 (firmware)")
+        self.assertIn("Abra primeiro a página indicada nos detalhes (https://exemplo.com/suporte/XY50).", p)
+        self.assertLess(p.index("Abra primeiro"), p.index("Comece pela página de suporte"))
+
     def test_diz_a_data_de_hoje(self):
         self.assertIn("Hoje é 2026-11-04", server.news_prompt("Lâmpada", ""), "a data de hoje (INV_HOJE nos testes)")
 

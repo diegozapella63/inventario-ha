@@ -115,6 +115,7 @@ A IA recebe só o nome, o começo dos detalhes e a quantidade do item. O app bai
 
 Na ficha de um eletrônico, **Novidades** pede à IA de busca (a mesma da busca de fotos, em Mais > Configurações > Integrações) o que saiu nos últimos 12 meses e o que já foi anunciado para os próximos meses sobre o produto: atualizações de firmware ou software, modelo novo, lançamentos da mesma linha, recalls e fim de suporte.
 
+- A busca começa pela página de suporte do fabricante, nos downloads (os arquivos de firmware e de atualização do sistema, com a data), e olha também a do mesmo modelo em outro país, que costuma ter um código um pouco diferente. Se ainda assim não achar, cole o endereço da página de suporte nos **Detalhes** do item: a IA abre essa página primeiro.
 - Vêm só as 3 novidades mais recentes, dos últimos 12 meses. Cada uma vem com o tipo, a data quando se sabe e o site da fonte, que abre fora do app. Sem fonte, não entra. Rumor aparece marcado como **Boato**; recall fica em destaque, mas só quando o produto é chamado de volta (troca, conserto ou reembolso); falha de segurança corrigida por atualização aparece como Atualização.
 - A IA só acha o que já foi publicado: lançamento que ainda não foi anunciado não aparece.
 - As novidades aparecem na própria ficha e ficam guardadas: ao abrir a ficha de novo, já estão lá, sem chamar a IA. **Buscar de novo** pergunta outra vez; fechar a ficha no meio da busca não perde o resultado. Cada busca conta em Uso da IA.

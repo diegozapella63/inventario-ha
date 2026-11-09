@@ -48,7 +48,7 @@ import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.39.3"
+VERSION = "1.39.4"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -2363,13 +2363,23 @@ MOCK_NEWS = {"produto": "Produto de exemplo", "novidades": [
 
 
 def news_prompt(name: str, details: str) -> str:
+    links = re.findall(r"https?://[^\s<>\"']+", details or "")
     return "\n".join(filter(None, [
         "Você acompanha os equipamentos e objetos de uma casa no Brasil.",
         f"Produto: {name}",
         f"Detalhes: {details}" if details else "",
         f"Hoje é {news_today().isoformat()}.",
         "",
-        "Use a busca na web agora. Procure, de preferência no site do fabricante e em sites de tecnologia e de notícias confiáveis, "
+        "Use a busca na web agora.",
+        f"Abra primeiro a página indicada nos detalhes ({', '.join(links[:2])})." if links else "",
+        # a busca comum não achava o firmware: ele fica na página de suporte do fabricante, nos downloads, e às vezes só na
+        # do mesmo modelo em outro país (o código muda um pouco por região)
+        "Comece pela página de suporte do fabricante para este modelo, na parte de downloads ou de software (manuais e downloads, "
+        "firmware, atualização de software): cada arquivo de firmware ou de atualização do sistema com data nos últimos 12 meses "
+        "é uma atualização (no título, a versão; a data é a do arquivo; a fonte é a página de suporte). O mesmo aparelho costuma "
+        "ter um código um pouco diferente em cada país (mudam as letras do começo ou do fim): se a página do Brasil não mostrar "
+        "os arquivos, procure a do mesmo modelo em outro país.",
+        "Depois procure, no site do fabricante e em sites de tecnologia e de notícias confiáveis, "
         "o que saiu nos últimos 12 meses e o que já foi anunciado para os próximos meses sobre este produto:",
         "- atualizações de firmware, software ou aplicativo;",
         "- modelo novo ou sucessor;",
