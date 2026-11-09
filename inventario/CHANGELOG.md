@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.39.3
+
+- **Mais › Novidades**: um item dos **Deixados de fora pela IA** que você conferiu sobe para a lista, com o que foi achado, e passa a entrar nas próximas conferências. Antes ele ficava embaixo, como se não tivesse sido conferido.
+
 ## 1.39.2
 
 - **Mais › Novidades**: o mesmo eletrônico escrito de jeitos um pouco diferentes vira uma linha só e uma busca só, como "Amazon Echo Spot (2024) preto" e "Amazon Echo Spot 2024". A cor, os parênteses, palavras como "de" e "com" e a ordem das palavras não separam mais. O ano, a marca e o tamanho continuam separando.

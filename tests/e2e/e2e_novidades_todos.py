@@ -80,7 +80,8 @@ async def body(r, p):
     r.check(len(sent) == 1, f"um deixado de fora pode ser conferido sozinho ({nome})")
     await pg.click("dialog.modal .dlg-h [data-x]")
     await pg.wait_for_timeout(500)
-    r.check("novidades" in await pg.locator(".news-out .nrow", has_text=nome).first.text_content(), "e a lista já mostra o resultado")
+    r.eq(await pg.locator(".news-out .nrow", has_text=nome).count(), 0, "conferido, sai dos deixados de fora")
+    r.check("novidades" in await pg.locator("#p-news-list > div > .nlist .nrow", has_text=nome).first.text_content(), "e entra na lista, com o resultado")
 
     # de novo na mesma semana: nada a conferir
     await pg.click('[data-act="news-all"]')

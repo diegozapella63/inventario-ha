@@ -424,6 +424,22 @@ class Grupo(UnitBase):
         self.assertFalse(any("LX20" in x for x in seen), "sem gastar a IA de novo")
         self.assertEqual(server.news_of(b)["news"]["novidades"][0]["titulo"], "Firmware do grupo")
 
+    def test_deixado_de_fora_conferido_pela_pessoa_passa_a_ser_conferido(self):
+        a = self.add("sala", "Roteador Wi-Fi Exemplo AX10")
+        with server.NEWS_LOCK:
+            d = server.news_read()
+            d["triagem"][a] = {"sig": server.item_sig(server.STORE.item(a)), "conferir": False}  # a IA deixou de fora
+            d["itens"][a] = {"at": "2026-01-01T10:00:00", "sig": "", "news": server.news_clean(novidade("Antiga"))}  # e a pessoa conferiu
+            server.write_json_atomic(server.NEWS_FILE, d)
+        seen = []
+        with mock.patch.object(server, "AI_MOCK", True), mock.patch.object(server.time, "sleep", lambda s: None), \
+                mock.patch.object(server, "ai_triage", lambda its: set()), \
+                mock.patch.object(server, "ai_find_news", lambda n, de, e: seen.append(n) or novidade()):
+            jid = server.news_batch_start()["id"]
+            while server.WEB_JOBS[jid]["stage"] == "busy":
+                time.sleep(0.02)
+        self.assertIn("Roteador Wi-Fi Exemplo AX10", seen, "conferido pela pessoa: entra nas próximas conferências")
+
     def test_o_mesmo_noutra_cor_e_uma_linha_so(self):
         a = self.add("sala", "Amazon Echo Spot (2024) preto")
         b = self.add("cozinha", "Amazon Echo Spot 2024")

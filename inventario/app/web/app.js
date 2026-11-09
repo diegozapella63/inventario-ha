@@ -1385,8 +1385,9 @@
     const res = ov.itens || {}, tri = ov.triagem || {};
     const rank = (g) => (newsRecall(g.r) ? 0 : newsCount(g.r) ? 1 : !g.r ? 2 : 3);
     const sortG = (a, b) => rank(a) - rank(b) || newsCount(b.r) - newsCount(a.r) || a.it.name.localeCompare(b.it.name, "pt-BR");
-    const chosen = newsGroups(D.items.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || (res[it.id] && tri[it.id] !== false))), ov).sort(sortG);
-    const out = newsGroups(D.items.filter((it) => tri[it.id] === false && ov.cats.includes(it.cat)), ov).sort(sortG);
+    // na lista: os que a IA escolheu e os já conferidos (um deixado de fora conferido sai de lá); embaixo, os deixados de fora
+    const chosen = newsGroups(D.items.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || res[it.id])), ov).sort(sortG);
+    const out = newsGroups(D.items.filter((it) => tri[it.id] === false && !res[it.id] && ov.cats.includes(it.cat)), ov).sort(sortG);
     ls.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map(newsRow).join("")}</ul>`
         : `<p class="muted">${ov.pendentes ? "Toque em Conferir novidades: a IA escolhe os equipamentos." : "Nenhum item em Eletrônicos."}</p>`}
       ${out.length ? `<details class="news-out"><summary>${ic("chev", "sm")}Deixados de fora pela IA (${int(out.length)})</summary><ul class="nlist">${out.map(newsRow).join("")}</ul></details>` : ""}`;

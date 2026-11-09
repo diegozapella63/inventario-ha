@@ -354,7 +354,7 @@
       for (const i of d.items) if (cats.includes(i.cat) && !(i.id in ST.news.triagem)) ST.news.triagem[i.id] = PICK.test(plain(i.name));
       const week = Date.now() - 7 * 864e5;
       const seen = new Set();
-      const todo = d.items.filter((i) => cats.includes(i.cat) && ST.news.triagem[i.id] && !(ST.news.itens[i.id] && Date.parse(ST.news.itens[i.id].at) > week))
+      const todo = d.items.filter((i) => cats.includes(i.cat) && (ST.news.triagem[i.id] || ST.news.itens[i.id]) && !(ST.news.itens[i.id] && Date.parse(ST.news.itens[i.id].at) > week))
         .filter((i) => !seen.has(groupKey(i)) && seen.add(groupKey(i))); // uma busca por equipamento
       const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");
       ST.jobs.set(id, { lote: true, at: Date.now(), todo, saved: 0, done: false });

@@ -48,7 +48,7 @@ import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.39.2"
+VERSION = "1.39.3"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -2686,7 +2686,8 @@ def _news_batch_run(jid: str):
                 write_json_atomic(NEWS_FILE, d)
         # sozinho, de tempos em tempos: confere de novo o que tem mais tempo que o intervalo (menos um dia de folga)
         fresh = time.time() - (max(1, news_every() - 1) if job.get("auto") else NEWS_FRESH_DAYS) * 86400
-        sel = [i for i in cands if (d["triagem"].get(i["id"]) or {}).get("conferir")]
+        # os que a IA escolheu e os que a pessoa conferiu (um deixado de fora conferido pela ficha passa a ser conferido também)
+        sel = [i for i in cands if (d["triagem"].get(i["id"]) or {}).get("conferir") or i["id"] in d["itens"]]
 
         def checked_at(i):
             at = (d["itens"].get(i["id"]) or {}).get("at")
