@@ -139,8 +139,10 @@ async def body(r, p):
     await pg.wait_for_selector("#bk-zones")
     r.check(await pg.locator("#bk-zones .chip", has_text="Parede da TV").count() == 1, "as zonas do cômodo viram opções")
     await pg.locator("#bk-zones .chip", has_text="Sem zona").click()
+    # o aviso de antes ainda pode estar saindo (no GitHub, mais lento): espera o novo
+    await pg.evaluate("document.querySelectorAll('.toast').forEach(t => t.dataset.velho = '1')")
     await pg.click("dialog.modal [data-ok]")
-    await pg.locator(".toast", has_text="3 itens alterados").wait_for(timeout=6000)
+    await pg.locator(".toast:not([data-velho])", has_text="3 itens alterados").wait_for(timeout=6000)
     d = {i["id"]: i for i in r.data()["items"]}
     r.eq([d[i]["zone"] for i in ids], [""] * 3, "Sem zona tira a zona")
     await pg.click('[data-act="sel-end"]')
