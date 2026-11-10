@@ -1,10 +1,32 @@
 """As caixas de seleção (1.35.0): web/selectsheet.js, o mesmo arquivo dos outros apps da família. Uma caixa não abre a
 janela padrão do celular: abre uma janela no visual do app, de baixo para cima, com as opções em linhas e a atual
 marcada na cor do app, no claro e no escuro. Escolher entra na própria caixa (o app ouve como sempre); o Voltar do
-celular, o X e tocar fora fecham só ela, e o Voltar seguinte é o do app. No computador, no meio; o teclado também."""
+celular, o X e tocar fora fecham só ela, e o Voltar seguinte é o do app. No computador, no meio; o teclado também.
+A caixa fechada (1.41.0) é igual aos outros campos: 44 px de altura (38 nas linhas do Catalogar, como os campos de lá),
+os mesmos cantos, a seta na cor do texto apagado do tema (claro e escuro) e o texto inteiro, em 384 e 320 px."""
 from e2e_lib import main
 
 HEX = "(h) => { h = h.trim().replace('#', ''); return `rgb(${parseInt(h.slice(0, 2), 16)}, ${parseInt(h.slice(2, 4), 16)}, ${parseInt(h.slice(4, 6), 16)})`; }"
+
+
+# cada caixa visível: altura, cantos (os do campo de texto), a seta (cor do --muted do tema), o texto inteiro e o toque barrado
+CLOSED = """() => { const bad = [], muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim().replace('#', '').toLowerCase();
+  const inp = document.createElement('input'); inp.className = 'input'; document.body.append(inp); const rad = getComputedStyle(inp).borderRadius; inp.remove();
+  const c = document.createElement('canvas').getContext('2d'); let n = 0;
+  for (const s of document.querySelectorAll('select')) {
+    if (!s.offsetParent) continue; n++;
+    const cs = getComputedStyle(s), r = s.getBoundingClientRect(), name = s.getAttribute('aria-label') || s.id || s.dataset.input;
+    const want = s.closest('.found') ? 38 : 44;
+    if (Math.round(r.height) !== want) bad.push(name + ': altura ' + r.height);
+    if (cs.borderRadius !== rad) bad.push(name + ': cantos ' + cs.borderRadius + ' (campo ' + rad + ')');
+    if (!cs.backgroundImage.toLowerCase().includes('%23' + muted)) bad.push(name + ': seta fora da cor do tema');
+    if (cs.pointerEvents !== 'none') bad.push(name + ': a caixa recebe o toque');
+    c.font = cs.fontSize + ' ' + cs.fontFamily;
+    const t = (s.options[s.selectedIndex] || {}).text || '';
+    if (c.measureText(t).width > r.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) + 1) bad.push(name + ': texto cortado');
+    if (r.right > innerWidth + 1 || r.left < -1) bad.push(name + ': passa da tela');
+  }
+  return n ? bad : ['nenhuma caixa']; }"""
 
 
 async def tap(pg, sel):
@@ -105,6 +127,26 @@ async def body(r, p):
     await pg.wait_for_timeout(600)
     r.eq(await loc.evaluate("(s) => s.selectedIndex"), 1, "computador: Enter abre, as setas e o Enter escolhem")
     await ctx.close()
+    # a caixa fechada, igual aos outros campos: nas telas e nas janelas, claro e escuro, 384 e 320 px
+    for size in ("cel", "estreito"):
+        for scheme in ("light", "dark"):
+            ctx, pg = await r.page(b, size, scheme, accent="verde")
+            for h in ("#/buscar", "#/config/integracoes", "#/config/opcoes"):
+                await r.open(pg, h)
+                await pg.wait_for_timeout(500)
+                bad = await pg.evaluate(CLOSED)
+                r.check(not bad, f"[{size} {scheme}] {h}: as caixas fechadas iguais aos campos" + (f": {bad[:3]}" if bad else ""))
+            for h, opener, wait in (("#/i/sal-001", 'dialog.sheet [data-act="item-edit"].primary', "#f-cat"), ("#/i/sal-002", 'dialog.sheet [data-act="item-move"]', "#mv-room"),
+                                    ("#/c/quarto", '.rhead-actions [data-act="catalog"]', "#c-room")):
+                await r.open(pg, h, "dialog.sheet h1, .rhead")
+                await pg.click(opener)
+                await pg.wait_for_selector(wait)
+                await pg.wait_for_timeout(400)
+                bad = await pg.evaluate(CLOSED)
+                r.check(not bad, f"[{size} {scheme}] {wait}: as caixas fechadas iguais aos campos" + (f": {bad[:3]}" if bad else ""))
+                if wait == "#f-cat" and size == "cel":
+                    await r.shot(pg, f"fechada-{scheme}")
+            await ctx.close()
     await b.close()
 
 

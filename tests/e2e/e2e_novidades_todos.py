@@ -1,5 +1,6 @@
 """Novidades (no menu Mais): só Eletrônicos, sem escolher categorias; conferir todos (a IA escolhe, entre os eletrônicos, o que vale conferir),
-progresso e Parar, a lista com recall primeiro, abrir um item, os deixados de fora, item de outra categoria fora da lista,
+progresso e Parar, a lista com recall primeiro, abrir um item, os deixados de fora (no fim, recolhidos, com a contagem; abertos, ficam
+abertos enquanto a tela está aberta), item de outra categoria fora da lista,
 Limpar novidades com confirmação e a aba some com a IA desligada."""
 from e2e_lib import OVERFLOW, main
 
@@ -10,6 +11,7 @@ async def body(r, p):
     r.start(search=False)
     for room, name in (("quarto", "Lâmpada inteligente Wi-Fi LX10"), ("sala", "Lâmpadas inteligentes Wi-Fi LX10")):  # o mesmo equipamento em 2 cômodos
         r.api("POST", "api/items", {"room": room, "name": name, "cat": "eletronicos", "value": 90})
+    r.api("POST", "api/items", {"room": "quarto", "name": "Rádio relógio despertador", "cat": "eletronicos", "value": 60})  # mais um que a IA deixa de fora
     b = await r.browser(p)
     ctx, pg = await r.page(b, "cel", "dark", accent="laranja")
     await r.open(pg, "#/novidades", "#p-news")
@@ -69,7 +71,10 @@ async def body(r, p):
     await pg.wait_for_timeout(300)
     r.check(pg.url.endswith("#/novidades") and await pg.locator("#p-news-list .nrow").count() > 0, "o Voltar volta para as Novidades")
 
-    # os deixados de fora: dá para conferir um por um
+    # os deixados de fora: no fim da lista, recolhidos, com o nome e a contagem (o padrão dos apps); abrem num toque
+    pos = await pg.evaluate("""(() => { const d = document.querySelector('#p-news-list .news-out'); return d ? [d.open, d === d.parentElement.lastElementChild,
+      d.querySelectorAll('.nrow').length, d.querySelector('summary').textContent.trim()] : null; })()""")
+    r.check(pos and pos[0] is False and pos[1] and pos[3] == f"Deixados de fora pela IA ({pos[2]})", f"deixados de fora: no fim, recolhidos, com a contagem ({pos})")
     await pg.click(".news-out summary")
     out_rows = pg.locator(".news-out .nrow")
     r.check(await out_rows.count() >= 1, "abre a lista dos deixados de fora")
@@ -81,6 +86,8 @@ async def body(r, p):
     await pg.click("dialog.modal .dlg-h [data-x]")
     await pg.wait_for_timeout(500)
     r.eq(await pg.locator(".news-out .nrow", has_text=nome).count(), 0, "conferido, sai dos deixados de fora")
+    if pos[2] > 1:
+        r.check(await pg.locator(".news-out[open]").count() == 1, "e a seção continua aberta, para conferir o próximo")
     r.check("novidades" in await pg.locator("#p-news-list > div > .nlist .nrow", has_text=nome).first.text_content(), "e entra na lista, com o resultado")
 
     # de novo na mesma semana: nada a conferir
@@ -92,6 +99,8 @@ async def body(r, p):
     st, _, out = r.app.request("POST", "api/news", {"item": "coz-004"})
     r.eq((st, out.get("error")), (400, "As novidades são só dos eletrônicos."), "a geladeira (Cozinha) não é conferida")
     await r.open(pg, "#/novidades", "#p-news-list .nlist")
+    if pos[2] > 1:
+        r.eq(await pg.locator(".news-out:not([open])").count(), 1, "ao voltar à tela, os deixados de fora recolhidos de novo")
     todos = await pg.evaluate("[...document.querySelectorAll('#p-news-list .nrow b')].map(b => b.textContent)")
     r.check("Geladeira frost free inox" not in todos and "Smart TV 55 polegadas" in todos, "e não entra na lista: só eletrônicos")
     r.eq(await pg.locator("#view .chip").count(), 0, "e continua sem escolher categorias")

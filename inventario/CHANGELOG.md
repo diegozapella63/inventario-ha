@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.41.0
+
+- **Zona** (no cadastro, no **Mover** e no **Catalogar itens com IA**): as sugestões das zonas do cômodo aparecem logo abaixo do campo, no visual do app, em vez da lista do celular. Até 6, as que combinam com o que você digita (sem precisar de acento); num campo que já tem uma zona, as outras. Tocar numa preenche o campo, e o teclado não fecha.
+- As caixas de seleção fechadas ficam iguais aos outros campos: os filtros do **Buscar** com a mesma altura, e a seta na cor certa no tema escuro.
+- **Mais › Novidades**: **Deixados de fora pela IA** continua aberto depois de conferir um deles, para conferir o próximo. Ao voltar à tela, começa recolhido.
+
 ## 1.40.0
 
 - **Buscar › Selecionar** como no ResolvIA: embaixo, um botão só, **Alterar N itens**, abre uma janela com **Cômodo**, **Categoria** e **Zona** (com as zonas ligadas). Cada um começa em **Manter**; dá para mudar o cômodo e a categoria juntos. Na zona, as zonas do cômodo aparecem como opções, além de **Sem zona** e **Outra**. No alto, o **X** sai do Selecionar e **Todos** marca a lista inteira (de novo, **Nenhum**). O aviso diz quantos itens foram alterados e tem **Desfazer**.

@@ -382,6 +382,83 @@
   });
   const topEntry = () => stack[stack.length - 1];
 
+  // ------------------------------------------------------------------ sugestões no visual do app
+  // No lugar da lista do celular (<datalist>, que no Android abre fora do padrão), como no GerencIA: o campo com
+  // data-sug="<id do datalist>" mostra logo abaixo, dentro da janela, até 6 sugestões que combinam com o que foi
+  // digitado (sem acento); ao entrar num campo que já tem uma delas, as outras. Tocar numa preenche o campo (com os
+  // eventos input e change de sempre); sair do campo, Esc ou escolher fecha. No teclado, as setas marcam uma e o Enter escolhe.
+  let SUG = null; // {inp, box, at, press}
+  function sugClose() { if (SUG) { SUG.box.remove(); SUG = null; } }
+  function sugShow(inp, entering = false) {
+    const dl = document.getElementById(inp.dataset.sug), cur = norm(inp.value.trim());
+    const all = dl ? [...new Set([...dl.options].map((o) => o.value))].filter(Boolean) : [];
+    const q = entering && all.some((v) => norm(v) === cur) ? "" : cur;
+    const ops = all.filter((v) => norm(v) !== cur && (!q || norm(v).includes(q))).slice(0, 6);
+    if (!ops.length) { sugClose(); return; }
+    const fresh = !SUG || SUG.inp !== inp || !SUG.box.isConnected;
+    if (fresh) {
+      sugClose();
+      const box = document.createElement("div");
+      box.className = "sug-box";
+      box.setAttribute("role", "listbox");
+      if (inp.id) box.id = `${inp.id}-sug`;
+      // embaixo do campo (ou da linha dele, quando o campo divide a linha com outros, como no Catalogar)
+      (inp.closest(".frow2") || inp).insertAdjacentElement("afterend", box);
+      SUG = { inp, box, at: -1, press: false };
+    }
+    SUG.at = -1;
+    SUG.box.innerHTML = ops.map((v) => `<button type="button" class="sug-op" role="option" tabindex="-1" data-sugv="${esc(v)}">${esc(v)}</button>`).join("");
+    if (fresh) requestAnimationFrame(() => { if (SUG && SUG.box.isConnected) SUG.box.scrollIntoView({ block: "nearest" }); });
+  }
+  function sugPick(b) {
+    if (!SUG) return;
+    const inp = SUG.inp;
+    inp.value = b.dataset.sugv;
+    sugClose();
+    inp.dispatchEvent(new Event("input", { bubbles: true }));
+    inp.dispatchEvent(new Event("change", { bubbles: true }));
+    sugClose(); // o input acima mostraria as que ainda combinam: escolher fecha
+  }
+  const isSug = (t) => t && t.matches && t.matches("input[data-sug]");
+  document.addEventListener("focusin", (e) => { if (isSug(e.target)) sugShow(e.target, true); });
+  document.addEventListener("input", (e) => { if (isSug(e.target) && document.activeElement === e.target) sugShow(e.target); });
+  document.addEventListener("focusout", (e) => {
+    if (!SUG || e.target !== SUG.inp) return;
+    setTimeout(() => { if (SUG && !SUG.press && document.activeElement !== SUG.inp) sugClose(); }, 150);
+  });
+  // o toque na sugestão não tira o foco do campo (o teclado do celular fica); arrastar para rolar não escolhe
+  document.addEventListener("pointerdown", (e) => {
+    const b = e.target.closest && e.target.closest(".sug-op");
+    if (!b || !SUG) return;
+    e.preventDefault();
+    SUG.press = true;
+  }, true);
+  document.addEventListener("mousedown", (e) => { if (e.target.closest && e.target.closest(".sug-op")) e.preventDefault(); }, true);
+  const sugRelease = () => { if (SUG) { SUG.press = false; if (document.activeElement !== SUG.inp) sugClose(); } };
+  document.addEventListener("pointercancel", sugRelease, true);
+  document.addEventListener("pointerup", () => { if (SUG && SUG.press) setTimeout(sugRelease, 300); }, true); // depois do clique
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest && e.target.closest(".sug-op");
+    if (!b || !SUG || !SUG.box.contains(b)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    sugPick(b);
+  }, true);
+  document.addEventListener("keydown", (e) => {
+    if (!SUG || e.target !== SUG.inp) return;
+    const ops = [...SUG.box.querySelectorAll(".sug-op")];
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); sugClose(); return; } // só a lista, não a janela
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      SUG.at = Math.max(-1, Math.min(ops.length - 1, SUG.at + (e.key === "ArrowDown" ? 1 : -1)));
+      ops.forEach((o, i) => { o.classList.toggle("on", i === SUG.at); o.setAttribute("aria-selected", i === SUG.at ? "true" : "false"); });
+      if (ops[SUG.at]) ops[SUG.at].scrollIntoView({ block: "nearest" });
+      return;
+    }
+    if (e.key === "Enter" && ops[SUG.at] && !e.isComposing) { e.preventDefault(); e.stopPropagation(); sugPick(ops[SUG.at]); }
+    else if (e.key === "Tab") sugClose();
+  }, true);
+
   function confirmBox({ title, body = "", ok = "Confirmar", cancel = "Cancelar", danger = false }) {
     return new Promise((resolve) => {
       let answer = false;
@@ -1405,9 +1482,12 @@
     // na lista: os que a IA escolheu e os já conferidos (um deixado de fora conferido sai de lá); embaixo, os deixados de fora
     const chosen = newsGroups(D.items.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || res[it.id])), ov).sort(sortG);
     const out = newsGroups(D.items.filter((it) => tri[it.id] === false && !res[it.id] && ov.cats.includes(it.cat)), ov).sort(sortG);
+    // os deixados de fora no fim, recolhidos (o padrão dos apps para o que fica de fora): abertos, ficam abertos
+    // enquanto a tela está aberta (conferir um por um não fecha a lista); ao voltar à tela, recolhidos de novo
+    const wasOpen = !!$(".news-out[open]", ls);
     ls.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map(newsRow).join("")}</ul>`
         : `<p class="muted">${ov.pendentes ? "Toque em Conferir novidades: a IA escolhe os equipamentos." : "Nenhum item em Eletrônicos."}</p>`}
-      ${out.length ? `<details class="news-out"><summary>${ic("chev", "sm")}Deixados de fora pela IA (${int(out.length)})</summary><ul class="nlist">${out.map(newsRow).join("")}</ul></details>` : ""}`;
+      ${out.length ? `<details class="news-out"${wasOpen ? " open" : ""}><summary>${ic("chev", "sm")}Deixados de fora pela IA (${int(out.length)})</summary><ul class="nlist">${out.map(newsRow).join("")}</ul></details>` : ""}`;
     if (!newsJob) renderNewsJob(null);
   }
   function renderNewsJob(st) {
@@ -2402,7 +2482,7 @@
           <p class="muted" style="margin:0">${esc(it.name)}</p>
           <div class="field"><label for="mv-room">Para o cômodo</label><select id="mv-room" class="select" name="room">${roomOptions(it.room)}</select>
             ${zones ? "" : `<p class="help">Em outro cômodo, o item ganha um código novo.</p>`}</div>
-          ${zones ? `<div class="field"><label for="mv-zone">Zona</label><input id="mv-zone" class="input" name="zone" list="mv-zones" value="${esc(it.zone || "")}" autocomplete="off"><datalist id="mv-zones">${zonesFor(it.room)}</datalist>
+          ${zones ? `<div class="field"><label for="mv-zone">Zona</label><input id="mv-zone" class="input" name="zone" data-sug="mv-zones" value="${esc(it.zone || "")}" autocomplete="off"><datalist id="mv-zones">${zonesFor(it.room)}</datalist>
             <p class="help">Em outro cômodo, o item ganha um código novo.</p></div>` : ""}
         </div></form>
         <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok>${ic("move")}Mover</button></div></div>`,
@@ -2453,7 +2533,7 @@
     const otherCat = BENS_GROUPS.some(([k]) => k && k === F.cat) ? "outros" : F.cat || "outros"; // Outro guarda a categoria de um item que veio de um cômodo
     const tipoBtns = () => BENS_GROUPS.map(([k, name]) => { const on = (k || "") === bensGroup(F); return `<button type="button" data-ed="tipo" data-v="${k}" aria-pressed="${on}">${{ imoveis: "Imóvel", veiculos: "Veículo" }[k] || "Outro"}</button>`; }).join("");
     const roomField = `<div class="field"><label for="f-room">Cômodo</label><select id="f-room" class="select" name="room">${roomOptions(F.room)}</select></div>`;
-    const zoneField = `<div class="field"><label for="f-zone">Zona</label><input id="f-zone" class="input" name="zone" list="f-zones" maxlength="120" value="${esc(F.zone)}" placeholder="Ex.: Estante, Bancada"><datalist id="f-zones"></datalist></div>`;
+    const zoneField = `<div class="field"><label for="f-zone">Zona</label><input id="f-zone" class="input" name="zone" data-sug="f-zones" maxlength="120" autocomplete="off" value="${esc(F.zone)}" placeholder="Ex.: Estante, Bancada"><datalist id="f-zones"></datalist></div>`;
     const entry = openDialog({
       cls: "modal", label: title,
       html: `<div class="dlg">
@@ -2991,7 +3071,7 @@
               </div>${COARSE ? "" : `<p class="help" style="margin:0">Também dá para arrastar ou colar (Ctrl+V).</p>`}`}
           <div class="${zonesUse ? "row2" : ""}">
             <div class="field"><label for="c-room">Cômodo</label><select id="c-room" class="select" data-ct-in="room">${roomOpts(C.room, ["", "A IA escolhe"])}</select></div>
-            ${zonesUse ? `<div class="field"><label for="c-zone">Zona (opcional)</label><input id="c-zone" class="input" data-ct-in="zone" list="c-zones" value="${esc(C.zone)}" placeholder="Deixe vazio para a IA sugerir" autocomplete="off">
+            ${zonesUse ? `<div class="field"><label for="c-zone">Zona (opcional)</label><input id="c-zone" class="input" data-ct-in="zone" data-sug="c-zones" value="${esc(C.zone)}" placeholder="Deixe vazio para a IA sugerir" autocomplete="off">
               <datalist id="c-zones">${zonesOf(C.room).map((z) => `<option value="${esc(z)}">`).join("")}</datalist></div>` : ""}
           </div>
           <div class="field"><label for="c-hint">Dica para a IA (opcional)</label><input id="c-hint" class="input" data-ct-in="hint" value="${esc(C.hint)}" maxlength="300" placeholder="Ex.: são taças de cristal; o vaso é de cerâmica" autocomplete="off"></div>
@@ -3026,7 +3106,7 @@
                 <div class="money"><input class="input" data-ri="${i}" data-rf="value" value="${esc(moneyInput(r.value))}" inputmode="decimal" aria-label="Valor total"></div></div>
               <div class="frow2">${each ? `<select class="select${r.room ? "" : " need"}" data-ri="${i}" data-rf="room" aria-label="Cômodo">${roomOpts(r.room || "", r.room ? null : ["", "Qual cômodo?"])}</select>` : ""}
                 <select class="select" data-ri="${i}" data-rf="cat" aria-label="Categoria">${CATS.map(([k, v]) => `<option value="${k}"${k === r.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
-                ${zonesUse ? `<input class="input" data-ri="${i}" data-rf="zone" value="${esc(r.zone)}"${r.room ? ` list="cr-zones-${zl.indexOf(r.room)}"` : ""} placeholder="Zona" aria-label="Zona">` : ""}</div>
+                ${zonesUse ? `<input class="input" data-ri="${i}" data-rf="zone" value="${esc(r.zone)}"${r.room ? ` data-sug="cr-zones-${zl.indexOf(r.room)}"` : ""} placeholder="Zona" aria-label="Zona" autocomplete="off">` : ""}</div>
               ${r.details ? `<p class="fdet">${esc(r.details)}</p>` : ""}
               ${r.existing || r.confidence === "baixa" ? `<div class="fflag">${r.existing ? `<span class="pill warn">Parece já cadastrado: ${esc(r.existing)}</span>` : ""}${r.confidence === "baixa" ? `<span class="pill">IA pouco segura, confira</span>` : ""}</div>` : ""}
             </div></li>`).join("")}</ul>
