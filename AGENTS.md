@@ -76,6 +76,17 @@ O `config.yaml` tem o `url` do repositório. O `panel_admin` fica no padrão do 
 
 Este repositório é público e tem **só código**. O inventário real (itens, valores, fotos, cômodos da casa do dono) nunca entra aqui: nem em testes, nem em exemplos, nem em capturas, nem em mensagens de commit. Exemplos e capturas usam a casa inventada (`tests/fixtures/casa`, `tools/demo.py`). Nunca guarde IMEI, número de série ou telefone em nenhum lugar. Valores que o dono informou para os itens dele são dele: nada (script, migração, IA) muda um valor que já está gravado sem ele pedir. Antes de cada push, `git diff --cached` e uma busca por nomes, valores e números que não sejam da casa de teste.
 
+## Arquivos iguais em todos os apps
+
+A lista dos arquivos que são iguais nos apps da família fica em `tools/iguais.py` (ele também é igual em todos):
+`python3 tools/iguais.py` confere os daqui com os dos apps ao lado (`../resolvia-ha`, ...), e o GitHub confere a cada
+push (job **Arquivos iguais aos dos outros apps**, que baixa os outros apps). Mudou um arquivo da lista? Copie para os
+outros apps do grupo e publique todos. Um arquivo que passa a ser igual entra em `GRUPOS`, aqui e nas cópias.
+
+`share/<app>/integracao.json` começa igual em todos os apps: `app` (o id, como no `correria.json`), `nome`, `versao` e
+`gravado_em` (ISO 8601 com o fuso), depois os campos de cada app. O ResolvIA e o CronologIA ainda gravam o nome em
+`app` (as versões de antes conferem por ele) e quem lê aceita os dois; o id entra numa próxima versão.
+
 ## Como os apps conversam
 
 - Este app grava `share/inventario/integracao.json` (`url`, `ip_url`, `chave`) e responde, só para leitura e com `Authorization: Bearer <chave>`:

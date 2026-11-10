@@ -1165,6 +1165,14 @@ dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; 
 
 /* Mais: botões e listas de escolha das seções com a mesma largura, alinhados entre si */
 .more-panel .opts .oa > .btn:not(.icon), .more-panel .opts .oa > .select, .mscreen .opts .oa > .btn:not(.icon) { width: 280px; max-width: 100%; min-width: 0; height: 44px; }
+/* Configurações › Dados: os botões no padrão da família (o modelo é o GerencIA): na largura do cartão no celular (250 px a
+   partir de 1000 px), da mesma altura, com o ícone ao lado do texto; Criar backup cheio, os outros com borda, Apagar tudo vermelho */
+.sec-acao { display: flex; margin: 4px 0 12px; }
+.sec-acao > .btn, #p-export .opts .oa > .btn:not(.icon) { width: 100%; height: 50px; justify-content: center; font-size: 15px; }
+#p-export .opts .oa { flex: 1 1 100%; }
+@media (min-width: 1000px) { .sec-acao > .btn, #p-export .opts .oa > .btn:not(.icon) { width: 250px; } #p-export .opts .oa { flex: none; } }
+#p-backup .bk-lista:empty { display: none; }
+.sec-acao > .btn.danger { border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
 
 /* o aviso no celular (o mesmo componente dos apps da família): Horário e A cada lado a lado, do mesmo tamanho; Quem recebe
    com um botão por pessoa, dois por linha, do mesmo tamanho; Testar no meu celular na largura toda, embaixo */

@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.44.0
+
+- **Mais › Configurações › Dados**: os botões no padrão dos outros apps da família: na largura do cartão no celular, da mesma altura, sem a linha com o título repetido em cima de cada um. **Apagar tudo** fica vermelho.
+
 ## 1.43.0
 
 - **Opções › Novidades**: o aviso no celular igual ao dos outros apps da família. **Conferir sozinho** liga e desliga, com o **Horário** (sem AM/PM) e **A cada** 7, 15 ou 30 dias lado a lado; **Avisar no celular** liga o aviso; em **Quem recebe**, um botão para cada pessoa da casa (dá para escolher várias); **Testar no meu celular** fica embaixo, na largura toda. Quem já recebia o aviso continua recebendo.

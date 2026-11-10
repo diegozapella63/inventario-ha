@@ -492,7 +492,7 @@ class ConexaoCorreria(UnitBase):
     def test_integracao_json_continua_igual(self):
         c = S.Conexao()
         c.publicar()
-        self.assertEqual(self.ler(c)["app"], "InventarIA", "o ResolvIA e o GerencIA leem este arquivo")
+        self.assertEqual((self.ler(c)["app"], self.ler(c)["nome"]), ("inventario", "InventarIA"), "o ResolvIA e o GerencIA leem este arquivo (não olham o app)")
         self.assertNotIn("ferramentas", self.ler(c))
 
     def test_autorizado_sem_marcar_nao_guarda_o_ultimo(self):

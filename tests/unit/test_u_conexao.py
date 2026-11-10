@@ -129,7 +129,8 @@ class Publicar(UnitBase):
         c = S.Conexao()
         c.publicar()
         quando = datetime.fromisoformat(self.ler(c)["gravado_em"])
-        self.assertLess(abs((datetime.now() - quando).total_seconds()), 120, "um arquivo velho quer dizer que o app parou")
+        self.assertIsNotNone(quando.tzinfo, "com o fuso, como nos outros apps da família")
+        self.assertLess(abs((datetime.now().astimezone() - quando).total_seconds()), 120, "um arquivo velho quer dizer que o app parou")
 
     def test_substitui_o_arquivo_anterior(self):
         c = S.Conexao()

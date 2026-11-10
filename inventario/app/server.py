@@ -3919,7 +3919,8 @@ class Conexao:
     def __init__(self, nome="integracao", campos=None):
         self.arq_chave = os.path.join(DATA_DIR, f"{nome}.key")
         self.arq_share = os.path.join(SHARE_DIR, f"{nome}.json")
-        self.campos = campos if campos is not None else {"app": "InventarIA"}
+        # o começo de share/<app>/integracao.json é o mesmo em todos os apps da família: app (o id), nome, versao, gravado_em
+        self.campos = campos if campos is not None else {"app": "inventario", "nome": "InventarIA"}
         self._chave = None
         self.ultimo = None
 
@@ -3957,7 +3958,8 @@ class Conexao:
                 return
             url, ip = self.endereco()
             corpo = {**self.campos, "versao": VERSION, "url": url, "ip_url": f"http://{ip}:{PORT}" if ip else None,
-                     "chave": self.chave(), "gravado_em": datetime.now().isoformat(timespec="seconds")}
+                     # no integracao.json, a hora com o fuso (igual nos outros apps); no correria.json, como no contrato dele
+                     "chave": self.chave(), "gravado_em": (datetime.now().astimezone() if self.arq_share.endswith("integracao.json") else datetime.now()).isoformat(timespec="seconds")}
             os.makedirs(SHARE_DIR, exist_ok=True)
             tmp = self.arq_share + ".tmp"
             write_private(tmp, json.dumps(corpo, ensure_ascii=False, indent=1))

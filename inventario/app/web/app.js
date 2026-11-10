@@ -1709,12 +1709,13 @@
     <section class="panel" id="p-import">
       <h2>${secIc("upload")}Importar</h2>
       <p class="lead">Backup .zip, com fotos, ou .json do app. Antes, o app guarda uma cópia do atual.</p>
-      <ul class="opts"><li><div class="ot"><b>Importar backup ou JSON</b><span>${MULTI_PICK ? "Backup em partes: escolha todas de uma vez." : "Backup em partes: uma de cada vez, começando pela parte 1."}</span></div><div class="oa"><button class="btn" data-act="import-file">${ic("upload")}Escolher arquivo</button></div></li></ul>
+      <div class="sec-acao"><button class="btn" data-act="import-file">${ic("upload")}Escolher arquivo</button></div>
+      <p class="help">${MULTI_PICK ? "Backup em partes: escolha todas de uma vez." : "Backup em partes: uma de cada vez, começando pela parte 1."}</p>
     </section>
     <section class="panel" id="p-history">
       <h2>${secIc("history")}Versões anteriores</h2>
       <p class="lead">Uma cópia a cada 10 minutos de uso e antes de importar, restaurar ou apagar tudo. Ficam as 3 mais recentes.</p>
-      <ul class="opts"><li><div class="ot"><b>Versões guardadas</b></div><div class="oa"><button class="btn" data-act="versions">${ic("history")}Ver versões</button></div></li></ul>
+      <div class="sec-acao"><button class="btn" data-act="versions">${ic("history")}Ver versões</button></div>
     </section>
     <section class="panel" id="p-where">
       <h2>${secIc("folder")}Onde ficam os dados</h2>
@@ -1723,7 +1724,7 @@
     <section class="panel" id="p-zero">
       <h2>${secIc("trash")}Começar do zero</h2>
       <p class="lead">Apaga os cômodos, os bens e os itens. As categorias e as opções continuam, e uma cópia fica em Versões anteriores.</p>
-      <ul class="opts"><li><div class="ot"><b>Apagar tudo</b></div><div class="oa"><button type="button" class="btn danger" data-act="erase-all"${S.items.length || S.rooms.length ? "" : " disabled"}>${ic("trash")}Apagar tudo</button></div></li></ul>
+      <div class="sec-acao"><button type="button" class="btn danger" data-act="erase-all"${S.items.length || S.rooms.length ? "" : " disabled"}>${ic("trash")}Apagar tudo</button></div>
     </section>`;
   }
   function moreLook() {
@@ -1924,9 +1925,9 @@
     if (bslot) try {
       const b = await API.get("api/backups");
       if (document.contains(bslot)) {
-        bslot.innerHTML = `<ul class="opts">
-          <li><div class="ot"><b>Criar backup</b><span>${b.available === false ? "A pasta share não está disponível." : "Salva um arquivo .zip com dados e fotos."}</span></div>
-            <div class="oa"><button class="btn primary" data-act="backup-create"${b.available === false ? " disabled" : ""}>${ic("archive")}Criar backup</button></div></li>
+        bslot.innerHTML = `<div class="sec-acao"><button class="btn primary" data-act="backup-create"${b.available === false ? " disabled" : ""}>${ic("archive")}Criar backup</button></div>
+          ${b.available === false ? '<p class="help">A pasta share não está disponível.</p>' : ""}
+          <ul class="opts bk-lista">
           ${(b.backups || []).slice(0, 12).map((x) => `<li><div class="ot"><b>${esc(x.name)}</b><span>${esc(dateTime(x.date))}, ${esc(fmtSize(x.size))}</span></div>
             <div class="oa"><button class="btn" data-act="backup-restore" data-name="${esc(x.name)}">${ic("history")}Restaurar</button></div></li>`).join("")}
         </ul>`;

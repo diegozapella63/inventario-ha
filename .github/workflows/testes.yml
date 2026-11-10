@@ -38,3 +38,37 @@ jobs:
           name: capturas-e-saidas
           path: ${{ runner.temp }}/e2e
           retention-days: 7
+
+  # os arquivos que são iguais nos apps da família (tools/iguais.py): baixa os outros apps e compara
+  iguais:
+    name: Arquivos iguais aos dos outros apps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: inventario-ha
+      - uses: actions/checkout@v4
+        with:
+          repository: diegozapella63/gerencia-ha
+          path: gerencia-ha
+      - uses: actions/checkout@v4
+        with:
+          repository: diegozapella63/economia-ha
+          path: economia-ha
+      - uses: actions/checkout@v4
+        with:
+          repository: diegozapella63/CorrerIA-ha
+          path: correria-ha
+      - uses: actions/checkout@v4
+        with:
+          repository: diegozapella63/resolvia-ha
+          path: resolvia-ha
+      - uses: actions/checkout@v4
+        with:
+          repository: diegozapella63/cronologia-ha
+          path: cronologia-ha
+      - uses: actions/checkout@v4
+        with:
+          repository: diegozapella63/memoria-ha
+          path: memoria-ha
+      - run: python3 inventario-ha/tools/iguais.py --exigir

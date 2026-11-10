@@ -11,7 +11,7 @@ import zipfile
 
 from e2e_lib import OVERFLOW, TMP, AppServer, helpers, main
 
-ROWS = "[...document.querySelectorAll('#p-backup .opts li')].slice(1).map(li => [li.querySelector('b').textContent, li.querySelector('.ot span').textContent])"
+ROWS = "[...document.querySelectorAll('#p-backup .opts li')].map(li => [li.querySelector('b').textContent, li.querySelector('.ot span').textContent])"
 LONG = "inventario-copia-da-casa-antes-da-mudanca-de-apartamento.zip"
 
 
@@ -63,7 +63,11 @@ async def body(r, p):
     r.eq(rows[5][1].rsplit(", ", 1)[1], fmt_size(sizes[old_name]), f"um backup de mais de 1 MB mostra o tamanho em MB ({fmt_size(sizes[old_name])})")
     r.eq(rows[0][1].rsplit(", ", 1)[1], fmt_size(sizes[made[0][0]]), f"um pequeno, em KB ({fmt_size(sizes[made[0][0]])})")
     btns = await pg.evaluate("[...document.querySelectorAll('#p-backup .oa .btn')].map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), Math.round(r.right)]; })")
-    r.check(len({tuple(x) for x in btns}) == 1, f"Criar backup e os Restaurar do mesmo tamanho e alinhados ({sorted({tuple(x) for x in btns})})")
+    r.check(len({tuple(x) for x in btns}) == 1, f"os Restaurar do mesmo tamanho e alinhados ({sorted({tuple(x) for x in btns})})")
+    # 1.44: os botões de Dados no padrão da família (o do GerencIA): na largura do cartão no celular, da mesma altura
+    acoes = await pg.evaluate("[...document.querySelectorAll('#mp .sec-acao > .btn, #p-export .oa > .btn')].map(b => { const r = b.getBoundingClientRect(), c = b.closest('section').getBoundingClientRect(); return [Math.round(r.height), Math.round(r.width), Math.round(c.width - r.width), innerWidth]; })")
+    r.check(len(acoes) >= 7 and all(h == 50 and (w == 250 if tela >= 1000 else sobra <= 60) for h, w, sobra, tela in acoes),
+            f"Dados: 250 px no computador (na largura do cartão no celular), todos com 50 px de altura ({acoes[:2]})")
     await r.shot(pg, "lista", full_page=True)
 
     # -- restaurar um antigo: pergunta; Cancelar não muda nada
@@ -85,7 +89,7 @@ async def body(r, p):
     r.check(len(d["items"]) == len(old["items"]) and r.item_named("Item do backup antigo") is not None, f"Restaurar: o inventário é o do backup antigo ({len(d['items'])} itens)")
     n_photos = len({f for i in old["items"] for f in i["photos"]} | {f["file"] for x in old["rooms"] for f in x["photos"]})
     r.eq((await pg.text_content(".page-sub")).replace("\xa0", " "), f"{len(old['items'])} itens e {n_photos} fotos no inventário", "a tela já mostra o restaurado")
-    await pg.wait_for_function("(e => e && e.textContent.startsWith('antes-de-restaurar-'))(document.querySelector('#p-backup .opts li:nth-child(2) b'))", timeout=8000)
+    await pg.wait_for_function("(e => e && e.textContent.startsWith('antes-de-restaurar-'))(document.querySelector('#p-backup .opts li:nth-child(1) b'))", timeout=8000)
     r.check(True, "a cópia de antes de restaurar aparece em primeiro na lista")
     hist = r.api("GET", "api/history")["history"]
     r.check(hist and hist[0]["reason"] == "restore" and hist[0]["items"] == 38, "e uma versão de antes de restaurar, com os 38 itens")
@@ -96,7 +100,7 @@ async def body(r, p):
     t = pg.locator(".toast", has_text="Backup salvo: inventario-")
     await t.wait_for(timeout=15000)
     created = (await t.text_content()).split("Backup salvo: ", 1)[1].strip()
-    await pg.wait_for_function(f"(e => e && e.textContent === {json.dumps(created)})(document.querySelector('#p-backup .opts li:nth-child(2) b'))", timeout=8000)
+    await pg.wait_for_function(f"(e => e && e.textContent === {json.dumps(created)})(document.querySelector('#p-backup .opts li:nth-child(1) b'))", timeout=8000)
     r.check(True, f"Criar backup: o novo aparece em primeiro ({created})")
     with zipfile.ZipFile(os.path.join(share, created)) as z:
         names = z.namelist()
@@ -121,7 +125,7 @@ async def body(r, p):
         ctx, pg = await r.page(b, "cel", "light", accent="azul")
         await pg.goto(app.base + "#/config/dados")
         await pg.wait_for_selector('[data-act="backup-create"]', timeout=10000)
-        r.eq(" ".join((await pg.text_content("#p-backup .opts li .ot span")).split()), "A pasta share não está disponível.", "sem a pasta share: diz isso")
+        r.eq(" ".join((await pg.text_content("#p-backup .help")).split()), "A pasta share não está disponível.", "sem a pasta share: diz isso")
         r.check(await pg.is_disabled('[data-act="backup-create"]'), "e Criar backup fica desligado")
         r.eq(await pg.locator('[data-act="backup-restore"]').count(), 0, "sem backups na lista")
         st, _, out = app.post("api/backups")

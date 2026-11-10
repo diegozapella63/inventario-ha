@@ -26,7 +26,9 @@ class Conexao(UnitBase):
         c.publicar()
         with open(c.arq_share, encoding="utf-8") as f:
             info = json.load(f)
-        self.assertEqual((info["app"], info["versao"], info["chave"]), ("InventarIA", S.VERSION, c.chave()))
+        self.assertEqual((info["app"], info["nome"], info["versao"], info["chave"]), ("inventario", "InventarIA", S.VERSION, c.chave()))
+        self.assertEqual(list(info)[:2], ["app", "nome"], "o começo igual ao dos outros apps da família")
+        self.assertRegex(info["gravado_em"], r"[+-]\d\d:\d\d$", "a hora com o fuso")
         self.assertTrue(info["url"].startswith("http://") and info["url"].endswith(f":{S.PORT}"))
         self.assertEqual(stat.S_IMODE(os.stat(c.arq_share).st_mode), 0o600, "só o dono lê a chave")
         self.assertFalse(os.path.exists(c.arq_share + ".tmp"))
