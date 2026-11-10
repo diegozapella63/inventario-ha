@@ -806,6 +806,13 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .inews > .btn { margin-top: 14px; }
 .inews > .formerr { margin: 10px 0 0; }
 .inews .wbusy { padding: 8px 4px; }
+/* tarefas no ResolvIA, na ficha do item */
+.itasks > .btn { margin-top: 12px; }
+.itasks > [data-slot] > .muted { margin: 8px 0 0; }
+.tlist { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.tlist li { display: grid; gap: 2px; padding: 10px 2px; border-bottom: 1px solid var(--line); min-width: 0; }
+.tlist b { font-weight: 600; overflow-wrap: anywhere; }
+.tlist span { color: var(--muted); font-size: 14px; }
 .news-of { margin: 0 0 4px; font-weight: 600; }
 .news { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
 .news li { display: grid; gap: 4px; padding: 14px 2px; border-bottom: 1px solid var(--line); min-width: 0; }

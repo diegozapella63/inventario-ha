@@ -82,6 +82,9 @@ class FakeHA:
         self.devices = json.loads(json.dumps(DEFAULT_DEVICES))  # config/device_registry/list
         self.trackers = json.loads(json.dumps(DEFAULT_TRACKERS))  # config/entity_registry/list_for_display (os rastreadores)
         self.notify_status = 200
+        self.todo_items = {}  # todo.x -> [{summary, uid, status, due?}] (todo.add_item e todo.get_items)
+        self.events = []  # [(tipo, dados)] dos eventos disparados (POST /api/events/<tipo>)
+        self.events_status = 200
         self.pipelines = json.loads(json.dumps(DEFAULT_PIPELINES))
         self.stt_text = "Sofá cinza, dois mil reais. Televisão de 50 polegadas, mil e quinhentos reais."
         self.stt_status = 200
@@ -193,6 +196,20 @@ class FakeHA:
                         fake.requests[-1]["attachments_present"] = seen
                     data = fake.ai_reply(kind, body)
                     return self._send(200, {"changed_states": [], "service_response": {"data": data}})
+                if path == "/core/api/services/todo/add_item":
+                    t = {"summary": body.get("item"), "uid": f"u{sum(len(v) for v in fake.todo_items.values()) + 1}", "status": "needs_action"}
+                    if body.get("due_date"):
+                        t["due"] = body["due_date"]
+                    fake.todo_items.setdefault(body.get("entity_id"), []).append(t)
+                    return self._send(200, [])
+                if path == "/core/api/services/todo/get_items":
+                    eid, quer = body.get("entity_id"), body.get("status") or ["needs_action", "completed"]
+                    return self._send(200, {"changed_states": [], "service_response": {eid: {"items": [t for t in fake.todo_items.get(eid, []) if t["status"] in quer]}}})
+                if path.startswith("/core/api/events/"):
+                    if fake.events_status != 200:
+                        return self._send(fake.events_status, {"message": "falhou"})
+                    fake.events.append((path.rsplit("/", 1)[1], body))
+                    return self._send(200, {"message": "Event fired."})
                 if path.startswith("/core/api/services/notify/"):
                     return self._send(fake.notify_status, [] if fake.notify_status == 200 else {"message": "falhou"})
                 if path == "/core/api/services/conversation/process":

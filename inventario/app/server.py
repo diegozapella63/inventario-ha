@@ -73,6 +73,8 @@ WEB_DIR = os.environ.get("INV_WEB", "/app/web")
 SHARE_DIR = os.environ.get("INV_SHARE", "/share/inventario")
 # o arquivo do GerencIA na pasta share: a depreciação de cada categoria, para o Valor de hoje
 GERENCIA_ARQ = os.environ.get("INV_GERENCIA") or os.path.join(os.path.dirname(SHARE_DIR.rstrip("/")), "gerencia", "integracao.json")
+# o do ResolvIA: com Usar equipamentos ligado lá, ele publica os equipamentos (os itens daqui) e a tarefa de cada um
+RESOLVIA_ARQ = os.environ.get("INV_RESOLVIA") or os.path.join(os.path.dirname(SHARE_DIR.rstrip("/")), "resolvia", "integracao.json")
 MEDIA_ROOT = os.environ.get("INV_MEDIA", "/media")
 PORT = int(os.environ.get("INV_PORT", "8099"))
 ALLOWED_IPS = {ip.strip() for ip in os.environ.get("INV_ALLOW", "172.30.32.2").split(",") if ip.strip()}
@@ -1203,6 +1205,123 @@ def valor_hoje(valor, valor_em, taxa, hoje=None) -> float:
 def item_hoje(it: dict, taxas: dict, hoje=None) -> float:
     v = float(it.get("value") or 0)
     return valor_hoje(v, it.get("valueAt") or it.get("createdAt"), taxas.get(it.get("cat") or "outros", 10), hoje) if v else 0.0
+
+
+# ---- Tarefas no ResolvIA (1.47.0): com Usar equipamentos ligado no ResolvIA (Mais › Configurações › Integrações ›
+# InventarIA de lá, que publica "equipamentos" em share/resolvia/integracao.json), a ficha de cada item mostra as tarefas
+# abertas ligadas a ele e cria uma nova. A tarefa entra na lista do Home Assistant (todo.add_item, como o Novo › Tarefa
+# da CronologIA) e o evento resolvia_comodo liga a tarefa ao item e ao cômodo no ResolvIA, pelo nome da tarefa (a
+# taskKey de lá). Nada muda no ResolvIA nem aqui.
+_rv = {"mtime": None, "info": None}
+TODO_CREATE, TODO_DUE_DATE = 1, 16
+
+
+def resolvia_info() -> dict | None:
+    try:
+        mt = os.path.getmtime(RESOLVIA_ARQ)
+    except OSError:
+        return None
+    if _rv["mtime"] != mt:
+        try:
+            with open(RESOLVIA_ARQ, encoding="utf-8") as f:
+                info = json.load(f)
+        except (OSError, ValueError):
+            info = None
+        _rv.update(mtime=mt, info=info if isinstance(info, dict) else None)
+    return _rv["info"]
+
+
+def resolvia_on() -> bool:
+    info = resolvia_info()
+    return bool(info) and isinstance(info.get("equipamentos"), dict)
+
+
+def task_key(s) -> str:
+    """O nome da tarefa como o ResolvIA guarda (taskKey): sem acentos, minúsculo, um espaço só."""
+    t = "".join(ch for ch in unicodedata.normalize("NFD", str(s or "")) if not unicodedata.combining(ch))
+    return " ".join(t.lower().split())[:255]
+
+
+def resolvia_listas(states=None) -> list:
+    """As listas de tarefas do Home Assistant que aceitam tarefa nova; prazo: se aceitam data."""
+    out = []
+    for st in states if states is not None else ha_request("GET", "/states") or []:
+        eid, attrs = st.get("entity_id", ""), st.get("attributes") or {}
+        f = int(attrs.get("supported_features") or 0)
+        if eid.startswith("todo.") and f & TODO_CREATE:
+            out.append({"id": eid, "nome": attrs.get("friendly_name") or eid, "prazo": bool(f & TODO_DUE_DATE)})
+    return sorted(out, key=lambda x: fold(x["nome"]))
+
+
+def resolvia_tarefas(item_id: str) -> list:
+    """As tarefas abertas ligadas ao item no ResolvIA: {lista, nome_lista, tarefa, prazo}, as com prazo primeiro."""
+    links = ((resolvia_info() or {}).get("equipamentos") or {}).get("tarefas") or {}
+    nomes, out = None, []
+    for eid, mapa in links.items() if isinstance(links, dict) else []:
+        if not str(eid).startswith("todo.") or not isinstance(mapa, dict):
+            continue
+        chaves = {k for k, v in mapa.items() if v == item_id or (isinstance(v, list) and item_id in v)}
+        if not chaves:
+            continue
+        if nomes is None:
+            nomes = {x["id"]: x["nome"] for x in resolvia_listas()}
+        r = ha_request("POST", "/services/todo/get_items?return_response", {"entity_id": eid, "status": ["needs_action"]}) or {}
+        for t in ((r.get("service_response") or {}).get(eid) or {}).get("items") or []:
+            if isinstance(t, dict) and task_key(t.get("summary")) in chaves:
+                out.append({"lista": eid, "nome_lista": nomes.get(eid, eid), "tarefa": str(t.get("summary") or ""), "prazo": str(t.get("due") or "")[:10]})
+    return sorted(out, key=lambda x: (not x["prazo"], x["prazo"], fold(x["tarefa"])))
+
+
+def resolvia_nova(body: dict, user=None) -> dict:
+    if not resolvia_on():
+        raise ApiError(409, "Ligue Usar equipamentos no ResolvIA para criar tarefas daqui.")
+    with STORE.lock:
+        it = next((i for i in STORE.data["items"] if i.get("id") == body.get("item")), None)
+        it = dict(it) if it else None
+    if not it:
+        raise ApiError(404, "Item não encontrado.")
+    tarefa = " ".join(str(body.get("tarefa") or "").split())[:255]
+    if not tarefa:
+        raise ApiError(400, "Dê um nome à tarefa.")
+    lista = next((x for x in resolvia_listas() if x["id"] == body.get("lista")), None)
+    if not lista:
+        raise ApiError(400, "Escolha uma lista do ResolvIA.")
+    prazo = str(body.get("prazo") or "")
+    if prazo:
+        try:
+            date.fromisoformat(prazo)
+        except ValueError:
+            raise ApiError(400, "Prazo inválido.")
+        if not lista["prazo"]:
+            raise ApiError(400, "Essa lista não aceita prazo.")
+    ha_request("POST", "/services/todo/add_item", {"entity_id": lista["id"], "item": tarefa, **({"due_date": prazo} if prazo else {})})
+    ev = {"entity_id": lista["id"], "tarefa": tarefa, "equipamento": it["id"], "origem": "InventarIA"}
+    if it.get("room"):
+        ev["comodo"] = it["room"]
+    ligada = True
+    try:
+        ha_request("POST", "/events/resolvia_comodo", ev)
+    except ApiError as e:  # a tarefa já está na lista: só não ficou ligada ao item
+        log.info("tarefa no ResolvIA sem a ligação com o item: %s", e.msg)
+        ligada = False
+    log.info("tarefa no ResolvIA: %s em %s (%s)%s", tarefa, lista["id"], it["id"], f" por {user}" if user else "")
+    return {"ok": True, "tarefa": tarefa, "lista": lista["id"], "nome_lista": lista["nome"], "ligada": ligada}
+
+
+def r_resolvia_listas(h, query):
+    if not resolvia_on():
+        raise ApiError(409, "Ligue Usar equipamentos no ResolvIA para criar tarefas daqui.")
+    h.send_json({"listas": resolvia_listas()})
+
+
+def r_resolvia_tarefas(h, query):
+    if not resolvia_on():
+        raise ApiError(409, "Ligue Usar equipamentos no ResolvIA para criar tarefas daqui.")
+    h.send_json({"tarefas": resolvia_tarefas(str((query.get("item") or [""])[0]))})
+
+
+def r_resolvia_nova(h, query):
+    h.send_json(resolvia_nova(h.read_body() or {}, h.user()))
 
 
 def bens_enabled() -> bool:
@@ -3490,7 +3609,7 @@ def r_data(h, query):
                              "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target(), "correria": correria_enabled(),
                              "news_hora": news_hora(), "news_aviso": news_aviso(), "news_para": news_para_salvo(),
                              "accent": app_accent(), "accent_daily": app_accent_daily(), "deprec": STORE.settings.get("deprec") is True},
-                "gerencia": {"taxas": gerencia_taxas()} if gerencia_taxas() else None,
+                "gerencia": {"taxas": gerencia_taxas()} if gerencia_taxas() else None, "resolvia": resolvia_on(),
                 "correria_uso": correria_uso() if correria_enabled() else None,
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
     h.send_json(out)
@@ -4125,6 +4244,9 @@ def r_integracao_itens(h, query):
 
 ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/data", r_data),
+    ("GET", r"/api/resolvia/listas", r_resolvia_listas),
+    ("GET", r"/api/resolvia/tarefas", r_resolvia_tarefas),
+    ("POST", r"/api/resolvia/tarefa", r_resolvia_nova),
     ("GET", r"/api/rev", r_rev),
     ("GET", r"/api/health", r_health),
     ("GET", r"/api/integracao/comodos", r_integracao_comodos),

@@ -299,7 +299,7 @@
     Object.assign(S, {
       rooms: d.rooms || [], items: d.items || [], rev: d.rev || 0, updatedAt: d.updatedAt, user: d.user || null,
       version: d.version || "", features: d.features || {}, settings: d.settings || {}, loaded: true, error: null, stale: false,
-      correriaUso: d.correria_uso || null, gerencia: d.gerencia || null,
+      correriaUso: d.correria_uso || null, gerencia: d.gerencia || null, resolvia: d.resolvia === true,
     });
     applyCats(d.cats);
     derive();
@@ -2493,6 +2493,77 @@
       sheet.onClose = () => { sheet = null; stopItemNews(); INEWS.id = null; };
     }
     if (newsOn() && it.cat === "eletronicos") loadItemNews(it); // as novidades são só dos eletrônicos
+    if (S.resolvia) loadTarefas(it);
+  }
+  // -- Tarefas no ResolvIA (com Usar equipamentos ligado lá): as abertas ligadas ao item e a Nova tarefa, que entra numa
+  // lista do Home Assistant e fica ligada ao item (e ao cômodo) no ResolvIA. O servidor faz as duas coisas.
+  const TAREFAS = { id: null, st: null }; // st: {lista: [...]} | {erro} | null (carregando)
+  const prazoCurto = (d) => { const x = diaLocal(d); if (!x) return ""; const h = new Date(); h.setHours(0, 0, 0, 0);
+    const n = Math.round((x - h) / 864e5); return n === 0 ? "hoje" : n === 1 ? "amanhã" : n < 0 ? `atrasada desde ${dataCurta(d).slice(0, 5)}` : `até ${dataCurta(d).slice(0, 5)}`; };
+  function tarefasHtml(it) {
+    const st = TAREFAS.id === it.id ? TAREFAS.st : null;
+    if (!st) return `<p class="muted">Carregando…</p>`;
+    if (st.erro) return `<p class="muted">${esc(st.erro)}</p>`;
+    if (!st.lista.length) return `<p class="muted">Nenhuma tarefa aberta.</p>`;
+    return `<ul class="tlist">${st.lista.map((t) => `<li><b>${esc(t.tarefa)}</b><span>${esc(t.nome_lista)}${t.prazo ? ` · ${esc(prazoCurto(t.prazo))}` : ""}</span></li>`).join("")}</ul>`;
+  }
+  function paintTarefas(it) {
+    const el = sheet && sheet.itemId === it.id ? $('[data-slot="tarefas-lista"]', sheet.dlg) : null;
+    if (el) el.innerHTML = tarefasHtml(it);
+  }
+  function loadTarefas(it, again = false) {
+    if (TAREFAS.id === it.id && TAREFAS.st && !again) { paintTarefas(it); return; }
+    Object.assign(TAREFAS, { id: it.id, st: again ? TAREFAS.st : null });
+    paintTarefas(it);
+    API.get(`api/resolvia/tarefas?item=${encodeURIComponent(it.id)}`)
+      .then((r) => { if (TAREFAS.id === it.id) { TAREFAS.st = { lista: r.tarefas || [] }; paintTarefas(it); } })
+      .catch((e) => { if (TAREFAS.id === it.id) { TAREFAS.st = { erro: e.message }; paintTarefas(it); } });
+  }
+  const PRAZOS = [["", "Sem prazo"], [0, "Hoje"], [1, "Amanhã"], [7, "Em 7 dias"], [30, "Em 30 dias"]];
+  const diaMais = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  function openTarefaNova(it) {
+    const entry = openDialog({
+      cls: "modal narrow", label: "Nova tarefa no ResolvIA",
+      html: `<div class="dlg"><div class="dlg-h"><h2>Nova tarefa</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <form class="dlg-b" data-tn><div class="form">
+          <p class="muted" style="margin:0">${esc(it.name)}</p>
+          <div class="field"><label for="tn-nome">Tarefa</label><input id="tn-nome" class="input" name="tarefa" maxlength="255" placeholder="Ex.: Trocar o filtro" autocomplete="off"></div>
+          <div class="field"><label for="tn-lista">Lista do ResolvIA</label><select id="tn-lista" class="select" name="lista" disabled><option>Carregando…</option></select></div>
+          <div class="field" data-tn-prazo><span class="lbl" id="tn-l-prazo">Prazo</span>
+            <div class="chips" role="radiogroup" aria-labelledby="tn-l-prazo">${PRAZOS.map(([v, t], k) => `<label class="chip"><input type="radio" name="prazo" value="${v}"${k === 0 ? " checked" : ""}>${t}</label>`).join("")}</div></div>
+          <div class="formerr" data-err hidden></div>
+        </div></form>
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok disabled>Criar tarefa</button></div></div>`,
+    });
+    const form = $("[data-tn]", entry.dlg), err = $("[data-err]", entry.dlg), ok = $("[data-ok]", entry.dlg);
+    let listas = [];
+    const prazoOk = () => { const l = listas.find((x) => x.id === form.lista.value); $("[data-tn-prazo]", entry.dlg).hidden = !(l && l.prazo); };
+    API.get("api/resolvia/listas").then((r) => {
+      listas = r.listas || [];
+      if (!listas.length) { err.hidden = false; err.textContent = "Nenhuma lista do Home Assistant aceita tarefa nova."; form.lista.innerHTML = ""; return; }
+      const last = LS.get("resolviaLista", "");
+      form.lista.innerHTML = listas.map((l) => `<option value="${esc(l.id)}"${l.id === last ? " selected" : ""}>${esc(l.nome)}</option>`).join("");
+      form.lista.disabled = false; ok.disabled = false; prazoOk();
+    }).catch((e) => { err.hidden = false; err.textContent = e.message; form.lista.innerHTML = ""; });
+    form.lista.addEventListener("change", prazoOk);
+    form.tarefa.addEventListener("input", () => { err.hidden = true; });
+    setTimeout(() => form.tarefa.focus(), 50);
+    const go = async () => {
+      const tarefa = form.tarefa.value.trim();
+      if (!tarefa) { err.hidden = false; err.textContent = "Dê um nome à tarefa."; form.tarefa.focus(); return; }
+      if (ok.disabled) return;
+      const pv = (form.querySelector('input[name="prazo"]:checked') || {}).value || "";
+      const l = listas.find((x) => x.id === form.lista.value);
+      ok.disabled = true;
+      try {
+        const r = await API.post("api/resolvia/tarefa", { item: it.id, lista: form.lista.value, tarefa, prazo: pv !== "" && l && l.prazo ? diaMais(+pv) : "" });
+        LS.set("resolviaLista", form.lista.value);
+        finalizeThen(entry, () => { toast(r.ligada === false ? `Tarefa criada em ${r.nome_lista}, sem a ligação com o item` : `Tarefa criada em ${r.nome_lista}`); loadTarefas(it, true); });
+      } catch (e) { err.hidden = false; err.textContent = e.message; ok.disabled = false; }
+    };
+    form.addEventListener("submit", (e) => { e.preventDefault(); go(); });
+    form.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("input[type=text], input:not([type])") && !e.isComposing) { e.preventDefault(); go(); } });
+    entry.dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); if (e.target.closest("[data-ok]")) go(); });
   }
   function leaveItem() {
     if (inAppNavs > 0) history.back();
@@ -2535,6 +2606,10 @@
           ${it.updatedAt && it.updatedAt !== it.createdAt ? `<dt>Alterado</dt><dd>${esc(dateTime(it.updatedAt))}${by(it.updatedBy)}</dd>` : ""}
         </dl>
         ${newsOn() && it.cat === "eletronicos" ? `<div class="inews" data-slot="item-news" aria-live="polite">${itemNewsHtml(it)}</div>` : ""}
+        ${S.resolvia ? `<div class="inews itasks" data-slot="item-tarefas">
+          <h3 class="inews-h">${ic("checks")}Tarefas no ResolvIA</h3>
+          <div data-slot="tarefas-lista" aria-live="polite">${tarefasHtml(it)}</div>
+          <button type="button" class="btn" data-act="tarefa-nova" data-id="${esc(it.id)}">${ic("plus")}Nova tarefa</button></div>` : ""}
       </div>
       <div class="dlg-f">
         <button type="button" class="btn danger" data-act="item-delete" data-id="${esc(it.id)}" aria-label="Apagar">${lbl("trash", "Apagar")}</button>
@@ -3900,6 +3975,7 @@
       case "web-photo": if (item) addWebPhoto(item); break;
       case "item-news": if (item) searchItemNews(item); break;
       case "item-dup": if (item) openEditor({ dup: item }); break;
+      case "tarefa-nova": if (item) openTarefaNova(item); break;
       case "item-move": if (item) moveItem(item); break;
       case "item-delete": if (item) deleteItem(item); break;
       case "sheet-close": if (sheet) requestClose(sheet); break;

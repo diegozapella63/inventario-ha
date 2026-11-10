@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.47.0
+
+- **Tarefas no ResolvIA**, na ficha de cada item: com **Usar equipamentos** ligado no ResolvIA (Mais › Configurações › Integrações › InventarIA, lá), a ficha mostra as tarefas abertas ligadas ao item e o botão **Nova tarefa**. Escreva o que fazer ("Trocar o filtro"), escolha a lista e o prazo (sem prazo, hoje, amanhã, em 7 ou em 30 dias) e toque em **Criar tarefa**. A tarefa entra na lista e já fica ligada ao item e ao cômodo no ResolvIA (e aparece também na CronologIA). A última lista escolhida fica lembrada.
+
 ## 1.46.0
 
 - **Valor de hoje, com a depreciação do GerencIA**: em **Mais > Configurações > Integrações > GerencIA**, ligue **Valor de hoje** (vem desligado; o cartão aparece quando o GerencIA 1.55.0 ou mais novo está instalado). Os valores perdem, por ano, a taxa de cada categoria que está no GerencIA (eletrônicos 20%, móveis 10%, imóveis 0%…), desde a data em que o valor mudou. O Início mostra **Patrimônio hoje**, e os cômodos, a busca, os gráficos e o relatório (também o PDF) usam o valor de hoje. Na ficha, embaixo do valor de hoje, fica o valor que você informou, a data e a taxa. O valor gravado não muda.
