@@ -1231,3 +1231,19 @@ dialog.camera::backdrop { background: #000; }
 /* o tipo de um bem (Imóvel, Veículo, Outro): três botões do mesmo tamanho */
 .seg.tipo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 440px); }
 .seg.tipo button { height: 40px; padding: 0 6px; }
+
+/* ---------- uma altura só, a mesma em todos os apps da família (50 px): botões, campos, caixas de seleção, botões de
+   escolha (as abas de Configurações, o Tema, o Tipo do bem) e as escolhas em botões. Ficam de fora os botões só com
+   ícone, os quadrinhos da IA, as linhas compactas da conferência da IA, as linhas das listas, os interruptores e as cores. */
+:root { --altura: 50px; }
+.btn:not(.icon), .btn.sm:not(.icon) { height: var(--altura); }
+@media (pointer: coarse) { .btn:not(.icon), .btn.sm:not(.icon) { height: var(--altura); } }
+.input, .select, .sfilters .select, .sbar .q .input, .homesearch .input { height: var(--altura); }
+.more-panel .opts .oa > .btn:not(.icon), .more-panel .opts .oa > .select, .mscreen .opts .oa > .btn:not(.icon) { height: var(--altura); }
+.chip, .quem-p, .aviso-testar { min-height: var(--altura); }
+.seg { min-height: var(--altura); align-items: stretch; }
+.seg button { height: auto; }
+.seg.themes button, .seg.tipo button { flex-direction: row; gap: 7px; min-height: 0; height: auto; padding: 0 6px; }
+.seg.themes button .ic { width: 18px; height: 18px; flex: none; }
+@media (max-width: 380px) { .seg.themes button .ic { display: none; } }
+.found .input, .found .select { height: 38px; }

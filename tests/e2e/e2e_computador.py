@@ -51,7 +51,7 @@ async def body(r, p):
 
         # -- botões no alto, à direita, alinhados
         top = m["top"]
-        r.check(len(top) == 2 and top[0]["h"] == top[1]["h"] == 40 and top[0]["t"] == top[1]["t"] and top[0]["r"] < top[1]["l"]
+        r.check(len(top) == 2 and top[0]["h"] == top[1]["h"] == 50 and top[0]["t"] == top[1]["t"] and top[0]["r"] < top[1]["l"]
                 and near(top[1]["r"], m["topbar"]["r"] - m["padR"]), f"{tag} Catalogar e Adicionar item no alto, do mesmo tamanho, à direita ({top})")
 
         # -- Início em duas colunas, com largura máxima

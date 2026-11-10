@@ -8,7 +8,7 @@ import zipfile
 
 from e2e_lib import OVERFLOW, TMP, main
 
-# botões e seleções das linhas de Mais: 280 × 44 e com a borda direita alinhada (ou a largura toda, no celular estreito)
+# botões e seleções das linhas de Mais: 280 × 50 (1.45: a altura da família) e com a borda direita alinhada (ou a largura toda, no celular estreito)
 BUTTONS = """(() => [...document.querySelectorAll('.more-panel .opts .oa > .btn:not(.icon), .more-panel .opts .oa > .select')]
   .filter(e => e.offsetParent).map(e => { const b = e.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height), Math.round(b.right)]; }))()"""
 
@@ -78,7 +78,7 @@ async def body(r, p):
         sizes = await pg.evaluate(BUTTONS)
         if k in ("aparencia", "opcoes", "dados"):  # tema e cor: botões de escolha; Opções: só a chave das zonas; Dados: o padrão da família (e2e_backups)
             continue
-        r.check(sizes and all(w == 280 and h == 44 for w, h, _ in sizes), f"[{k}] botões 280×44 ({sorted({(w, h) for w, h, _ in sizes})})")
+        r.check(sizes and all(w == 280 and h == 50 for w, h, _ in sizes), f"[{k}] botões 280×50 ({sorted({(w, h) for w, h, _ in sizes})})")
         r.check(len({x for _, _, x in sizes}) == 1, f"[{k}] alinhados pela direita ({sorted({x for _, _, x in sizes})})")
         r.check(await pg.evaluate(OVERFLOW), f"[{k}] sem rolagem para o lado")
         await r.shot(pg, f"aba-{k}", full_page=True)
@@ -96,7 +96,7 @@ async def body(r, p):
     for k in ("integracoes", "dados", "aparencia", "opcoes"):
         await tab(pg, k)
         sizes = await pg.evaluate(BUTTONS)
-        r.check(all(h == (50 if k == "dados" else 44) for _, h, _ in sizes) and len({w for w, _, _ in sizes}) <= 1, f"[estreito {k}] botões iguais ({sorted({(w, h) for w, h, _ in sizes})})")
+        r.check(all(h == 50 for _, h, _ in sizes) and len({w for w, _, _ in sizes}) <= 1, f"[estreito {k}] botões iguais ({sorted({(w, h) for w, h, _ in sizes})})")
         r.check(await pg.evaluate(OVERFLOW), f"[estreito {k}] sem rolagem para o lado")
     await r.shot(pg, "estreito-dados", full_page=True)
     await ctx.close()

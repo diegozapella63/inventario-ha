@@ -49,7 +49,7 @@ async def body(r, p):
             r.eq(await pg.evaluate("[...document.querySelectorAll('#news-every option')].map(o => o.textContent)"), ["7 dias", "15 dias", "30 dias"], "A cada: 7, 15 ou 30 dias")
             r.eq(await pg.evaluate(PESSOAS), [["Ana", True, ""], ["Beto", False, "sem celular"], ["Carla", False, ""]], "Quem recebe: um botão por pessoa da casa (nenhum aparelho), a Ana marcada")
         geo = await pg.evaluate(GEO)
-        r.check(geo["quando"] and geo["quando"][0][1] == geo["quando"][1][1] and abs(geo["quando"][0][2] - geo["quando"][1][2]) < 1 and all(h == 44 for _, _, _, h in geo["quando"]),
+        r.check(geo["quando"] and geo["quando"][0][1] == geo["quando"][1][1] and abs(geo["quando"][0][2] - geo["quando"][1][2]) < 1 and all(h == 50 for _, _, _, h in geo["quando"]),
                 f"{size} {scheme}: Horário e A cada lado a lado, do mesmo tamanho ({geo['quando']})")
         ws = {round(w) for _, _, w, _ in geo["quem"]}
         r.check(len(ws) == 1 and len({y for _, y, _, _ in geo["quem"][:2]}) == 1, f"{size} {scheme}: os botões das pessoas do mesmo tamanho, lado a lado ({geo['quem']})")

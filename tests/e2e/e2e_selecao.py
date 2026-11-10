@@ -2,7 +2,7 @@
 janela padrão do celular: abre uma janela no visual do app, de baixo para cima, com as opções em linhas e a atual
 marcada na cor do app, no claro e no escuro. Escolher entra na própria caixa (o app ouve como sempre); o Voltar do
 celular, o X e tocar fora fecham só ela, e o Voltar seguinte é o do app. No computador, no meio; o teclado também.
-A caixa fechada (1.41.0) é igual aos outros campos: 44 px de altura (38 nas linhas do Catalogar, como os campos de lá),
+A caixa fechada (1.41.0) é igual aos outros campos: 50 px de altura (1.45, a da família; 38 nas linhas do Catalogar, como os campos de lá),
 os mesmos cantos, a seta na cor do texto apagado do tema (claro e escuro) e o texto inteiro, em 384 e 320 px."""
 from e2e_lib import main
 
@@ -16,7 +16,7 @@ CLOSED = """() => { const bad = [], muted = getComputedStyle(document.documentEl
   for (const s of document.querySelectorAll('select')) {
     if (!s.offsetParent) continue; n++;
     const cs = getComputedStyle(s), r = s.getBoundingClientRect(), name = s.getAttribute('aria-label') || s.id || s.dataset.input;
-    const want = s.closest('.found') ? 38 : 44;
+    const want = s.closest('.found') ? 38 : 50;
     if (Math.round(r.height) !== want) bad.push(name + ': altura ' + r.height);
     if (cs.borderRadius !== rad) bad.push(name + ': cantos ' + cs.borderRadius + ' (campo ' + rad + ')');
     if (!cs.backgroundImage.toLowerCase().includes('%23' + muted)) bad.push(name + ': seta fora da cor do tema');

@@ -38,6 +38,7 @@ GRUPOS = [
     ("a cor do app e a Cor do dia", _src("look.js")),
     ("arrastar para voltar", _src("swipe.js")),
     ("a escolha de equipamentos", _src("equip-picker.js", ("resolvia-ha", "cronologia-ha"))),
+    ("o campo de data (Outra data e o mês)", _src("calendar.js", ("resolvia-ha", "cronologia-ha"))),
     ("o Uso da IA (a tela)", _src("usage-panel.js")),
     ("o Lit", [f"{r}/frontend/vendor/lit-all.min.js" for r in LIT]),
     ("a fala para texto do Home Assistant (Node)", _lib("voice.js")),
