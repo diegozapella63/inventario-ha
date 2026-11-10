@@ -110,6 +110,31 @@ class TarefasNoResolvia(UnitBase):
                       tarefas={"todo.casa": {"trocar o filtro": iid}, "todo.mercado": {"pilhas": iid}})
         self.assertEqual({(t["lista"], t["nome_lista"]) for t in S.resolvia_tarefas(iid)}, {("todo.casa", "Minha casa"), ("todo.mercado", "Mercado")})
 
+    def test_1_48_1_a_mesma_tarefa_uma_vez_so(self):
+        # no ResolvIA, as tarefas de mesmo nome numa lista são uma só (a taskKey): aparece uma vez, com quantas há
+        iid = self.it["id"]
+        self.ha.todo_items = {"todo.casa": [{"summary": "Limpar filtros", "uid": k, "status": "needs_action"} for k in "abc"]
+                              + [{"summary": "limpar  Filtros", "uid": "d", "status": "needs_action", "due": "2026-11-20"}]}
+        self.resolvia(tarefas={"todo.casa": {"limpar filtros": [iid, "outro", "mais_um"]}})
+        self.assertEqual(S.resolvia_tarefas(iid), [{"lista": "todo.casa", "nome_lista": "Casa", "tarefa": "Limpar filtros", "prazo": "2026-11-20", "iguais": 4}])
+
+    def test_1_48_1_nova_com_o_nome_de_uma_aberta_liga_a_ela(self):
+        # já há "Limpar filtros" aberta na lista, ligada a outros equipamentos: não cria outra igual; este item entra
+        # junto dos outros (antes, a nova trocava os equipamentos da que já existia)
+        outro = next(i for i in self.store.data["items"] if i.get("room") and i["id"] != self.it["id"] and i["room"] != self.it["room"])
+        self.ha.todo_items = {"todo.casa": [{"summary": "Limpar filtros", "uid": "a", "status": "needs_action"}]}
+        self.resolvia(tarefas={"todo.casa": {"limpar filtros": [outro["id"], "sumiu"]}})
+        r = S.resolvia_nova({"item": self.it["id"], "lista": "todo.casa", "tarefa": "limpar filtros", "prazo": "2026-11-20"})
+        self.assertEqual((r["tarefa"], r["ja_existia"], r["ligada"]), ("Limpar filtros", True, True))
+        self.assertEqual(len(self.ha.todo_items["todo.casa"]), 1, "nada de tarefa repetida")
+        self.assertEqual(self.ha.events, [("resolvia_comodo", {"entity_id": "todo.casa", "tarefa": "Limpar filtros", "equipamento": [outro["id"], "sumiu", self.it["id"]],
+                                                               "origem": "InventarIA", "comodo": [outro["room"], self.it["room"]]})])
+        # já ligada a este item: continua uma só, sem repetir o item
+        self.resolvia(quando=2000, tarefas={"todo.casa": {"limpar filtros": [outro["id"], self.it["id"]]}})
+        S.resolvia_nova({"item": self.it["id"], "lista": "todo.casa", "tarefa": "Limpar filtros"})
+        self.assertEqual(self.ha.events[-1][1]["equipamento"], [outro["id"], self.it["id"]])
+        self.assertEqual(len(self.ha.todo_items["todo.casa"]), 1)
+
     def test_o_nome_como_o_resolvia_guarda(self):
         self.assertEqual(S.task_key("  Trocar   o FILTRO da Cozinha  "), "trocar o filtro da cozinha")
         self.assertEqual(S.task_key("Revisão do ar-condicionado"), "revisao do ar-condicionado")

@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.48.1
+
+- **Tarefas no ResolvIA**: uma tarefa ligada a vários equipamentos aparecia repetida na ficha. Agora aparece uma vez só (com **n iguais na lista** quando a lista do Home Assistant tem mais de uma com o mesmo nome).
+- **Nova tarefa** com o nome de uma que já está aberta na lista: não cria outra igual, liga este item a ela, junto dos equipamentos que já estavam. Antes, a nova tirava os equipamentos da que já existia.
+
 ## 1.48.0
 
 - **Atalho no celular**, em **Mais › Configurações › Opções**: o caminho do InventarIA no Home Assistant, com **Copiar**, e como criar um ícone na tela inicial do celular que abre o app direto (no app do Home Assistant: Configurações › Aplicativo complementar › Gerenciar atalhos). O mesmo vale em todos os apps da família.

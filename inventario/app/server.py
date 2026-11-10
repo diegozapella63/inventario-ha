@@ -1272,8 +1272,23 @@ def resolvia_listas(states=None) -> list:
     return [{**x, "prazo": prazos and x["prazo"] and x["id"] not in sem} for x in listas_do_ha(states)]
 
 
+def _abertas(eid: str) -> list:
+    """As tarefas abertas de uma lista do Home Assistant (todo.get_items)."""
+    r = ha_request("POST", "/services/todo/get_items?return_response", {"entity_id": eid, "status": ["needs_action"]}) or {}
+    return [t for t in ((r.get("service_response") or {}).get(eid) or {}).get("items") or [] if isinstance(t, dict)]
+
+
+def _ligados(eid: str, chave: str) -> list:
+    """Os itens daqui ligados a uma tarefa no ResolvIA (pela lista e pela taskKey): um id ou uma lista de ids lá."""
+    v = ((((resolvia_info() or {}).get("equipamentos") or {}).get("tarefas") or {}).get(eid) or {})
+    v = v.get(chave) if isinstance(v, dict) else None
+    return [str(x) for x in (v if isinstance(v, list) else [v] if v else [])]
+
+
 def resolvia_tarefas(item_id: str) -> list:
-    """As tarefas abertas ligadas ao item no ResolvIA: {lista, nome_lista, tarefa, prazo}, as com prazo primeiro."""
+    """As tarefas abertas ligadas ao item no ResolvIA: {lista, nome_lista, tarefa, prazo, iguais?}, as com prazo primeiro.
+    No ResolvIA, as tarefas de mesmo nome numa lista são uma só (a taskKey guarda os pontos, o cômodo e os equipamentos):
+    aparecem uma vez, com quantas há (iguais) quando há mais de uma, e o prazo mais perto."""
     links = ((resolvia_info() or {}).get("equipamentos") or {}).get("tarefas") or {}
     nomes, out = None, []
     for eid, mapa in links.items() if isinstance(links, dict) else []:
@@ -1284,10 +1299,20 @@ def resolvia_tarefas(item_id: str) -> list:
             continue
         if nomes is None:  # os nomes do ResolvIA; uma lista desmarcada lá, o do Home Assistant
             nomes = {**{x["id"]: x["nome"] for x in listas_do_ha()}, **{x["id"]: x["nome"] for x in resolvia_listas([])}}
-        r = ha_request("POST", "/services/todo/get_items?return_response", {"entity_id": eid, "status": ["needs_action"]}) or {}
-        for t in ((r.get("service_response") or {}).get(eid) or {}).get("items") or []:
-            if isinstance(t, dict) and task_key(t.get("summary")) in chaves:
-                out.append({"lista": eid, "nome_lista": nomes.get(eid, eid), "tarefa": str(t.get("summary") or ""), "prazo": str(t.get("due") or "")[:10]})
+        vistas = {}
+        for t in _abertas(eid):
+            k = task_key(t.get("summary"))
+            if k not in chaves:
+                continue
+            prazo = str(t.get("due") or "")[:10]
+            if k in vistas:
+                x = vistas[k]
+                x["iguais"] = x.get("iguais", 1) + 1
+                if prazo and (not x["prazo"] or prazo < x["prazo"]):
+                    x["prazo"] = prazo
+                continue
+            vistas[k] = {"lista": eid, "nome_lista": nomes.get(eid, eid), "tarefa": str(t.get("summary") or ""), "prazo": prazo}
+            out.append(vistas[k])
     return sorted(out, key=lambda x: (not x["prazo"], x["prazo"], fold(x["tarefa"])))
 
 
@@ -1315,18 +1340,31 @@ def resolvia_nova(body: dict, user=None) -> dict:
             raise ApiError(400, "Controlar prazos está desligado no ResolvIA.")
         if not lista["prazo"]:
             raise ApiError(400, "Essa lista não aceita prazo.")
-    ha_request("POST", "/services/todo/add_item", {"entity_id": lista["id"], "item": tarefa, **({"due_date": prazo} if prazo else {})})
-    ev = {"entity_id": lista["id"], "tarefa": tarefa, "equipamento": it["id"], "origem": "InventarIA"}
-    if it.get("room"):
-        ev["comodo"] = it["room"]
+    # já há uma aberta com esse nome na lista: no ResolvIA é a mesma tarefa (a taskKey), então não cria outra igual e
+    # este item entra junto dos que já estavam ligados a ela (antes, a nova trocava os equipamentos da que existia)
+    chave = task_key(tarefa)
+    existe = next((t for t in _abertas(lista["id"]) if task_key(t.get("summary")) == chave), None)
+    equips = [it["id"]]
+    if existe:
+        tarefa = str(existe.get("summary") or tarefa)
+        antes = _ligados(lista["id"], chave)
+        equips = antes + ([] if it["id"] in antes else [it["id"]])
+    else:
+        ha_request("POST", "/services/todo/add_item", {"entity_id": lista["id"], "item": tarefa, **({"due_date": prazo} if prazo else {})})
+    ev = {"entity_id": lista["id"], "tarefa": tarefa, "equipamento": equips if len(equips) > 1 else equips[0], "origem": "InventarIA"}
+    with STORE.lock:
+        sala = {i.get("id"): i.get("room") for i in STORE.data["items"] if i.get("id") in equips}
+    comodos = list(dict.fromkeys(sala[e] for e in equips if sala.get(e)))
+    if comodos:
+        ev["comodo"] = comodos if len(comodos) > 1 else comodos[0]
     ligada = True
     try:
         ha_request("POST", "/events/resolvia_comodo", ev)
     except ApiError as e:  # a tarefa já está na lista: só não ficou ligada ao item
         log.info("tarefa no ResolvIA sem a ligação com o item: %s", e.msg)
         ligada = False
-    log.info("tarefa no ResolvIA: %s em %s (%s)%s", tarefa, lista["id"], it["id"], f" por {user}" if user else "")
-    return {"ok": True, "tarefa": tarefa, "lista": lista["id"], "nome_lista": lista["nome"], "ligada": ligada}
+    log.info("tarefa no ResolvIA: %s em %s (%s)%s%s", tarefa, lista["id"], it["id"], " (já existia)" if existe else "", f" por {user}" if user else "")
+    return {"ok": True, "tarefa": tarefa, "lista": lista["id"], "nome_lista": lista["nome"], "ligada": ligada, "ja_existia": bool(existe)}
 
 
 def r_resolvia_listas(h, query):

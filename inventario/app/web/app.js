@@ -2529,7 +2529,7 @@
     if (!st) return `<p class="muted">Carregando…</p>`;
     if (st.erro) return `<p class="muted">${esc(st.erro)}</p>`;
     if (!st.lista.length) return `<p class="muted">Nenhuma tarefa aberta.</p>`;
-    return `<ul class="tlist">${st.lista.map((t) => `<li><b>${esc(t.tarefa)}</b><span>${esc(t.nome_lista)}${t.prazo ? ` · ${esc(prazoCurto(t.prazo))}` : ""}</span></li>`).join("")}</ul>`;
+    return `<ul class="tlist">${st.lista.map((t) => `<li><b>${esc(t.tarefa)}</b><span>${esc(t.nome_lista)}${t.prazo ? ` · ${esc(prazoCurto(t.prazo))}` : ""}${t.iguais > 1 ? ` · ${int(t.iguais)} iguais na lista` : ""}</span></li>`).join("")}</ul>`;
   }
   function paintTarefas(it) {
     const el = sheet && sheet.itemId === it.id ? $('[data-slot="tarefas-lista"]', sheet.dlg) : null;
@@ -2587,7 +2587,9 @@
       try {
         const r = await API.post("api/resolvia/tarefa", { item: it.id, lista, tarefa, prazo: pv !== "" && l && l.prazo ? diaMais(+pv) : "" });
         LS.set("resolviaLista", lista);
-        finalizeThen(entry, () => { toast(r.ligada === false ? `Tarefa criada em ${r.nome_lista}, sem a ligação com o item` : `Tarefa criada em ${r.nome_lista}`); loadTarefas(it, true); });
+        const msg = r.ja_existia ? `${r.tarefa} já estava em ${r.nome_lista}: ${r.ligada === false ? "não consegui ligar a este item" : "agora ligada a este item também"}`
+          : r.ligada === false ? `Tarefa criada em ${r.nome_lista}, sem a ligação com o item` : `Tarefa criada em ${r.nome_lista}`;
+        finalizeThen(entry, () => { toast(msg); loadTarefas(it, true); });
       } catch (e) { err.hidden = false; err.textContent = e.message; ok.disabled = false; }
     };
     form.addEventListener("submit", (e) => { e.preventDefault(); go(); });

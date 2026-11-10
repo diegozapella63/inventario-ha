@@ -37,12 +37,15 @@ async def body(r, p):
     await r.open(pg, f"#/i/{it['id']}", ".ihead")
     r.eq(await pg.locator('[data-slot="item-tarefas"]').count(), 0, "sem o ResolvIA: nada de tarefas")
     # o ResolvIA com Usar equipamentos: uma tarefa aberta já ligada ao item
-    ha.todo_items = {"todo.casa": [{"summary": "Limpar o filtro", "uid": "a", "status": "needs_action", "due": (date.today() + timedelta(days=1)).isoformat()}]}
+    # (1.48.1: duas iguais na lista são uma tarefa só no ResolvIA: aparece uma vez)
+    ha.todo_items = {"todo.casa": [{"summary": "Limpar o filtro", "uid": "a", "status": "needs_action", "due": (date.today() + timedelta(days=1)).isoformat()},
+                                   {"summary": "Limpar o filtro", "uid": "b", "status": "needs_action"}]}
     resolvia()
     await r.open(pg, f"#/i/{it['id']}", ".ihead")
     sec = pg.locator('[data-slot="item-tarefas"]')
     await sec.locator(".tlist li").first.wait_for(timeout=8000)
-    r.eq(" ".join((await sec.locator(".tlist").inner_text()).split()), "Limpar o filtro Minha casa · amanhã", "a tarefa aberta do item, a lista (o nome do ResolvIA) e o prazo")
+    r.eq(" ".join((await sec.locator(".tlist").inner_text()).split()), "Limpar o filtro Minha casa · amanhã · 2 iguais na lista",
+         "a tarefa aberta do item, uma vez só, a lista (o nome do ResolvIA) e o prazo")
     # as tarefas acima das Novidades, e os botões das duas do mesmo tamanho
     blocos = await pg.locator(".dlg-b > .inews").evaluate_all("es => es.map(e => e.dataset.slot)")
     r.eq(blocos, ["item-tarefas", "item-news"], "Tarefas no ResolvIA acima das Novidades")
@@ -76,7 +79,7 @@ async def body(r, p):
     r.check(await pg.evaluate(OVERFLOW), "nada passa da largura")
     await dlg.locator("[data-ok]").click()
     await pg.locator(".toast", has_text="Tarefa criada em Minha casa").wait_for(timeout=8000)
-    r.eq(ha.todo_items["todo.casa"][-1], {"summary": "Trocar o filtro", "uid": "u2", "status": "needs_action", "due": (date.today() + timedelta(days=7)).isoformat()},
+    r.eq(ha.todo_items["todo.casa"][-1], {"summary": "Trocar o filtro", "uid": "u3", "status": "needs_action", "due": (date.today() + timedelta(days=7)).isoformat()},
          "a tarefa na lista, com o prazo")
     r.eq(ha.events[-1], ("resolvia_comodo", {"entity_id": "todo.casa", "tarefa": "Trocar o filtro", "equipamento": it["id"], "origem": "InventarIA", "comodo": it["room"]}),
          "o evento liga a tarefa ao item e ao cômodo no ResolvIA")
@@ -90,6 +93,16 @@ async def body(r, p):
     await dlg.locator("#tn-nome").press("Enter")
     await pg.locator(".toast", has_text="Tarefa criada em Mercado").wait_for(timeout=8000)
     r.eq(ha.todo_items["todo.mercado"][-1].get("due"), None, "sem prazo")
+    # 1.48.1: o mesmo nome de uma aberta na lista: não cria outra igual, liga este item a ela junto dos que já estavam
+    n = len(ha.todo_items["todo.casa"])
+    await sec.locator('[data-act="tarefa-nova"]').click()
+    await chips.first.wait_for(timeout=8000)
+    await chips.filter(has_text="Minha casa").click()
+    await dlg.locator("#tn-nome").fill("limpar o filtro")
+    await dlg.locator("[data-ok]").click()
+    await pg.locator(".toast", has_text="Limpar o filtro já estava em Minha casa: agora ligada a este item também").wait_for(timeout=8000)
+    r.eq(len(ha.todo_items["todo.casa"]), n, "nada de tarefa repetida")
+    r.eq(ha.events[-1][1]["equipamento"], it["id"], "o item, que já estava ligado, uma vez só")
     # Controlar prazos desligado no ResolvIA: nenhuma lista pede prazo
     resolvia(prazos=False, listas=[{**x, "prazo": False} for x in PUBLICADAS])
     await sec.locator('[data-act="tarefa-nova"]').click()
