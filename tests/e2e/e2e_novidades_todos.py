@@ -50,6 +50,8 @@ async def body(r, p):
     r.check(fora.startswith("Deixados de fora pela IA ("), f"os que a IA deixou de fora ficam recolhidos ({fora.strip()})")
     foot = await pg.text_content('[data-slot="news-job"]')
     r.check("Conferido hoje" in foot and "com novidades" in foot, f"resumo da última conferência ({foot.strip()})")
+    n_lista = len(rows)
+    r.check(f"{n_lista} de {n_lista} com novidades" in foot, f"todos os da lista com novidades ({foot.strip()})")
     r.check(await pg.is_enabled('[data-act="news-all"]'), "o botão volta")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "depois", full_page=True)
@@ -106,6 +108,7 @@ async def body(r, p):
     r.eq(await pg.locator("#view .chip").count(), 0, "e continua sem escolher categorias")
 
     # um item que deixa de ser eletrônico sai da lista: muda a categoria pela ficha (Ver item › Editar) e volta
+    k_antes = await pg.evaluate("[...document.querySelectorAll('#p-news-list .nrow')].filter(b => !b.closest('.news-out')).length")
     rows = pg.locator("#p-news-list > div > .nlist .nrow")
     alvo = None
     for k in range(await rows.count()):
@@ -127,6 +130,10 @@ async def body(r, p):
     await pg.wait_for_timeout(500)
     todos = await pg.evaluate("[...document.querySelectorAll('#p-news-list .nrow b')].map(b => b.textContent)")
     r.check(alvo not in todos and "Smart TV 55 polegadas" in todos, f"deixou de ser eletrônico: sai das Novidades ({alvo})")
+    # 1.49.1: o resumo conta os de agora (antes ficava o número do dia da conferência)
+    k = await pg.evaluate("[...document.querySelectorAll('#p-news-list .nrow')].filter(b => !b.closest('.news-out')).length")
+    foot = (await pg.text_content('[data-slot="news-job"]')).strip()
+    r.check(f"{k} de {k} com novidades" in foot and k == k_antes - 1, f"o resumo sem o que saiu ({foot}, {k}, antes {k_antes})")
 
     # Limpar novidades, com confirmação
     await pg.wait_for_selector("#p-news-list .nlist .nrow", timeout=8000)

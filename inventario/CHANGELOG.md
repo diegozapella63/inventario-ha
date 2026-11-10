@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.50.0
+
+- **Nova tarefa**: o prazo ganhou **Outra data**, que abre o mês para escolher qualquer dia (no visual do app, sem a janela do celular).
+- **Novidades**: o resumo ("Conferido …: 39 de 87 com novidades") conta os equipamentos de agora. Um item apagado ou que saiu de Eletrônicos depois de conferir não entra mais na conta.
+
 ## 1.49.0
 
 - **Nova tarefa** nas listas que não aceitam data (as da Alexa): agora pede o prazo também. Ele fica guardado no ResolvIA (2.59.0 ou mais novo), com o aviso "Guardado no ResolvIA: a lista não aceita data."

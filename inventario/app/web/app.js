@@ -1482,7 +1482,7 @@
       <div data-slot="news-list"><p class="muted">Carregando…</p></div>
     </section>`;
   }
-  let newsOv = null, newsJob = null, newsTimer = null;
+  let newsOv = null, newsJob = null, newsTimer = null, newsNums = null;
   async function loadNews() {
     try { newsOv = await API.get("api/news"); }
     catch (e) { const sl = $('#view [data-slot="news-list"]'); if (sl) sl.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
@@ -1524,6 +1524,8 @@
     const sortG = (a, b) => rank(a) - rank(b) || newsCount(b.r) - newsCount(a.r) || a.it.name.localeCompare(b.it.name, "pt-BR");
     // na lista: os que a IA escolheu e os já conferidos (um deixado de fora conferido sai de lá); embaixo, os deixados de fora
     const chosen = newsGroups(D.items.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || res[it.id])), ov).sort(sortG);
+    const vistos = chosen.filter((g) => g.r);
+    newsNums = { conferidos: vistos.length, com: vistos.filter((g) => newsCount(g.r) > 0).length };
     const out = newsGroups(D.items.filter((it) => tri[it.id] === false && !res[it.id] && ov.cats.includes(it.cat)), ov).sort(sortG);
     // os deixados de fora no fim, recolhidos (o padrão dos apps para o que fica de fora): abertos, ficam abertos
     // enquanto a tela está aberta (conferir um por um não fecha a lista); ao voltar à tela, recolhidos de novo
@@ -1546,8 +1548,10 @@
       return;
     }
     if (st && st.stage === "error") { js.innerHTML = `<p class="formerr njob">${esc(st.msg)}</p>`; return; }
-    const u = newsOv && newsOv.ultima;
-    js.innerHTML = u ? `<p class="muted njob">Conferido ${esc(whenShort(u.at))}: ${u.conferidos ? `${int(u.com_novidades)} de ${int(u.conferidos)} com novidades` : "nada para conferir agora"}.</p>` : "";
+    // os números de agora (1.49.1): os equipamentos que estão na lista e já foram conferidos; um item apagado (ou que
+    // saiu de Eletrônicos) depois de conferir não conta mais
+    const u = newsOv && newsOv.ultima, c = newsNums;
+    js.innerHTML = u ? `<p class="muted njob">Conferido ${esc(whenShort(u.at))}: ${c && c.conferidos ? `${int(c.com)} de ${int(c.conferidos)} com novidades` : "nada para conferir agora"}.</p>` : "";
   }
   async function startNewsAll() {
     try { const r = await API.post("api/news/all", {}); newsJob = r.id; renderNewsJob({ stage: "busy", msg: "Começando…" }); pollNewsAll(); }
@@ -2543,8 +2547,22 @@
       .then((r) => { if (TAREFAS.id === it.id) { TAREFAS.st = { lista: r.tarefas || [] }; paintTarefas(it); } })
       .catch((e) => { if (TAREFAS.id === it.id) { TAREFAS.st = { erro: e.message }; paintTarefas(it); } });
   }
-  const PRAZOS = [["", "Sem prazo"], [0, "Hoje"], [1, "Amanhã"], [7, "Em 7 dias"], [30, "Em 30 dias"]];
+  const PRAZOS = [["", "Sem prazo"], [0, "Hoje"], [1, "Amanhã"], [7, "Em 7 dias"], [30, "Em 30 dias"], ["outra", "Outra data"]];
   const diaMais = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  // Outra data (1.49.1): o mês no visual do app (nunca a janela de data do celular), como no ResolvIA; o domingo primeiro
+  const mesMais = (ym, n) => { const [y, m] = ym.split("-").map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+  function calHtml(ym, valor) {
+    const [y, m] = ym.split("-").map(Number);
+    const hoje = diaMais(0), n = new Date(y, m, 0).getDate(), antes = new Date(y, m - 1, 1).getDay();
+    const titulo = new Date(y, m - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    const dia = (k) => `${ym}-${String(k).padStart(2, "0")}`;
+    return `<div class="tcal" role="group" aria-label="Escolher a data"><div class="tcal-h">
+        <button type="button" class="btn ghost icon" data-cal="-1" aria-label="Mês anterior">${ic("back", "sm")}</button>
+        <b aria-live="polite">${esc(titulo.charAt(0).toUpperCase() + titulo.slice(1))}</b>
+        <button type="button" class="btn ghost icon tcal-next" data-cal="1" aria-label="Próximo mês">${ic("chev", "sm")}</button></div>
+      <div class="tcal-g">${["D", "S", "T", "Q", "Q", "S", "S"].map((w) => `<span class="tcal-w" aria-hidden="true">${w}</span>`).join("")}${"<span></span>".repeat(antes)}${Array.from({ length: n }, (_, k) => dia(k + 1)).map((d) =>
+        `<button type="button" class="tcal-d${d === valor ? " on" : ""}${d === hoje ? " hoje" : ""}" data-day="${d}" aria-pressed="${d === valor}" aria-label="${esc(dataCurta(d))}">${+d.slice(8)}</button>`).join("")}</div></div>`;
+  }
   function openTarefaNova(it) {
     const entry = openDialog({
       cls: "modal narrow", label: "Nova tarefa no ResolvIA",
@@ -2555,7 +2573,8 @@
           <div class="field"><span class="lbl" id="tn-l-lista">Lista</span>
             <div class="chips grid" role="radiogroup" aria-labelledby="tn-l-lista" data-slot="tn-listas"><p class="muted">Carregando…</p></div></div>
           <div class="field" data-tn-prazo hidden><span class="lbl" id="tn-l-prazo">Prazo</span>
-            <div class="chips grid" role="radiogroup" aria-labelledby="tn-l-prazo">${PRAZOS.map(([v, t], k) => `<label class="chip"><input type="radio" name="prazo" value="${v}"${k === 0 ? " checked" : ""}>${t}</label>`).join("")}</div>
+            <div class="chips grid" role="radiogroup" aria-labelledby="tn-l-prazo">${PRAZOS.map(([v, t], k) => `<label class="chip"${v === "outra" ? " data-outra" : ""}><input type="radio" name="prazo" value="${v}"${k === 0 ? " checked" : ""}>${v === "outra" ? `${ic("calendar", "sm")}<span data-outra-l>${t}</span>` : t}</label>`).join("")}</div>
+            <div data-tn-cal hidden></div>
             <p class="muted tn-app" data-tn-app hidden>${ic("info", "sm")}<span>Guardado no ResolvIA: a lista não aceita data.</span></p></div>
           <div class="formerr" data-err hidden></div>
         </div></form>
@@ -2576,6 +2595,17 @@
       ok.disabled = false; prazoOk();
     }).catch((e) => { err.hidden = false; err.textContent = e.message; slot.innerHTML = ""; });
     slot.addEventListener("change", prazoOk);
+    // Outra data: o mês abre embaixo; escolhido o dia, ele fica no botão e o mês fecha (tocar de novo reabre)
+    let outra = "", mes = diaMais(0).slice(0, 7);
+    const cal = $("[data-tn-cal]", entry.dlg);
+    const pintaCal = (aberto) => { cal.hidden = !aberto; cal.innerHTML = aberto ? calHtml(mes, outra) : ""; if (aberto) cal.scrollIntoView({ block: "nearest" }); };
+    $("[data-tn-prazo] .chips", entry.dlg).addEventListener("change", (e) => { if (e.target.name === "prazo") pintaCal(e.target.value === "outra"); err.hidden = true; });
+    $("[data-outra]", entry.dlg).addEventListener("click", (e) => { if (e.target.matches("input") && e.target.checked && cal.hidden && outra) pintaCal(true); });
+    cal.addEventListener("click", (e) => {
+      const nav = e.target.closest("[data-cal]"), d = e.target.closest("[data-day]");
+      if (nav) { mes = mesMais(mes, +nav.dataset.cal); pintaCal(true); }
+      if (d) { outra = d.dataset.day; mes = outra.slice(0, 7); $("[data-outra-l]", entry.dlg).textContent = dataCurta(outra); pintaCal(false); err.hidden = true; }
+    });
     form.tarefa.addEventListener("input", () => { err.hidden = true; });
     setTimeout(() => form.tarefa.focus(), 50);
     const go = async () => {
@@ -2584,9 +2614,11 @@
       if (ok.disabled) return;
       const pv = (form.querySelector('input[name="prazo"]:checked') || {}).value || "";
       const lista = escolhida(), l = listas.find((x) => x.id === lista);
+      const comPrazo = pv !== "" && l && l.prazo;
+      if (comPrazo && pv === "outra" && !outra) { err.hidden = false; err.textContent = "Escolha a data."; pintaCal(true); return; }
       ok.disabled = true;
       try {
-        const r = await API.post("api/resolvia/tarefa", { item: it.id, lista, tarefa, prazo: pv !== "" && l && l.prazo ? diaMais(+pv) : "" });
+        const r = await API.post("api/resolvia/tarefa", { item: it.id, lista, tarefa, prazo: comPrazo ? (pv === "outra" ? outra : diaMais(+pv)) : "" });
         LS.set("resolviaLista", lista);
         const msg = r.ja_existia ? `${r.tarefa} já estava em ${r.nome_lista}: ${r.ligada === false ? "não consegui ligar a este item" : "agora ligada a este item também"}`
           : r.ligada === false ? `Tarefa criada em ${r.nome_lista}, sem a ligação com o item` : `Tarefa criada em ${r.nome_lista}`;
