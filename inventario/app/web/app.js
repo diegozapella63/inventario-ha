@@ -299,7 +299,7 @@
     Object.assign(S, {
       rooms: d.rooms || [], items: d.items || [], rev: d.rev || 0, updatedAt: d.updatedAt, user: d.user || null,
       version: d.version || "", features: d.features || {}, settings: d.settings || {}, loaded: true, error: null, stale: false,
-      correriaUso: d.correria_uso || null, gerencia: d.gerencia || null, resolvia: d.resolvia === true,
+      correriaUso: d.correria_uso || null, gerencia: d.gerencia || null, resolvia: d.resolvia === true, atalho: d.atalho || null,
     });
     applyCats(d.cats);
     derive();
@@ -1866,7 +1866,31 @@
       <p class="lead">Partes de um cômodo, como Estante ou Rack da TV.</p>
       <ul class="opts"><li><div class="ot"><b id="zones-h">Usar zonas</b><span>Desligar não apaga as zonas.</span></div>
         <div class="oa">${switchHtml("zones-on", zonesOn(), "zones-h")}</div></li></ul>
+    </section>
+    ${moreShortcut()}`;
+  }
+  // Atalho no celular (igual em todos os apps da família): o caminho do app no Home Assistant, para um ícone na tela inicial
+  // que abre o app direto (Atalho fixado do app do Home Assistant no Android). Fora do Home Assistant, não aparece.
+  function moreShortcut() {
+    if (!S.atalho) return "";
+    return `<section class="panel" id="p-atalho">
+      <h2>${secIc("phone")}Atalho no celular</h2>
+      <p class="lead">Um ícone na tela inicial do celular que abre o InventarIA direto.</p>
+      <ol class="steps"><li>No app do Home Assistant: <b>Configurações › Aplicativo complementar › Gerenciar atalhos</b>.</li><li>Em <b>Atalho fixado</b>, escolha o tipo <b>Painel</b> e cole o <b>Caminho</b> abaixo.</li></ol>
+      <div class="field atalho-f"><label for="atalho-c">Caminho</label><div class="copy-row"><input id="atalho-c" class="input" readonly value="${esc(S.atalho)}">
+        <button type="button" class="btn" data-act="copy-field" data-target="atalho-c">${ic("copy")}Copiar</button></div></div>
     </section>`;
+  }
+  // Copiar: em http o navegador não deixa (sem área de transferência): o texto fica selecionado e o aviso explica
+  async function copyField(id) {
+    const inp = document.getElementById(id);
+    if (!inp) return;
+    inp.focus(); inp.select();
+    try {
+      if (!navigator.clipboard) throw new Error("sem área de transferência");
+      await navigator.clipboard.writeText(inp.value);
+      toast("Copiado");
+    } catch { toast("Toque e segure no texto para copiar"); }
   }
   // -- Categorias: uma tela própria, no menu Mais
   function viewCats() {
@@ -2528,24 +2552,29 @@
         <form class="dlg-b" data-tn><div class="form">
           <p class="muted" style="margin:0">${esc(it.name)}</p>
           <div class="field"><label for="tn-nome">Tarefa</label><input id="tn-nome" class="input" name="tarefa" maxlength="255" placeholder="Ex.: Trocar o filtro" autocomplete="off"></div>
-          <div class="field"><label for="tn-lista">Lista do ResolvIA</label><select id="tn-lista" class="select" name="lista" disabled><option>Carregando…</option></select></div>
-          <div class="field" data-tn-prazo><span class="lbl" id="tn-l-prazo">Prazo</span>
-            <div class="chips" role="radiogroup" aria-labelledby="tn-l-prazo">${PRAZOS.map(([v, t], k) => `<label class="chip"><input type="radio" name="prazo" value="${v}"${k === 0 ? " checked" : ""}>${t}</label>`).join("")}</div></div>
+          <div class="field"><span class="lbl" id="tn-l-lista">Lista</span>
+            <div class="chips grid" role="radiogroup" aria-labelledby="tn-l-lista" data-slot="tn-listas"><p class="muted">Carregando…</p></div></div>
+          <div class="field" data-tn-prazo hidden><span class="lbl" id="tn-l-prazo">Prazo</span>
+            <div class="chips grid" role="radiogroup" aria-labelledby="tn-l-prazo">${PRAZOS.map(([v, t], k) => `<label class="chip"><input type="radio" name="prazo" value="${v}"${k === 0 ? " checked" : ""}>${t}</label>`).join("")}</div></div>
           <div class="formerr" data-err hidden></div>
         </div></form>
         <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok disabled>Criar tarefa</button></div></div>`,
     });
     const form = $("[data-tn]", entry.dlg), err = $("[data-err]", entry.dlg), ok = $("[data-ok]", entry.dlg);
+    // as listas como no Nova tarefa do ResolvIA: todas à vista, cada uma com a cor de lá; o prazo só numa lista que aceita
+    // prazo, com Controlar prazos ligado lá (o servidor já diz isso em "prazo")
     let listas = [];
-    const prazoOk = () => { const l = listas.find((x) => x.id === form.lista.value); $("[data-tn-prazo]", entry.dlg).hidden = !(l && l.prazo); };
+    const slot = $('[data-slot="tn-listas"]', entry.dlg);
+    const escolhida = () => (form.querySelector('input[name="lista"]:checked') || {}).value || "";
+    const prazoOk = () => { const l = listas.find((x) => x.id === escolhida()); $("[data-tn-prazo]", entry.dlg).hidden = !(l && l.prazo); };
     API.get("api/resolvia/listas").then((r) => {
       listas = r.listas || [];
-      if (!listas.length) { err.hidden = false; err.textContent = "Nenhuma lista do Home Assistant aceita tarefa nova."; form.lista.innerHTML = ""; return; }
-      const last = LS.get("resolviaLista", "");
-      form.lista.innerHTML = listas.map((l) => `<option value="${esc(l.id)}"${l.id === last ? " selected" : ""}>${esc(l.nome)}</option>`).join("");
-      form.lista.disabled = false; ok.disabled = false; prazoOk();
-    }).catch((e) => { err.hidden = false; err.textContent = e.message; form.lista.innerHTML = ""; });
-    form.lista.addEventListener("change", prazoOk);
+      if (!listas.length) { err.hidden = false; err.textContent = "Nenhuma lista do ResolvIA aceita tarefa nova."; slot.innerHTML = ""; return; }
+      const last = listas.some((l) => l.id === LS.get("resolviaLista", "")) ? LS.get("resolviaLista", "") : listas[0].id;
+      slot.innerHTML = listas.map((l) => `<label class="chip lchip"${l.cor ? ` style="--c:${esc(l.cor)}"` : ""}><input type="radio" name="lista" value="${esc(l.id)}"${l.id === last ? " checked" : ""}><span class="dot"></span><span>${esc(l.nome)}</span></label>`).join("");
+      ok.disabled = false; prazoOk();
+    }).catch((e) => { err.hidden = false; err.textContent = e.message; slot.innerHTML = ""; });
+    slot.addEventListener("change", prazoOk);
     form.tarefa.addEventListener("input", () => { err.hidden = true; });
     setTimeout(() => form.tarefa.focus(), 50);
     const go = async () => {
@@ -2553,11 +2582,11 @@
       if (!tarefa) { err.hidden = false; err.textContent = "Dê um nome à tarefa."; form.tarefa.focus(); return; }
       if (ok.disabled) return;
       const pv = (form.querySelector('input[name="prazo"]:checked') || {}).value || "";
-      const l = listas.find((x) => x.id === form.lista.value);
+      const lista = escolhida(), l = listas.find((x) => x.id === lista);
       ok.disabled = true;
       try {
-        const r = await API.post("api/resolvia/tarefa", { item: it.id, lista: form.lista.value, tarefa, prazo: pv !== "" && l && l.prazo ? diaMais(+pv) : "" });
-        LS.set("resolviaLista", form.lista.value);
+        const r = await API.post("api/resolvia/tarefa", { item: it.id, lista, tarefa, prazo: pv !== "" && l && l.prazo ? diaMais(+pv) : "" });
+        LS.set("resolviaLista", lista);
         finalizeThen(entry, () => { toast(r.ligada === false ? `Tarefa criada em ${r.nome_lista}, sem a ligação com o item` : `Tarefa criada em ${r.nome_lista}`); loadTarefas(it, true); });
       } catch (e) { err.hidden = false; err.textContent = e.message; ok.disabled = false; }
     };
@@ -2605,11 +2634,11 @@
           ${it.createdAt ? `<dt>Cadastrado</dt><dd>${esc(dateTime(it.createdAt))}${by(it.createdBy)}</dd>` : ""}
           ${it.updatedAt && it.updatedAt !== it.createdAt ? `<dt>Alterado</dt><dd>${esc(dateTime(it.updatedAt))}${by(it.updatedBy)}</dd>` : ""}
         </dl>
-        ${newsOn() && it.cat === "eletronicos" ? `<div class="inews" data-slot="item-news" aria-live="polite">${itemNewsHtml(it)}</div>` : ""}
         ${S.resolvia ? `<div class="inews itasks" data-slot="item-tarefas">
           <h3 class="inews-h">${ic("checks")}Tarefas no ResolvIA</h3>
           <div data-slot="tarefas-lista" aria-live="polite">${tarefasHtml(it)}</div>
           <button type="button" class="btn" data-act="tarefa-nova" data-id="${esc(it.id)}">${ic("plus")}Nova tarefa</button></div>` : ""}
+        ${newsOn() && it.cat === "eletronicos" ? `<div class="inews" data-slot="item-news" aria-live="polite">${itemNewsHtml(it)}</div>` : ""}
       </div>
       <div class="dlg-f">
         <button type="button" class="btn danger" data-act="item-delete" data-id="${esc(it.id)}" aria-label="Apagar">${lbl("trash", "Apagar")}</button>
@@ -3976,6 +4005,7 @@
       case "item-news": if (item) searchItemNews(item); break;
       case "item-dup": if (item) openEditor({ dup: item }); break;
       case "tarefa-nova": if (item) openTarefaNova(item); break;
+      case "copy-field": copyField(b.dataset.target); break;
       case "item-move": if (item) moveItem(item); break;
       case "item-delete": if (item) deleteItem(item); break;
       case "sheet-close": if (sheet) requestClose(sheet); break;

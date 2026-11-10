@@ -1,5 +1,11 @@
 # Mudanças
 
+## 1.48.0
+
+- **Atalho no celular**, em **Mais › Configurações › Opções**: o caminho do InventarIA no Home Assistant, com **Copiar**, e como criar um ícone na tela inicial do celular que abre o app direto (no app do Home Assistant: Configurações › Aplicativo complementar › Gerenciar atalhos). O mesmo vale em todos os apps da família.
+- **Tarefas no ResolvIA**, na ficha do item: fica acima das **Novidades**, e os botões das duas têm o mesmo tamanho.
+- **Nova tarefa**: as listas aparecem todas na tela, em botões, como no ResolvIA (os mesmos nomes e cores, sem as desmarcadas lá; com o ResolvIA 2.57.0 ou mais novo). O prazo só aparece com **Controlar prazos** ligado no ResolvIA e numa lista que aceita prazo.
+
 ## 1.47.1
 
 - **Avisos no celular**: o título fica "InventarIA · 🆕 Novidades" e o ícone pequeno é o do app. Como todos os apps chegam como Home Assistant, agora dá para ver de qual app é cada aviso. Vale para todos os apps da família.

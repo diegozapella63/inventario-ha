@@ -26,9 +26,9 @@ class TarefasNoResolvia(UnitBase):
         self.ha = self.fake_ha()
         self.ha.states += [dict(x) for x in LISTAS]
 
-    def resolvia(self, equipamentos=True, tarefas=None, quando=None):
+    def resolvia(self, equipamentos=True, tarefas=None, quando=None, **mais):
         with open(self.arq, "w", encoding="utf-8") as f:
-            json.dump({"app": "ResolvIA", "nome": "ResolvIA", **({"equipamentos": {"lista": [], "tarefas": tarefas or {}}} if equipamentos else {})}, f)
+            json.dump({"app": "ResolvIA", "nome": "ResolvIA", **({"equipamentos": {"lista": [], "tarefas": tarefas or {}}} if equipamentos else {}), **mais}, f)
         os.utime(self.arq, (quando or 1000, quando or 1000))
 
     def test_so_com_os_equipamentos_ligados_la(self):
@@ -40,7 +40,31 @@ class TarefasNoResolvia(UnitBase):
         self.assertTrue(S.resolvia_on())
 
     def test_as_listas_que_aceitam_tarefa(self):
-        self.assertEqual(S.resolvia_listas(), [{"id": "todo.casa", "nome": "Casa", "prazo": True}, {"id": "todo.mercado", "nome": "Mercado", "prazo": False}])
+        # um ResolvIA de antes da 2.57.0 (sem "listas"): as do Home Assistant que aceitam tarefa nova
+        self.assertEqual(S.resolvia_listas(), [{"id": "todo.casa", "nome": "Casa", "cor": None, "prazo": True}, {"id": "todo.mercado", "nome": "Mercado", "cor": None, "prazo": False}])
+        self.resolvia(sem_prazo=["todo.casa"])
+        self.assertFalse(S.resolvia_listas()[0]["prazo"], "datas só como informação na lista: sem prazo")
+        self.resolvia(prazos=False, quando=2000)
+        self.assertEqual([x["prazo"] for x in S.resolvia_listas()], [False, False], "Controlar prazos desligado lá: sem prazo")
+
+    def test_1_48_as_listas_como_o_resolvia_mostra(self):
+        # o ResolvIA 2.57.0 publica as listas dele: os nomes e as cores de lá, na ordem de lá, sem as desmarcadas
+        self.resolvia(listas=[{"id": "todo.mercado", "nome": "Compras  da casa", "cor": "#4ED3A6", "prazo": False},
+                              {"id": "todo.casa", "nome": "Casa", "cor": "vermelho", "prazo": True}, {"id": "light.sala"}, "x"])
+        self.assertEqual(S.resolvia_listas(), [{"id": "todo.mercado", "nome": "Compras da casa", "cor": "#4ED3A6", "prazo": False},
+                                               {"id": "todo.casa", "nome": "Casa", "cor": None, "prazo": True}])
+        self.assertEqual(self.ha.calls("GET", "/core/api/states"), [], "sem perguntar ao Home Assistant")
+        self.resolvia(prazos=False, quando=2000, listas=[{"id": "todo.casa", "nome": "Casa", "cor": "#FF5A4F", "prazo": True}])
+        self.assertEqual(S.resolvia_listas(), [{"id": "todo.casa", "nome": "Casa", "cor": "#FF5A4F", "prazo": False}], "Controlar prazos desligado lá")
+
+    def test_1_48_so_as_listas_do_resolvia_e_o_prazo_so_com_controlar_prazos(self):
+        base = {"item": self.it["id"], "lista": "todo.casa", "tarefa": "Trocar o filtro"}
+        self.resolvia(listas=[{"id": "todo.casa", "nome": "Minha casa", "cor": "#FF5A4F", "prazo": True}])
+        self.assertApiError(400, S.resolvia_nova, {**base, "lista": "todo.mercado"}, msg_part="Escolha uma lista")
+        self.assertEqual(S.resolvia_nova(base)["nome_lista"], "Minha casa")
+        self.resolvia(prazos=False, quando=2000, listas=[{"id": "todo.casa", "nome": "Minha casa", "cor": "#FF5A4F", "prazo": False}])
+        self.assertApiError(400, S.resolvia_nova, {**base, "prazo": "2026-11-20"}, msg_part="Controlar prazos")
+        self.assertEqual(self.ha.todo_items["todo.casa"], [{"summary": "Trocar o filtro", "uid": "u1", "status": "needs_action"}])
 
     def test_cria_e_liga_ao_item(self):
         self.resolvia()
@@ -81,6 +105,10 @@ class TarefasNoResolvia(UnitBase):
             {"lista": "todo.casa", "nome_lista": "Casa", "tarefa": "Limpar a coifa", "prazo": ""}],
             "as abertas ligadas ao item, as com prazo primeiro; a concluída e as de outro item ficam fora")
         self.assertEqual(len(self.ha.calls("POST", "/core/api/services/todo/get_items")), 1, "só pergunta à lista que tem tarefa do item")
+        # com as listas do ResolvIA: o nome de lá (uma lista desmarcada lá fica com o do Home Assistant)
+        self.resolvia(quando=2000, listas=[{"id": "todo.casa", "nome": "Minha casa", "cor": "#FF5A4F", "prazo": True}],
+                      tarefas={"todo.casa": {"trocar o filtro": iid}, "todo.mercado": {"pilhas": iid}})
+        self.assertEqual({(t["lista"], t["nome_lista"]) for t in S.resolvia_tarefas(iid)}, {("todo.casa", "Minha casa"), ("todo.mercado", "Mercado")})
 
     def test_o_nome_como_o_resolvia_guarda(self):
         self.assertEqual(S.task_key("  Trocar   o FILTRO da Cozinha  "), "trocar o filtro da cozinha")

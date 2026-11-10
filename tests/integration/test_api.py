@@ -49,6 +49,7 @@ class Dados(ServerCase):
                                          "news_hora": "10:00", "news_aviso": False, "news_para": [], "accent": None, "accent_daily": None, "deprec": False})
         self.assertIsNone(d["correria_uso"], "CorrerIA desligado: sem o último uso")
         self.assertIsNone(d["gerencia"], "sem o GerencIA: sem a depreciação")
+        self.assertIsNone(d["atalho"], "fora do Home Assistant: sem o caminho do Atalho no celular")
         self.assertEqual(d["features"], {"ai": False, "share": True}, "sem Home Assistant, sem IA")
         self.assertRegex(d["version"], r"^\d+\.\d+\.\d+$")
         self.assertEqual(self.app.ok("GET", "api/rev")["rev"], d["rev"])

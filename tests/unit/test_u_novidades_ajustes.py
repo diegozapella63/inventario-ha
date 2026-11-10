@@ -129,6 +129,13 @@ class Aviso(UnitBase):
             self.assertEqual(server.news_notice(1)["message"], "Novidades em 1 item. Toque para abrir.")
             self.assertEqual(server.news_notice(2, test=True)["title"], "InventarIA · 🆕 Novidades (teste)")
 
+    def test_o_caminho_do_atalho_no_celular(self):
+        # o mesmo caminho do aviso é o do Atalho no celular (Opções); INV_HOST troca o nome da máquina nos testes
+        with mock.patch.dict(server.os.environ, {"INV_HOST": "e5f6a7b8-inventario"}):
+            self.assertEqual(server.ingress_path(), "/app/e5f6a7b8_inventario")
+        with mock.patch.object(server.socket, "gethostname", return_value="meu-computador"):
+            self.assertIsNone(server.ingress_path())
+
     def test_fora_do_home_assistant_sem_link(self):
         with mock.patch.object(server.socket, "gethostname", return_value="meu-computador"):
             self.assertIsNone(server.news_notice(2)["link"])

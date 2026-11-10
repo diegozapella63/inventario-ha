@@ -785,6 +785,14 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .chip input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .chip:has(input:checked) { background: var(--tag-soft); border-color: var(--tag-edge); color: var(--ink); font-weight: 600; }
 .chip:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* escolhas lado a lado, do mesmo tamanho (como no ResolvIA): as listas e o prazo do Nova tarefa */
+.chips.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5em), 1fr)); }
+.chips.grid .chip { justify-content: center; text-align: center; min-width: 0; padding: 6px 10px; line-height: 1.2; border-radius: 14px; overflow-wrap: anywhere; }
+.chips.grid > .muted { margin: 0; }
+/* a lista do ResolvIA: a bolinha na cor de lá; escolhida, o fundo na cor dela */
+.lchip { gap: 8px; }
+.lchip .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--c, var(--tag-text)); }
+.chip.lchip:has(input:checked) { background: color-mix(in srgb, var(--c, var(--tag-text)) 18%, var(--surface)); border-color: var(--c, var(--tag-edge)); }
 .njob { display: grid; gap: 10px; margin: 14px 0 0; }
 .njob p { display: flex; align-items: center; gap: 10px; margin: 0; }
 .njob .btn { justify-self: start; }
@@ -803,7 +811,7 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .inews { margin-top: 18px; }
 .inews-h { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 17px; font-weight: 700; }
 .inews-h .ic { color: var(--tag-text); }
-.inews > .btn { margin-top: 14px; }
+.inews > .btn { margin-top: 14px; width: 100%; } /* Novidades, Buscar de novo e Nova tarefa: do mesmo tamanho */
 .inews > .formerr { margin: 10px 0 0; }
 .inews .wbusy { padding: 8px 4px; }
 /* tarefas no ResolvIA, na ficha do item */
@@ -1047,6 +1055,11 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .status.warn i { background: var(--warn); }
 .status.bad i { background: var(--danger); }
 .steps { margin: 10px 0 0; padding-left: 20px; color: var(--ink-2); font-size: 15px; display: grid; gap: 6px; }
+/* Atalho no celular: o caminho com o Copiar ao lado */
+.atalho-f { margin-top: 14px; }
+/* o caminho na largura toda (inteiro também em 320 px), o Copiar embaixo */
+.copy-row { display: grid; gap: 8px; min-width: 0; }
+.copy-row .input { min-width: 0; font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
 .codepath { font: 500 14px/1.4 var(--font); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
 
 /* cor do app: amostras em forma de etiqueta, cada uma pintada pelo próprio data-accent */

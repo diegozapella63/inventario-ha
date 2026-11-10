@@ -56,6 +56,8 @@ O valor de cada item é o que você quiser registrar, somando todas as unidades.
 
 Desligar uma opção só esconde: nada do que já foi gravado se perde, e ligar de novo traz tudo de volta.
 
+**Atalho no celular** (Mais > Configurações > Opções, por último): para abrir o InventarIA direto da tela inicial do celular (Android), toque em **Copiar** embaixo do **Caminho** (algo como `/app/a1b2c3d4_inventario`). No app do Home Assistant, abra **Configurações › Aplicativo complementar › Gerenciar atalhos** e, em **Atalho fixado**, escolha o tipo **Painel**, cole o caminho e dê um nome. Fora do Home Assistant o cartão não aparece.
+
 ## Leitura de fotos por IA
 
 O app não tem IA própria e não guarda chave de API. Ele usa a ação `ai_task.generate_data` do Home Assistant, então funciona com a integração de IA que você configurar lá, e dá para trocar quando quiser:
@@ -159,7 +161,7 @@ A ligação é automática, sem nada para configurar aqui: o InventarIA grava `s
 - **ResolvIA** (2.28.0 ou mais novo): liga uma tarefa a um cômodo daqui e, a partir da 2.29.0, a um ou mais itens (um equipamento, um móvel…). Ligue lá, em **Mais > Configurações > Integrações > InventarIA** (**Usar cômodos** e **Usar equipamentos**, desligados de início).
 - **CronologIA**: recebe os cômodos e os itens pelo ResolvIA. As tarefas mostram o cômodo e o equipamento, e o **Novo > Tarefa** pede os dois.
 - **Bens** aparece para os outros apps ao lado dos cômodos, com os bens como itens: no ResolvIA e na CronologIA, uma tarefa pode ser ligada ao carro ou à casa da praia.
-- **Tarefas no ResolvIA**: com **Usar equipamentos** ligado lá, a ficha de cada item daqui tem **Tarefas no ResolvIA**: as tarefas abertas ligadas ao item (com a lista e o prazo) e **Nova tarefa**. Escreva o que fazer, escolha a lista do Home Assistant e o prazo (**Sem prazo**, **Hoje**, **Amanhã**, **Em 7 dias** ou **Em 30 dias**; numa lista que não aceita prazo, ele some) e toque em **Criar tarefa**. A tarefa entra na lista e fica ligada ao item e ao cômodo no ResolvIA, como se tivesse sido criada lá.
+- **Tarefas no ResolvIA**: com **Usar equipamentos** ligado lá, a ficha de cada item daqui tem **Tarefas no ResolvIA** (acima das Novidades): as tarefas abertas ligadas ao item (com a lista e o prazo) e **Nova tarefa**. Escreva o que fazer, toque na lista (todas à vista, com os nomes e as cores do ResolvIA, sem as desmarcadas lá; com o ResolvIA 2.57.0 ou mais novo) e escolha o prazo (**Sem prazo**, **Hoje**, **Amanhã**, **Em 7 dias** ou **Em 30 dias**; ele só aparece com **Controlar prazos** ligado no ResolvIA e numa lista que aceita prazo) e toque em **Criar tarefa**. A tarefa entra na lista e fica ligada ao item e ao cômodo no ResolvIA, como se tivesse sido criada lá.
 - **GerencIA** (1.19.0 ou mais novo): soma os valores dos itens e dos bens no patrimônio, como **Bens da casa** (imóveis não perdem valor; veículos perdem 15% ao ano, e dá para mudar lá). Lê o valor e a data em que ele mudou e deprecia por categoria (eletrônicos perdem mais rápido que móveis, por exemplo). Dá para desligar lá, em **Mais > Integrações > Bens no InventarIA**.
 
 ## Valor de hoje (GerencIA)

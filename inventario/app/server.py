@@ -1242,15 +1242,34 @@ def task_key(s) -> str:
     return " ".join(t.lower().split())[:255]
 
 
-def resolvia_listas(states=None) -> list:
+def listas_do_ha(states=None) -> list:
     """As listas de tarefas do Home Assistant que aceitam tarefa nova; prazo: se aceitam data."""
     out = []
     for st in states if states is not None else ha_request("GET", "/states") or []:
         eid, attrs = st.get("entity_id", ""), st.get("attributes") or {}
         f = int(attrs.get("supported_features") or 0)
         if eid.startswith("todo.") and f & TODO_CREATE:
-            out.append({"id": eid, "nome": attrs.get("friendly_name") or eid, "prazo": bool(f & TODO_DUE_DATE)})
+            out.append({"id": eid, "nome": attrs.get("friendly_name") or eid, "cor": None, "prazo": bool(f & TODO_DUE_DATE)})
     return sorted(out, key=lambda x: fold(x["nome"]))
+
+
+def resolvia_listas(states=None) -> list:
+    """As listas do Nova tarefa como o ResolvIA mostra (1.48.0): as que ele publica em "listas" (2.57.0 ou mais novo: os
+    nomes e as cores de lá, na ordem de lá, sem as desmarcadas em Mais › Listas). Prazo só com Controlar prazos ligado lá
+    e numa lista com prazo. Um ResolvIA de antes: as listas do Home Assistant que aceitam tarefa nova."""
+    info = resolvia_info() or {}
+    prazos = info.get("prazos") is not False
+    pub = info.get("listas")
+    if isinstance(pub, list):
+        out = []
+        for x in pub:
+            if isinstance(x, dict) and str(x.get("id") or "").startswith("todo.") and len(out) < 200:
+                cor = str(x.get("cor") or "")
+                out.append({"id": str(x["id"]), "nome": " ".join(str(x.get("nome") or x["id"]).split())[:80],
+                            "cor": cor if re.fullmatch(r"#[0-9a-fA-F]{6}", cor) else None, "prazo": prazos and x.get("prazo") is True})
+        return out
+    sem = set(info.get("sem_prazo") or []) if isinstance(info.get("sem_prazo"), list) else set()
+    return [{**x, "prazo": prazos and x["prazo"] and x["id"] not in sem} for x in listas_do_ha(states)]
 
 
 def resolvia_tarefas(item_id: str) -> list:
@@ -1263,8 +1282,8 @@ def resolvia_tarefas(item_id: str) -> list:
         chaves = {k for k, v in mapa.items() if v == item_id or (isinstance(v, list) and item_id in v)}
         if not chaves:
             continue
-        if nomes is None:
-            nomes = {x["id"]: x["nome"] for x in resolvia_listas()}
+        if nomes is None:  # os nomes do ResolvIA; uma lista desmarcada lá, o do Home Assistant
+            nomes = {**{x["id"]: x["nome"] for x in listas_do_ha()}, **{x["id"]: x["nome"] for x in resolvia_listas([])}}
         r = ha_request("POST", "/services/todo/get_items?return_response", {"entity_id": eid, "status": ["needs_action"]}) or {}
         for t in ((r.get("service_response") or {}).get(eid) or {}).get("items") or []:
             if isinstance(t, dict) and task_key(t.get("summary")) in chaves:
@@ -1292,6 +1311,8 @@ def resolvia_nova(body: dict, user=None) -> dict:
             date.fromisoformat(prazo)
         except ValueError:
             raise ApiError(400, "Prazo inválido.")
+        if (resolvia_info() or {}).get("prazos") is False:
+            raise ApiError(400, "Controlar prazos está desligado no ResolvIA.")
         if not lista["prazo"]:
             raise ApiError(400, "Essa lista não aceita prazo.")
     ha_request("POST", "/services/todo/add_item", {"entity_id": lista["id"], "item": tarefa, **({"due_date": prazo} if prazo else {})})
@@ -3002,8 +3023,9 @@ def news_new_entries(before, after) -> list[dict]:
 
 
 def ingress_path() -> str | None:
-    """O endereço do app dentro do Home Assistant (/app/<slug>, desde o 2026.2), pelo nome da máquina ("a1b2c3d4-inventario")."""
-    h = socket.gethostname()
+    """O endereço do app dentro do Home Assistant (/app/<slug>, desde o 2026.2), pelo nome da máquina ("a1b2c3d4-inventario").
+    É também o caminho do Atalho no celular (Configurações › Opções); INV_HOST troca o nome da máquina (testes)."""
+    h = os.environ.get("INV_HOST") or socket.gethostname()
     return f"/app/{h.replace('-', '_', 1)}" if re.fullmatch(r"[a-z0-9]+-inventario", h) else None
 
 
@@ -3610,7 +3632,7 @@ def r_data(h, query):
                              "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target(), "correria": correria_enabled(),
                              "news_hora": news_hora(), "news_aviso": news_aviso(), "news_para": news_para_salvo(),
                              "accent": app_accent(), "accent_daily": app_accent_daily(), "deprec": STORE.settings.get("deprec") is True},
-                "gerencia": {"taxas": gerencia_taxas()} if gerencia_taxas() else None, "resolvia": resolvia_on(),
+                "gerencia": {"taxas": gerencia_taxas()} if gerencia_taxas() else None, "resolvia": resolvia_on(), "atalho": ingress_path(),
                 "correria_uso": correria_uso() if correria_enabled() else None,
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
     h.send_json(out)

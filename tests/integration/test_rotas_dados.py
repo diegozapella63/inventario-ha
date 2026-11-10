@@ -216,7 +216,10 @@ class CorDoApp(DadosCase):
         for velha, nova in (("amarelo", "ouro"), ("kraft", "coral"), ("cinza", "grafite"), ("roxo", None)):
             with self.subTest(velha=velha):
                 path = self.app.path("data", "settings.json")
-                st = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
+                st = {}
+                if os.path.exists(path):
+                    with open(path, encoding="utf-8") as f:
+                        st = json.load(f)
                 st["accent"] = velha
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(st, f)
