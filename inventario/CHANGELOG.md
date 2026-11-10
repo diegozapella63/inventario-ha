@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.49.0
+
+- **Nova tarefa** nas listas que não aceitam data (as da Alexa): agora pede o prazo também. Ele fica guardado no ResolvIA (2.59.0 ou mais novo), com o aviso "Guardado no ResolvIA: a lista não aceita data."
+
 ## 1.48.1
 
 - **Tarefas no ResolvIA**: uma tarefa ligada a vários equipamentos aparecia repetida na ficha. Agora aparece uma vez só (com **n iguais na lista** quando a lista do Home Assistant tem mais de uma com o mesmo nome).

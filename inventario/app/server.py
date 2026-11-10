@@ -1265,8 +1265,12 @@ def resolvia_listas(states=None) -> list:
         for x in pub:
             if isinstance(x, dict) and str(x.get("id") or "").startswith("todo.") and len(out) < 200:
                 cor = str(x.get("cor") or "")
+                # prazo_app (ResolvIA 2.59.0): a list without dates whose deadline the ResolvIA keeps: the date goes in
+                # resolvia_comodo, not to Home Assistant (app)
+                app = prazos and x.get("prazo_app") is True
                 out.append({"id": str(x["id"]), "nome": " ".join(str(x.get("nome") or x["id"]).split())[:80],
-                            "cor": cor if re.fullmatch(r"#[0-9a-fA-F]{6}", cor) else None, "prazo": prazos and x.get("prazo") is True})
+                            "cor": cor if re.fullmatch(r"#[0-9a-fA-F]{6}", cor) else None, "prazo": (prazos and x.get("prazo") is True) or app,
+                            **({"app": True} if app else {})})
         return out
     sem = set(info.get("sem_prazo") or []) if isinstance(info.get("sem_prazo"), list) else set()
     return [{**x, "prazo": prazos and x["prazo"] and x["id"] not in sem} for x in listas_do_ha(states)]
@@ -1350,8 +1354,11 @@ def resolvia_nova(body: dict, user=None) -> dict:
         antes = _ligados(lista["id"], chave)
         equips = antes + ([] if it["id"] in antes else [it["id"]])
     else:
-        ha_request("POST", "/services/todo/add_item", {"entity_id": lista["id"], "item": tarefa, **({"due_date": prazo} if prazo else {})})
+        no_ha = prazo and not lista.get("app")
+        ha_request("POST", "/services/todo/add_item", {"entity_id": lista["id"], "item": tarefa, **({"due_date": prazo} if no_ha else {})})
     ev = {"entity_id": lista["id"], "tarefa": tarefa, "equipamento": equips if len(equips) > 1 else equips[0], "origem": "InventarIA"}
+    if prazo and lista.get("app") and not existe:  # o ResolvIA guarda o prazo dessa lista
+        ev["prazo"] = prazo
     with STORE.lock:
         sala = {i.get("id"): i.get("room") for i in STORE.data["items"] if i.get("id") in equips}
     comodos = list(dict.fromkeys(sala[e] for e in equips if sala.get(e)))

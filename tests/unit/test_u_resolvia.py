@@ -110,6 +110,17 @@ class TarefasNoResolvia(UnitBase):
                       tarefas={"todo.casa": {"trocar o filtro": iid}, "todo.mercado": {"pilhas": iid}})
         self.assertEqual({(t["lista"], t["nome_lista"]) for t in S.resolvia_tarefas(iid)}, {("todo.casa", "Minha casa"), ("todo.mercado", "Mercado")})
 
+    def test_1_49_o_prazo_que_o_resolvia_guarda(self):
+        # uma lista sem data (a da Alexa) com o prazo guardado no ResolvIA 2.59.0: o prazo vai no evento, não para o
+        # Home Assistant (que recusa)
+        self.resolvia(listas=[{"id": "todo.mercado", "nome": "Mercado", "cor": "#FF5A4F", "prazo": False, "prazo_app": True}])
+        self.assertEqual(S.resolvia_listas(), [{"id": "todo.mercado", "nome": "Mercado", "cor": "#FF5A4F", "prazo": True, "app": True}])
+        S.resolvia_nova({"item": self.it["id"], "lista": "todo.mercado", "tarefa": "Comprar pilhas", "prazo": "2026-11-20"})
+        self.assertEqual(self.ha.todo_items["todo.mercado"], [{"summary": "Comprar pilhas", "uid": "u1", "status": "needs_action"}], "sem data no Home Assistant")
+        self.assertEqual(self.ha.events[-1][1]["prazo"], "2026-11-20")
+        self.resolvia(quando=2000, prazos=False, listas=[{"id": "todo.mercado", "nome": "Mercado", "cor": "#FF5A4F", "prazo": False, "prazo_app": True}])
+        self.assertEqual(S.resolvia_listas()[0]["prazo"], False, "Controlar prazos desligado lá")
+
     def test_1_48_1_a_mesma_tarefa_uma_vez_so(self):
         # no ResolvIA, as tarefas de mesmo nome numa lista são uma só (a taskKey): aparece uma vez, com quantas há
         iid = self.it["id"]

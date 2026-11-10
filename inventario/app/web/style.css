@@ -791,6 +791,7 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .chips.grid > .muted { margin: 0; }
 /* a lista do ResolvIA: a bolinha na cor de lá; escolhida, o fundo na cor dela */
 .lchip { gap: 8px; }
+.tn-app { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 14px; }
 .lchip .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--c, var(--tag-text)); }
 .chip.lchip:has(input:checked) { background: color-mix(in srgb, var(--c, var(--tag-text)) 18%, var(--surface)); border-color: var(--c, var(--tag-edge)); }
 .njob { display: grid; gap: 10px; margin: 14px 0 0; }

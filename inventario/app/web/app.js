@@ -2555,7 +2555,8 @@
           <div class="field"><span class="lbl" id="tn-l-lista">Lista</span>
             <div class="chips grid" role="radiogroup" aria-labelledby="tn-l-lista" data-slot="tn-listas"><p class="muted">Carregando…</p></div></div>
           <div class="field" data-tn-prazo hidden><span class="lbl" id="tn-l-prazo">Prazo</span>
-            <div class="chips grid" role="radiogroup" aria-labelledby="tn-l-prazo">${PRAZOS.map(([v, t], k) => `<label class="chip"><input type="radio" name="prazo" value="${v}"${k === 0 ? " checked" : ""}>${t}</label>`).join("")}</div></div>
+            <div class="chips grid" role="radiogroup" aria-labelledby="tn-l-prazo">${PRAZOS.map(([v, t], k) => `<label class="chip"><input type="radio" name="prazo" value="${v}"${k === 0 ? " checked" : ""}>${t}</label>`).join("")}</div>
+            <p class="muted tn-app" data-tn-app hidden>${ic("info", "sm")}<span>Guardado no ResolvIA: a lista não aceita data.</span></p></div>
           <div class="formerr" data-err hidden></div>
         </div></form>
         <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok disabled>Criar tarefa</button></div></div>`,
@@ -2566,7 +2567,7 @@
     let listas = [];
     const slot = $('[data-slot="tn-listas"]', entry.dlg);
     const escolhida = () => (form.querySelector('input[name="lista"]:checked') || {}).value || "";
-    const prazoOk = () => { const l = listas.find((x) => x.id === escolhida()); $("[data-tn-prazo]", entry.dlg).hidden = !(l && l.prazo); };
+    const prazoOk = () => { const l = listas.find((x) => x.id === escolhida()); $("[data-tn-prazo]", entry.dlg).hidden = !(l && l.prazo); $("[data-tn-app]", entry.dlg).hidden = !(l && l.app); };
     API.get("api/resolvia/listas").then((r) => {
       listas = r.listas || [];
       if (!listas.length) { err.hidden = false; err.textContent = "Nenhuma lista do ResolvIA aceita tarefa nova."; slot.innerHTML = ""; return; }
