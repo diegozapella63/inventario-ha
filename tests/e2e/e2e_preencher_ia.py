@@ -55,7 +55,7 @@ async def body(r, p):
 
     # -- com foto: o botão e a dica; Enter na dica já lê
     await upload(fotos[0])
-    r.eq((await pg.text_content('[data-ed="ai"]')).strip(), "Preencher com IA", "com foto: Preencher com IA")
+    r.eq((await pg.text_content('[data-ed="ai"]')).strip(), "Digitalizar com IA", "com foto: Digitalizar com IA")
     r.check(await pg.locator("[data-ed-hint]").count() == 1, "e a dica para a IA")
     await pg.fill("[data-ed-hint]", "é uma cafeteira Oster")
     await pg.press("[data-ed-hint]", "Enter")

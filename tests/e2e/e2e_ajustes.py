@@ -1,9 +1,15 @@
-"""Mais > Configurações > Integrações (com um Home Assistant de mentira), Aparência (tema e cor) e Opções (zonas e categorias)."""
+"""Mais > Configurações > Integrações (com um Home Assistant de mentira), Aparência (o tema no aparelho, a cor do app para a casa toda,
+as 12 cores da família e a Cor do dia) e Opções (zonas e categorias)."""
 import datetime
 import json
 import time
 
-from e2e_lib import FakeHA, main
+from e2e_lib import OVERFLOW, AppServer, FakeHA, main
+
+PALETA = ["vermelho", "coral", "laranja", "ouro", "verde", "menta", "turquesa", "azul", "indigo", "lilas", "rosa", "grafite"]
+DIAS = ["ouro", "verde", "menta", "turquesa", "azul", "indigo", "lilas", "rosa", "vermelho", "coral", "laranja"]  # de 3 a 13 de novembro de 2026
+ACC = "document.documentElement.dataset.accent || 'ouro'"  # o Ouro é o padrão (sem data-accent)
+CHECKED = "document.querySelector('[data-input=accent]:checked').value"
 
 SENSOR = "sensor.inventaria_ia_hoje"
 
@@ -60,7 +66,7 @@ async def body(r, p):
     r.eq(hoje.strip(), "1", "Uso da IA: 1 chamada hoje")
     await pg.click(".uso-ult summary")
     ult = await pg.text_content(".uso-ult li")
-    r.check("Preencher com IA" in ult and "Google AI Task" in ult, f"última chamada, com a IA usada ({' '.join(ult.split())[:60]})")
+    r.check("Digitalizar com IA" in ult and "Google AI Task" in ult, f"última chamada, com a IA usada ({' '.join(ult.split())[:60]})")
     r.check("Google Cloud Console" in await pg.text_content("#p-usage .help"), "link do consumo exato do Gemini")
     await pg.locator(".uso-bar").first.click()
     cap = await pg.text_content(".uso-cap")
@@ -115,98 +121,145 @@ async def body(r, p):
     r.eq(await pg.locator(".mic-top").count(), 0, "e o microfone sai do alto")
     await ctx.close()
 
-    # -- Aparência: tema e cor, só neste aparelho; a Cor do dia vem ligada
-    ctx, pg = await r.page(b, "cel", "light", accent=None)
-    await ctx.clock.install(time=datetime.datetime(2026, 11, 3, 23, 59, 30))  # hora local
-    await r.open(pg, "#/config/aparencia", ".more-tabs")
-    r.eq(await pg.evaluate("[new Date().getDate(), new Date().getHours()]"), [3, 23], "o navegador está em 3 de novembro, 23h59")
-    html_ = pg.locator("html")
-    daily = pg.get_by_role("switch", name="Cor do dia")
-    r.check(await daily.is_checked(), "Cor do dia vem ligada")
-    r.eq(await pg.evaluate("[...document.querySelectorAll('#p-accent .opts .ot > *')].map(e => e.textContent)"), ["Cor do dia", "Muda a cor do app todo dia."], "Cor do dia, com a dica curta, junto da cor do app")
-    r.eq(await html_.get_attribute("data-accent"), "turquesa", "3 de novembro de 2026: turquesa")
-    checked = "document.querySelector('[data-input=accent]:checked').value"
-    r.eq(await pg.evaluate(checked), "turquesa", "a cor do dia é a marcada")
-    box = await pg.evaluate("(() => { const s = document.querySelector('#p-accent .switch').getBoundingClientRect(), z = document.querySelector('#p-accent .swatches').getBoundingClientRect(); return [Math.round(innerWidth - s.right), s.bottom <= z.top]; })()")
-    r.check(box[1] and box[0] <= 24, f"a chave fica à direita, acima das cores ({box})")
-    await r.shot(pg, "cor-do-dia", full_page=True)
-    await pg.set_viewport_size({"width": 320, "height": 700})
-    box = await pg.evaluate("(() => { const s = document.querySelector('#p-accent .switch').getBoundingClientRect(), t = document.querySelector('#daily-h').getBoundingClientRect(); return [Math.round(innerWidth - s.right), s.top < t.bottom]; })()")
-    r.check(box[1] and box[0] <= 24, f"no celular de 320 px, a chave continua à direita, na linha do nome ({box})")
-    await r.shot(pg, "cor-do-dia-320")
-    await pg.set_viewport_size({"width": 384, "height": 854})
-    await ctx.clock.fast_forward("02:00")  # passa da meia-noite com o app aberto
-    await pg.wait_for_function("document.documentElement.dataset.accent === 'verde'", timeout=5000)
-    r.eq([await html_.get_attribute("data-accent"), await pg.evaluate(checked)], ["verde", "verde"], "passou da meia-noite: a cor do dia seguinte, sem recarregar")
-    await pg.click('[data-act="theme"][data-theme="dark"]')
-    r.eq(await pg.evaluate("document.documentElement.dataset.theme"), "dark", "tema Escuro")
-    r.eq(await pg.get_attribute('[data-act="theme"][data-theme="dark"]', "aria-pressed"), "true", "o botão fica marcado")
-    accents = await pg.evaluate("[...document.querySelectorAll('.sw')].map(s => s.dataset.accent)")
-    r.eq(accents, ["amarelo", "laranja", "coral", "rosa", "lilas", "azul", "turquesa", "verde", "kraft", "cinza"], "as 10 cores do app")
-    # escolher uma cor desliga a Cor do dia
-    await pg.click('.sw[data-accent="rosa"]')
-    r.eq(await html_.get_attribute("data-accent"), "rosa", "cor Rosa")
-    r.check(not await daily.is_checked(), "escolher uma cor desliga a Cor do dia")
-    r.eq(await pg.evaluate("[localStorage.getItem('inv:accent'), localStorage.getItem('inv:accentDaily')]"), ['"rosa"', "false"], "e fica gravado neste aparelho")
-    await ctx.clock.fast_forward("24:00:00")
-    await pg.evaluate("window.dispatchEvent(new Event('focus'))")
-    r.eq(await html_.get_attribute("data-accent"), "rosa", "desligada, a cor não muda no outro dia")
-    # ligar de novo volta à cor do dia (5 de novembro: kraft); desligar volta à escolhida
-    await daily.click()
-    r.eq([await html_.get_attribute("data-accent"), await pg.evaluate(checked)], ["kraft", "kraft"], "ligar de novo: a cor do dia, marcada")
-    await daily.click()
-    r.eq([await html_.get_attribute("data-accent"), await pg.evaluate(checked)], ["rosa", "rosa"], "desligar: a cor escolhida antes")
-    await pg.click('.sw[data-accent="verde"]')
-    r.eq(await html_.get_attribute("data-accent"), "verde", "cor Verde")
-    await pg.reload()
-    await pg.wait_for_selector(".more-tabs")
-    r.eq(await pg.evaluate("[document.documentElement.dataset.theme, document.documentElement.dataset.accent]"), ["dark", "verde"], "tema e cor ficam depois de recarregar")
-    r.check(not await daily.is_checked() and await pg.evaluate(checked) == "verde", "e a Cor do dia continua desligada")
-    await r.shot(pg, "aparencia", full_page=True)
-    await pg.click('[data-act="theme"][data-theme="auto"]')
-    r.check(await pg.evaluate("!document.documentElement.dataset.theme"), "Automático segue o celular")
-    await ctx.close()
+    # -- Aparência (1.42.0, o padrão da família): o tema vale neste aparelho; a cor do app, para a casa toda (gravada no
+    # servidor); a paleta da família, 12 cores; a Cor do dia vem ligada e é a mesma em todos os apps (as 11 sem o Grafite, pelo
+    # número do dia). Numa casa nova (outro servidor), para começar sem cor escolhida.
+    principal = (r.app, r.base)
+    casas = []
 
-    # quem já tinha escolhido uma cor também passa a ter a Cor do dia; depois da última cor da paleta, volta à primeira
-    ctx, pg = await r.page(b, "cel", "dark", accent=None, init="try{if(!localStorage.getItem('inv:accent'))localStorage.setItem('inv:accent', JSON.stringify('coral'))}catch(e){}")
-    await ctx.clock.install(time=datetime.datetime(2026, 11, 5, 23, 59, 0))
-    await r.open(pg, "#/", ".tag")
-    r.eq(await pg.locator("html").get_attribute("data-accent"), "kraft", "cor escolhida antes (Coral): vale a do dia (Kraft)")
-    await ctx.clock.fast_forward("02:00")
-    await pg.wait_for_function("document.documentElement.dataset.accent !== 'kraft'", timeout=5000)
-    r.eq(await pg.evaluate("document.documentElement.dataset.accent || 'amarelo'"), "amarelo", "6 de novembro: depois do Kraft, o Amarelo de novo (o Cinza fica de fora)")
-    await r.shot(pg, "cor-do-dia-inicio")
-    await r.open(pg, "#/config/aparencia", ".more-tabs")
-    r.check(await pg.get_by_role("switch", name="Cor do dia").is_checked() and await pg.evaluate(checked) == "amarelo", "na Aparência, ligada e com o Amarelo marcado")
-    await ctx.close()
+    def casa_nova():
+        c = AppServer(mock_ai=True)
+        casas.append(c)
+        r.app, r.base = c, c.base
+        return c
 
-    # o index.html pinta a cor do dia antes do app.js (a mesma conta, dias seguidos)
-    ctx, pg = await r.page(b, "cel", "light", accent=None)
-    await pg.route("**/app.js*", lambda route: route.abort())
-    want = ["turquesa", "verde", "kraft", "amarelo", "laranja", "coral", "rosa", "lilas", "azul", "turquesa"]
-    got = []
-    for d in range(10):
-        await ctx.clock.set_fixed_time(datetime.datetime(2026, 11, 3 + d, 8, 0, 0))
-        await pg.goto("about:blank")
-        await pg.goto(r.base + "#/")
-        got.append(await pg.evaluate("document.documentElement.dataset.accent || 'amarelo'"))
-    r.eq(got, want, "antes do app.js: a mesma cor do dia, de 3 a 12 de novembro")
-    await pg.evaluate("localStorage.setItem('inv:accent', JSON.stringify('azul')); localStorage.setItem('inv:accentDaily', 'false')")
-    await pg.reload()
-    r.eq(await pg.evaluate("document.documentElement.dataset.accent"), "azul", "e, desligada, a cor escolhida")
-    await ctx.close()
-
-    # cada cor, clara e escura, no Início
-    for scheme in ("light", "dark"):
-        ctx, pg = await r.page(b, "cel", scheme, accent=None)
-        await r.open(pg, "#/", ".tag")
-        for a in accents:
-            await pg.evaluate(f"localStorage.setItem('inv:accent', JSON.stringify('{a}')); localStorage.setItem('inv:accentDaily', 'false')")
-            await pg.reload()
-            await pg.wait_for_selector(".tag")
-            await pg.wait_for_timeout(200)
-            await r.shot(pg, f"cor-{a}-{scheme}")
+    try:
+        casa_nova()
+        ctx, pg = await r.page(b, "cel", "light", accent=None)
+        await ctx.clock.install(time=datetime.datetime(2026, 11, 3, 23, 59, 30))  # hora local
+        await r.open(pg, "#/config/aparencia", ".more-tabs")
+        r.eq(await pg.evaluate("[new Date().getDate(), new Date().getHours()]"), [3, 23], "o navegador está em 3 de novembro, 23h59")
+        daily = pg.get_by_role("switch", name="Cor do dia")
+        r.check(await daily.is_checked(), "Cor do dia vem ligada")
+        r.eq(await pg.evaluate("[...document.querySelectorAll('#p-look .lead, #p-accent .lead')].map(e => e.textContent)"),
+             ["Cada aparelho guarda a sua escolha.", "Vale para todos os aparelhos."], "o tema é do aparelho; a cor, da casa")
+        r.eq(await pg.evaluate("[...document.querySelectorAll('#p-accent .opts .ot > *')].map(e => e.textContent)"), ["Cor do dia", "Muda a cor do app todo dia."], "Cor do dia, com a dica curta, junto da cor do app")
+        r.eq(await pg.evaluate(ACC), "ouro", "3 de novembro de 2026: Ouro")
+        r.eq(await pg.evaluate(CHECKED), "ouro", "a cor do dia é a marcada")
+        r.eq(r.data()["settings"]["accent"], None, "ninguém escolheu: a casa continua sem cor gravada")
+        box = await pg.evaluate("(() => { const s = document.querySelector('#p-accent .switch').getBoundingClientRect(), z = document.querySelector('#p-accent .swatches').getBoundingClientRect(); return [Math.round(innerWidth - s.right), s.bottom <= z.top]; })()")
+        r.check(box[1] and box[0] <= 24, f"a chave fica à direita, acima das cores ({box})")
+        r.check(await pg.evaluate(OVERFLOW), "as 12 cores cabem na largura")
+        await r.shot(pg, "cor-do-dia", full_page=True)
+        await pg.set_viewport_size({"width": 320, "height": 700})
+        box = await pg.evaluate("(() => { const s = document.querySelector('#p-accent .switch').getBoundingClientRect(), t = document.querySelector('#daily-h').getBoundingClientRect(); return [Math.round(innerWidth - s.right), s.top < t.bottom]; })()")
+        r.check(box[1] and box[0] <= 24, f"no celular de 320 px, a chave continua à direita, na linha do nome ({box})")
+        cut = await pg.evaluate("[...document.querySelectorAll('.sw span')].filter(e => e.scrollWidth > e.parentElement.clientWidth + 1).map(e => e.textContent)")
+        r.check(not cut and await pg.evaluate(OVERFLOW), f"em 320 px, os nomes das cores inteiros ({cut})")
+        await r.shot(pg, "cor-do-dia-320", full_page=True)
+        await pg.set_viewport_size({"width": 384, "height": 854})
+        await ctx.clock.fast_forward("02:00")  # passa da meia-noite com o app aberto
+        await pg.wait_for_function("document.documentElement.dataset.accent === 'verde'", timeout=5000)
+        r.eq([await pg.evaluate(ACC), await pg.evaluate(CHECKED)], ["verde", "verde"], "passou da meia-noite: a cor do dia seguinte, sem recarregar")
+        await pg.click('[data-act="theme"][data-theme="dark"]')
+        r.eq(await pg.evaluate("document.documentElement.dataset.theme"), "dark", "tema Escuro")
+        r.eq(await pg.get_attribute('[data-act="theme"][data-theme="dark"]', "aria-pressed"), "true", "o botão fica marcado")
+        r.eq(await pg.evaluate("[...document.querySelectorAll('.sw')].map(s => s.dataset.accent)"), PALETA, "as 12 cores da família, na ordem")
+        r.eq(await pg.evaluate("[...document.querySelectorAll('.sw span')].map(s => s.textContent)"),
+             ["Vermelho", "Coral", "Laranja", "Ouro", "Verde", "Menta", "Turquesa", "Azul", "Índigo", "Lilás", "Rosa", "Grafite"], "com os nomes da família")
+        fills = await pg.evaluate("[...document.querySelectorAll('.sw')].map(s => getComputedStyle(s).getPropertyValue('--a').trim().toLowerCase())")
+        r.eq(fills, ["#ff5a4f", "#ff8a65", "#ffa23e", "#f2c14e", "#8bd45f", "#4ed3a6", "#3ccbda", "#62b5ff", "#8f9bff", "#b99bff", "#ff77a9", "#b5b9c2"], "e as cores da família")
+        # escolher uma cor desliga a Cor do dia e vale para a casa toda
+        await pg.click('.sw[data-accent="rosa"]')
+        await pg.wait_for_timeout(300)
+        r.eq(await pg.evaluate(ACC), "rosa", "cor Rosa")
+        r.check(not await daily.is_checked(), "escolher uma cor desliga a Cor do dia")
+        st = r.data()["settings"]
+        r.eq([st["accent"], st["accent_daily"]], ["rosa", False], "e fica gravado para a casa toda")
+        r.eq(await pg.evaluate("[localStorage.getItem('inv:accent'), localStorage.getItem('inv:accentDaily')]"), ['"rosa"', "false"], "com a cópia do aparelho, para pintar antes de carregar")
+        await ctx.clock.fast_forward("24:00:00")
+        await pg.evaluate("window.dispatchEvent(new Event('focus'))")
+        r.eq(await pg.evaluate(ACC), "rosa", "desligada, a cor não muda no outro dia")
+        # ligar de novo volta à cor do dia (5 de novembro: Menta); desligar volta à escolhida
+        await daily.click()
+        await pg.wait_for_timeout(300)
+        r.eq([await pg.evaluate(ACC), await pg.evaluate(CHECKED)], ["menta", "menta"], "ligar de novo: a cor do dia, marcada")
+        r.eq(r.data()["settings"]["accent_daily"], True, "a Cor do dia também vale para a casa")
+        await daily.click()
+        await pg.wait_for_timeout(300)
+        r.eq([await pg.evaluate(ACC), await pg.evaluate(CHECKED)], ["rosa", "rosa"], "desligar: a cor escolhida antes")
+        await pg.click('.sw[data-accent="indigo"]')
+        await pg.wait_for_timeout(300)
+        r.eq(await pg.evaluate(ACC), "indigo", "cor Índigo")
+        await pg.reload()
+        await pg.wait_for_selector(".more-tabs")
+        r.eq(await pg.evaluate("[document.documentElement.dataset.theme, document.documentElement.dataset.accent]"), ["dark", "indigo"], "tema e cor ficam depois de recarregar")
+        r.check(not await daily.is_checked() and await pg.evaluate(CHECKED) == "indigo", "e a Cor do dia continua desligada")
+        await r.shot(pg, "aparencia", full_page=True)
+        await pg.click('[data-act="theme"][data-theme="auto"]')
+        r.check(await pg.evaluate("!document.documentElement.dataset.theme"), "Automático segue o celular")
         await ctx.close()
+        # outro aparelho: a mesma cor (a da casa), com o tema dele
+        ctx, pg = await r.page(b, "cel", "light", accent=None, init="try{localStorage.setItem('inv:theme', JSON.stringify('light'))}catch(e){}")
+        await r.open(pg, "#/", ".tag")
+        r.eq(await pg.evaluate("[document.documentElement.dataset.theme, document.documentElement.dataset.accent]"), ["light", "indigo"], "outro aparelho: a cor da casa, com o tema dele")
+        r.eq(await pg.evaluate("localStorage.getItem('inv:accent')"), '"indigo"', "e guarda a cópia da cor da casa")
+        await ctx.close()
+
+        # primeira vez numa casa sem cor: vale a escolhida neste aparelho, que passa para a casa; uma cor de antes da paleta
+        # vira a mais próxima (Kraft: Coral)
+        casa_nova()
+        ctx, pg = await r.page(b, "cel", "dark", accent=None, init="try{if(!sessionStorage.getItem('x')){sessionStorage.setItem('x',1);localStorage.setItem('inv:accent', JSON.stringify('kraft'));localStorage.setItem('inv:accentDaily', 'false')}}catch(e){}")
+        await r.open(pg, "#/", ".tag")
+        await pg.wait_for_timeout(500)
+        r.eq(await pg.evaluate(ACC), "coral", "o Kraft deste aparelho vira o Coral")
+        st = r.data()["settings"]
+        r.eq([st["accent"], st["accent_daily"]], ["coral", False], "e passa para a casa toda, na primeira vez")
+        await ctx.close()
+        # quem tinha escolhido uma cor antes da Cor do dia passa a ter a Cor do dia; depois da última cor, a primeira
+        casa_nova()
+        ctx, pg = await r.page(b, "cel", "dark", accent=None, init="try{if(!localStorage.getItem('inv:accent'))localStorage.setItem('inv:accent', JSON.stringify('coral'))}catch(e){}")
+        await ctx.clock.install(time=datetime.datetime(2026, 11, 13, 23, 59, 0))
+        await r.open(pg, "#/", ".tag")
+        r.eq(await pg.evaluate(ACC), "laranja", "cor escolhida antes (Coral): vale a do dia (13 de novembro: Laranja)")
+        r.eq(r.data()["settings"]["accent_daily"], True, "a casa fica com a Cor do dia")
+        await ctx.clock.fast_forward("02:00")
+        await pg.wait_for_function("document.documentElement.dataset.accent !== 'laranja'", timeout=5000)
+        r.eq(await pg.evaluate(ACC), "ouro", "14 de novembro: depois do Laranja, o Ouro de novo (11 cores; o Grafite fica de fora)")
+        await r.open(pg, "#/config/aparencia", ".more-tabs")
+        r.check(await pg.get_by_role("switch", name="Cor do dia").is_checked() and await pg.evaluate(CHECKED) == "ouro", "na Aparência, ligada e com o Ouro marcado")
+        await ctx.close()
+
+        # o index.html pinta a cor do dia antes do app.js (a mesma conta, dias seguidos), e a cópia da cor da casa
+        ctx, pg = await r.page(b, "cel", "light", accent=None)
+        await pg.route("**/app.js*", lambda route: route.abort())
+        got = []
+        for d in range(12):
+            await ctx.clock.set_fixed_time(datetime.datetime(2026, 11, 3 + d, 8, 0, 0))
+            await pg.goto("about:blank")
+            await pg.goto(r.base + "#/")
+            got.append(await pg.evaluate(ACC))
+        r.eq(got, DIAS + ["ouro"], "antes do app.js: a mesma cor do dia, de 3 a 14 de novembro")
+        for guardada, vale in (("azul", "azul"), ("kraft", "coral"), ("amarelo", "ouro"), ("cinza", "grafite")):
+            await pg.evaluate(f"localStorage.setItem('inv:accent', JSON.stringify('{guardada}')); localStorage.setItem('inv:accentDaily', 'false')")
+            await pg.reload()
+            r.eq(await pg.evaluate(ACC), vale, f"desligada, a cor guardada ({guardada}: {vale})")
+        await ctx.close()
+
+        # cada cor, clara e escura, no Início
+        for scheme in ("light", "dark"):
+            ctx, pg = await r.page(b, "cel", scheme, accent=None)
+            for a in PALETA:
+                r.api("PUT", "api/settings", {"accent": a, "accent_daily": False})
+                await r.open(pg, "#/", ".tag")
+                await pg.wait_for_timeout(200)
+                await r.shot(pg, f"cor-{a}-{scheme}")
+            r.eq(await pg.evaluate(ACC), "grafite", f"{scheme}: a cor da casa vale ao abrir")
+            await ctx.close()
+    finally:
+        r.app, r.base = principal
+        for c in casas:
+            c.stop()
 
     # -- Opções: zonas; Categorias: tela própria, no menu Mais
     ctx, pg = await r.page(b, "cel", "dark", accent="rosa")
@@ -254,8 +307,8 @@ async def body(r, p):
     r.check("1 item vai para Outros" in await pg.text_content("dialog[open]:last-of-type"), "excluir avisa para onde vão os itens")
     await r.shot(pg, "categoria-excluir")
     await pg.click('[data-r="1"]')
-    await pg.locator(".toast", has_text="excluída").wait_for(timeout=5000)
-    r.check(all(c["id"] != cat["id"] for c in r.data()["cats"]), "categoria excluída")
+    await pg.locator(".toast", has_text="apagada").wait_for(timeout=5000)
+    r.check(all(c["id"] != cat["id"] for c in r.data()["cats"]), "categoria apagada")
     r.eq(next(i for i in r.data()["items"] if i["id"] == furadeira["id"])["cat"], "outros", "o item foi para Outros")
     # a categoria renomeada aparece no cadastro e na busca
     await pg.click('[data-act="cat-edit"][data-cat="moveis"]')

@@ -57,7 +57,7 @@ async def body(r, p):
     r.check(True, "o link Mais, no alto, volta ao menu")
 
     # endereços antigos: Mais com abas
-    for old, new in (("#/mais/integracoes", "#/config/integracoes"), ("#/mais/opcoes", "#/config/opcoes"), ("#/mais/novidades", "#/novidades"), ("#/dados", "#/config")):
+    for old, new in (("#/mais/integracoes", "#/config"), ("#/config/integracoes", "#/config"), ("#/mais/opcoes", "#/config/opcoes"), ("#/mais/novidades", "#/novidades"), ("#/dados", "#/config/dados"), ("#/mais/dados", "#/config/dados")):
         await pg.goto("about:blank")
         await pg.goto(r.base + old)
         await pg.wait_for_selector(".more-tabs, #p-news", timeout=8000)
@@ -66,14 +66,15 @@ async def body(r, p):
     await r.open(pg, "#/config", ".more-tabs")
     r.eq((await pg.text_content(".page-title")).strip(), "Configurações", "Configurações com o título")
     tabs = await pg.evaluate("[...document.querySelectorAll('.more-tabs [role=tab]')].map(t => t.textContent.trim())")
-    r.eq(tabs, ["Dados", "Integrações", "Aparência", "Opções"], "as quatro abas, sem Novidades")
+    r.eq(tabs, ["Integrações", "Dados", "Aparência", "Opções"], "as quatro abas na ordem da família, sem Novidades")
+    r.eq(await pg.get_attribute(".more-tabs [aria-selected=true]", "id"), "mt-integracoes", "Configurações abre em Integrações")
     r.eq(await pg.locator('#view a[href="#/relatorio"]').count(), 0, "o Relatório fica no menu, não em Dados")
     r.eq((await pg.text_content(".page-sub")).replace("\xa0", " "), "38 itens e 9 fotos no inventário", "resumo no alto")
     foot = await pg.text_content(".foot")
     r.check(f"v{r.data()['version']}" in foot, f"rodapé com a versão ({foot.strip()[:40]})")
-    for k in ("integracoes", "aparencia", "opcoes", "dados"):
+    for k in ("dados", "aparencia", "opcoes", "integracoes"):
         await tab(pg, k)
-        r.check(pg.url.endswith("#/config" if k == "dados" else f"#/config/{k}"), f"aba {k} no endereço")
+        r.check(pg.url.endswith("#/config" if k == "integracoes" else f"#/config/{k}"), f"aba {k} no endereço")
         sizes = await pg.evaluate(BUTTONS)
         if k in ("aparencia", "opcoes"):  # tema e cor: botões de escolha; Opções: só a chave das zonas
             continue
@@ -82,17 +83,17 @@ async def body(r, p):
         r.check(await pg.evaluate(OVERFLOW), f"[{k}] sem rolagem para o lado")
         await r.shot(pg, f"aba-{k}", full_page=True)
     # teclado nas abas
-    await pg.focus("#mt-dados")
+    await pg.focus("#mt-integracoes")
     await pg.keyboard.press("ArrowRight")
     await pg.wait_for_timeout(400)
-    r.check(pg.url.endswith("#/config/integracoes"), "seta para a direita troca de aba")
+    r.check(pg.url.endswith("#/config/dados"), "seta para a direita troca de aba")
     await tab(pg, "dados")
     await ctx.close()
 
     # celular estreito: tudo cabe
     ctx, pg = await r.page(b, "estreito", "light")
     await r.open(pg, "#/config", ".more-tabs")
-    for k in ("dados", "integracoes", "aparencia", "opcoes"):
+    for k in ("integracoes", "dados", "aparencia", "opcoes"):
         await tab(pg, k)
         sizes = await pg.evaluate(BUTTONS)
         r.check(all(h == 44 for _, h, _ in sizes) and len({w for w, _, _ in sizes}) <= 1, f"[estreito {k}] botões iguais ({sorted({(w, h) for w, h, _ in sizes})})")
@@ -102,7 +103,7 @@ async def body(r, p):
 
     # exportar
     ctx, pg = await r.page(b, "pc", "light")
-    await r.open(pg, "#/config", ".more-tabs")
+    await r.open(pg, "#/config/dados", ".more-tabs")
     got = {}
     for kind in ("csv", "json", "zip"):
         async with pg.expect_download() as dl:
@@ -165,13 +166,45 @@ async def body(r, p):
     bad = os.path.join(TMP, "lista.txt")
     with open(bad, "w") as f:
         f.write("não é backup")
-    await r.open(pg, "#/config", ".more-tabs")
+    await r.open(pg, "#/config/dados", ".more-tabs")
     async with pg.expect_file_chooser() as fc:
         await pg.click('[data-act="import-file"]')
     await (await fc.value).set_files(bad)
     t = pg.locator(".toast", has_text="não é um backup")
     await t.wait_for(timeout=5000)
     r.check(True, "arquivo que não é backup: aviso, nada muda")
+
+    # Dados na ordem da família, com Começar do zero no fim: apaga tudo só depois de confirmar, com uma versão antes
+    secs = await pg.evaluate("[...document.querySelectorAll('#mp .panel > h2')].map(h => h.textContent.trim())")
+    r.eq(secs, ["Exportar", "Backup na pasta share", "Importar", "Versões anteriores", "Onde ficam os dados", "Começar do zero"], "Dados: as seções na ordem da família")
+    r.check("Versões anteriores" in await pg.text_content("#p-zero .lead"), "Começar do zero diz que uma cópia fica em Versões anteriores")
+    n0 = len(r.data()["items"])
+    await pg.click('[data-act="erase-all"]')
+    await pg.wait_for_selector('[data-r="1"]')
+    dlg = pg.locator("dialog[open]:last-of-type")
+    r.eq((await dlg.locator("h2").text_content()).strip(), "Apagar tudo?", "pergunta antes")
+    body = " ".join((await dlg.locator(".dlg-b").text_content()).split())
+    r.check(body.startswith(f"Saem 6 cômodos, {n0 - 3} itens e 3 bens.") or body.startswith(f"Saem 6 cômodos e {n0} itens."), f"com o que sai ({body})")
+    r.eq((await dlg.locator('[data-r="1"]').text_content()).strip(), "Apagar tudo", "o botão diz o que faz")
+    await r.shot(pg, "apagar-tudo")
+    await pg.click('[data-r="0"]')
+    await pg.wait_for_timeout(400)
+    r.eq(len(r.data()["items"]), n0, "Cancelar não apaga nada")
+    await pg.click('[data-act="erase-all"]')
+    await pg.click('[data-r="1"]')
+    await pg.locator(".toast", has_text="Tudo apagado").wait_for(timeout=8000)
+    d = r.data()
+    r.eq((d["rooms"], d["items"]), ([], []), "confirmado: sem cômodos nem itens")
+    r.check(await pg.is_disabled('[data-act="erase-all"]'), "sem nada, o Apagar tudo fica inativo")
+    await pg.click('[data-act="versions"]')
+    await pg.wait_for_selector("dialog .versions li", timeout=8000)
+    rows = await pg.evaluate("[...document.querySelectorAll('dialog .versions li .ot span')].map(e => e.textContent)")
+    r.check(any("antes de apagar tudo" in x for x in rows), f"a versão de antes de apagar tudo ({rows})")
+    await pg.click('dialog .versions [data-ver="0"]')
+    await pg.wait_for_selector('[data-r="1"]')
+    await pg.click('[data-r="1"]')
+    await pg.locator(".toast", has_text="Versão restaurada").wait_for(timeout=15000)
+    r.eq(len(r.data()["items"]), n0, "restaurar a versão traz tudo de volta")
     await ctx.close()
     await b.close()
 

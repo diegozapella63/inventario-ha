@@ -60,9 +60,9 @@ class Pessoas(UnitBase):
     def test_pessoas_e_celulares(self):
         self.fake_ha()
         self.assertEqual(server.news_people(), [
-            {"id": "person.ana", "name": "Ana", "phones": ["mobile_app_celular_da_ana"]},  # pelo nome do aparelho, não do rastreador
-            {"id": "person.beto", "name": "Beto", "phones": []},  # o roteador não é celular
-            {"id": "person.carla", "name": "Carla", "phones": ["mobile_app_tablet_da_sala"]},  # fora dos registros: pelo nome do rastreador
+            {"id": "person.ana", "name": "Ana", "user_id": "u-ana", "phones": ["mobile_app_celular_da_ana"]},  # pelo nome do aparelho, não do rastreador
+            {"id": "person.beto", "name": "Beto", "user_id": "u-beto", "phones": []},  # o roteador não é celular
+            {"id": "person.carla", "name": "Carla", "user_id": "", "phones": ["mobile_app_tablet_da_sala"]},  # fora dos registros: pelo nome do rastreador
         ])
 
     def test_sem_os_registros_pelo_nome_do_rastreador(self):

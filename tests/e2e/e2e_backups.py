@@ -51,8 +51,8 @@ async def body(r, p):
     sizes = {n: os.path.getsize(os.path.join(share, n)) for n, _ in made}
 
     b = await r.browser(p)
-    ctx, pg = await r.page(b, "pc", "light", accent="cinza")
-    await r.open(pg, "#/config", ".more-tabs")
+    ctx, pg = await r.page(b, "pc", "light", accent="grafite")
+    await r.open(pg, "#/config/dados", ".more-tabs")
     await pg.wait_for_selector('[data-act="backup-restore"]', timeout=10000)
     rows = await pg.evaluate(ROWS)
     r.eq(len(rows), 12, "mostra os 12 backups mais novos (eram 13)")
@@ -106,7 +106,7 @@ async def body(r, p):
 
     # -- celular estreito: o nome comprido quebra sem passar da tela
     ctx, pg = await r.page(b, "estreito", "dark", accent="verde")
-    await r.open(pg, "#/config", ".more-tabs")
+    await r.open(pg, "#/config/dados", ".more-tabs")
     await pg.wait_for_selector(f'[data-name="{LONG}"]', timeout=10000)
     r.check(await pg.evaluate(OVERFLOW), "celular de 320 px: nome comprido sem rolagem para o lado")
     await pg.locator(f'[data-name="{LONG}"]').scroll_into_view_if_needed()
@@ -119,7 +119,7 @@ async def body(r, p):
     app = AppServer(seed=True, env={"INV_SHARE": os.path.join(tmp, "share", "inventario")})
     try:
         ctx, pg = await r.page(b, "cel", "light", accent="azul")
-        await pg.goto(app.base + "#/config")
+        await pg.goto(app.base + "#/config/dados")
         await pg.wait_for_selector('[data-act="backup-create"]', timeout=10000)
         r.eq(" ".join((await pg.text_content("#p-backup .opts li .ot span")).split()), "A pasta share não está disponível.", "sem a pasta share: diz isso")
         r.check(await pg.is_disabled('[data-act="backup-create"]'), "e Criar backup fica desligado")
@@ -147,7 +147,7 @@ async def body(r, p):
     app = AppServer(seed=True, env={"INV_SHARE": os.path.join(tmp, "inventario")})
     try:
         ctx, pg = await r.page(b, "cel", "light")
-        await pg.goto(app.base + "#/config")
+        await pg.goto(app.base + "#/config/dados")
         await pg.wait_for_function("(e => e && !e.textContent.includes('Carregando'))(document.querySelector('[data-slot=backups]'))", timeout=10000)
         txt = " ".join((await pg.text_content('[data-slot="backups"]')).split())
         await r.shot(pg, "share-arquivo")

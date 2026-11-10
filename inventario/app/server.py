@@ -48,7 +48,7 @@ import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.41.0"
+VERSION = "1.42.0"
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -465,9 +465,9 @@ class Store:
         """Exclui a categoria; os itens dela vão para Outros. Devolve quantos itens mudaram."""
         with self.lock:
             if cid == "outros":
-                raise ApiError(400, "A categoria Outros não pode ser excluída.")
+                raise ApiError(400, "A categoria Outros não pode ser apagada.")
             if cid == "eletronicos":
-                raise ApiError(400, "Eletrônicos é a categoria das novidades: não dá para excluir.")
+                raise ApiError(400, "Eletrônicos é a categoria das novidades: não dá para apagar.")
             cats = self.cats()
             if not any(c["id"] == cid for c in cats):
                 raise ApiError(404, "Esta categoria não existe mais.")
@@ -786,7 +786,7 @@ class Store:
             if not room:
                 raise ApiError(404, "Este cômodo não existe mais.")
             if any(i["room"] == rid for i in self.data["items"]):
-                raise ApiError(400, "Mova ou exclua os itens deste cômodo antes de excluí-lo.")
+                raise ApiError(400, "Mova ou apague os itens deste cômodo antes de apagá-lo.")
             self.data["rooms"].remove(room)
             self._normalize_order()
             self.save()
@@ -2871,7 +2871,7 @@ def tracker_phones(trackers, notify: set, devices: dict | None) -> list[str]:
 def news_people() -> list[dict]:
     """As pessoas da casa no Home Assistant e os celulares de cada uma: [{id, name, phones}], por nome (cache de 60 s)."""
     if AI_MOCK and not SUPERVISOR_TOKEN:
-        return [{"id": "person.pessoa_de_teste", "name": "Pessoa de Teste", "phones": ["mobile_app_celular_de_teste"]}]
+        return [{"id": "person.pessoa_de_teste", "name": "Pessoa de Teste", "user_id": "", "phones": ["mobile_app_celular_de_teste"]}]
     if not SUPERVISOR_TOKEN:
         return []
     if _people_cache["value"] is not None and time.time() - _people_cache["at"] < 60:
@@ -2885,10 +2885,20 @@ def news_people() -> list[dict]:
         eid = str((st or {}).get("entity_id") or "")
         if re.fullmatch(r"person\.[a-z0-9_]+", eid):
             a = st.get("attributes") or {}
-            out.append({"id": eid, "name": str(a.get("friendly_name") or eid[7:]), "phones": tracker_phones(a.get("device_trackers"), notify, devices)})
+            out.append({"id": eid, "name": str(a.get("friendly_name") or eid[7:]), "user_id": str(a.get("user_id") or ""),
+                        "phones": tracker_phones(a.get("device_trackers"), notify, devices)})
     out.sort(key=lambda p: fold(p["name"]))
     _people_cache.update(at=time.time(), value=out)
     return out
+
+
+def my_person(user_id: str):
+    """A pessoa do Home Assistant de quem está na tela (o X-Remote-User-Id do Ingress é o user_id dela), para o Testar no
+    meu celular. Sem Home Assistant (dev/run.sh), a pessoa de teste."""
+    people = news_people()
+    if AI_MOCK and not SUPERVISOR_TOKEN:
+        return people[0] if people else None
+    return next((p for p in people if user_id and p.get("user_id") == user_id), None)
 
 
 def news_phones(who: str) -> list[str]:
@@ -3337,13 +3347,31 @@ class Handler(BaseHTTPRequestHandler):
 
 # -- rotas
 
+# Aparência > Cor do app: vale para a casa toda. A paleta da família (as mesmas 12 cores em todos os apps, na ordem); None
+# enquanto ninguém escolheu (a tela adota a do aparelho na primeira vez). Uma cor de antes da paleta vira a mais próxima.
+ACCENTS = ("vermelho", "coral", "laranja", "ouro", "verde", "menta", "turquesa", "azul", "indigo", "lilas", "rosa", "grafite")
+OLD_ACCENTS = {"amarelo": "ouro", "kraft": "coral", "cinza": "grafite"}
+
+
+def app_accent():
+    a = STORE.settings.get("accent")
+    a = OLD_ACCENTS.get(a, a)
+    return a if a in ACCENTS else None
+
+
+def app_accent_daily():
+    v = STORE.settings.get("accent_daily")
+    return v if isinstance(v, bool) else None
+
+
 def r_data(h, query):
     with STORE.lock:
         out = STORE.public()
     out.update({"version": VERSION, "user": h.user(),
                 "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai_search": STORE.settings.get("ai_search") or "",
                              "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "bens": bens_enabled(), "ha_sensors": sensors_enabled(),
-                             "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target(), "correria": correria_enabled()},
+                             "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target(), "correria": correria_enabled(),
+                             "accent": app_accent(), "accent_daily": app_accent_daily()},
                 "correria_uso": correria_uso() if correria_enabled() else None,
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
     h.send_json(out)
@@ -3527,12 +3555,18 @@ def r_news_all(h, query):
 
 
 def r_news_people(h, query):
-    h.send_json({"people": [{"id": p["id"], "name": p["name"], "phone": bool(p["phones"])} for p in news_people()]})
+    me = my_person(h.headers.get("X-Remote-User-Id") or "")
+    h.send_json({"people": [{"id": p["id"], "name": p["name"], "phone": bool(p["phones"]), "eu": bool(me and me["id"] == p["id"])} for p in news_people()]})
 
 
 def r_news_notify_test(h, query):
     body = h.read_body()
     who = str(body.get("who") or news_notify_target())
+    if who == "eu":  # Testar no meu celular: o de quem está na tela
+        me = my_person(h.headers.get("X-Remote-User-Id") or "")
+        if not me:
+            raise ApiError(400, "Você não está entre as pessoas do Home Assistant (Configurações > Pessoas).")
+        who = me["id"]
     if not WHO_RE.fullmatch(who):
         raise ApiError(400, "Escolha quem avisar.")
     h.send_json({"ok": True, "sent": send_news_notice(2, who, test=True)})
@@ -3577,6 +3611,14 @@ def r_settings_put(h, query):
         if t and not WHO_RE.fullmatch(t):
             raise ApiError(400, "Escolha quem avisar.")
         upd["news_notify"] = t
+    if "accent" in body:
+        if body["accent"] not in ACCENTS:
+            raise ApiError(400, "Escolha uma das cores do app.")
+        upd["accent"] = body["accent"]
+    if "accent_daily" in body:
+        if not isinstance(body["accent_daily"], bool):
+            raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
+        upd["accent_daily"] = body["accent_daily"]
     with STORE.lock:
         STORE.settings.update(upd)
         STORE.save_settings()
@@ -3738,6 +3780,23 @@ def r_upload_cancel(h, uid, query):
 
 def r_history(h, query):
     h.send_json({"history": STORE.history_list()})
+
+
+def r_erase(h, query):
+    """Configurações > Dados > Começar do zero: apaga os cômodos (com a área Bens) e os itens, só com a confirmação da tela e
+    depois de guardar uma versão (Versões anteriores, "antes de apagar tudo"). As categorias, as opções e as fotos no disco
+    ficam: restaurar a versão traz tudo de volta."""
+    body = h.read_body()
+    if not isinstance(body, dict) or body.get("confirm") is not True:
+        raise ApiError(400, "Confirme para apagar tudo.")
+    with STORE.lock:
+        STORE.snapshot_if_due(force=True, reason="erase")
+        STORE.data["rooms"] = []
+        STORE.data["items"] = []
+        STORE.save()
+        rev = STORE.data["rev"]
+    log.info("Começar do zero: cômodos e itens apagados (a versão de antes ficou em Versões anteriores)")
+    h.send_json({"ok": True, "rev": rev})
 
 
 def r_history_restore(h, query):
@@ -3980,6 +4039,7 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("DELETE", r"/api/upload/([a-f0-9]{16})", r_upload_cancel),
     ("GET", r"/api/history", r_history),
     ("POST", r"/api/history/restore", r_history_restore),
+    ("POST", r"/api/erase", r_erase),
 ]]
 
 

@@ -1,4 +1,4 @@
-"""Primeiro uso, sem inventário: boas-vindas, começar do zero (primeiro cômodo e item) e importar um backup."""
+"""Primeiro uso, sem inventário: boas-vindas, criar o primeiro cômodo (e o primeiro item) e importar um backup."""
 import json
 import os
 import zipfile
@@ -24,11 +24,11 @@ async def body(r, p):
     b = await r.browser(p)
 
     for size, scheme in (("cel", "dark"), ("estreito", "light"), ("pc", "light")):
-        ctx, pg = await r.page(b, size, scheme, accent="kraft")
+        ctx, pg = await r.page(b, size, scheme, accent="coral")
         await r.open(pg, "#/", ".welcome")
         r.eq((await pg.text_content(".welcome h1")).strip(), "Vamos começar", f"[{size}] boas-vindas")
         acts = await pg.evaluate("[...document.querySelectorAll('.welcome .acts .btn')].map(b => b.textContent.trim())")
-        r.eq(acts, ["Importar backup", "Começar do zero"], f"[{size}] importar ou começar do zero")
+        r.eq(acts, ["Importar backup", "Criar o primeiro cômodo"], f"[{size}] importar ou criar o primeiro cômodo")
         r.check(await pg.evaluate(OVERFLOW), f"[{size}] sem rolagem para o lado")
         await r.shot(pg, f"inicio-{size}")
         await ctx.close()

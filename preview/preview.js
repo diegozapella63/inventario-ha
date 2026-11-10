@@ -109,7 +109,7 @@
     if (method === "GET" && path === "api/data") {
       const st = ST.settings;
       return { ...clone(d), rev: ST.rev, version: "%%V%%", user: null, features: { ai: true, share: false },
-        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false, correria: st.correria === true }, correria_uso: null };
+        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false, correria: st.correria === true, accent: st.accent ?? null, accent_daily: st.accent_daily ?? null }, correria_uso: null };
     }
     if (method === "GET" && path === "api/rev") return { rev: ST.rev, correria_uso: null };
     if (method === "POST" && path === "api/items") {
@@ -182,7 +182,7 @@
     if ((m = path.match(/^api\/cats\/([a-z0-9_-]+)$/))) {
       const cats = catsOf(d), cat = cats.find((c) => c.id === m[1]);
       if (!cat) fail("Esta categoria não existe mais.", 404);
-      if (cat.id === "eletronicos") fail(`Eletrônicos é a categoria das novidades: não dá para ${method === "PUT" ? "renomear" : "excluir"}.`);
+      if (cat.id === "eletronicos") fail(`Eletrônicos é a categoria das novidades: não dá para ${method === "PUT" ? "renomear" : "apagar"}.`);
       if (method === "PUT") {
         const name = String(body.name || "").trim().replace(/\s+/g, " ");
         if (!name) fail("Preencha o campo nome da categoria.");
@@ -191,7 +191,7 @@
         return { cat: clone(cat), cats: clone(cats), rev: bump() };
       }
       if (method === "DELETE") {
-        if (cat.id === "outros") fail("A categoria Outros não pode ser excluída.");
+        if (cat.id === "outros") fail("A categoria Outros não pode ser apagada.");
         let moved = 0;
         d.items.forEach((i) => { if (i.cat === cat.id) { i.cat = "outros"; moved++; } });
         cats.splice(cats.indexOf(cat), 1);
@@ -238,7 +238,7 @@
       const r = room(d, decodeURIComponent(m[1]));
       if (!r) fail("Este cômodo não existe mais.", 404);
       if (method === "DELETE") {
-        if (d.items.some((i) => i.room === r.id)) fail("Mova ou exclua os itens deste cômodo antes de excluí-lo.");
+        if (d.items.some((i) => i.room === r.id)) fail("Mova ou apague os itens deste cômodo antes de apagá-lo.");
         d.rooms.splice(d.rooms.indexOf(r), 1);
         return { room: clone(r), rooms: clone(d.rooms), rev: bump() };
       }
@@ -407,7 +407,7 @@
       items = items.map((it) => ({ ...it, room }));
       return { items, room, entity: "ai_task.exemplo", example: true };
     }
-    if (method === "GET" && path === "api/news/people") return { people: [{ id: "person.ana", name: "Ana", phone: true }, { id: "person.beto", name: "Beto", phone: true }] };
+    if (method === "GET" && path === "api/news/people") return { people: [{ id: "person.ana", name: "Ana", phone: true, eu: true }, { id: "person.beto", name: "Beto", phone: true, eu: false }] };
     if (method === "POST" && path === "api/news/notify-test") return { ok: true, sent: body.who === "todos" ? 2 : 1, example: true };
     if (path === "api/settings") { if (method === "PUT") Object.assign(ST.settings, body); return { ...ST.settings }; }
     if (path === "api/backups") fail(OFF + "os backups vão para a pasta share/inventario.");
@@ -417,6 +417,7 @@
         { name: "b", date: at(190), items: Math.max(0, n - 3), rooms: d.rooms.length, reason: "import" },
         { name: "c", date: at(1500), items: Math.max(0, n - 7), rooms: d.rooms.length, reason: "auto" }] };
     }
+    if (method === "POST" && path === "api/erase") { d.rooms = []; d.items = []; return { ok: true, rev: bump() }; } // Começar do zero
     if (path === "api/history/restore") fail(OFF + "a versão escolhida volta, e o app guarda antes uma cópia do que existe hoje.");
     if (path === "api/upload" || path.startsWith("api/upload/")) fail(OFF + "a importação traz o backup com fotos para dentro do app.");
     if (method === "POST" && path === "api/import") {

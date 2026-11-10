@@ -27,6 +27,8 @@ ANDROID_APP_UA = ("Mozilla/5.0 (Linux; Android 14; SM-S921B Build/UP1A; wv) Appl
                   "Chrome/130.0 Mobile Safari/537.36 Home Assistant/2026.10.1-full")
 ANDROID_CHROME_UA = "Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36"
 
+OLD_ACCENTS = {"amarelo": "ouro", "kraft": "coral", "cinza": "grafite"}  # as cores de antes da paleta da família (até a 1.41)
+
 SIZES = {  # nome: (largura, altura, celular?)
     "cel": (384, 854, True), "estreito": (320, 700, True), "tablet": (820, 1100, True), "pc": (1280, 900, False),
 }
@@ -102,12 +104,17 @@ class Run:
             b.close = b_close
         return b
 
-    async def page(self, b, size="cel", scheme="dark", accent="amarelo", ua=None, perms=None, init=None, user="Davi", motion="reduce"):
+    async def page(self, b, size="cel", scheme="dark", accent="ouro", ua=None, perms=None, init=None, user="Davi", motion="reduce", user_id=None):
         w, h, mobile = SIZES[size]
         ctx = await b.new_context(viewport={"width": w, "height": h}, device_scale_factor=2 if mobile else 1, is_mobile=mobile, has_touch=mobile,
                                   color_scheme=scheme, reduced_motion=motion, user_agent=ua, permissions=perms or [],
-                                  extra_http_headers={"X-Remote-User-Display-Name": user} if user else {})
+                                  extra_http_headers={**({"X-Remote-User-Display-Name": user} if user else {}), **({"X-Remote-User-Id": user_id} if user_id else {})})
         if accent:  # uma cor fixa, sem a Cor do dia; None: fica a do dia ou a que a pessoa escolher na tela
+            # a cor vale para a casa toda (gravada no servidor, 1.42.0); o aparelho guarda a cópia que pinta antes de carregar.
+            # As cores de antes da paleta da família viram a mais próxima.
+            accent = OLD_ACCENTS.get(accent, accent)
+            if self.app:
+                self.app.ok("PUT", "api/settings", {"accent": accent, "accent_daily": False})
             await ctx.add_init_script(f"try{{localStorage.setItem('inv:accent', JSON.stringify('{accent}'));localStorage.setItem('inv:accentDaily', 'false')}}catch(e){{}}")
         if init:
             await ctx.add_init_script(init)

@@ -54,7 +54,7 @@ async def body(r, p):
     b2 = make_zip("outro-parte2.zip", {"photos/outro-b.jpg": jpg}, big=13)
 
     b = await r.browser(p)
-    ctx, pg = await r.page(b, "pc", "light", accent="kraft")
+    ctx, pg = await r.page(b, "pc", "light", accent="coral")
     delay = {"s": 0.0}
 
     async def slow(route):
@@ -66,7 +66,7 @@ async def body(r, p):
     pg.on("request", lambda q: starts.append(q.post_data_json.get("name")) if q.url.endswith("/api/upload") and q.method == "POST" else None)
 
     async def choose(*paths):
-        await r.open(pg, "#/config", ".more-tabs")
+        await r.open(pg, "#/config/dados", ".more-tabs")
         async with pg.expect_file_chooser() as fc:
             await pg.click('[data-act="import-file"]')
         chooser = await fc.value

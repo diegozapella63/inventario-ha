@@ -16,7 +16,7 @@ async def body(r, p):
     await pg.click('[data-go="catalog"]')
     await pg.wait_for_selector('[data-ct="upload"]')
     tiles = await pg.evaluate("[...document.querySelectorAll('dialog .phs .add')].map(b => b.textContent.trim())")
-    r.eq(tiles[:2], ["Tirar foto", "Escolher foto"], "Catalogar: Tirar foto e Escolher foto")
+    r.eq(tiles[:2], ["Tirar foto", "Escolher fotos"], "Catalogar: Tirar foto e Escolher fotos")
     await r.shot(pg, "catalogar")
     await pg.click('[data-ct="camera"]')
     await pg.wait_for_selector("dialog.camera")
@@ -28,7 +28,7 @@ async def body(r, p):
     await pg.click('[data-cam="shoot"]')
     await pg.wait_for_selector("dialog.camera", state="detached", timeout=8000)
     await pg.wait_for_selector(".cat-photo img", timeout=10000)
-    r.check(await pg.is_enabled('[data-ct="read"]'), "a foto entra no Catalogar e Ler foto liga")
+    r.check(await pg.is_enabled('[data-ct="read"]'), "a foto entra no Catalogar e Digitalizar com IA liga")
     await ctx.close()
 
     # editor: várias fotos, Pronto (n); Voltar e X fecham sem foto
@@ -83,7 +83,7 @@ async def body(r, p):
     await r.shot(pg, "sem-camera")
     async with pg.expect_file_chooser():
         await pg.click('[data-cam="pick"]')
-    r.check(True, "Escolher foto abre a galeria")
+    r.check(True, "Escolher fotos abre a galeria")
     await ctx.close()
 
     # navegador do celular (não o app): continua a câmera do aparelho
@@ -104,7 +104,7 @@ async def body(r, p):
     await r.open(pg, "#/", ".tag")
     await pg.click('.side [data-act="item-new"], [data-act="item-new"]')
     await pg.wait_for_selector("#f-name")
-    r.eq(await pg.locator('[data-ed="camera"]').count(), 0, "computador: sem Tirar foto, só Enviar")
+    r.eq(await pg.locator('[data-ed="camera"]').count(), 0, "computador: sem Tirar foto, só Escolher fotos")
     await ctx.close()
     await b.close()
 

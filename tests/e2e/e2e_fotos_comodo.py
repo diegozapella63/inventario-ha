@@ -16,7 +16,7 @@ def room(r, rid="escritorio"):
 async def body(r, p):
     r.start(search=False)
     b = await r.browser(p)
-    ctx, pg = await r.page(b, "cel", "dark", accent="kraft")
+    ctx, pg = await r.page(b, "cel", "dark", accent="coral")
 
     async def viewer(i):
         await pg.click(f'.strip .ph[data-i="{i}"]')

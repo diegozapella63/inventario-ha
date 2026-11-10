@@ -68,7 +68,7 @@ async def body(r, p):
     await pg.click('.rhead-actions [data-act="room-edit"]')
     await pg.wait_for_selector("#re-name")
     await pg.click('[data-re="delete"]')
-    t = pg.locator(".toast", has_text="Mova ou exclua")
+    t = pg.locator(".toast", has_text="Mova ou apague")
     await t.wait_for(timeout=4000)
     r.check(any(x["id"] == "varanda" for x in r.data()["rooms"]), f"cômodo com itens não é excluído ({(await t.text_content()).strip()})")
     await pg.click('[data-re="cancel"]')

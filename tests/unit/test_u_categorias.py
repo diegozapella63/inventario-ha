@@ -261,7 +261,7 @@ class EletronicosFicaSempre(UnitBase):
         self.assertEqual([c["id"] for c in self.store.cats()], ["eletronicos", "moveis", "outros"])
 
     def test_nao_renomeia_nem_exclui(self):
-        for f, args, msg in ((self.store.update_cat, ("eletronicos", {"name": "Aparelhos"}), "renomear"), (self.store.delete_cat, ("eletronicos",), "excluir")):
+        for f, args, msg in ((self.store.update_cat, ("eletronicos", {"name": "Aparelhos"}), "renomear"), (self.store.delete_cat, ("eletronicos",), "apagar")):
             with self.assertRaises(S.ApiError) as e:
                 f(*args)
             self.assertEqual((e.exception.status, e.exception.msg), (400, f"Eletrônicos é a categoria das novidades: não dá para {msg}."))

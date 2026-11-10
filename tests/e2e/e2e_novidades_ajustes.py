@@ -1,5 +1,5 @@
 """Ajustes das novidades (Mais > Configurações > Opções): Usar novidades, Conferir sozinho, Avisar (uma pessoa da casa ou
-todas, nunca um aparelho, como no ResolvIA e na CronologIA) e Testar o aviso, os dois só com Conferir sozinho ligado; desligadas, somem do menu Mais e da ficha; IA desligada,
+todas, nunca um aparelho, como no ResolvIA e na CronologIA) e Testar no meu celular (o de quem está na tela), os dois só com Conferir sozinho ligado; desligadas, somem do menu Mais e da ficha; IA desligada,
 o painel some; o link do aviso (/app/<app>/novidades) abre o app direto em Novidades, pela mensagem do painel do Home Assistant."""
 from e2e_lib import OVERFLOW, FakeHA, main
 
@@ -50,8 +50,8 @@ async def body(r, p):
         await ctx.close()
     r.api("PUT", "api/settings", {"news_every": 0})
 
-    # escolher: grava na hora; Conferir sozinho traz o Avisar
-    ctx, pg = await r.page(b, "cel", "dark", accent="laranja")
+    # escolher: grava na hora; Conferir sozinho traz o Avisar. Quem está na tela é a Ana (o user_id dela no Home Assistant)
+    ctx, pg = await r.page(b, "cel", "dark", accent="laranja", user="Ana", user_id="u-ana")
     await r.open(pg, "#/config/opcoes", "#p-news-opts")
     r.eq(await pg.locator('[data-input="news-notify"]').count(), 0, "Não: sem Avisar")
     await pg.select_option('[data-input="news-every"]', "7")
@@ -69,7 +69,8 @@ async def body(r, p):
     await pg.locator(".toast", has_text="Aviso enviado").wait_for(timeout=8000)
     c = ha.calls("POST", "/core/api/services/notify/")
     r.eq(len(c), n + 1, "Testar manda um aviso")
-    r.eq(c[-1]["path"], f"/core/api/services/notify/{PHONE}", "no celular ligado à Ana no Home Assistant")
+    r.eq(c[-1]["path"], f"/core/api/services/notify/{PHONE}", "no meu celular (o ligado à Ana, quem está na tela)")
+    r.eq((await pg.text_content("#p-news-opts li:has([data-act=news-notify-test]) .ot b")).strip(), "Testar no meu celular", "Testar no meu celular, como nos outros apps")
     r.eq(c[-1]["body"]["message"], "Novidades em 2 itens. Toque para abrir.", "com o texto do aviso")
     w = await pg.evaluate("[...document.querySelectorAll('#p-news-opts .oa > .select, #p-news-opts .oa > .btn')].map(e => Math.round(e.getBoundingClientRect().width))")
     r.check(len(set(w)) == 1, f"Testar com a largura das seleções ({w})")
@@ -78,8 +79,8 @@ async def body(r, p):
     await pg.select_option('[data-input="news-notify"]', "todos")
     await pg.locator(".toast", has_text="Avisar: todos").wait_for(timeout=5000)
     await test.click()
-    await pg.locator(".toast", has_text="Aviso enviado para 2 celulares").wait_for(timeout=8000)
-    r.check(True, "Todos: o aviso vai para o celular de cada pessoa")
+    await pg.locator(".toast", has_text="Aviso enviado").nth(1).wait_for(timeout=8000)
+    r.eq(ha.calls("POST", "/core/api/services/notify/")[-1]["path"], f"/core/api/services/notify/{PHONE}", "com Todos, o teste continua indo só para o meu celular")
     await pg.select_option('[data-input="news-notify"]', ANA)
     await pg.locator(".toast", has_text="Avisar: Ana").wait_for(timeout=5000)
     await pg.reload()

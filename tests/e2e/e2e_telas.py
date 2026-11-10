@@ -3,7 +3,7 @@ nada passa da largura (o Chrome do celular encolheria a página), as janelas cab
 de baixo visíveis, e nenhum texto de botão fica cortado."""
 from e2e_lib import main
 
-PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/bens", "#/graficos", "#/novidades", "#/categorias", "#/config", "#/config/integracoes", "#/config/aparencia", "#/config/opcoes", "#/sobre"]
+PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/bens", "#/graficos", "#/novidades", "#/categorias", "#/config", "#/config/dados", "#/config/aparencia", "#/config/opcoes", "#/sobre"]
 
 # (nome, endereço, como abrir (um seletor ou vários, um depois do outro), seletor que aparece)
 DIALOGS = [
@@ -17,7 +17,7 @@ DIALOGS = [
     ("novo-comodo", "#/comodos", '#view [data-act="room-new"]', "#rn-name"),
     ("editar-comodo", "#/c/sala", '.rhead-actions [data-act="room-edit"]', "#re-name"),
     ("mover", "#/i/sal-002", 'dialog.sheet [data-act="item-move"]', "#mv-room"),
-    ("versoes", "#/config", '[data-act="versions"]', "dialog .dlg-b"),
+    ("versoes", "#/config/dados", '[data-act="versions"]', "dialog .dlg-b"),
     ("categoria", "#/categorias", '[data-act="cat-new"]', "#cn-name"),
     ("foto-comodo", "#/c/sala", ".strip .ph", "dialog.viewer"),
     ("excluir-item", "#/i/var-001", 'dialog.sheet [data-act="item-delete"]', '[data-r="1"]'),

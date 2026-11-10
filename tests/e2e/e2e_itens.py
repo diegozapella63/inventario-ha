@@ -112,7 +112,7 @@ async def body(r, p):
     await pg.click('[data-r="1"]')
     await pg.wait_for_timeout(700)
     r.check(not any(i["id"] == it["id"] for i in r.data()["items"]), "Excluir tira o item")
-    await pg.locator(".toast", has_text="Item excluído").locator("button").click()
+    await pg.locator(".toast", has_text="Item apagado").locator("button").click()
     await pg.wait_for_timeout(700)
     back = next((i for i in r.data()["items"] if i["id"] == it["id"]), None)
     r.check(back is not None and back["room"] == "quarto", "Desfazer devolve o item, no mesmo cômodo")

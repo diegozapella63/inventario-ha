@@ -101,13 +101,13 @@ async def body(r, p):
     await pg.locator(".uso-bar").nth(1).click()
     r.eq(" ".join((await pg.text_content(".uso-cap")).split()), f"{label(day(5, now))}: 0 chamadas.", "um dia sem uso: 0 chamadas")
     r.eq(await pg.evaluate("[...document.querySelectorAll('.uso-tipos li')].map(l => l.textContent.trim())"),
-         ["Preencher com IA 6", "Catalogar itens 4", "Buscar foto na internet 3", "Falar 2"], "os tipos dos 7 dias, do mais usado ao menos")
+         ["Digitalizar com IA 6", "Catalogar itens 4", "Buscar foto na internet 3", "Falar 2"], "os tipos dos 7 dias, do mais usado ao menos")
     r.eq(await pg.evaluate("document.querySelector('.uso-ult').open"), False, "Últimas chamadas começa fechado")
     await pg.click(".uso-ult summary")
     rows = await pg.evaluate("[...document.querySelectorAll('.uso-ult li')].map(li => [li.querySelector('b').textContent, li.querySelector('span').textContent, (li.querySelector('.r-erro') || {}).textContent || '', li.querySelector('.t').textContent])")
-    r.eq([x[:3] for x in rows], [["Preencher com IA", "OpenAI AI Task", ""], ["Catalogar itens", "OpenAI AI Task", "cota excedida"],
+    r.eq([x[:3] for x in rows], [["Digitalizar com IA", "OpenAI AI Task", ""], ["Catalogar itens", "OpenAI AI Task", "cota excedida"],
                                 ["Buscar foto na internet", "OpenAI AI Task", "sem busca na web"], ["Falar", "OpenAI AI Task", "fora do formato"],
-                                ["Preencher com IA", "OpenAI AI Task", "erro"]], "últimas chamadas: o tipo, a IA pelo nome e o que deu errado")
+                                ["Digitalizar com IA", "OpenAI AI Task", "erro"]], "últimas chamadas: o tipo, a IA pelo nome e o que deu errado")
     hm = lambda t: time.strftime("%H:%M", time.localtime(t))  # noqa: E731
     r.eq(rows[0][3], f"5,1 s · ≈ 1 mil tokens · 1 imagem · hoje {hm(now - 60)}", "tempo, tokens, imagem e hora de hoje")
     r.eq(rows[1][3], f"1,2 s · ≈ 900 tokens · 1 imagem · ontem {hm(now - 86400)}", "a de ontem diz ontem")

@@ -284,7 +284,7 @@ class ExcluirComodo(ComodosCase):
 
     def test_com_itens_nao_sai_nem_muda_a_revisao(self):
         r0 = self.rev()
-        self.erro("DELETE", "api/rooms/varanda", None, 400, "Mova ou exclua os itens deste cômodo antes de excluí-lo.")
+        self.erro("DELETE", "api/rooms/varanda", None, 400, "Mova ou apague os itens deste cômodo antes de apagá-lo.")
         self.assertEqual(self.rev(), r0)
         self.assertIsNotNone(self.comodo("varanda"))
 
@@ -447,7 +447,7 @@ class Categorias(ComodosCase):
 
     def test_excluir_inexistente_404_e_outros_400(self):
         self.erro("DELETE", "api/cats/nao-existe", None, 404, "Esta categoria não existe mais.")
-        self.erro("DELETE", "api/cats/outros", None, 400, "A categoria Outros não pode ser excluída.")
+        self.erro("DELETE", "api/cats/outros", None, 400, "A categoria Outros não pode ser apagada.")
         self.assertIn("outros", self.ids())
 
     def test_excluir_leva_os_itens_para_outros_com_data_nova(self):

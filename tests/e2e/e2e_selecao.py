@@ -31,7 +31,8 @@ CLOSED = """() => { const bad = [], muted = getComputedStyle(document.documentEl
 
 async def tap(pg, sel):
     loc = pg.locator(sel).first
-    await loc.scroll_into_view_if_needed()
+    await loc.evaluate("e => e.scrollIntoView({ block: 'center' })")  # longe da barra de baixo, que fica por cima
+    await pg.wait_for_timeout(100)
     bx = await loc.bounding_box()
     await pg.touchscreen.tap(bx["x"] + bx["width"] / 2, bx["y"] + bx["height"] / 2)
     await pg.wait_for_timeout(450)
@@ -91,6 +92,9 @@ async def body(r, p):
     await r.open(pg, "#/")
     await r.open(pg, "#/config/integracoes", ".more-tabs")
     ai = '[data-input="ai-entity"]'
+    await pg.wait_for_selector(ai)
+    await pg.wait_for_selector('[data-slot="voice-panel"] .opts, [data-slot="voice-panel"] .status', timeout=8000)
+    await pg.wait_for_timeout(600)  # os painéis de baixo (Falar, Uso da IA) terminam de carregar: a caixa não muda de lugar
     await tap(pg, ai)
     r.eq((await pg.locator(".ss-wrap.in .ss-head b").inner_text()).strip(), "IA para ler fotos", "Integrações: o título")
     want = await pg.locator(f"{ai} option").nth(1).get_attribute("value")
@@ -100,7 +104,7 @@ async def body(r, p):
     await tap(pg, ai)
     await pg.go_back()
     await pg.wait_for_timeout(500)
-    r.check(await pg.locator(".ss-wrap").count() == 0 and "#/config/integracoes" in pg.url, f"Voltar fecha só a caixa ({pg.url})")
+    r.check(await pg.locator(".ss-wrap").count() == 0 and pg.url.endswith("#/config"), f"Voltar fecha só a caixa ({pg.url})")
     await pg.go_back()
     await pg.wait_for_timeout(600)
     r.check("#/config" not in pg.url, f"o Voltar seguinte é o do app ({pg.url})")

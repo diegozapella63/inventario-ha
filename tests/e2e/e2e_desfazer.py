@@ -37,7 +37,7 @@ async def body(r, p):
     await r.open(pg, "#/c/sala", ".rhead")
     await delete_from_room(pg, "Quadro de paisagem")
     r.check(item(r, "sal-005") is None and await pg.locator("#view .irow", has_text="Quadro de paisagem").count() == 0, "Excluir tira o item da lista e do servidor")
-    t = pg.locator(".toast", has_text="Item excluído")
+    t = pg.locator(".toast", has_text="Item apagado")
     r.eq((await t.locator("button").text_content()).strip(), "Desfazer", "o aviso oferece Desfazer")
     await t.locator("button").click()
     await pg.locator(".toast", has_text="Item restaurado").wait_for(timeout=5000)
@@ -48,14 +48,14 @@ async def body(r, p):
     for name in ("Soundbar", "Caixa de som de estante", "Tapete listrado", "Almofadas decorativas"):
         await delete_from_room(pg, name)
     msgs = await pg.locator(".toast .tmsg").all_text_contents()
-    r.eq(msgs, ["Item excluído"] * 3, "quatro exclusões seguidas: ficam só os três avisos mais novos")
+    r.eq(msgs, ["Item apagado"] * 3, "quatro exclusões seguidas: ficam só os três avisos mais novos")
     ids = {"Soundbar": "sal-009", "Caixa de som de estante": "sal-010", "Tapete listrado": "sal-006", "Almofadas decorativas": "sal-002"}
     r.check(all(item(r, i) is None for i in ids.values()), "os quatro saíram")
-    await pg.locator(".toast", has_text="Item excluído").first.locator("button").click()
+    await pg.locator(".toast", has_text="Item apagado").first.locator("button").click()
     await pg.locator(".toast", has_text="Item restaurado").wait_for(timeout=5000)
     r.check(item(r, "sal-010") is not None and item(r, "sal-006") is None and item(r, "sal-002") is None,
             "Desfazer no aviso mais antigo que sobrou volta a Caixa de som (a segunda), só ela")
-    await pg.locator(".toast", has_text="Item excluído").last.locator("button").click()
+    await pg.locator(".toast", has_text="Item apagado").last.locator("button").click()
     await pg.wait_for_timeout(800)
     r.check(item(r, "sal-002") is not None and item(r, "sal-006") is None, "Desfazer no mais novo volta as Almofadas")
     r.eq(item(r, "sal-009"), None, "o aviso que saiu da pilha (Soundbar) não tem mais como desfazer")
@@ -64,7 +64,7 @@ async def body(r, p):
     # -- com uma janela aberta depois do aviso
     await r.open(pg, "#/c/sala", ".rhead")
     await delete_from_room(pg, "Luminária de chão")
-    await pg.locator(".toast", has_text="Item excluído").wait_for()
+    await pg.locator(".toast", has_text="Item apagado").wait_for()
     await pg.locator("body").click(position={"x": 5, "y": 600})
     await pg.keyboard.press("n")
     await pg.wait_for_selector("#f-name")
@@ -74,7 +74,7 @@ async def body(r, p):
     r.check(on_top, "o Desfazer de antes continua à mão com o cadastro aberto")
     await pg.keyboard.press("Escape")
     await pg.wait_for_selector("#f-name", state="detached", timeout=4000)
-    await pg.locator(".toast", has_text="Item excluído").locator("button").click()
+    await pg.locator(".toast", has_text="Item apagado").locator("button").click()
     await pg.wait_for_timeout(800)
     r.check(item(r, "sal-003") is not None, "fechada a janela, o Desfazer funciona")
 

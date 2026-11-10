@@ -82,7 +82,7 @@ async def body(r, p):
     r.eq(results(r)[0], "erro", "o uso conta como erro")
     await pg.click('dialog .dlg-f [data-ct="back"]')
     await pg.wait_for_selector('dialog .dlg-f [data-ct="read"]:not([disabled])', timeout=4000)
-    r.eq((await pg.text_content('dialog .dlg-f [data-ct="read"]')).strip(), "Ler foto", "Voltar: de novo em Ler foto, com a mesma foto")
+    r.eq((await pg.text_content('dialog .dlg-f [data-ct="read"]')).strip(), "Digitalizar com IA", "Voltar: de novo em Digitalizar com IA, com a mesma foto")
 
     ha.ai_error = None
     reply["catalogo"] = json.dumps({"items": []})

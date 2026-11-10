@@ -1,5 +1,5 @@
 """A ficha do item: galeria com miniaturas, foto grande com setas, o site de origem da foto da internet, os links do cômodo
-e da categoria, item sem foto, a quantidade, e os botões (Editar, Mover, Duplicar, Excluir) e o que cada um abre, no celular e no computador."""
+e da categoria, item sem foto, a quantidade, e os botões (Editar, Mover, Duplicar, Apagar) e o que cada um abre, no celular e no computador."""
 from e2e_lib import OVERFLOW, main
 
 LOJA = "https://www.lojaexemplo.com.br/moveis/painel-de-tv"
@@ -29,7 +29,7 @@ async def body(r, p):
                                      "details": "Painel de madeira com nichos.", "photos": ["sala-1.jpg", "sala-2.jpg", "sala-3.jpg"],
                                      "photoSrc": {"sala-2.jpg": LOJA}})["item"]
     b = await r.browser(p)
-    ctx, pg = await r.page(b, "cel", "dark", accent="kraft")
+    ctx, pg = await r.page(b, "cel", "dark", accent="coral")
 
     # -- galeria
     await r.open(pg, f"#/i/{it['id']}", "dialog.sheet h1")
@@ -86,8 +86,8 @@ async def body(r, p):
     # -- botões: no celular, só ícones com nome; o que cada um abre
     await r.open(pg, f"#/i/{it['id']}", "dialog.sheet h1")
     btns = await pg.evaluate("[...document.querySelectorAll('dialog.sheet .dlg-f .btn')].map(b => [b.dataset.act, b.getAttribute('aria-label'), b.innerText.trim()])")
-    r.eq(btns, [["item-delete", "Excluir", ""], ["item-move", "Mover", ""], ["item-dup", "Duplicar", ""], ["item-edit", None, "Editar"]],
-         "celular: Excluir, Mover e Duplicar só com o ícone (e o nome para o leitor de tela); Editar com o texto")
+    r.eq(btns, [["item-delete", "Apagar", ""], ["item-move", "Mover", ""], ["item-dup", "Duplicar", ""], ["item-edit", None, "Editar"]],
+         "celular: Apagar, Mover e Duplicar só com o ícone (e o nome para o leitor de tela); Editar com o texto")
     await pg.click('dialog.sheet [data-act="item-edit"].primary')
     await pg.wait_for_selector("#f-name")
     r.check(await pg.text_content("dialog.modal h2") == "Editar item" and await pg.input_value("#f-name") == it["name"], "Editar abre o cadastro do item")
@@ -101,10 +101,10 @@ async def body(r, p):
     r.check(await pg.locator("#mv-room").count() == 0, "Mover para o mesmo cômodo: só avisa, sem mudar nada")
     await pg.click('dialog.sheet [data-act="item-delete"]')
     await pg.wait_for_selector('[data-r="1"]')
-    r.check(it["name"] in await pg.text_content("dialog[open]:last-of-type .dlg-b"), "Excluir pergunta, com o nome do item")
+    r.check(it["name"] in await pg.text_content("dialog[open]:last-of-type .dlg-b"), "Apagar pergunta, com o nome do item")
     await pg.click('[data-r="0"]')
     await pg.wait_for_timeout(400)
-    r.check(any(i["id"] == it["id"] for i in r.data()["items"]) and await pg.locator("dialog.sheet[open]").count() == 1, "Cancelar não exclui e a ficha fica")
+    r.check(any(i["id"] == it["id"] for i in r.data()["items"]) and await pg.locator("dialog.sheet[open]").count() == 1, "Cancelar não apaga e a ficha fica")
     await pg.click('dialog.sheet [data-act="item-dup"]')
     await pg.wait_for_selector("#f-name")
     r.check(await pg.text_content("dialog.modal h2") == "Duplicar item" and await pg.locator("[data-slot=photos] .ph img").count() == 3, "Duplicar abre o cadastro com os dados e as fotos")
@@ -125,7 +125,7 @@ async def body(r, p):
     await r.shot(pg, "sem-foto")
     await pg.click('dialog.sheet .gal-none [data-act="item-edit"]')
     await pg.wait_for_selector('[data-ed="upload"]')
-    r.check(await pg.input_value("#f-name") == "Micro-ondas 30 L", "Adicionar foto abre o cadastro, com o Enviar foto")
+    r.check(await pg.input_value("#f-name") == "Micro-ondas 30 L", "Adicionar foto abre o cadastro, com o Escolher fotos")
     await back_to_sheet(pg)
     await r.open(pg, "#/i/sal-002", "dialog.sheet h1")
     r.eq(txt(await pg.text_content("dialog.sheet .ival .unit")), "2 unidades, R$ 45 cada", "quantidade 2: o valor de cada uma")
@@ -134,13 +134,13 @@ async def body(r, p):
     await ctx.close()
 
     # -- computador: painel do lado, botões com o nome
-    ctx, pg = await r.page(b, "pc", "light", accent="kraft")
+    ctx, pg = await r.page(b, "pc", "light", accent="coral")
     await r.open(pg, f"#/i/{dup['id']}", "dialog.sheet h1")
     box = await pg.evaluate("""(r => [Math.round(r.width), Math.round(innerWidth - r.right), Math.round(r.height)])(
       document.querySelector('dialog.sheet').getBoundingClientRect())""")
     r.check(box[0] == 560 and 0 <= box[1] <= 16 and box[2] == 900, f"computador: a ficha é um painel de 560 px à direita (fora a barra de rolagem), da altura da tela ({box})")
     labels = await pg.evaluate("[...document.querySelectorAll('dialog.sheet .dlg-f .btn')].map(b => b.textContent.trim())")
-    r.eq(labels, ["Excluir", "Mover", "Duplicar", "Editar"], "computador: os botões com o nome")
+    r.eq(labels, ["Apagar", "Mover", "Duplicar", "Editar"], "computador: os botões com o nome")
     r.check(await pg.locator(".side, #view").first.is_visible(), "a página continua atrás da ficha")
     props = await pg.evaluate("Object.fromEntries([...document.querySelectorAll('dialog.sheet .props dt')].map(d => [d.textContent, d.nextElementSibling.textContent.trim()]))")
     r.check(props.get("Cadastrado", "").endswith("por Davi"), f"quem cadastrou aparece ({props.get('Cadastrado')})")

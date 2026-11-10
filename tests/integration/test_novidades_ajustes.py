@@ -1,5 +1,6 @@
 """Ajustes das novidades pelo HTTP: ligar e desligar (as rotas recusam), de quanto em quanto tempo conferir sozinho, quem
-avisar (as pessoas do Home Assistant, nunca um aparelho), Testar o aviso e a conferência sozinha que avisa quando acha novidade."""
+avisar (as pessoas do Home Assistant, nunca um aparelho), Testar no meu celular (o de quem está na tela, pelo
+X-Remote-User-Id do Ingress) e a conferência sozinha que avisa quando acha novidade."""
 import json
 import os
 import tempfile
@@ -62,8 +63,20 @@ class Ajustes(unittest.TestCase):
 
     def test_pessoas(self):
         self.assertEqual(self.app.ok("GET", "api/news/people")["people"],
-                         [{"id": ANA, "name": "Ana", "phone": True}, {"id": "person.beto", "name": "Beto", "phone": False},
-                          {"id": "person.carla", "name": "Carla", "phone": True}], "as pessoas, e quem tem celular")
+                         [{"id": ANA, "name": "Ana", "phone": True, "eu": False}, {"id": "person.beto", "name": "Beto", "phone": False, "eu": False},
+                          {"id": "person.carla", "name": "Carla", "phone": True, "eu": False}], "as pessoas, e quem tem celular")
+        eu = self.app.ok("GET", "api/news/people", headers={"X-Remote-User-Id": "u-beto"})["people"]
+        self.assertEqual([p["id"] for p in eu if p["eu"]], ["person.beto"], "quem está na tela, pelo user_id da pessoa")
+
+    def test_testar_no_meu_celular(self):
+        n = len(self.ha.calls("POST", f"/core/api/services/notify/{PHONE}"))
+        self.assertEqual(self.app.ok("POST", "api/news/notify-test", {"who": "eu"}, headers={"X-Remote-User-Id": "u-ana"}), {"ok": True, "sent": 1})
+        self.assertEqual(len(self.ha.calls("POST", f"/core/api/services/notify/{PHONE}")), n + 1, "no celular de quem está na tela (Ana)")
+        st, _, out = self.app.request("POST", "api/news/notify-test", {"who": "eu"}, headers={"X-Remote-User-Id": "u-beto"})
+        self.assertEqual((st, out["error"]), (400, "Sem celular ligado a Beto no Home Assistant (Configurações > Pessoas)."))
+        for h in ({"X-Remote-User-Id": "u-ninguem"}, {}):
+            st, _, out = self.app.request("POST", "api/news/notify-test", {"who": "eu"}, headers=h)
+            self.assertEqual((st, out["error"]), (400, "Você não está entre as pessoas do Home Assistant (Configurações > Pessoas)."))
 
     def test_testar_o_aviso(self):
         n = len(self.ha.calls("POST", "/core/api/services/notify/"))

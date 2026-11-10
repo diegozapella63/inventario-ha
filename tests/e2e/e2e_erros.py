@@ -53,7 +53,7 @@ async def body(r, p):
     b = await r.browser(p)
 
     # -- servidor fora do ar ao abrir
-    ctx, pg = await r.page(b, "cel", "dark", accent="amarelo")
+    ctx, pg = await r.page(b, "cel", "dark", accent="ouro")
     await ctx.route(r.base + "**", static)
     root, port = r.app.root, r.app.port
     r.app.stop(clean=False)
@@ -236,7 +236,7 @@ async def body(r, p):
     r.eq(sum(1 for i in r.data()["items"] if i["name"] == "Abajur de leitura"), 1, "tocar de novo ou Ctrl+Enter enquanto salva não grava duas vezes")
     await pg.unroute("**/api/items")
     await pg.route("**/api/backups", fail_with(delay=2.0))
-    await r.open(pg, "#/config", ".more-tabs")
+    await r.open(pg, "#/config/dados", ".more-tabs")
     r.eq(txt(await pg.text_content('[data-slot="backups"]')), "Carregando backups…", "backups devagar: Carregando backups…")
     await pg.route("**/api/history", fail_with(delay=2.0))
     await pg.click('[data-act="versions"]')

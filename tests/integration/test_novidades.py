@@ -170,7 +170,7 @@ class Todos(ServerCase):
         """Eletrônicos é a categoria das novidades: não se renomeia nem se exclui, e volta se faltar na lista guardada."""
         app = self.fresh(mock_ai=True)
         st, _, body = app.request("DELETE", "api/cats/eletronicos")
-        self.assertEqual((st, body["error"]), (400, "Eletrônicos é a categoria das novidades: não dá para excluir."))
+        self.assertEqual((st, body["error"]), (400, "Eletrônicos é a categoria das novidades: não dá para apagar."))
         st, _, body = app.request("PUT", "api/cats/eletronicos", {"name": "Aparelhos"})
         self.assertEqual((st, body["error"]), (400, "Eletrônicos é a categoria das novidades: não dá para renomear."))
         self.assertEqual(app.data()["cats"][0], {"id": "eletronicos", "name": "Eletrônicos"})

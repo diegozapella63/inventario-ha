@@ -1,4 +1,14 @@
-# Changelog
+# Mudanças
+
+## 1.42.0
+
+O padrão da família de apps:
+
+- **Configurações** abre em **Integrações**, com as abas na ordem Integrações › Dados › Aparência › Opções. Em Integrações, o **CorrerIA** vem primeiro, antes da IA do Home Assistant.
+- **Dados › Começar do zero** (novo, no fim): apaga os cômodos, os bens e os itens depois de confirmar. Antes, o app guarda uma cópia em **Versões anteriores**; as categorias e as opções continuam. Na casa vazia, o botão que criava o primeiro cômodo agora se chama **Criar o primeiro cômodo**.
+- **Aparência**: a **cor do app** vale para a casa toda (antes, só para o aparelho); na primeira vez, fica a que este aparelho já usava. As cores são as 12 da família: Vermelho, Coral, Laranja, Ouro, Verde, Menta, Turquesa, Azul, Índigo, Lilás, Rosa e Grafite. Uma cor que saiu vira a mais parecida (Amarelo: Ouro; Kraft: Coral; Cinza: Grafite). A **Cor do dia** é a mesma em todos os apps. O tema continua em cada aparelho.
+- **Apagar** no lugar de Excluir (item, cômodo e categoria); **Escolher fotos** no lugar de Galeria e Enviar foto; **Digitalizar com IA** no lugar de Ler foto e Preencher com IA; **Criar backup** no lugar de Criar backup agora; **Apagar foto** no botão da lixeira das fotos do cômodo (antes dizia Tirar foto, o mesmo nome da câmera).
+- **Opções › Novidades › Testar no meu celular**: o aviso de teste vai para o celular de quem está usando o app.
 
 ## 1.41.0
 

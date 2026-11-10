@@ -185,6 +185,83 @@ class Configuracoes(DadosCase):
         self.erro("PUT", "api/settings", {"voice_stt": "stt.Fala"}, 400, "Fala para texto inválida.")
 
 
+class CorDoApp(DadosCase):
+    """Aparência > Cor do app (1.42.0): vale para a casa toda, gravada no servidor. A paleta da família (12 cores); de
+    início, nenhuma (a tela adota a do aparelho na primeira vez); uma cor de antes da paleta vira a mais próxima."""
+
+    def setUp(self):
+        self.app = AppServer()
+        self.addCleanup(lambda: self.app.stop())
+
+    def test_de_inicio_nenhuma(self):
+        st = self.app.data()["settings"]
+        self.assertEqual((st["accent"], st["accent_daily"]), (None, None))
+
+    def test_grava_para_a_casa(self):
+        out = self.app.ok("PUT", "api/settings", {"accent": "indigo", "accent_daily": False})
+        self.assertEqual((out["accent"], out["accent_daily"]), ("indigo", False))
+        st = self.app.data()["settings"]
+        self.assertEqual((st["accent"], st["accent_daily"]), ("indigo", False), "quem abrir em outro aparelho vê a mesma")
+        self.assertTrue(self.app.ok("PUT", "api/settings", {"accent_daily": True})["accent_daily"])
+
+    def test_so_as_12_cores(self):
+        for a in ("vermelho", "coral", "laranja", "ouro", "verde", "menta", "turquesa", "azul", "indigo", "lilas", "rosa", "grafite"):
+            self.assertEqual(self.app.ok("PUT", "api/settings", {"accent": a})["accent"], a)
+        for a in ("amarelo", "kraft", "cinza", "", None, 3, "#ff0000"):
+            with self.subTest(a=a):
+                self.erro("PUT", "api/settings", {"accent": a}, 400, "Escolha uma das cores do app.")
+        self.erro("PUT", "api/settings", {"accent_daily": "sim"}, 400, "Use verdadeiro ou falso nesta opção.")
+
+    def test_cor_antiga_vira_a_mais_proxima(self):
+        for velha, nova in (("amarelo", "ouro"), ("kraft", "coral"), ("cinza", "grafite"), ("roxo", None)):
+            with self.subTest(velha=velha):
+                path = self.app.path("data", "settings.json")
+                st = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
+                st["accent"] = velha
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(st, f)
+                self.app.stop(clean=False)
+                self.app = AppServer(root=self.app.root)
+                self.assertEqual(self.app.data()["settings"]["accent"], nova)
+
+
+class ComecarDoZero(unittest.TestCase):
+    """Configurações > Dados > Começar do zero (1.42.0): apaga os cômodos, os bens e os itens só com a confirmação, depois de
+    guardar uma versão ("antes de apagar tudo"); as categorias, as opções e as fotos ficam, e a versão traz tudo de volta."""
+
+    def setUp(self):
+        self.app = AppServer()
+        self.addCleanup(self.app.stop)
+
+    def test_sem_confirmar_nada_muda(self):
+        for body in ({}, {"confirm": "sim"}, {"confirm": 1}, None):
+            with self.subTest(body=body):
+                st, _, out = self.app.request("POST", "api/erase", body)
+                self.assertEqual((st, out.get("error")), (400, "Confirme para apagar tudo."))
+        d = self.app.data()
+        self.assertEqual((len(d["rooms"]), len(d["items"])), (6, 38))
+
+    def test_apaga_tudo_e_a_versao_traz_de_volta(self):
+        self.app.ok("PUT", "api/settings", {"zones": True})
+        cat = self.app.ok("POST", "api/cats", {"name": "Ferramentas"})["cat"]
+        fotos = sorted(os.listdir(self.app.path("data", "photos")))
+        r0 = self.app.ok("GET", "api/rev")["rev"]
+        out = self.app.ok("POST", "api/erase", {"confirm": True})
+        self.assertGreater(out["rev"], r0, "a revisão sobe: os outros aparelhos recarregam")
+        d = self.app.data()
+        self.assertEqual((d["rooms"], d["items"]), ([], []), "nem cômodos, nem itens")
+        self.assertIn(cat["id"], [c["id"] for c in d["cats"]], "as categorias continuam")
+        self.assertTrue(d["settings"]["zones"], "as opções continuam")
+        self.assertEqual(sorted(os.listdir(self.app.path("data", "photos"))), fotos, "as fotos ficam no disco")
+        hist = self.app.ok("GET", "api/history")["history"]
+        antes = next((v for v in hist if v["reason"] == "erase"), None)
+        self.assertIsNotNone(antes, f"uma versão antes de apagar tudo ({hist})")
+        self.assertEqual((antes["rooms"], antes["items"]), (6, 38))
+        self.app.ok("POST", "api/history/restore", {"name": antes["name"]})
+        d = self.app.data()
+        self.assertEqual((len(d["rooms"]), len(d["items"])), (6, 38), "restaurar a versão traz tudo de volta")
+
+
 class Exportar(DadosCase):
     def planilha(self, app=None):
         raw = (app or self.app).get("api/export.csv")[2]

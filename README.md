@@ -29,7 +29,7 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 
 - **Início** com a etiqueta do patrimônio, a busca, o item mais valioso, o maior cômodo, os últimos cadastros e a parte de cada cômodo no total.
 - **Cômodos** com foto, número de itens e valor. Em **Organizar**, as setas mudam a ordem. Cada foto do cômodo mostra os itens que estão nela. Se quiser, ligue as **zonas** para separar os itens de cada cômodo (sofá, estante, bancada), com o subtotal de cada uma.
-- **Cadastro de itens** com várias fotos (câmera, galeria, arrastar ou colar), quantidade e valor, e **categorias** que você renomeia, cria ou exclui. Na ficha do item, **Duplicar**, **Mover** e **Excluir**, com Desfazer.
+- **Cadastro de itens** com várias fotos (câmera, galeria, arrastar ou colar), quantidade e valor, e **categorias** que você renomeia, cria ou apaga. Na ficha do item, **Duplicar**, **Mover** e **Apagar**, com Desfazer.
 - **Leitura de fotos por IA**: a IA preenche um item a partir da foto, ou lista tudo o que aparece numa foto de prateleira, e você confere antes de salvar. Funciona com Anthropic Claude, OpenAI, Google Gemini ou um modelo local no Ollama, pela ação `ai_task.generate_data` do Home Assistant. Quem não quiser IA desliga numa chave e os botões somem.
 - **Falar**: o microfone no alto da tela. Fale os itens e quanto valem; o Home Assistant transcreve com a fala para texto que você escolher (ou a do Assist) e a IA separa os itens para você conferir.
 - **Uso da IA**: chamadas de hoje, da semana e do mês, gráfico por dia, últimas chamadas com tokens estimados e, se você ligar, o sensor `sensor.inventaria_ia_hoje` no Home Assistant.
@@ -45,7 +45,7 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 - **Nos outros apps da casa**: o [ResolvIA](https://github.com/diegozapella63/resolvia-ha) liga tarefas a cômodos e itens daqui (e o [CronologIA](https://github.com/diegozapella63/cronologia-ha) mostra nas tarefas), e o [GerencIA](https://github.com/diegozapella63/gerencia-ha) soma os itens no patrimônio, como bens. Eles só leem: nada muda aqui.
 - **Pelo WhatsApp, pelo Claude e pelo Gemini**, com o [CorrerIA](https://github.com/diegozapella63/correria-ha) (se você ligar): ver o resumo, buscar, cadastrar, editar, mover e apagar itens, com as mesmas regras da tela.
 - **Celular e computador**: no celular, arrastar para o lado troca de aba; no computador, barra lateral com os cômodos e atalhos de teclado.
-- **Tema claro e escuro** e **cor do app**: amarelo, laranja, coral, rosa, lilás, azul, turquesa, verde, kraft ou cinza, ou a **Cor do dia**, que muda todo dia.
+- **Tema claro e escuro** (em cada aparelho) e **cor do app** (para a casa toda), com as 12 cores da família: vermelho, coral, laranja, ouro, verde, menta, turquesa, azul, índigo, lilás, rosa ou grafite, ou a **Cor do dia**, que muda todo dia e é a mesma em todos os apps.
 - **Sobre** (no fim do menu Mais): quem faz o app e os outros apps da família, cada um com o link para o GitHub.
 
 Mais detalhes em [inventario/DOCS.md](inventario/DOCS.md).

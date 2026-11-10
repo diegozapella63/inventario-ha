@@ -73,12 +73,12 @@ async def body(r, p):
         ("cadastro", "#/c/garagem", '.rhead-actions [data-act="item-new"]', "#f-name", "Novo item"),
         ("fotos do cômodo", None, '[data-ed="roomphotos"]', "dialog .pick", "Fotos do cômodo"),
         ("mover", "#/i/sal-002", 'dialog.sheet [data-act="item-move"]', "#mv-room", "Mover item"),
-        ("excluir", "#/i/sal-002", 'dialog.sheet [data-act="item-delete"]', '[data-r="1"]', "Excluir este item?"),
+        ("excluir", "#/i/sal-002", 'dialog.sheet [data-act="item-delete"]', '[data-r="1"]', "Apagar este item?"),
         ("adicionar", "#/", ".tabbar .plus", "[data-go]", "Adicionar"),
         ("catalogar", "#/c/quarto", '.rhead-actions [data-act="catalog"]', '[data-ct="upload"]', "Catalogar itens com IA"),
         ("editar cômodo", "#/c/sala", '.rhead-actions [data-act="room-edit"]', "#re-name", "Editar cômodo"),
         ("nova categoria", "#/categorias", '[data-act="cat-new"]', "#cn-name", "Nova categoria"),
-        ("versões", "#/config", '[data-act="versions"]', "dialog .dlg-b", "Versões anteriores"),
+        ("versões", "#/config/dados", '[data-act="versions"]', "dialog .dlg-b", "Versões anteriores"),
     ]
     for name, h, opener, wait, label in dialogs:
         if h:
@@ -124,7 +124,7 @@ async def body(r, p):
     await r.open(pg, "#/config/integracoes", ".more-tabs")
     await pg.wait_for_timeout(500)
     names = await pg.evaluate("[...document.querySelectorAll('[role=switch]')].map(i => (document.getElementById(i.getAttribute('aria-labelledby')) || {}).textContent)")
-    r.eq(names, ["Usar IA", "Criar os sensores", "Usar com o CorrerIA"], "Integrações: Usar IA, Criar os sensores e Usar com o CorrerIA são chaves com nome")
+    r.eq(names, ["Usar com o CorrerIA", "Usar IA", "Criar os sensores"], "Integrações (na ordem da família): Usar com o CorrerIA, Usar IA e Criar os sensores são chaves com nome")
     await r.open(pg, "#/config/aparencia", ".more-tabs")
     look = await pg.evaluate("""[document.querySelector('.seg.themes').getAttribute('role'), [...document.querySelectorAll('[data-act=theme]')].map(b => b.getAttribute('aria-pressed')),
       document.querySelector('.swatches').getAttribute('role'), document.getElementById(document.querySelector('.swatches').getAttribute('aria-labelledby')).textContent.trim()]""")

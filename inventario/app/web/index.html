@@ -7,8 +7,9 @@
 <meta name="referrer" content="same-origin">
 <title>InventarIA</title>
 <link rel="stylesheet" href="style.css?v=%%V%%">
-<!-- tema e cor antes de pintar a tela; a Cor do dia é a mesma conta do colorOfDay do app.js -->
-<script>try{var h=document.documentElement,L=function(k){try{return JSON.parse(localStorage.getItem("inv:"+k)||"null")}catch(e){return null}},t=L("theme"),a=L("accent");if(t==="light"||t==="dark")h.dataset.theme=t;if(L("accentDaily")!==false){var c=["amarelo","laranja","coral","rosa","lilas","azul","turquesa","verde","kraft"],d=new Date();a=c[Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5)%c.length]}if(typeof a==="string"&&/^[a-z]{2,16}$/.test(a)&&a!=="amarelo")h.dataset.accent=a}catch(e){}</script>
+<!-- tema e cor antes de pintar a tela (a cor é a cópia da da casa guardada no aparelho); a Cor do dia é a mesma conta do
+     colorOfDay do app.js; as cores de antes da paleta da família viram a mais próxima, como no nearestAccent -->
+<script>try{var h=document.documentElement,L=function(k){try{return JSON.parse(localStorage.getItem("inv:"+k)||"null")}catch(e){return null}},t=L("theme"),a=L("accent"),o={amarelo:"ouro",kraft:"coral",cinza:"grafite"};if(t==="light"||t==="dark")h.dataset.theme=t;if(o[a])a=o[a];if(L("accentDaily")!==false){var c=["vermelho","coral","laranja","ouro","verde","menta","turquesa","azul","indigo","lilas","rosa"],d=new Date();a=c[Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5)%c.length]}if(typeof a==="string"&&/^[a-z]{2,16}$/.test(a)&&a!=="ouro")h.dataset.accent=a}catch(e){}</script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">

@@ -112,19 +112,21 @@
   color-scheme: dark;
 }
 
-/* Cor do app (data-accent no <html>; o amarelo é o padrão). Cada cor traz o preenchimento, a borda,
-   o anel do ilhós e o fundo suave; os nomes com -d são do modo escuro. O texto sobre a cor é sempre
-   escuro (--tag-ink), com contraste de 6:1 ou mais. As amostras do seletor usam as mesmas regras. */
-:root, [data-accent="amarelo"] { --a: #f5c400; --a-text: #846800; --a-hover: #ffd21a; --a-edge: #d4a800; --a-edge-d: #b38f00; --a-ring: #fbe27a; --a-ring-d: #ffe27a; --a-soft: #fff4c4; --a-soft-d: #3b3417; }
-[data-accent="laranja"] { --a: #ff9d35; --a-text: #9e5a00; --a-hover: #ffb067; --a-edge: #da852a; --a-edge-d: #b76e1f; --a-ring: #ffc089; --a-ring-d: #ffc28c; --a-soft: #fff0e4; --a-soft-d: #442f1c; }
-[data-accent="coral"] { --a: #fb7e5f; --a-text: #ba4326; --a-hover: #ff9175; --a-edge: #d4684d; --a-edge-d: #b0543d; --a-ring: #ffa38c; --a-ring-d: #ffa58e; --a-soft: #ffefeb; --a-soft-d: #472c25; }
-[data-accent="rosa"] { --a: #f77cb0; --a-text: #b54076; --a-hover: #ff8dbc; --a-edge: #d16794; --a-edge-d: #ae537a; --a-ring: #ffa1c6; --a-ring-d: #ffa3c7; --a-soft: #ffeef4; --a-soft-d: #462b35; }
-[data-accent="lilas"] { --a: #b48cf6; --a-text: #7f56bb; --a-hover: #bf99ff; --a-edge: #9774d0; --a-edge-d: #7c5eac; --a-ring: #c7abfa; --a-ring-d: #c8acfc; --a-soft: #f5f0ff; --a-soft-d: #372f46; }
-[data-accent="azul"] { --a: #5caef8; --a-text: #116eb3; --a-hover: #6fbaff; --a-edge: #4a92d2; --a-edge-d: #3a78ae; --a-ring: #8ac5fc; --a-ring-d: #8bc6fe; --a-soft: #eaf5ff; --a-soft-d: #253646; }
-[data-accent="turquesa"] { --a: #3ed0c8; --a-text: #007974; --a-hover: #49ddd5; --a-edge: #31b1aa; --a-edge-d: #25948e; --a-ring: #85e2db; --a-ring-d: #86e3dd; --a-soft: #d2fdf9; --a-soft-d: #203a38; }
-[data-accent="verde"] { --a: #5fd37f; --a-text: #007b37; --a-hover: #69e089; --a-edge: #4fb36b; --a-edge-d: #3f9658; --a-ring: #94e4a5; --a-ring-d: #95e6a6; --a-soft: #d8ffdf; --a-soft-d: #243a29; }
-[data-accent="kraft"] { --a: #caa377; --a-text: #886439; --a-hover: #d7af81; --a-edge: #aa8962; --a-edge-d: #8d704f; --a-ring: #dabc9c; --a-ring-d: #dbbd9d; --a-soft: #fff1e1; --a-soft-d: #3b3229; }
-[data-accent="cinza"] { --a: #acb2b9; --a-text: #676c73; --a-hover: #b8bec5; --a-edge: #91969c; --a-edge-d: #787d82; --a-ring: #c4c9ce; --a-ring-d: #c6cacf; --a-soft: #d4d9de; --a-soft-d: #333436; }
+/* Cor do app (data-accent no <html>; o ouro é o padrão): a paleta da família, 12 cores com o nome e a tinta (--a-text) de
+   cada uma, as mesmas do CronologIA. Cada cor traz o preenchimento, a borda, o anel do ilhós e o fundo suave; os nomes com -d
+   são do modo escuro. O texto sobre a cor é sempre escuro (--tag-ink). As amostras do seletor usam as mesmas regras. */
+:root, [data-accent="ouro"] { --a: #f2c14e; --a-text: #8a6100; --a-hover: #f4ca69; --a-edge: #d0a643; --a-edge-d: #ae8b38; --a-ring: #f8dd9e; --a-ring-d: #f7db98; --a-soft: #fdf4df; --a-soft-d: #433e2e; }
+[data-accent="vermelho"] { --a: #ff5a4f; --a-text: #c42a1f; --a-hover: #ff7369; --a-edge: #db4d44; --a-edge-d: #b84139; --a-ring: #ffa49e; --a-ring-d: #ff9f99; --a-soft: #ffe1df; --a-soft-d: #452c2e; }
+[data-accent="coral"] { --a: #ff8a65; --a-text: #c2410c; --a-hover: #ff9c7c; --a-edge: #db7757; --a-edge-d: #b86349; --a-ring: #ffbfaa; --a-ring-d: #ffbba6; --a-soft: #ffeae3; --a-soft-d: #453532; }
+[data-accent="laranja"] { --a: #ffa23e; --a-text: #b45309; --a-hover: #ffb05b; --a-edge: #db8b35; --a-edge-d: #b8752d; --a-ring: #ffcc95; --a-ring-d: #ffc98f; --a-soft: #ffeedc; --a-soft-d: #45392b; }
+[data-accent="verde"] { --a: #8bd45f; --a-text: #3f7a17; --a-hover: #9cda77; --a-edge: #78b652; --a-edge-d: #649944; --a-ring: #bfe7a7; --a-ring-d: #bce6a2; --a-soft: #eaf7e2; --a-soft-d: #314131; }
+[data-accent="menta"] { --a: #4ed3a6; --a-text: #0e7a57; --a-hover: #69dab3; --a-edge: #43b58f; --a-edge-d: #389878; --a-ring: #9ee7ce; --a-ring-d: #98e5cb; --a-soft: #dff7ef; --a-soft-d: #27413d; }
+[data-accent="turquesa"] { --a: #3ccbda; --a-text: #0b7285; --a-hover: #59d3e0; --a-edge: #34afbb; --a-edge-d: #2b929d; --a-ring: #94e2eb; --a-ring-d: #8ee1ea; --a-soft: #dcf6f8; --a-soft-d: #244045; }
+[data-accent="azul"] { --a: #62b5ff; --a-text: #0b67a8; --a-hover: #7ac0ff; --a-edge: #549cdb; --a-edge-d: #4782b8; --a-ring: #a9d6ff; --a-ring-d: #a4d4ff; --a-soft: #e3f2ff; --a-soft-d: #2a3c4c; }
+[data-accent="indigo"] { --a: #8f9bff; --a-text: #3d4bc2; --a-hover: #a0aaff; --a-edge: #7b85db; --a-edge-d: #6770b8; --a-ring: #c1c8ff; --a-ring-d: #bec5ff; --a-soft: #ebedff; --a-soft-d: #32374c; }
+[data-accent="lilas"] { --a: #b99bff; --a-text: #6d3fd6; --a-hover: #c4aaff; --a-edge: #9f85db; --a-edge-d: #8570b8; --a-ring: #d8c8ff; --a-ring-d: #d6c5ff; --a-soft: #f2edff; --a-soft-d: #39374c; }
+[data-accent="rosa"] { --a: #ff77a9; --a-text: #be185d; --a-hover: #ff8bb6; --a-edge: #db6691; --a-edge-d: #b8567a; --a-ring: #ffb4d0; --a-ring-d: #ffb0cd; --a-soft: #ffe7f0; --a-soft-d: #45313d; }
+[data-accent="grafite"] { --a: #b5b9c2; --a-text: #4e5560; --a-hover: #c0c4cb; --a-edge: #9c9fa7; --a-edge-d: #82858c; --a-ring: #d6d8dd; --a-ring-d: #d4d6dc; --a-soft: #f2f2f4; --a-soft-d: #383c41; }
 
 /* ---------- base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1041,8 +1043,8 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .codepath { font: 500 14px/1.4 var(--font); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
 
 /* cor do app: amostras em forma de etiqueta, cada uma pintada pelo próprio data-accent */
-.swatches { flex: 1 1 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: -6px -4px 0; min-width: 0; }
-@media (min-width: 700px) { .swatches { grid-template-columns: repeat(10, minmax(0, 76px)); } }
+.swatches { flex: 1 1 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: -6px -4px 0; min-width: 0; }
+@media (min-width: 520px) { .swatches { grid-template-columns: repeat(6, minmax(0, 76px)); } }
 .opts + .swatches { margin-top: 10px; } /* abaixo da Cor do dia */
 .sw { --sw-bg: var(--paper); position: relative; display: grid; justify-items: center; gap: 4px; padding: 8px 2px 7px; border-radius: 10px; background: var(--sw-bg); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 @media (hover: hover) { .sw:hover { --sw-bg: var(--surface-2); } }

@@ -27,15 +27,19 @@ async def body(r, p):
     r.eq(await ev("() => __f.esc('<img src=x onerror=alert(1)>&\"')"), "&lt;img src=x onerror=alert(1)&gt;&amp;&quot;", "texto escapado (sem HTML de fora)")
     r.eq(await ev("() => __f.siteOf('https://www.loja.exemplo/p?x=1')"), "loja.exemplo", "site de uma foto da internet")
 
-    # Cor do dia: uma cor da paleta por dia, pela data local; o cinza fica de fora; depois da última, a primeira
+    # Cor do dia: uma cor da paleta por dia, pela data local, a mesma em todos os apps da família: as 11 cores sem o Grafite,
+    # pelo número do dia desde 01/01/1970 (Date.UTC do dia local); depois da última, a primeira
     r.eq(await ev("() => [__f.accents().length, __f.dayAccents()]"),
-         [10, ["amarelo", "laranja", "coral", "rosa", "lilas", "azul", "turquesa", "verde", "kraft"]], "Cor do dia: as 10 cores menos o Cinza")
+         [12, ["vermelho", "coral", "laranja", "ouro", "verde", "menta", "turquesa", "azul", "indigo", "lilas", "rosa"]], "Cor do dia: as 12 cores menos o Grafite")
     dias = await ev("() => [[2026, 10, 3], [2026, 10, 4], [2026, 10, 5], [2026, 10, 6], [2026, 11, 31], [2027, 0, 1], [2024, 1, 29], [1970, 0, 1]].map(([y, m, d]) => __f.colorOfDay(new Date(y, m, d, 12)))")
-    r.eq(dias, ["turquesa", "verde", "kraft", "amarelo", "laranja", "coral", "amarelo", "amarelo"], "Cor do dia em datas fixas (de Kraft volta a Amarelo; virada do ano; 29 de fevereiro)")
-    r.eq(await ev("() => [0, 1, 12, 23].map(h => __f.colorOfDay(new Date(2026, 10, 3, h, h ? 59 : 0, h ? 59 : 0)))"), ["turquesa"] * 4, "a mesma cor o dia todo, da meia-noite às 23h59")
-    seq = await ev("() => Array.from({ length: 18 }, (_, i) => __f.colorOfDay(new Date(2026, 10, 3 + i)))")
-    r.check(len(set(seq[:9])) == 9 and seq[9:] == seq[:9], f"9 dias seguidos, 9 cores diferentes, e de novo ({seq})")
-    r.check(await ev("() => Array.from({ length: 3700 }, (_, i) => __f.colorOfDay(new Date(2026, 0, 1 + i))).every(c => c !== 'cinza')"), "em 10 anos, nenhum dia Cinza")
+    r.eq(dias, ["ouro", "verde", "menta", "turquesa", "turquesa", "azul", "verde", "vermelho"], "Cor do dia em datas fixas (virada do ano; 29 de fevereiro; o dia 0 é o Vermelho)")
+    r.eq(await ev("() => [0, 1, 12, 23].map(h => __f.colorOfDay(new Date(2026, 10, 3, h, h ? 59 : 0, h ? 59 : 0)))"), ["ouro"] * 4, "a mesma cor o dia todo, da meia-noite às 23h59")
+    seq = await ev("() => Array.from({ length: 22 }, (_, i) => __f.colorOfDay(new Date(2026, 10, 3 + i)))")
+    r.check(len(set(seq[:11])) == 11 and seq[11:] == seq[:11], f"11 dias seguidos, 11 cores diferentes, e de novo ({seq})")
+    r.check(await ev("() => Array.from({ length: 3700 }, (_, i) => __f.colorOfDay(new Date(2026, 0, 1 + i))).every(c => c !== 'grafite')"), "em 10 anos, nenhum dia Grafite")
+    # uma cor gravada que não está na paleta vira a mais próxima
+    r.eq(await ev("() => ['amarelo', 'kraft', 'cinza', 'rosa', 'lilas', 'verde', 'qualquer', '', '#f00000', '#3ad0c0'].map(__f.nearestAccent)"),
+         ["ouro", "coral", "grafite", "rosa", "lilas", "verde", "ouro", "ouro", "vermelho", "turquesa"], "a cor de antes da paleta vira a mais próxima")
 
     # Falar sem IA: separa pelas vírgulas, pontos e "e"; valor falado vai para o item
     split = await ev("(t) => __f.splitSpoken(t).map(i => [i.name, i.value])",

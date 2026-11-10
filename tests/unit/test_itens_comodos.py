@@ -198,7 +198,7 @@ class Comodos(UnitBase):
         self.assertEqual([r["order"] for r in self.store.data["rooms"]], list(range(6)))
 
     def test_excluir_so_vazio(self):
-        self.assertApiError(400, self.store.delete_room, "sala", msg_part="Mova ou exclua")
+        self.assertApiError(400, self.store.delete_room, "sala", msg_part="Mova ou apague")
         r = self.store.create_room({"name": "Vazio"})
         self.store.delete_room(r["id"])
         self.assertIsNone(self.store.room(r["id"]))

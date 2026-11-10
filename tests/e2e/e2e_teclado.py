@@ -29,7 +29,7 @@ async def walk_tab(pg, n=30, back=False):
 async def body(r, p):
     r.start(search=False)
     b = await r.browser(p)
-    ctx, pg = await r.page(b, "pc", "light", accent="cinza")
+    ctx, pg = await r.page(b, "pc", "light", accent="grafite")
 
     # -- N e /
     await r.open(pg, "#/", ".tag")
@@ -93,13 +93,13 @@ async def body(r, p):
     await pg.keyboard.press("Enter")
     await pg.wait_for_selector('[data-r="0"]')
     await pg.wait_for_timeout(100)
-    r.eq(await pg.evaluate(ACTIVE), "0", "Excluir: o foco começa em Cancelar")
+    r.eq(await pg.evaluate(ACTIVE), "0", "Apagar: o foco começa em Cancelar")
     (o1, i1), (o2, i2) = await walk_tab(pg, 8), await walk_tab(pg, 8, back=True)
     r.check(not o1 + o2 and i1 + i2 >= 8, f"Tab e Shift+Tab na pergunta não vão para a ficha atrás dela ({(o1 + o2)[:2]})")
     await pg.focus('[data-r="0"]')
     await pg.keyboard.press("Enter")
     await pg.wait_for_selector('[data-r="0"]', state="detached", timeout=4000)
-    r.check(len(r.data()["items"]) == 38 and await pg.evaluate(ACTIVE) == "item-delete", "Enter em Cancelar não exclui, e o foco volta para Excluir")
+    r.check(len(r.data()["items"]) == 38 and await pg.evaluate(ACTIVE) == "item-delete", "Enter em Cancelar não apaga, e o foco volta para Apagar")
 
     # -- visualizador: setas e Esc
     await pg.click("dialog.sheet .gal-main")
@@ -173,13 +173,13 @@ async def body(r, p):
 
     # -- abas de Mais: setas, Home e End
     await r.open(pg, "#/config", ".more-tabs")
-    await pg.focus("#mt-dados")
+    await pg.focus("#mt-integracoes")
     seq = []
     for k in ("ArrowLeft", "Home", "End", "ArrowRight"):
         await pg.keyboard.press(k)
         await pg.wait_for_timeout(250)
         seq.append([hash_(pg), await pg.evaluate("document.activeElement.id")])
-    r.eq(seq, [["#/config/opcoes", "mt-opcoes"], ["#/config", "mt-dados"], ["#/config/opcoes", "mt-opcoes"], ["#/config", "mt-dados"]],
+    r.eq(seq, [["#/config/opcoes", "mt-opcoes"], ["#/config", "mt-integracoes"], ["#/config/opcoes", "mt-opcoes"], ["#/config", "mt-integracoes"]],
          "abas de Mais: seta para a esquerda dá a volta, Home e End vão às pontas, e o foco acompanha")
     tabidx = await pg.evaluate("[...document.querySelectorAll('.more-tabs [role=tab]')].map(t => t.tabIndex)")
     r.check(len(tabidx) >= 4 and tabidx[0] == 0 and set(tabidx[1:]) == {-1}, f"só a aba atual entra no Tab; as outras, pelas setas ({tabidx})")

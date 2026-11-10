@@ -84,28 +84,47 @@
     get(k, d) { try { const v = localStorage.getItem("inv:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) { try { localStorage.setItem("inv:" + k, JSON.stringify(v)); } catch { /* sem armazenamento */ } },
   };
-  // Cor do app (as cores ficam no style.css, em [data-accent]). Cada aparelho guarda a sua.
-  const ACCENTS = [["amarelo", "Amarelo"], ["laranja", "Laranja"], ["coral", "Coral"], ["rosa", "Rosa"], ["lilas", "Lilás"],
-    ["azul", "Azul"], ["turquesa", "Turquesa"], ["verde", "Verde"], ["kraft", "Kraft"], ["cinza", "Cinza"]];
-  const pickedAccent = () => { const a = LS.get("accent", "amarelo"); return ACCENTS.some(([k]) => k === a) ? a : "amarelo"; };
-  // Cor do dia (Mais > Configurações > Aparência): ligada até a pessoa desligar ou escolher uma cor. Uma cor da paleta por dia,
-  // pela data local: a mesma o dia todo e em todos os aparelhos; amanhã, a seguinte. O cinza fica de fora.
-  // O index.html faz a mesma conta antes de pintar a tela.
-  const DAY_ACCENTS = ACCENTS.map(([k]) => k).filter((k) => k !== "cinza");
+  // Cor do app (as cores ficam no style.css, em [data-accent]): a paleta da família, as mesmas 12 cores do CronologIA, com o
+  // preenchimento de cada uma (a conta da mais próxima usa ele). Vale para a casa toda (gravada no servidor, em settings.accent
+  // e settings.accent_daily); o aparelho guarda uma cópia só para pintar a tela antes de carregar (o index.html).
+  const ACCENTS = [["vermelho", "Vermelho", "#ff5a4f"], ["coral", "Coral", "#ff8a65"], ["laranja", "Laranja", "#ffa23e"], ["ouro", "Ouro", "#f2c14e"],
+    ["verde", "Verde", "#8bd45f"], ["menta", "Menta", "#4ed3a6"], ["turquesa", "Turquesa", "#3ccbda"], ["azul", "Azul", "#62b5ff"],
+    ["indigo", "Índigo", "#8f9bff"], ["lilas", "Lilás", "#b99bff"], ["rosa", "Rosa", "#ff77a9"], ["grafite", "Grafite", "#b5b9c2"]];
+  const ACCENT0 = "ouro"; // a cor do app quando ninguém escolheu (a etiqueta do ícone)
+  // as cores de antes da paleta da família (até a 1.41): uma gravada vira a mais próxima
+  const OLD_ACCENTS = { amarelo: "#f5c400", kraft: "#caa377", cinza: "#acb2b9" };
+  function nearestAccent(a) {
+    if (ACCENTS.some(([k]) => k === a)) return a;
+    const hex = OLD_ACCENTS[a] || (/^#[0-9a-f]{6}$/i.test(a || "") ? a : null);
+    if (!hex) return ACCENT0;
+    const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const c = rgb(hex);
+    const dist = (h) => { const [r, g, b] = rgb(h), m = (r + c[0]) / 2; return (2 + m / 256) * (r - c[0]) ** 2 + 4 * (g - c[1]) ** 2 + (2 + (255 - m) / 256) * (b - c[2]) ** 2; };
+    return ACCENTS.reduce((best, x) => (dist(x[2]) < dist(best[2]) ? x : best))[0];
+  }
+  // a da casa (depois de carregar: settings.accent e accent_daily) ou a cópia do aparelho
+  let HOUSE_LOOK = {};
+  const houseSet = (k) => HOUSE_LOOK[k] != null;
+  const pickedAccent = () => nearestAccent(houseSet("accent") ? HOUSE_LOOK.accent : LS.get("accent", ACCENT0));
+  // Cor do dia (Mais > Configurações > Aparência): ligada até a pessoa desligar ou escolher uma cor. Uma cor por dia, pela data
+  // local, a mesma em todos os apps da família: as 11 cores da paleta sem o Grafite, na ordem, pelo número do dia desde
+  // 01/01/1970 (Date.UTC do dia local). O index.html faz a mesma conta antes de pintar a tela.
+  const DAY_ACCENTS = ACCENTS.map(([k]) => k).filter((k) => k !== "grafite");
   function colorOfDay(d = new Date()) {
     const day = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000), n = DAY_ACCENTS.length;
     return DAY_ACCENTS[((day % n) + n) % n];
   }
-  const accentDaily = () => LS.get("accentDaily", true) !== false;
+  const accentDaily = () => (houseSet("accent_daily") ? HOUSE_LOOK.accent_daily !== false : LS.get("accentDaily", true) !== false);
   const accentOf = () => (accentDaily() ? colorOfDay() : pickedAccent());
-  // Mais é um menu (#/mais): Novidades (#/novidades), Categorias (#/categorias), Relatório, Configurações e, por último, Sobre (#/sobre). Configurações em abas, como no CronologIA
-  // e no ResolvIA: #/config (Dados, com Exportar no alto), #/config/integracoes, #/config/aparencia e #/config/opcoes.
-  const ALL_TABS = [["dados", "Dados", "archive"], ["integracoes", "Integrações", "plug"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
+  // Mais é um menu (#/mais): Novidades (#/novidades), Categorias (#/categorias), Relatório, Configurações e, por último, Sobre (#/sobre). Configurações em abas,
+  // na ordem da família (Integrações › Dados › Aparência › Opções), abrindo em Integrações: #/config (Integrações), #/config/dados (com Exportar no
+  // alto), #/config/aparencia e #/config/opcoes.
+  const ALL_TABS = [["integracoes", "Integrações", "plug"], ["dados", "Dados", "archive"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
   const moreTabs = () => ALL_TABS;
   const moreTab = (t) => (ALL_TABS.some(([k]) => k === t) ? t : ALL_TABS[0][0]);
   const IN_MORE = ["menu", "bens", "charts", "news", "cats", "data", "report", "about"]; // telas que ficam embaixo de Mais
   function applyAccent(a) {
-    if (a === "amarelo") delete document.documentElement.dataset.accent;
+    if (a === ACCENT0) delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = a;
     // Aparência aberta: a cor que está valendo fica marcada
     document.querySelectorAll('[data-input="accent"]').forEach((r) => { r.checked = r.value === a; });
@@ -262,6 +281,7 @@
     });
     applyCats(d.cats);
     derive();
+    syncLook();
   }
 
   // ------------------------------------------------------------------ avisos
@@ -498,7 +518,8 @@
         if (parts[1] === "novidades") return { name: newsOn() ? "news" : "menu", q };
         if (parts[1] === "sobre") return { name: "about", q }; // como no CronologIA (#/mais/sobre)
         return { name: "data", tab: moreTab(parts[1]), q };
-      case "config": case "dados": return { name: "data", tab: moreTab(parts[1]), q };
+      case "config": return { name: "data", tab: moreTab(parts[1]), q };
+      case "dados": return { name: "data", tab: "dados", q }; // o endereço antigo dos Dados
       case "novidades": return { name: newsOn() ? "news" : "menu", q }; // Novidades usa a IA e pode ser desligada: fica o menu
       case "categorias": return { name: "cats", q };
       case "graficos": return { name: "charts", q };
@@ -753,9 +774,9 @@
         </div>
         <div class="welcome-text">
           <h1>Vamos começar</h1>
-          <p>Importe um backup (.zip) ou comece do zero.</p>
+          <p>Importe um backup (.zip) ou crie o primeiro cômodo.</p>
           <div class="acts"><button type="button" class="btn primary" data-act="import-file">${ic("upload")}Importar backup</button>
-            <button type="button" class="btn" data-act="room-new">${ic("plus")}Começar do zero</button></div>
+            <button type="button" class="btn" data-act="room-new">${ic("plus")}Criar o primeiro cômodo</button></div>
           <p class="muted" style="font-size:14px;margin:0">${MULTI_PICK ? "Backup em partes: escolha todas de uma vez." : "Backup em partes: uma de cada vez, começando pela parte 1."}</p>
         </div>
       </section>`;
@@ -810,7 +831,7 @@
   // -- cômodo
   function viewRoom(id) {
     const r = D.roomById.get(id);
-    if (!r) return `<div class="empty">${emptyMark()}<h2>Cômodo não encontrado</h2><p>Ele pode ter sido excluído ou renomeado.</p><div class="acts"><a class="btn" href="#/comodos">Ver os cômodos</a></div></div>`;
+    if (!r) return `<div class="empty">${emptyMark()}<h2>Cômodo não encontrado</h2><p>Ele pode ter sido apagado ou renomeado.</p><div class="acts"><a class="btn" href="#/comodos">Ver os cômodos</a></div></div>`;
     const list = D.byRoom.get(id) || [];
     const total = D.roomTotals.get(id) || 0;
     const photos = r.photos || [];
@@ -1190,9 +1211,9 @@
       bensOn() && ["#/bens", "home", "Bens", "Casa, terreno, carro: o que fica fora de casa."],
       ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
       newsOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
-      ["#/categorias", "grid", "Categorias", "Criar, renomear e excluir."],
+      ["#/categorias", "grid", "Categorias", "Criar, renomear e apagar."],
       ["#/relatorio", "report", "Relatório do inventário", `Por cômodo, com ${LS.get("reportPhotos", true) ? "fotos e " : ""}gráficos. Baixa em PDF.`], // sem Mostrar fotos, não promete fotos
-      ["#/config", "gear", "Configurações", "Dados e backup, integrações, aparência e opções."],
+      ["#/config", "gear", "Configurações", "Integrações, dados e backup, aparência e opções."],
       ["#/sobre", "info", "Sobre", "CorrerIA Code, os apps e o GitHub."],
     ].filter(Boolean);
     return `<nav aria-label="Mais"><ul class="menu-list">${rows.map(([h, i, t, d]) => `<li><a class="menu-row" href="${h}">${secIc(i)}
@@ -1554,7 +1575,16 @@
   const switchHtml = (key, on, labelledby) => `<label class="switch"><input type="checkbox" role="switch" data-input="${key}" aria-labelledby="${labelledby}"${on ? " checked" : ""}><span class="track" aria-hidden="true"></span></label>`;
   function moreIntegrations() {
     const on = aiOn();
+    // na ordem da família: os outros apps (aqui, nada a ligar) › CorrerIA › IA do Home Assistant › Falar › Uso da IA › Sensores
     return `
+    <section class="panel" id="p-correria">
+      <h2>${secIc("flash")}CorrerIA</h2>
+      <ul class="opts"><li><div class="ot"><b id="correria-h">Usar com o CorrerIA</b><span>${correriaOn()
+        ? "Ligado: pelo WhatsApp, o Claude e o Gemini leem e mudam o inventário."
+        : "Para o WhatsApp, o Claude e o Gemini lerem e mudarem o inventário."}</span></div>
+        <div class="oa">${switchHtml("correria-on", correriaOn(), "correria-h")}</div></li></ul>
+      ${correriaOn() ? `<p class="help" data-slot="correria-uso">${esc(correriaUsoTxt())}</p>` : ""}
+    </section>
     <section class="panel" id="p-ai">
       <h2>${secIc("scan")}IA do Home Assistant</h2>
       <p class="lead">A IA configurada no Home Assistant: Claude, OpenAI, Gemini ou Ollama.</p>
@@ -1579,14 +1609,7 @@
         : "As chamadas de IA de hoje, para painéis e automações."}</span></div>
         <div class="oa">${switchHtml("sensors-on", sensorsOn(), "sensors-h")}</div></li></ul>
     </section>` : ""}
-    <section class="panel" id="p-correria">
-      <h2>${secIc("flash")}CorrerIA</h2>
-      <ul class="opts"><li><div class="ot"><b id="correria-h">Usar com o CorrerIA</b><span>${correriaOn()
-        ? "Ligado: pelo WhatsApp, o Claude e o Gemini leem e mudam o inventário."
-        : "Para o WhatsApp, o Claude e o Gemini lerem e mudarem o inventário."}</span></div>
-        <div class="oa">${switchHtml("correria-on", correriaOn(), "correria-h")}</div></li></ul>
-      ${correriaOn() ? `<p class="help" data-slot="correria-uso">${esc(correriaUsoTxt())}</p>` : ""}
-    </section>`;
+`;
   }
   // CorrerIA (o contato no WhatsApp e o servidor MCP do Claude e do Gemini) usa as ferramentas do servidor (ferramentas.py),
   // sem a IA daqui: não depende do Usar IA. A linha diz quem usou por último (o cliente do último pedido) e quando.
@@ -1599,7 +1622,7 @@
 
   // -- uso da IA (igual ao do EconomIA): hoje, 7 dias e o mês, gráfico por dia e as últimas chamadas
   let usageData = null, usageSel = null;
-  const USAGE_KIND = { foto: "Preencher com IA", catalogo: "Catalogar itens", busca: "Buscar foto na internet", fala: "Falar", novidades: "Novidades", triagem: "Escolher equipamentos", chat: "Conversar" };
+  const USAGE_KIND = { foto: "Digitalizar com IA", catalogo: "Catalogar itens", busca: "Buscar foto na internet", fala: "Falar", novidades: "Novidades", triagem: "Escolher equipamentos", chat: "Conversar" };
   const USAGE_RES = { ok: "", cota: "cota excedida", formato: "fora do formato", sem_busca: "sem busca na web", erro: "erro" };
   const WEEKDAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1690,12 +1713,17 @@
     </section>
     <section class="panel" id="p-history">
       <h2>${secIc("history")}Versões anteriores</h2>
-      <p class="lead">Uma cópia a cada 10 minutos de uso e antes de importar ou restaurar. Ficam as 3 mais recentes.</p>
+      <p class="lead">Uma cópia a cada 10 minutos de uso e antes de importar, restaurar ou apagar tudo. Ficam as 3 mais recentes.</p>
       <ul class="opts"><li><div class="ot"><b>Versões guardadas</b></div><div class="oa"><button class="btn" data-act="versions">${ic("history")}Ver versões</button></div></li></ul>
     </section>
     <section class="panel" id="p-where">
       <h2>${secIc("folder")}Onde ficam os dados</h2>
       <p class="lead">Itens em <span class="codepath">inventario.json</span> e fotos em JPG, dentro do app. Entram nos backups do Home Assistant.</p>
+    </section>
+    <section class="panel" id="p-zero">
+      <h2>${secIc("trash")}Começar do zero</h2>
+      <p class="lead">Apaga os cômodos, os bens e os itens. As categorias e as opções continuam, e uma cópia fica em Versões anteriores.</p>
+      <ul class="opts"><li><div class="ot"><b>Apagar tudo</b></div><div class="oa"><button type="button" class="btn danger" data-act="erase-all"${S.items.length || S.rooms.length ? "" : " disabled"}>${ic("trash")}Apagar tudo</button></div></li></ul>
     </section>`;
   }
   function moreLook() {
@@ -1704,13 +1732,14 @@
     return `
     <section class="panel" id="p-look">
       <h2>${secIc("contrast")}Tema</h2>
+      <p class="lead">Cada aparelho guarda a sua escolha.</p>
       <div class="seg themes" role="group" aria-label="Tema">
         ${[["auto", "Automático", "phone"], ["light", "Claro", "sun"], ["dark", "Escuro", "moon"]].map(([k, v, i]) => `<button type="button" data-act="theme" data-theme="${k}" aria-pressed="${theme === k}">${ic(i)}<span>${v}</span></button>`).join("")}
       </div>
     </section>
     <section class="panel" id="p-accent">
       <h2 id="accent-h">${secIc("palette")}Cor do app</h2>
-      <p class="lead">Tema e cor valem só para este aparelho.</p>
+      <p class="lead">Vale para todos os aparelhos.</p>
       <ul class="opts"><li><div class="ot"><b id="daily-h">Cor do dia</b><span>Muda a cor do app todo dia.</span></div>
         <div class="oa">${switchHtml("accent-daily", accentDaily(), "daily-h")}</div></li></ul>
       <div class="swatches" role="radiogroup" aria-labelledby="accent-h">${ACCENTS.map(([k, v]) => `<label class="sw" data-accent="${k}"><input type="radio" name="accent" value="${k}" data-input="accent"${k === accent ? " checked" : ""}>${SWATCH}<span>${v}</span></label>`).join("")}</div>
@@ -1746,10 +1775,16 @@
         <div class="oa"><select class="select" data-input="news-every" aria-label="Conferir sozinho">${NEWS_EVERY.map(([k, v]) => `<option value="${k}"${k === every ? " selected" : ""}>${v}</option>`).join("")}</select></div></li>
       ${every ? `<li><div class="ot"><b>Avisar</b><span data-slot="news-who">${esc(newsWhoHint())}</span></div>
         <div class="oa"><select class="select" data-input="news-notify" aria-label="Avisar">${newsNotifyOptions()}</select></div></li>
-      ${S.settings.news_notify ? `<li><div class="ot"><b>Testar o aviso</b><span>Manda um aviso agora.</span></div>
-        <div class="oa"><button type="button" class="btn" data-act="news-notify-test">${ic("send")}Testar</button></div></li>` : ""}` : ""}` : ""}
+      ${S.settings.news_notify ? `<li><div class="ot"><b>Testar no meu celular</b><span data-slot="news-test-why">${esc(newsTestWhy() || "Manda um aviso agora.")}</span></div>
+        <div class="oa"><button type="button" class="btn" data-act="news-notify-test" aria-label="Testar no meu celular"${newsTestWhy() ? " disabled" : ""}>${ic("send")}Testar</button></div></li>` : ""}` : ""}` : ""}
       </ul>
     </section>`;
+  }
+  // Testar no meu celular: o aviso vai para o celular de quem está na tela (como nos outros apps); sem celular, fica inativo
+  function newsTestWhy() {
+    if (!newsPeople) return "";
+    const me = newsPeople.find((x) => x.eu);
+    return !me ? "Você não está entre as pessoas do Home Assistant." : me.phone ? "" : "Sem celular ligado a você no Home Assistant.";
   }
   async function loadNewsTargets() {
     if (newsPeople || !newsOn()) return;
@@ -1757,6 +1792,9 @@
     const sel = $('#view [data-input="news-notify"]'), hint = $('#view [data-slot="news-who"]');
     if (sel) sel.innerHTML = newsNotifyOptions();
     if (hint) hint.textContent = newsWhoHint();
+    const tb = $('#view [data-act="news-notify-test"]'), why = $('#view [data-slot="news-test-why"]');
+    if (tb) tb.disabled = !!newsTestWhy();
+    if (why) why.textContent = newsTestWhy() || "Manda um aviso agora.";
   }
   function moreOptions() {
     return `${moreNewsOptions()}
@@ -1782,11 +1820,11 @@
           <div class="oa"><button type="button" class="btn" data-act="cat-new">${ic("plus")}Nova categoria</button></div></li>
         ${CATS.map(([k, v]) => {
           const n = D.catTotals.get(k)?.count || 0;
-          // Eletrônicos é a categoria das novidades: fica sempre, com o mesmo nome (sem Renomear nem Excluir)
+          // Eletrônicos é a categoria das novidades: fica sempre, com o mesmo nome (sem Renomear nem Apagar)
           if (k === "eletronicos") return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}</span></div></li>`;
           return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}</span></div>
             <div class="oa"><button type="button" class="btn icon" data-act="cat-edit" data-cat="${esc(k)}" aria-label="Renomear ${esc(v)}">${ic("edit")}</button>
-              ${k === "outros" ? `<span class="cat-keep" aria-hidden="true"></span>` : `<button type="button" class="btn icon danger" data-act="cat-del" data-cat="${esc(k)}" aria-label="Excluir ${esc(v)}">${ic("trash")}</button>`}</div></li>`;
+              ${k === "outros" ? `<span class="cat-keep" aria-hidden="true"></span>` : `<button type="button" class="btn icon danger" data-act="cat-del" data-cat="${esc(k)}" aria-label="Apagar ${esc(v)}">${ic("trash")}</button>`}</div></li>`;
         }).join("")}
       </ul>
     </section>`;
@@ -1821,12 +1859,12 @@
   async function deleteCat(id) {
     const name = CAT[id], n = D.catTotals.get(id)?.count || 0;
     if (!name) return;
-    const ok = await confirmBox({ title: `Excluir ${name}?`, body: n ? `${plural(n, "item vai", "itens vão")} para ${esc(CAT.outros || "Outros")}.` : "", ok: "Excluir categoria", danger: true });
+    const ok = await confirmBox({ title: `Apagar ${name}?`, body: n ? `${plural(n, "item vai", "itens vão")} para ${esc(CAT.outros || "Outros")}.` : "", ok: "Apagar categoria", danger: true });
     if (!ok) return;
     try {
       await API.del(`api/cats/${encodeURIComponent(id)}`);
       await loadData(); refreshAll();
-      toast(`${name} excluída`);
+      toast(`${name} apagada`);
     } catch (e) { fail(e); }
   }
   // Trocar de aba substitui o endereço (não enche o histórico: Voltar sai de Mais) e mantém as abas no alto.
@@ -1861,7 +1899,7 @@
       const b = await API.get("api/backups");
       if (document.contains(bslot)) {
         bslot.innerHTML = `<ul class="opts">
-          <li><div class="ot"><b>Criar backup agora</b><span>${b.available === false ? "A pasta share não está disponível." : "Salva um arquivo .zip com dados e fotos."}</span></div>
+          <li><div class="ot"><b>Criar backup</b><span>${b.available === false ? "A pasta share não está disponível." : "Salva um arquivo .zip com dados e fotos."}</span></div>
             <div class="oa"><button class="btn primary" data-act="backup-create"${b.available === false ? " disabled" : ""}>${ic("archive")}Criar backup</button></div></li>
           ${(b.backups || []).slice(0, 12).map((x) => `<li><div class="ot"><b>${esc(x.name)}</b><span>${esc(dateTime(x.date))}, ${esc(fmtSize(x.size))}</span></div>
             <div class="oa"><button class="btn" data-act="backup-restore" data-name="${esc(x.name)}">${ic("history")}Restaurar</button></div></li>`).join("")}
@@ -2021,7 +2059,7 @@
       const finish = (r) => { out = r; requestClose(entry, { force: true }); };
       const fail = (msg) => {
         stop();
-        $(".cam-mid", dlg).innerHTML = `<div class="cam-msg">${ic("camera", "lg")}<p>${esc(msg)}</p><button type="button" class="btn primary" data-cam="pick">${ic("image")}Escolher foto</button></div>`;
+        $(".cam-mid", dlg).innerHTML = `<div class="cam-msg">${ic("camera", "lg")}<p>${esc(msg)}</p><button type="button" class="btn primary" data-cam="pick">${ic("image")}Escolher fotos</button></div>`;
         shoot.disabled = true;
       };
       const md = navigator.mediaDevices;
@@ -2441,7 +2479,7 @@
         ${newsOn() && it.cat === "eletronicos" ? `<div class="inews" data-slot="item-news" aria-live="polite">${itemNewsHtml(it)}</div>` : ""}
       </div>
       <div class="dlg-f">
-        <button type="button" class="btn danger" data-act="item-delete" data-id="${esc(it.id)}" aria-label="Excluir">${lbl("trash", "Excluir")}</button>
+        <button type="button" class="btn danger" data-act="item-delete" data-id="${esc(it.id)}" aria-label="Apagar">${lbl("trash", "Apagar")}</button>
         <span class="grow"></span>
         <button type="button" class="btn" data-act="item-move" data-id="${esc(it.id)}" aria-label="Mover">${lbl("move", "Mover")}</button>
         <button type="button" class="btn" data-act="item-dup" data-id="${esc(it.id)}" aria-label="Duplicar">${lbl("copy", "Duplicar")}</button>
@@ -2450,7 +2488,7 @@
   }
 
   async function deleteItem(it) {
-    const ok = await confirmBox({ title: "Excluir este item?", body: `<b>${esc(it.name)}</b> sai do inventário. Dá para desfazer logo em seguida.`, ok: "Excluir", danger: true });
+    const ok = await confirmBox({ title: "Apagar este item?", body: `<b>${esc(it.name)}</b> sai do inventário. Dá para desfazer logo em seguida.`, ok: "Apagar", danger: true });
     if (!ok) return;
     try {
       const res = await API.del(`api/items/${encodeURIComponent(it.id)}`);
@@ -2459,7 +2497,7 @@
       derive();
       if (sheet && sheet.itemId === it.id) requestClose(sheet, { force: true });
       refreshAll();
-      toast("Item excluído", {
+      toast("Item apagado", {
         action: "Desfazer",
         onAction: async () => {
           try {
@@ -2585,7 +2623,7 @@
           <button type="button" class="x" data-ed="rmphoto" data-i="${i}" aria-label="Remover foto ${i + 1}">${ic("close")}</button></div>`).join("")
         + Array.from({ length: F.uploading }, () => `<div class="ph loading"><span class="spin lg"></span></div>`).join("")
         + (CAMERA ? `<button type="button" class="add" data-ed="camera">${ic("camera")}Tirar foto</button>` : "")
-        + `<button type="button" class="add" data-ed="upload">${ic(COARSE ? "image" : "upload")}${ANDROID_APP ? "Escolher foto" : COARSE ? "Galeria" : "Enviar foto"}</button>`
+        + `<button type="button" class="add" data-ed="upload">${ic(COARSE ? "image" : "upload")}Escolher fotos</button>`
         + (hasRoomPhotos ? `<button type="button" class="add" data-ed="roomphotos">${ic("images")}Fotos do cômodo</button>` : "")
         + (F.photos.length < 12 && aiOn() ? `<button type="button" class="add" data-ed="web">${ic("search")}Buscar na internet</button>` : "");
       renderAi();
@@ -2602,7 +2640,7 @@
         return;
       }
       box.innerHTML = `<div class="aih"><p>A IA lê a primeira foto e preenche os campos.</p>
-          <button type="button" class="btn" data-ed="ai">${ic("scan")}Preencher com IA</button></div>
+          <button type="button" class="btn" data-ed="ai">${ic("scan")}Digitalizar com IA</button></div>
         <input class="input" data-ed-hint placeholder="Dica para a IA (opcional), ex.: é uma cafeteira Oster" value="${esc(F.hint)}" maxlength="300" style="height:40px">`;
     };
     const showErr = (msg) => { const el = slot("formerr"); el.hidden = !msg; el.innerHTML = msg || ""; if (msg) el.scrollIntoView({ block: "nearest", behavior: "smooth" }); };
@@ -2824,7 +2862,7 @@
     if (n === "NotAllowedError" || n === "SecurityError") return "O microfone está bloqueado. Permita o microfone para o Home Assistant (no navegador, no cadeado ao lado do endereço; no app do celular, nas permissões do app Home Assistant) e tente de novo.";
     if (n === "NotFoundError" || n === "OverconstrainedError") return "Não achei um microfone neste aparelho.";
     if (n === "NotReadableError") return "O microfone está sendo usado por outro app. Feche o outro e tente de novo.";
-    if (n === "NoApi") return "Este navegador não deixa usar o microfone aqui. Abra o Home Assistant pelo endereço com https (como o do Nabu Casa) ou pelo app.";
+    if (n === "NoApi") return "Este navegador não deixa usar o microfone aqui. Abra o Home Assistant pelo endereço com https (como o do Home Assistant Cloud) ou pelo app.";
     return `Não consegui abrir o microfone (${(err && err.message) || n || "erro"}).`;
   }
   async function loadVoice(fresh = false) {
@@ -3066,7 +3104,7 @@
             : `<div class="phs" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
                 ${C.uploading ? `<div class="ph loading" style="aspect-ratio:4/3"><span class="spin lg"></span></div>` : `
                 ${CAMERA ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="camera">${ic("camera", "lg")}Tirar foto</button>` : ""}
-                <button type="button" class="add" style="aspect-ratio:4/3" data-ct="upload">${ic(COARSE ? "image" : "upload", "lg")}${ANDROID_APP ? "Escolher foto" : COARSE ? "Galeria" : "Enviar foto"}</button>
+                <button type="button" class="add" style="aspect-ratio:4/3" data-ct="upload">${ic(COARSE ? "image" : "upload", "lg")}Escolher fotos</button>
                 ${hasRoomPhotos ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="roomphoto">${ic("images", "lg")}Foto do cômodo</button>` : ""}`}
               </div>${COARSE ? "" : `<p class="help" style="margin:0">Também dá para arrastar ou colar (Ctrl+V).</p>`}`}
           <div class="${zonesUse ? "row2" : ""}">
@@ -3077,7 +3115,7 @@
           <div class="field"><label for="c-hint">Dica para a IA (opcional)</label><input id="c-hint" class="input" data-ct-in="hint" value="${esc(C.hint)}" maxlength="300" placeholder="Ex.: são taças de cristal; o vaso é de cerâmica" autocomplete="off"></div>
         </div>`;
         foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
-          <button type="button" class="btn primary" data-ct="read"${C.file ? "" : " disabled"}>${ic("scan")}Ler foto</button>`;
+          <button type="button" class="btn primary" data-ct="read"${C.file ? "" : " disabled"}>${ic("scan")}Digitalizar com IA</button>`;
       } else if (C.step === "reading") {
         body.innerHTML = C.voice ? `${heardBox()}<div class="ai-wait voice-wait"><span class="spin lg"></span><b>Separando os itens…</b></div>`
           : `<div class="cat-photo"><img src="${esc(src(C.file, "photos"))}" alt=""><div class="scan"></div></div>
@@ -3411,7 +3449,7 @@
           <div class="field"><span class="lbl">Fotos do cômodo</span><div data-slot="rphotos"></div></div>
           <div class="formerr" data-err hidden></div>
         </div></form>
-        <div class="dlg-f"><button type="button" class="btn danger" data-re="delete"${count ? ` title="Mova ou exclua os ${count} itens antes"` : ""}>${ic("trash")}<span class="lbl">Excluir cômodo</span></button><span class="grow"></span>
+        <div class="dlg-f"><button type="button" class="btn danger" data-re="delete"${count ? ` title="Mova ou apague os ${count} itens antes"` : ""}>${ic("trash")}<span class="lbl">Apagar cômodo</span></button><span class="grow"></span>
           <button type="button" class="btn ghost" data-re="cancel">Cancelar</button><button type="button" class="btn primary" data-re="save">Salvar</button></div></div>`,
       guard: async () => !R.dirty || confirmBox({ title: "Descartar as alterações?", ok: "Descartar", cancel: "Continuar editando", danger: true }),
     });
@@ -3423,11 +3461,11 @@
           <input class="input" data-re-label="${i}" value="${esc(p.label || "")}" placeholder="Legenda" aria-label="Legenda da foto">
           <button type="button" class="btn sm${R.cover === i ? " primary" : ""}" data-re="cover" data-i="${i}" aria-pressed="${R.cover === i}">${R.cover === i ? "Capa" : "Usar como capa"}</button>
           <button type="button" class="btn sm icon" data-re="up" data-i="${i}" aria-label="Subir foto"${i === 0 ? " disabled" : ""}>${ic("up", "sm")}</button>
-          <button type="button" class="btn sm icon" data-re="rm" data-i="${i}" aria-label="Tirar foto">${ic("trash", "sm")}</button></li>`).join("")}</ul>
+          <button type="button" class="btn sm icon" data-re="rm" data-i="${i}" aria-label="Apagar foto">${ic("trash", "sm")}</button></li>`).join("")}</ul>
         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
           ${R.uploading ? `<span class="muted"><span class="spin sm"></span> Enviando ${R.uploading} foto(s)…</span>` : ""}
           ${CAMERA ? `<button type="button" class="btn sm" data-re="camera">${ic("camera", "sm")}Tirar foto</button>` : ""}
-          <button type="button" class="btn sm" data-re="upload">${ic("upload", "sm")}Enviar fotos</button></div>`;
+          <button type="button" class="btn sm" data-re="upload">${ic(COARSE ? "image" : "upload", "sm")}Escolher fotos</button></div>`;
     };
     const addFiles = async (files) => {
       const all = [...(files || [])];
@@ -3470,13 +3508,13 @@
       else if (act === "up" && i > 0) { const [p] = R.photos.splice(i, 1); R.photos.splice(i - 1, 0, p); if (R.cover === i) R.cover = i - 1; else if (R.cover === i - 1) R.cover = i; R.dirty = true; renderPhotos(); }
       else if (act === "rm") { R.photos.splice(i, 1); if (R.cover >= R.photos.length) R.cover = 0; else if (R.cover > i) R.cover -= 1; R.dirty = true; renderPhotos(); }
       else if (act === "delete") {
-        if (count) { toast(`Mova ou exclua os ${count} itens de ${r.name} antes de excluir o cômodo.`, { error: true }); return; }
-        const ok = await confirmBox({ title: `Excluir ${r.name}?`, ok: "Excluir cômodo", danger: true });
+        if (count) { toast(`Mova ou apague os ${count} itens de ${r.name} antes de apagar o cômodo.`, { error: true }); return; }
+        const ok = await confirmBox({ title: `Apagar ${r.name}?`, ok: "Apagar cômodo", danger: true });
         if (!ok) return;
         try {
           const res = await API.del(`api/rooms/${encodeURIComponent(id)}`);
           setRev(res.rev); S.rooms = res.rooms; derive(); R.dirty = false;
-          finalizeThen(entry, () => { nav("#/comodos"); toast("Cômodo excluído"); });
+          finalizeThen(entry, () => { nav("#/comodos"); toast("Cômodo apagado"); });
         } catch (er) { fail(er); }
       }
     });
@@ -3558,7 +3596,7 @@
     try { await API.post("api/backups/restore", { name }); await loadData(); refreshAll(); toast("Backup restaurado"); }
     catch (e) { fail(e); }
   }
-  const VERSION_WHY = { auto: "automática", restore: "antes de restaurar", import: "antes de importar" };
+  const VERSION_WHY = { auto: "automática", restore: "antes de restaurar", import: "antes de importar", erase: "antes de apagar tudo" };
   async function restoreHistory(v) {
     const ok = await confirmBox({ title: "Restaurar esta versão?", body: `O inventário volta a ser o de <b>${esc(dateTime(v.date))}</b>${v.items != null ? `, com ${esc(plural(v.items, "item", "itens"))} em ${esc(plural(v.rooms || 0, "cômodo", "cômodos"))}` : ""}. Antes, o app guarda uma cópia do atual.`, ok: "Restaurar", danger: true });
     if (!ok) return false;
@@ -3693,23 +3731,65 @@
       try { if (lock) await lock.release(); } catch { /* ok */ }
     }
   }
+  // Configurações > Dados > Começar do zero: apaga os cômodos, os bens e os itens, só depois de confirmar; o servidor guarda
+  // antes uma versão (Versões anteriores). As categorias e as opções continuam.
+  async function eraseAll() {
+    // tudo o que está gravado, inclusive os bens com Usar bens desligado
+    const bensIds = new Set(S.rooms.filter((r) => r.kind === "bens").map((r) => r.id));
+    const nb = S.items.filter((i) => bensIds.has(i.room)).length, ni = S.items.length - nb, nr = S.rooms.length - bensIds.size;
+    const parts = [nr && plural(nr, "cômodo", "cômodos"), ni && plural(ni, "item", "itens"), nb && plural(nb, "bem", "bens")].filter(Boolean);
+    const ok = await confirmBox({ title: "Apagar tudo?",
+      body: `${parts.length ? `Saem ${parts.length > 1 ? `${parts.slice(0, -1).join(", ")} e ${parts[parts.length - 1]}` : parts[0]}. ` : ""}As categorias e as opções continuam, e uma cópia fica em Versões anteriores.`,
+      ok: "Apagar tudo", danger: true });
+    if (!ok) return;
+    try {
+      const r = await API.post("api/erase", { confirm: true });
+      setRev(r.rev);
+      await loadData();
+      refreshAll();
+      toast("Tudo apagado. Uma cópia ficou em Versões anteriores.");
+    } catch (e) { fail(e); }
+  }
   function setTheme(t) {
     LS.set("theme", t);
     if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
     else delete document.documentElement.dataset.theme;
     $$('[data-act="theme"]').forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === t)));
   }
-  // escolher uma cor desliga a Cor do dia e fica com ela
-  function setAccent(a) {
-    if (!ACCENTS.some(([k]) => k === a)) a = "amarelo";
-    LS.set("accent", a);
-    setAccentDaily(false);
+  // a cor do app vale para a casa toda: grava no servidor e guarda a cópia do aparelho (para pintar antes de carregar)
+  function keepLook() {
+    LS.set("accent", pickedAccent());
+    LS.set("accentDaily", accentDaily());
   }
-  // ligada, a cor do dia; desligada, a última cor escolhida (ou o amarelo)
-  function setAccentDaily(on) {
-    LS.set("accentDaily", on);
+  async function saveLook(patch) {
+    const before = { ...HOUSE_LOOK };
+    HOUSE_LOOK = { ...HOUSE_LOOK, ...patch };
+    Object.assign(S.settings, patch);
+    keepLook();
     const sw = $('[data-input="accent-daily"]');
-    if (sw) sw.checked = on;
+    if (sw) sw.checked = accentDaily();
+    applyAccent(accentOf());
+    try { await API.put("api/settings", patch); }
+    catch (e) { HOUSE_LOOK = before; Object.assign(S.settings, before); keepLook(); if (sw) sw.checked = accentDaily(); applyAccent(accentOf()); fail(e); }
+  }
+  // escolher uma cor desliga a Cor do dia e fica com ela
+  const setAccent = (a) => saveLook({ accent: nearestAccent(a), accent_daily: false });
+  // ligada, a cor do dia; desligada, a última cor escolhida (ou o Ouro)
+  const setAccentDaily = (on) => saveLook({ accent_daily: !!on, accent: pickedAccent() });
+  // depois de carregar: vale a da casa. Na primeira vez (a casa ainda sem cor), a escolhida neste aparelho passa para a casa.
+  function syncLook() {
+    const st = S.settings || {};
+    HOUSE_LOOK = { accent: st.accent ?? null, accent_daily: st.accent_daily ?? null };
+    if (HOUSE_LOOK.accent == null && HOUSE_LOOK.accent_daily == null && !PREVIEW) {
+      const a = LS.get("accent", null), d = LS.get("accentDaily", null);
+      if (a != null || d != null) {
+        const patch = { accent: nearestAccent(a || ACCENT0), accent_daily: d !== false };
+        HOUSE_LOOK = patch;
+        Object.assign(S.settings, patch);
+        API.put("api/settings", patch).catch(() => {});
+      }
+    }
+    if (houseSet("accent") || houseSet("accent_daily")) keepLook();
     applyAccent(accentOf());
   }
 
@@ -3783,9 +3863,10 @@
       case "news-all": startNewsAll(); break;
       case "news-cancel": cancelNewsAll(); break;
       case "news-clear": clearNews(); break;
+      case "erase-all": eraseAll(); break;
       case "news-notify-test":
         b.disabled = true;
-        API.post("api/news/notify-test", { who: S.settings.news_notify }).then((r) => toast(r.sent > 1 ? `Aviso enviado para ${r.sent} celulares` : "Aviso enviado"), fail).finally(() => { b.disabled = false; });
+        API.post("api/news/notify-test", { who: "eu" }).then((r) => toast(r.sent > 1 ? `Aviso enviado para ${r.sent} celulares` : "Aviso enviado"), fail).finally(() => { b.disabled = !!newsTestWhy(); });
         break;
       case "news-open": { const it = D.itemById.get(b.dataset.id); if (it) openNews(it); break; }
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }
@@ -4008,7 +4089,7 @@
   if (typeof window.INV_TEST === "function") {
     window.INV_TEST({ esc, norm, numTxt, money, moneyR, plural, pct, pctFmt, ago, parseMoney, moneyInput, qtyClean, qtyNum, qtyLabel, qtyShort,
       splitSpoken, wordsToNumbers, newsDate, moneyK, pctTxt, chatHtml, webFills, siteOf, suggestCode, hl, applyCats, cats: () => CATS,
-      colorOfDay, dayAccents: () => DAY_ACCENTS, accents: () => ACCENTS.map(([k]) => k) });
+      colorOfDay, nearestAccent, dayAccents: () => DAY_ACCENTS, accents: () => ACCENTS.map(([k]) => k) });
   }
   if (!PREVIEW || window.INV_BACKEND) boot();
   else window.INV_BOOT = boot;
