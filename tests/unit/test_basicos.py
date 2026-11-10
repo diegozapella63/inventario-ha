@@ -52,6 +52,22 @@ class Valores(UnitBase):
         self.assertEqual(S.read_json(os.path.join(S.DATA_DIR, "nao-existe.json"), {"padrao": 1}), {"padrao": 1})
 
 
+class Versao(UnitBase):
+    """A versão fica num lugar só (o config.yaml); o servidor lê de lá, ao lado dele (na imagem) ou uma pasta acima."""
+
+    def test_a_do_config_yaml(self):
+        with open(os.path.join(helpers.APP, "..", "config.yaml"), encoding="utf-8") as f:
+            self.assertIn(f'version: "{S.VERSION}"', f.read())
+        self.assertEqual(S._versao(), S.VERSION)
+
+    def test_sem_config_yaml(self):
+        from unittest import mock
+        with mock.patch("builtins.open", side_effect=OSError):
+            self.assertEqual(S._versao(), "0.0.0")
+        with mock.patch("builtins.open", mock.mock_open(read_data="name: InventarIA\n")):
+            self.assertEqual(S._versao(), "0.0.0", "sem a linha version")
+
+
 class Categorias(UnitBase):
     def test_lista_padrao(self):
         cats = S.default_cats()

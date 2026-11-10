@@ -22,7 +22,7 @@ app = open(f"{WEB}/app.js", encoding="utf-8").read()
 # as caixas de seleção no visual do app (o mesmo arquivo dos outros apps), antes do app: o Voltar dela vem primeiro
 caixas = open(f"{WEB}/selectsheet.js", encoding="utf-8").read()
 prev = open(f"{ROOT}/preview/preview.js", encoding="utf-8").read()
-version = re.search(r'VERSION = "([^"]+)"', open(f"{ROOT}/inventario/app/server.py", encoding="utf-8").read()).group(1)
+version = re.search(r'^version:\s*"?([^"\s]+)"?\s*$', open(f"{ROOT}/inventario/config.yaml", encoding="utf-8").read(), re.M).group(1)  # a versão fica só no config.yaml
 
 # fontes: na prévia vêm do Google Fonts (mesma família Barlow)
 css = re.sub(r"@font-face \{[^}]*\}\n", "", css)

@@ -1746,37 +1746,37 @@
     </section>`;
   }
   // Opções: o que muda o jeito de cadastrar e de ver o inventário, para a casa toda
-  const NEWS_EVERY = [[0, "Não"], [7, "Toda semana"], [15, "A cada 15 dias"], [30, "Todo mês"]];
-  // Avisar: uma pessoa da casa (ou todas), nunca um aparelho, como no ResolvIA e na CronologIA; o aviso vai para os
-  // celulares ligados à pessoa no Home Assistant (Configurações > Pessoas)
+  // Novidades › o aviso no celular, o mesmo componente dos apps da família (o modelo é o do GerencIA): Conferir sozinho,
+  // o Horário (uma caixa do app, de meia em meia hora, sem o AM/PM do celular) e A cada, lado a lado; Avisar no celular;
+  // Quem recebe (um botão por pessoa da casa, do mesmo tamanho, lado a lado; nunca um aparelho: os celulares de cada
+  // pessoa são os ligados a ela no Home Assistant) e Testar no meu celular, na largura toda, embaixo.
+  const NEWS_EVERY = [[7, "7 dias"], [15, "15 dias"], [30, "30 dias"]];
+  const NEWS_HORAS = Array.from({ length: 48 }, (_, k) => `${String(k >> 1).padStart(2, "0")}:${k % 2 ? "30" : "00"}`);
   let newsPeople = null;
-  function newsNotifyOptions() {
-    const cur = S.settings.news_notify || "", ps = newsPeople || [];
-    const list = [["", "Não avisar"], ...(ps.filter((x) => x.phone).length > 1 ? [["todos", "Todos"]] : []),
-      ...ps.map((x) => [x.id, x.phone ? x.name : `${x.name} (sem celular)`, !x.phone && x.id !== cur])];
-    if (cur && !list.some(([k]) => k === cur)) list.push([cur, cur === "todos" ? "Todos" : "Pessoa que saiu do Home Assistant"]);
-    return list.map(([k, v, off]) => `<option value="${esc(k)}"${k === cur ? " selected" : ""}${off ? " disabled" : ""}>${esc(v)}</option>`).join("");
+  const joinE = (l) => (l.length > 1 ? `${l.slice(0, -1).join(", ")} e ${l[l.length - 1]}` : l[0] || "");
+  // quem recebe; do jeito antigo (até a 1.42), "todos" marca todas as pessoas com celular
+  function newsPara() {
+    const p = S.settings.news_para || [];
+    return p.includes("todos") ? (newsPeople || []).filter((x) => x.phone).map((x) => x.id) : p;
   }
-  function newsWhoHint() {
-    const ps = newsPeople;
-    if (ps && !ps.some((x) => x.phone)) return "Ligue o celular a uma pessoa no Home Assistant (Configurações > Pessoas).";
-    return "Quando a conferência sozinha achar novidade.";
-  }
-  // Avisar (e Testar) só com Conferir sozinho: o aviso vem só dessa conferência; com "Não", nada avisaria
   function moreNewsOptions() {
     if (!aiOn()) return "";
-    const on = newsOn(), every = +S.settings.news_every || 0;
+    const on = newsOn(), every = +S.settings.news_every || 0, aviso = !!S.settings.news_aviso;
+    const hora = S.settings.news_hora || "10:00", horas = NEWS_HORAS.includes(hora) ? NEWS_HORAS : [...NEWS_HORAS, hora].sort();
+    const opt = (v, label, cur) => `<option value="${esc(v)}"${String(v) === String(cur) ? " selected" : ""}>${esc(label)}</option>`;
     return `
     <section class="panel" id="p-news-opts">
       <h2>${secIc("spark")}Novidades</h2>
       <ul class="opts"><li><div class="ot"><b id="news-h">Usar novidades</b><span>Atualizações e recalls dos eletrônicos.</span></div>
         <div class="oa">${switchHtml("news-on", on, "news-h")}</div></li>
-      ${on ? `<li><div class="ot"><b>Conferir sozinho</b><span>A IA confere os eletrônicos de tempos em tempos.</span></div>
-        <div class="oa"><select class="select" data-input="news-every" aria-label="Conferir sozinho">${NEWS_EVERY.map(([k, v]) => `<option value="${k}"${k === every ? " selected" : ""}>${v}</option>`).join("")}</select></div></li>
-      ${every ? `<li><div class="ot"><b>Avisar</b><span data-slot="news-who">${esc(newsWhoHint())}</span></div>
-        <div class="oa"><select class="select" data-input="news-notify" aria-label="Avisar">${newsNotifyOptions()}</select></div></li>
-      ${S.settings.news_notify ? `<li><div class="ot"><b>Testar no meu celular</b><span data-slot="news-test-why">${esc(newsTestWhy() || "Manda um aviso agora.")}</span></div>
-        <div class="oa"><button type="button" class="btn" data-act="news-notify-test" aria-label="Testar no meu celular"${newsTestWhy() ? " disabled" : ""}>${ic("send")}Testar</button></div></li>` : ""}` : ""}` : ""}
+      ${on ? `<li><div class="ot"><b id="news-auto-h">Conferir sozinho</b><span>A IA confere os eletrônicos de tempos em tempos.</span></div>
+        <div class="oa">${switchHtml("news-auto", !!every, "news-auto-h")}</div></li>` : ""}
+      ${on && every ? `<li class="aviso-quando">
+          <div class="field"><label for="news-hora">Horário</label><select id="news-hora" class="select" data-input="news-hora">${horas.map((x) => opt(x, x, hora)).join("")}</select></div>
+          <div class="field"><label for="news-every">A cada</label><select id="news-every" class="select" data-input="news-every">${NEWS_EVERY.map(([k, v]) => opt(k, v, every)).join("")}</select></div></li>
+        <li><div class="ot"><b id="news-aviso-h">Avisar no celular</b><span>Quando a conferência sozinha achar novidade.</span></div>
+          <div class="oa">${switchHtml("news-aviso", aviso, "news-aviso-h")}</div></li>
+        ${aviso ? `<li class="aviso-quem" data-slot="news-quem">${quemRecebe()}</li>` : ""}` : ""}
       </ul>
     </section>`;
   }
@@ -1786,15 +1786,41 @@
     const me = newsPeople.find((x) => x.eu);
     return !me ? "Você não está entre as pessoas do Home Assistant." : me.phone ? "" : "Sem celular ligado a você no Home Assistant.";
   }
+  function quemRecebe() {
+    const P = newsPeople, para = new Set(newsPara());
+    let h = `<div class="field"><span class="lbl" id="quem-l">Quem recebe</span>`;
+    if (!P) h += `<p class="help">Procurando as pessoas da casa…</p>`;
+    else if (!P.length) h += `<p class="help">Nenhuma pessoa da casa no Home Assistant.</p>`;
+    else {
+      h += `<div class="quem" role="group" aria-labelledby="quem-l">${P.map((p) => `<button type="button" class="quem-p${para.has(p.id) ? " on" : ""}${p.phone ? "" : " sem"}" data-act="news-pessoa" data-id="${esc(p.id)}" aria-pressed="${para.has(p.id)}">${ic("user", "sm")}<b>${esc(p.name)}</b>${p.phone ? "" : "<span>sem celular</span>"}</button>`).join("")}</div>`;
+      const sem = P.filter((p) => para.has(p.id) && !p.phone).map((p) => p.name);
+      if (sem.length) h += `<p class="help">Sem celular para ${esc(joinE(sem))}: ligue o celular à pessoa no Home Assistant (Configurações > Pessoas).</p>`;
+      else if (!para.size) h += `<p class="help">Escolha quem recebe.</p>`;
+    }
+    const why = newsTestWhy();
+    return `${h}</div><button type="button" class="btn block aviso-testar" data-act="news-notify-test"${why ? " disabled" : ""}>${ic("send")}Testar no meu celular</button>${why ? `<p class="help">${esc(why)}</p>` : ""}`;
+  }
   async function loadNewsTargets() {
     if (newsPeople || !newsOn()) return;
     try { newsPeople = (await API.get("api/news/people")).people || []; } catch { newsPeople = []; }
-    const sel = $('#view [data-input="news-notify"]'), hint = $('#view [data-slot="news-who"]');
-    if (sel) sel.innerHTML = newsNotifyOptions();
-    if (hint) hint.textContent = newsWhoHint();
-    const tb = $('#view [data-act="news-notify-test"]'), why = $('#view [data-slot="news-test-why"]');
-    if (tb) tb.disabled = !!newsTestWhy();
-    if (why) why.textContent = newsTestWhy() || "Manda um aviso agora.";
+    const slot = $('#view [data-slot="news-quem"]');
+    if (slot) slot.innerHTML = quemRecebe();
+  }
+  async function saveNews(patch, msg) {
+    try {
+      const out = await API.put("api/settings", patch);
+      Object.assign(S.settings, patch);
+      if (out && Array.isArray(out.news_para)) S.settings.news_para = out.news_para;
+      renderView(false);
+      if (msg) toast(msg);
+      return true;
+    } catch (er) { fail(er); renderView(false); return false; }
+  }
+  function toggleNewsPessoa(id) {
+    const para = new Set(newsPara());
+    if (para.has(id)) para.delete(id); else para.add(id);
+    const p = (newsPeople || []).find((x) => x.id === id);
+    saveNews({ news_para: [...para] }, `${p ? p.name : "A pessoa"} ${para.has(id) ? "recebe" : "não recebe"} o aviso`);
   }
   function moreOptions() {
     return `${moreNewsOptions()}
@@ -3864,6 +3890,7 @@
       case "news-cancel": cancelNewsAll(); break;
       case "news-clear": clearNews(); break;
       case "erase-all": eraseAll(); break;
+      case "news-pessoa": toggleNewsPessoa(b.dataset.id); break;
       case "news-notify-test":
         b.disabled = true;
         API.post("api/news/notify-test", { who: "eu" }).then((r) => toast(r.sent > 1 ? `Aviso enviado para ${r.sent} celulares` : "Aviso enviado"), fail).finally(() => { b.disabled = !!newsTestWhy(); });
@@ -3949,15 +3976,14 @@
       try { await API.put("api/settings", { ai_search: t.value }); S.settings.ai_search = t.value; aiCache.at = 0; toast("IA para buscar fotos atualizada"); }
       catch (er) { fail(er); }
     }
-    else if (k === "news-every" || k === "news-notify") {
-      const key = k === "news-every" ? "news_every" : "news_notify", val = k === "news-every" ? +t.value : t.value;
-      try {
-        await API.put("api/settings", { [key]: val });
-        S.settings[key] = val;
-        renderView(false);
-        toast(key === "news_every" ? (val ? `Conferir sozinho: ${NEWS_EVERY.find(([d]) => d === val)[1].toLowerCase()}` : "Conferir sozinho desligado")
-          : val ? `Avisar: ${val === "todos" ? "todos" : (newsPeople || []).find((x) => x.id === val)?.name || "ligado"}` : "Sem aviso das novidades");
-      } catch (er) { fail(er); renderView(false); }
+    else if (k === "news-every") saveNews({ news_every: +t.value }, `Conferir a cada ${+t.value} dias`);
+    else if (k === "news-hora") saveNews({ news_hora: t.value }, `Conferir às ${t.value}`);
+    else if (k === "news-auto") saveNews({ news_every: t.checked ? 7 : 0 }, t.checked ? `Conferir sozinho: a cada 7 dias, às ${S.settings.news_hora || "10:00"}` : "Conferir sozinho desligado");
+    else if (k === "news-aviso") {
+      // ligou o aviso sem ninguém escolhido: começa com quem está usando o app (como no GerencIA)
+      const me = (newsPeople || []).find((x) => x.eu), patch = { news_aviso: t.checked };
+      if (t.checked && !newsPara().length && me) patch.news_para = [me.id];
+      saveNews(patch, t.checked ? "Aviso no celular ligado" : "Aviso no celular desligado");
     }
     else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on" || k === "bens-on" || k === "correria-on") {
       const key = { "ai-on": "ai", "zones-on": "zones", "news-on": "news", "bens-on": "bens", "correria-on": "correria" }[k] || "ha_sensors", on = t.checked;

@@ -171,46 +171,94 @@ class Aviso(UnitBase):
 
 
 class Sozinho(UnitBase):
+    """Conferir sozinho a cada N dias, no horário (hora local do servidor), pela última conferência que terminou."""
+
     def setUp(self):
         super().setUp()
-        self.store.settings["news_every"] = 7
+        self.store.settings.update(news_every=7, news_hora="10:00")
 
     def ultima(self, at, tentativa=None):
         d = server.news_read()
-        d["ultima"] = {"at": at, "conferidos": 1} if at else None
+        d["ultima"] = {"at": at.isoformat() if at else None, "conferidos": 1} if at else None
         if tentativa:
-            d["auto_tentativa"] = tentativa
+            d["auto_tentativa"] = tentativa.isoformat()
         server.write_json_atomic(server.NEWS_FILE, d)
 
-    def test_nunca_conferido_confere(self):
-        self.assertTrue(server.news_auto_due(time.time()))
+    def due(self, quando):
+        return server.news_auto_due(quando.timestamp())
+
+    def test_nunca_conferido_confere_hoje_no_horario(self):
+        self.assertFalse(self.due(datetime(2026, 11, 4, 9, 59)), "antes do horário, espera")
+        self.assertTrue(self.due(datetime(2026, 11, 4, 10, 0)), "no horário, confere")
+        self.assertTrue(self.due(datetime(2026, 11, 4, 22, 0)), "e depois dele, no mesmo dia")
 
     def test_desligado_nao_confere(self):
         self.store.settings["news_every"] = 0
-        self.assertFalse(server.news_auto_due(time.time()))
+        self.assertFalse(self.due(datetime(2026, 11, 4, 12, 0)))
 
     def test_novidades_ou_ia_desligadas_nao_conferem(self):
         for key in ("news", "ai"):
             with self.subTest(key=key):
                 self.store.settings[key] = False
-                self.assertFalse(server.news_auto_due(time.time()))
+                self.assertFalse(self.due(datetime(2026, 11, 4, 12, 0)))
                 self.store.settings[key] = True
 
-    def test_conferido_ha_pouco_espera(self):
-        self.ultima(ago(days=3))
-        self.assertFalse(server.news_auto_due(time.time()))
+    def test_a_cada_n_dias_no_horario(self):
+        self.ultima(datetime(2026, 11, 4, 10, 3))  # a última terminou às 10h03 de 4/11
+        self.assertFalse(self.due(datetime(2026, 11, 7, 12, 0)), "3 dias depois: espera")
+        self.assertFalse(self.due(datetime(2026, 11, 11, 9, 59)), "no 7º dia, antes do horário: espera")
+        self.assertTrue(self.due(datetime(2026, 11, 11, 10, 0)), "no 7º dia, no horário: confere (não escorrega os 3 minutos)")
+        self.store.settings.update(news_every=15, news_hora="21:30")
+        self.assertFalse(self.due(datetime(2026, 11, 19, 21, 29)), "a cada 15 dias, às 21h30: um minuto antes, espera")
+        self.assertTrue(self.due(datetime(2026, 11, 19, 21, 30)), "no 15º dia, às 21h30: confere")
 
-    def test_passou_o_intervalo_confere(self):
-        self.ultima(ago(days=7, hours=0.5))
-        self.assertTrue(server.news_auto_due(time.time()))
-        self.ultima(ago(days=6, hours=23.5))
-        self.assertTrue(server.news_auto_due(time.time()), "com uma hora de folga, para não escorregar a cada semana")
+    def test_horario_ruim_vale_o_padrao(self):
+        for v in ("25:00", "9h", "", None, 930):
+            with self.subTest(v=v):
+                self.store.settings["news_hora"] = v
+                self.assertEqual(server.news_hora(), "10:00")
 
     def test_depois_de_uma_tentativa_espera_6_horas(self):
-        self.ultima(ago(days=10), tentativa=ago(hours=2))
-        self.assertFalse(server.news_auto_due(time.time()))
-        self.ultima(ago(days=10), tentativa=ago(hours=7))
-        self.assertTrue(server.news_auto_due(time.time()))
+        self.ultima(datetime(2026, 11, 1, 8, 0), tentativa=datetime(2026, 11, 11, 10, 0))
+        self.assertFalse(self.due(datetime(2026, 11, 11, 12, 0)))
+        self.assertTrue(self.due(datetime(2026, 11, 11, 16, 1)))
+
+
+class QuemRecebe(UnitBase):
+    """Avisar no celular e Quem recebe (as pessoas da casa, uma ou várias); quem vinha do jeito antigo (news_notify)
+    continua recebendo."""
+
+    def test_de_inicio_desligado_e_ninguem(self):
+        self.assertEqual((server.news_aviso(), server.news_para(), server.news_para_salvo()), (False, [], []))
+
+    def test_escolhidas(self):
+        self.store.settings.update(news_aviso=True, news_para=["person.ana", "person.beto", "person.ana", "x", 3, "person.Ana"])
+        self.assertEqual(server.news_para(), ["person.ana", "person.beto"], "só pessoas, sem repetir")
+        self.assertEqual(server.news_para_salvo(), ["person.ana", "person.beto"])
+        self.assertTrue(server.news_aviso())
+
+    def test_do_jeito_antigo(self):
+        self.store.settings["news_notify"] = "person.carla"
+        self.assertEqual((server.news_aviso(), server.news_para(), server.news_para_salvo()), (True, ["person.carla"], ["person.carla"]))
+        self.fake_ha()
+        self.store.settings["news_notify"] = "todos"
+        self.assertEqual(server.news_para_salvo(), ["todos"], "a tela marca todas as pessoas com celular")
+        self.assertEqual(server.news_para(), ["person.ana", "person.beto", "person.carla"], "todas as pessoas da casa")
+        self.store.settings["news_aviso"] = False
+        self.assertFalse(server.news_aviso(), "desligado vale sobre o jeito antigo")
+
+    def test_avisa_os_celulares_de_quem_recebe(self):
+        self.fake_ha()
+        self.store.settings.update(news_aviso=True, news_para=["person.ana", "person.beto", "person.carla"])
+        self.assertEqual(server.send_news_notice(2), 2, "Ana e Carla têm celular; Beto, não (fica de fora)")
+        self.store.settings["news_para"] = ["person.beto"]
+        with self.assertRaises(server.ApiError) as e:
+            server.send_news_notice(2)
+        self.assertEqual(e.exception.msg, "Ninguém escolhido tem celular ligado no Home Assistant (Configurações > Pessoas).")
+        self.store.settings["news_para"] = []
+        with self.assertRaises(server.ApiError) as e:
+            server.send_news_notice(2)
+        self.assertEqual(e.exception.msg, "Escolha quem avisar.")
 
 
 if __name__ == "__main__":

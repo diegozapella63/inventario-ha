@@ -1166,7 +1166,21 @@ dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; 
 /* Mais: botões e listas de escolha das seções com a mesma largura, alinhados entre si */
 .more-panel .opts .oa > .btn:not(.icon), .more-panel .opts .oa > .select, .mscreen .opts .oa > .btn:not(.icon) { width: 280px; max-width: 100%; min-width: 0; height: 44px; }
 
-/* Opções > Categorias: uma linha por categoria, com renomear e excluir à direita */
+/* o aviso no celular (o mesmo componente dos apps da família): Horário e A cada lado a lado, do mesmo tamanho; Quem recebe
+   com um botão por pessoa, dois por linha, do mesmo tamanho; Testar no meu celular na largura toda, embaixo */
+.opts > li.aviso-quando { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.opts > li.aviso-quem { display: block; }
+.quem { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.quem-p { display: flex; justify-content: center; align-items: center; gap: 7px; min-width: 0; min-height: 44px; padding: 8px 12px; border-radius: var(--r); border: 1px solid var(--line-2); background: var(--surface); color: var(--ink); font: 500 15px/1.2 var(--font); cursor: pointer; }
+.quem-p b { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quem-p span { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.quem-p .ic { flex: none; color: var(--muted); }
+.quem-p.on { border-color: var(--tag-edge); background: var(--tag-soft); }
+.quem-p.on .ic { color: var(--tag-text); }
+.quem + .help, .aviso-quem .help { margin-top: 8px; }
+.aviso-testar { margin-top: 12px; height: 44px; }
+
+/* Opções > Categorias: uma linha por categoria, com renomear e apagar à direita */
 .opts.cats > li + li { flex-wrap: nowrap; padding-block: 8px; }
 .opts.cats > li + li .ot { min-width: 0; }
 .opts.cats > li + li .ot b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

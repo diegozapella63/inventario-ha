@@ -46,7 +46,7 @@ class Dados(ServerCase):
         self.assertEqual(d["user"], "Davi")
         self.assertEqual(d["settings"], {"ai_entity": "", "ai_search": "", "voice_stt": "", "ai": True, "zones": False, "ha_sensors": False,
                                          "news": True, "news_every": 0, "news_notify": "", "bens": True, "correria": False,
-                                         "accent": None, "accent_daily": None})
+                                         "news_hora": "10:00", "news_aviso": False, "news_para": [], "accent": None, "accent_daily": None})
         self.assertIsNone(d["correria_uso"], "CorrerIA desligado: sem o último uso")
         self.assertEqual(d["features"], {"ai": False, "share": True}, "sem Home Assistant, sem IA")
         self.assertRegex(d["version"], r"^\d+\.\d+\.\d+$")

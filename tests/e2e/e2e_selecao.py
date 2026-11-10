@@ -131,7 +131,9 @@ async def body(r, p):
     await pg.wait_for_timeout(600)
     r.eq(await loc.evaluate("(s) => s.selectedIndex"), 1, "computador: Enter abre, as setas e o Enter escolhem")
     await ctx.close()
-    # a caixa fechada, igual aos outros campos: nas telas e nas janelas, claro e escuro, 384 e 320 px
+    # a caixa fechada, igual aos outros campos: nas telas e nas janelas, claro e escuro, 384 e 320 px (em Opções, o Horário
+    # e o A cada do Conferir sozinho)
+    r.api("PUT", "api/settings", {"news_every": 7})
     for size in ("cel", "estreito"):
         for scheme in ("light", "dark"):
             ctx, pg = await r.page(b, size, scheme, accent="verde")

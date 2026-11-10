@@ -109,7 +109,7 @@
     if (method === "GET" && path === "api/data") {
       const st = ST.settings;
       return { ...clone(d), rev: ST.rev, version: "%%V%%", user: null, features: { ai: true, share: false },
-        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false, correria: st.correria === true, accent: st.accent ?? null, accent_daily: st.accent_daily ?? null }, correria_uso: null };
+        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false, correria: st.correria === true, accent: st.accent ?? null, accent_daily: st.accent_daily ?? null, news_hora: st.news_hora || "10:00", news_aviso: st.news_aviso === true, news_para: st.news_para || [] }, correria_uso: null };
     }
     if (method === "GET" && path === "api/rev") return { rev: ST.rev, correria_uso: null };
     if (method === "POST" && path === "api/items") {

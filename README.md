@@ -21,7 +21,7 @@ Um App do Home Assistant para fazer o **inventário da casa**: cômodos, itens, 
    ```
 2. Procure **InventarIA** na loja, toque em **Instalar** e depois em **Iniciar**.
 3. Ative **Mostrar na barra lateral**.
-4. Abra o InventarIA e importe o seu backup (`.zip`) ou comece do zero.
+4. Abra o InventarIA e importe o seu backup (`.zip`) ou crie o primeiro cômodo.
 
 A primeira instalação leva alguns minutos, porque o app é montado no próprio Home Assistant. Depois, as atualizações aparecem sozinhas, com o botão **Atualizar**.
 
@@ -34,13 +34,13 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 - **Falar**: o microfone no alto da tela. Fale os itens e quanto valem; o Home Assistant transcreve com a fala para texto que você escolher (ou a do Assist) e a IA separa os itens para você conferir.
 - **Uso da IA**: chamadas de hoje, da semana e do mês, gráfico por dia, últimas chamadas com tokens estimados e, se você ligar, o sensor `sensor.inventaria_ia_hoje` no Home Assistant.
 - **Fotos da internet**: num item sem foto, a IA procura o produto no fabricante e nas lojas e o app mostra as fotos para você escolher. A foto fica marcada como ilustrativa, com o site de onde veio. Na mesma busca, a IA traz nome, detalhes, categoria e valor para preencher o item.
-- **Novidades** de cada item ou de todos os eletrônicos de uma vez (a IA escolhe quais): atualizações, lançamentos, modelo novo, recalls e fim de suporte, com a fonte de cada um. Pode conferir sozinho toda semana, a cada 15 dias ou todo mês e avisar no celular quando achar algo novo.
+- **Novidades** de cada item ou de todos os eletrônicos de uma vez (a IA escolhe quais): atualizações, lançamentos, modelo novo, recalls e fim de suporte, com a fonte de cada um. Pode conferir sozinho a cada 7, 15 ou 30 dias, no horário que você escolher, e avisar no celular das pessoas da casa que você escolher quando achar algo novo.
 - **Conversar** com a IA a qualquer momento, ao lado do microfone, sobre o que está na tela ou qualquer outro assunto.
 - **Buscar** por nome, marca ou detalhe, sem se importar com acentos, com filtros por cômodo e categoria, e **Selecionar** para alterar o cômodo, a categoria e a zona de vários itens de uma vez.
 - **Bens** fora de casa (casa, terreno, carro), separados em Imóveis, Veículos e Outros: contam no patrimônio e vêm à parte no relatório.
 - **Relatório do inventário** por cômodo, com fotos e gráficos, para baixar em PDF.
 - **Gráficos**: os cômodos, as categorias e os itens que mais valem, as faixas de valor e o patrimônio mês a mês.
-- **Exportar** em CSV, JSON ou ZIP com fotos, **backup** na pasta `share/inventario` e versões automáticas a cada 10 minutos de uso.
+- **Exportar** em CSV, JSON ou ZIP com fotos, **backup** na pasta `share/inventario`, versões automáticas a cada 10 minutos de uso e **Começar do zero** (com uma cópia antes).
 - **Importar backup** pelo celular, inclusive dividido em partes.
 - **Nos outros apps da casa**: o [ResolvIA](https://github.com/diegozapella63/resolvia-ha) liga tarefas a cômodos e itens daqui (e o [CronologIA](https://github.com/diegozapella63/cronologia-ha) mostra nas tarefas), e o [GerencIA](https://github.com/diegozapella63/gerencia-ha) soma os itens no patrimônio, como bens. Eles só leem: nada muda aqui.
 - **Pelo WhatsApp, pelo Claude e pelo Gemini**, com o [CorrerIA](https://github.com/diegozapella63/correria-ha) (se você ligar): ver o resumo, buscar, cadastrar, editar, mover e apagar itens, com as mesmas regras da tela.

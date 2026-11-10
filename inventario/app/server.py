@@ -48,7 +48,24 @@ import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-VERSION = "1.42.0"
+
+
+def _versao() -> str:
+    """A versão do app, de um lugar só: o config.yaml (o Home Assistant lê de lá). Na imagem, o Dockerfile copia o
+    config.yaml para /app; no computador e nos testes, ele fica uma pasta acima."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    for p in (os.path.join(here, "config.yaml"), os.path.join(here, "..", "config.yaml")):
+        try:
+            with open(p, encoding="utf-8") as f:
+                m = re.search(r'^version:\s*"?([0-9][0-9A-Za-z.+-]*)"?\s*$', f.read(), re.M)
+        except OSError:
+            continue
+        if m:
+            return m.group(1)
+    return "0.0.0"
+
+
+VERSION = _versao()
 DEV = os.environ.get("INV_DEV") == "1"
 DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
@@ -1190,9 +1207,48 @@ def news_every() -> int:
 
 
 def news_notify_target() -> str:
-    """Quem recebe o aviso das novidades: "todos", "person.<pessoa>" ou "" (não avisar)."""
+    """O jeito antigo (até a 1.42) de escolher quem recebe o aviso: "todos", "person.<pessoa>" ou "" (não avisar)."""
     t = str(STORE.settings.get("news_notify") or "")
     return t if WHO_RE.fullmatch(t) else ""
+
+
+# o aviso no celular (o mesmo componente dos apps da família): Avisar no celular, o horário (sem AM/PM), a cada quantos
+# dias (o da conferência sozinha) e quem recebe (as pessoas da casa, uma ou várias)
+PERSON_RE = re.compile(r"person\.[a-z0-9_]+")
+HORA_RE = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
+NEWS_HORA = "10:00"
+
+
+def news_hora() -> str:
+    v = str(STORE.settings.get("news_hora") or "")
+    return v if HORA_RE.fullmatch(v) else NEWS_HORA
+
+
+def news_aviso() -> bool:
+    """Avisar no celular: ligado ou não (quem vinha do jeito antigo, com alguém escolhido, fica ligado)."""
+    v = STORE.settings.get("news_aviso")
+    return v if isinstance(v, bool) else bool(news_notify_target())
+
+
+def news_para_salvo() -> list[str]:
+    """Quem recebe, para a tela (sem perguntar ao Home Assistant): a lista escolhida; do jeito antigo, a pessoa escolhida,
+    ou ["todos"] (a tela marca todas as pessoas com celular)."""
+    v = STORE.settings.get("news_para")
+    if isinstance(v, list):
+        return list(dict.fromkeys(x for x in v if isinstance(x, str) and PERSON_RE.fullmatch(x)))
+    t = news_notify_target()
+    return [t] if t else []
+
+
+def news_para() -> list[str]:
+    """Quem recebe: as pessoas escolhidas (person.*). Do jeito antigo, "todos" vira todas as pessoas da casa."""
+    v = STORE.settings.get("news_para")
+    if isinstance(v, list):
+        return list(dict.fromkeys(x for x in v if isinstance(x, str) and PERSON_RE.fullmatch(x)))
+    t = news_notify_target()
+    if t == "todos":
+        return [p["id"] for p in news_people()] if SUPERVISOR_TOKEN or AI_MOCK else []
+    return [t] if t else []
 
 
 # -- uso da IA: o Home Assistant não devolve tokens nem custo, então o app conta as chamadas (como no EconomIA)
@@ -2757,7 +2813,7 @@ def _news_batch_run(jid: str):
             d["ultima"] = {"at": now_iso(), **summary}
             write_json_atomic(NEWS_FILE, d)
         job.update(stage="done", msg="", summary=summary, progress={"feitos": done, "total": len(todo), "atual": ""})
-        if job.get("auto") and novos and news_notify_target():
+        if job.get("auto") and novos and news_aviso() and news_para():
             try:
                 send_news_notice(len(novos))
             except ApiError as e:
@@ -2796,11 +2852,20 @@ def news_notice(n: int, test: bool = False) -> dict:
 
 
 def send_news_notice(n: int, who: str | None = None, test: bool = False) -> int:
-    """Manda o aviso para os celulares de quem foi escolhido (todos ou uma pessoa). Devolve quantos celulares receberam."""
-    who = who or news_notify_target()
-    if not WHO_RE.fullmatch(who or ""):
-        raise ApiError(400, "Escolha quem avisar.")
-    phones = news_phones(who)
+    """Manda o aviso para os celulares de quem recebe: as pessoas escolhidas em Quem recebe (sem who) ou, no Testar,
+    todos ou uma pessoa. Quem não tem celular fica de fora. Devolve quantos celulares receberam."""
+    if who:
+        if not WHO_RE.fullmatch(who):
+            raise ApiError(400, "Escolha quem avisar.")
+        phones = news_phones(who)
+    else:
+        para = news_para()
+        if not para:
+            raise ApiError(400, "Escolha quem avisar.")
+        people = {p["id"]: p for p in news_people()}
+        phones = list(dict.fromkeys(ph for x in para for ph in (people.get(x) or {}).get("phones", [])))
+        if not phones:
+            raise ApiError(400, "Ninguém escolhido tem celular ligado no Home Assistant (Configurações > Pessoas).")
     note = news_notice(n, test)
     if AI_MOCK and not SUPERVISOR_TOKEN:
         log.info("aviso simulado para %s: %s", ", ".join(phones), note["message"])  # dev/run.sh: sem Home Assistant
@@ -2918,8 +2983,9 @@ def news_phones(who: str) -> list[str]:
 
 
 def news_auto_due(now: float) -> bool:
-    """Está na hora de conferir sozinho? Pela última conferência que terminou; depois de uma tentativa que deu erro,
-    espera 6 horas para não gastar a IA à toa."""
+    """Está na hora de conferir sozinho? A cada N dias, no horário (hora local): N dias depois do dia da última
+    conferência que terminou, a partir do horário; nunca conferido, hoje a partir do horário. Depois de uma tentativa
+    que deu erro, espera 6 horas para não gastar a IA à toa."""
     every = news_every()
     if not every or not news_enabled() or not ai_enabled():
         return False
@@ -2930,7 +2996,13 @@ def news_auto_due(now: float) -> bool:
             return datetime.fromisoformat(v).timestamp() if v else 0.0
         except (TypeError, ValueError):
             return 0.0
-    return now - ts((d.get("ultima") or {}).get("at")) >= every * 86400 - 3600 and now - ts(d.get("auto_tentativa")) >= 6 * 3600
+    if now - ts(d.get("auto_tentativa")) < 6 * 3600:
+        return False
+    h, m = (int(x) for x in news_hora().split(":"))
+    agora = datetime.fromtimestamp(now)
+    last = ts((d.get("ultima") or {}).get("at"))
+    dia = (datetime.fromtimestamp(last).date() + timedelta(days=every)) if last else agora.date()
+    return agora >= datetime(dia.year, dia.month, dia.day, h, m)
 
 
 def news_auto_loop():
@@ -3371,6 +3443,7 @@ def r_data(h, query):
                 "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai_search": STORE.settings.get("ai_search") or "",
                              "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "bens": bens_enabled(), "ha_sensors": sensors_enabled(),
                              "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target(), "correria": correria_enabled(),
+                             "news_hora": news_hora(), "news_aviso": news_aviso(), "news_para": news_para_salvo(),
                              "accent": app_accent(), "accent_daily": app_accent_daily()},
                 "correria_uso": correria_uso() if correria_enabled() else None,
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
@@ -3611,6 +3684,19 @@ def r_settings_put(h, query):
         if t and not WHO_RE.fullmatch(t):
             raise ApiError(400, "Escolha quem avisar.")
         upd["news_notify"] = t
+    if "news_hora" in body:
+        if not isinstance(body["news_hora"], str) or not HORA_RE.fullmatch(body["news_hora"]):
+            raise ApiError(400, "Escolha o horário (como 09:30).")
+        upd["news_hora"] = body["news_hora"]
+    if "news_aviso" in body:
+        if not isinstance(body["news_aviso"], bool):
+            raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
+        upd["news_aviso"] = body["news_aviso"]
+    if "news_para" in body:
+        v = body["news_para"]
+        if not isinstance(v, list) or len(v) > 50 or not all(isinstance(x, str) and PERSON_RE.fullmatch(x) for x in v):
+            raise ApiError(400, "Escolha quem recebe entre as pessoas da casa.")
+        upd["news_para"] = list(dict.fromkeys(v))
     if "accent" in body:
         if body["accent"] not in ACCENTS:
             raise ApiError(400, "Escolha uma das cores do app.")

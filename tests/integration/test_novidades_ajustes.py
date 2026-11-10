@@ -61,6 +61,20 @@ class Ajustes(unittest.TestCase):
                 self.erro("PUT", "api/settings", {"news_notify": v}, 400, "Escolha quem avisar.")
         self.erro("PUT", "api/settings", {"news": "sim"}, 400, "Use verdadeiro ou falso nesta opção.")
 
+    def test_horario_aviso_e_quem_recebe(self):
+        out = self.app.ok("PUT", "api/settings", {"news_hora": "21:30", "news_aviso": True, "news_para": [ANA, "person.beto", ANA]})
+        self.assertEqual((out["news_hora"], out["news_aviso"], out["news_para"]), ("21:30", True, [ANA, "person.beto"]), "sem repetir")
+        s = self.app.data()["settings"]
+        self.assertEqual((s["news_hora"], s["news_aviso"], s["news_para"]), ("21:30", True, [ANA, "person.beto"]))
+        for v in ("9:30", "24:00", "21h30", "", None, 930):
+            with self.subTest(v=v):
+                self.erro("PUT", "api/settings", {"news_hora": v}, 400, "Escolha o horário (como 09:30).")
+        for v in ("person.ana", [PHONE], ["todos"], [3], None):
+            with self.subTest(v=v):
+                self.erro("PUT", "api/settings", {"news_para": v}, 400, "Escolha quem recebe entre as pessoas da casa.")
+        self.erro("PUT", "api/settings", {"news_aviso": "sim"}, 400, "Use verdadeiro ou falso nesta opção.")
+        self.app.ok("PUT", "api/settings", {"news_hora": "10:00", "news_aviso": False, "news_para": []})
+
     def test_pessoas(self):
         self.assertEqual(self.app.ok("GET", "api/news/people")["people"],
                          [{"id": ANA, "name": "Ana", "phone": True, "eu": False}, {"id": "person.beto", "name": "Beto", "phone": False, "eu": False},
@@ -140,7 +154,7 @@ class Sozinho(unittest.TestCase):
         return False
 
     def test_confere_e_avisa_uma_vez(self):
-        app, ha = self.subir(news_every=7, news_notify=ANA)
+        app, ha = self.subir(news_every=7, news_hora="00:00", news_aviso=True, news_para=[ANA])
         self.assertTrue(self.esperar(lambda: ha.calls("POST", "/core/api/services/notify/")), "conferiu sozinho e avisou")
         c = ha.calls("POST", "/core/api/services/notify/")
         ultima = app.ok("GET", "api/news")["ultima"]
@@ -152,13 +166,18 @@ class Sozinho(unittest.TestCase):
         time.sleep(3)
         self.assertEqual(len(ha.calls("POST", "/core/api/services/notify/")), 1, "na mesma semana, não confere de novo")
 
+    def test_do_jeito_antigo_continua_avisando(self):
+        app, ha = self.subir(news_every=7, news_hora="00:00", news_notify=ANA)
+        self.assertTrue(self.esperar(lambda: ha.calls("POST", "/core/api/services/notify/")), "quem escolheu a Ana antes da 1.43 continua avisado")
+        self.assertEqual((app.data()["settings"]["news_aviso"], app.data()["settings"]["news_para"]), (True, [ANA]))
+
     def test_sem_aviso_confere_calado(self):
-        app, ha = self.subir(news_every=7)
+        app, ha = self.subir(news_every=7, news_hora="00:00", news_para=[ANA])
         self.assertTrue(self.esperar(lambda: (app.ok("GET", "api/news")["ultima"] or {}).get("conferidos")), "conferiu sozinho")
         self.assertEqual(ha.calls("POST", "/core/api/services/notify/"), [], "sem aviso escolhido, não avisa")
 
     def test_sem_intervalo_nao_confere(self):
-        app, ha = self.subir(news_notify=ANA)
+        app, ha = self.subir(news_hora="00:00", news_aviso=True, news_para=[ANA])
         time.sleep(3)
         self.assertIsNone(app.ok("GET", "api/news")["ultima"], "Conferir sozinho: Não")
         self.assertEqual(app.ok("GET", "api/ai/usage")["today"]["calls"], 0, "e não chama a IA")

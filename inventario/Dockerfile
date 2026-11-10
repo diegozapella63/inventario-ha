@@ -9,6 +9,8 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 COPY app/ /app/
+# a versão fica só no config.yaml: o servidor lê dele (VERSION)
+COPY config.yaml /app/config.yaml
 COPY seed/ /app/seed/
 
 CMD ["python3", "/app/server.py"]

@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.43.0
+
+- **Opções › Novidades**: o aviso no celular igual ao dos outros apps da família. **Conferir sozinho** liga e desliga, com o **Horário** (sem AM/PM) e **A cada** 7, 15 ou 30 dias lado a lado; **Avisar no celular** liga o aviso; em **Quem recebe**, um botão para cada pessoa da casa (dá para escolher várias); **Testar no meu celular** fica embaixo, na largura toda. Quem já recebia o aviso continua recebendo.
+
 ## 1.42.0
 
 O padrão da família de apps:
