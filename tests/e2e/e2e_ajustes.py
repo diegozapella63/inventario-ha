@@ -161,6 +161,8 @@ async def body(r, p):
         await ctx.clock.fast_forward("02:00")  # passa da meia-noite com o app aberto
         await pg.wait_for_function("document.documentElement.dataset.accent === 'verde'", timeout=5000)
         r.eq([await pg.evaluate(ACC), await pg.evaluate(CHECKED)], ["verde", "verde"], "passou da meia-noite: a cor do dia seguinte, sem recarregar")
+        # 1.45.1: Sistema no lugar de Automático, igual em todos os apps da família
+        r.eq(await pg.locator('[data-act="theme"]').all_inner_texts(), ["Sistema", "Claro", "Escuro"], "o Tema: Sistema, Claro e Escuro")
         await pg.click('[data-act="theme"][data-theme="dark"]')
         r.eq(await pg.evaluate("document.documentElement.dataset.theme"), "dark", "tema Escuro")
         r.eq(await pg.get_attribute('[data-act="theme"][data-theme="dark"]', "aria-pressed"), "true", "o botão fica marcado")
@@ -197,7 +199,7 @@ async def body(r, p):
         r.check(not await daily.is_checked() and await pg.evaluate(CHECKED) == "indigo", "e a Cor do dia continua desligada")
         await r.shot(pg, "aparencia", full_page=True)
         await pg.click('[data-act="theme"][data-theme="auto"]')
-        r.check(await pg.evaluate("!document.documentElement.dataset.theme"), "Automático segue o celular")
+        r.check(await pg.evaluate("!document.documentElement.dataset.theme"), "Sistema segue o celular")
         await ctx.close()
         # outro aparelho: a mesma cor (a da casa), com o tema dele
         ctx, pg = await r.page(b, "cel", "light", accent=None, init="try{localStorage.setItem('inv:theme', JSON.stringify('light'))}catch(e){}")

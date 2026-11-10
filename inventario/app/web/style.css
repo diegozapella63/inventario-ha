@@ -1172,6 +1172,14 @@ dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; 
 #p-export .opts .oa { flex: 1 1 100%; }
 @media (min-width: 1000px) { .sec-acao > .btn, #p-export .opts .oa > .btn:not(.icon) { width: 250px; } #p-export .opts .oa { flex: none; } }
 #p-backup .bk-lista:empty { display: none; }
+/* cada backup como no ResolvIA: a data e a hora, embaixo o tamanho e o nome do arquivo (cortado com …, inteiro ao segurar o
+   dedo), e o Restaurar ao lado, do tamanho do texto */
+#p-backup .bk-lista > li { flex-wrap: nowrap; gap: 12px; padding: 12px 0; }
+#p-backup .bk-lista .ot { min-width: 0; }
+#p-backup .bk-lista .ot b { font-variant-numeric: tabular-nums; }
+#p-backup .bk-lista .ot b, #p-backup .bk-lista .ot span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#p-backup .bk-lista .oa { flex: none; }
+#p-backup .bk-lista .oa > .btn { width: auto; padding: 0 16px; }
 .sec-acao > .btn.danger { border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
 
 /* o aviso no celular (o mesmo componente dos apps da família): Horário e A cada lado a lado, do mesmo tamanho; Quem recebe

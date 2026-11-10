@@ -56,6 +56,11 @@
   const dfLong = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", year: "numeric" });
   const rtf = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
   const dateTime = (s) => (parseDate(s) ? dfDateTime.format(parseDate(s)) : "");
+  // a data e a hora de um backup, curta como no ResolvIA: "09/11/2026 às 21:17"
+  const shortDateTime = (s) => {
+    const t = parseDate(s), d = new Date(t), p = (n) => String(n).padStart(2, "0");
+    return t ? `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} às ${p(d.getHours())}:${p(d.getMinutes())}` : "";
+  };
   function ago(s) {
     const t = parseDate(s);
     if (!t) return "";
@@ -1735,7 +1740,7 @@
       <h2>${secIc("contrast")}Tema</h2>
       <p class="lead">Cada aparelho guarda a sua escolha.</p>
       <div class="seg themes" role="group" aria-label="Tema">
-        ${[["auto", "Automático", "phone"], ["light", "Claro", "sun"], ["dark", "Escuro", "moon"]].map(([k, v, i]) => `<button type="button" data-act="theme" data-theme="${k}" aria-pressed="${theme === k}">${ic(i)}<span>${v}</span></button>`).join("")}
+        ${[["auto", "Sistema", "phone"], ["light", "Claro", "sun"], ["dark", "Escuro", "moon"]].map(([k, v, i]) => `<button type="button" data-act="theme" data-theme="${k}" aria-pressed="${theme === k}">${ic(i)}<span>${v}</span></button>`).join("")}
       </div>
     </section>
     <section class="panel" id="p-accent">
@@ -1928,7 +1933,7 @@
         bslot.innerHTML = `<div class="sec-acao"><button class="btn primary" data-act="backup-create"${b.available === false ? " disabled" : ""}>${ic("archive")}Criar backup</button></div>
           ${b.available === false ? '<p class="help">A pasta share não está disponível.</p>' : ""}
           <ul class="opts bk-lista">
-          ${(b.backups || []).slice(0, 12).map((x) => `<li><div class="ot"><b>${esc(x.name)}</b><span>${esc(dateTime(x.date))}, ${esc(fmtSize(x.size))}</span></div>
+          ${(b.backups || []).slice(0, 12).map((x) => `<li><div class="ot"><b>${esc(shortDateTime(x.date))}</b><span title="${esc(x.name)}">${esc(fmtSize(x.size))} · ${esc(x.name)}</span></div>
             <div class="oa"><button class="btn" data-act="backup-restore" data-name="${esc(x.name)}">${ic("history")}Restaurar</button></div></li>`).join("")}
         </ul>`;
       }

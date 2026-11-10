@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.45.1
+
+- **Tema**: **Automático** agora se chama **Sistema** (segue o claro ou escuro do Home Assistant, como antes). O nome cabe ao lado do ícone e é o mesmo em todos os apps da família.
+- **Backup na pasta share**: cada backup mostra a data e a hora em destaque e, embaixo, o tamanho e o nome do arquivo; o **Restaurar** fica ao lado, como no ResolvIA.
+
 ## 1.45.0
 
 - **Uma altura só**: botões, campos, caixas de seleção, botões de escolha (as abas de Configurações, o Tema, o Tipo do bem) e as escolhas em botões têm a mesma altura, a mesma de todos os apps da família. O Tema ficou com o ícone ao lado do nome.
