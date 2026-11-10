@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.47.1
+
+- **Avisos no celular**: o título fica "InventarIA · 🆕 Novidades" e o ícone pequeno é o do app. Como todos os apps chegam como Home Assistant, agora dá para ver de qual app é cada aviso. Vale para todos os apps da família.
+
 ## 1.47.0
 
 - **Tarefas no ResolvIA**, na ficha de cada item: com **Usar equipamentos** ligado no ResolvIA (Mais › Configurações › Integrações › InventarIA, lá), a ficha mostra as tarefas abertas ligadas ao item e o botão **Nova tarefa**. Escreva o que fazer ("Trocar o filtro"), escolha a lista e o prazo (sem prazo, hoje, amanhã, em 7 ou em 30 dias) e toque em **Criar tarefa**. A tarefa entra na lista e já fica ligada ao item e ao cômodo no ResolvIA (e aparece também na CronologIA). A última lista escolhida fica lembrada.

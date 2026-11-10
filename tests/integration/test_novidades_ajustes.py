@@ -98,7 +98,7 @@ class Ajustes(unittest.TestCase):
         c = self.ha.calls("POST", "/core/api/services/notify/")
         self.assertEqual(len(c), n + 1)
         self.assertEqual(c[-1]["path"], f"/core/api/services/notify/{PHONE}", "no celular da Ana")
-        self.assertEqual((c[-1]["body"]["title"], c[-1]["body"]["message"]), ("InventarIA (teste)", "Novidades em 2 itens. Toque para abrir."))
+        self.assertEqual((c[-1]["body"]["title"], c[-1]["body"]["message"]), ("InventarIA · 🆕 Novidades (teste)", "Novidades em 2 itens. Toque para abrir."))
         self.assertEqual(self.app.ok("POST", "api/news/notify-test", {"who": "todos"})["sent"], 2, "Todos: o celular de cada pessoa")
 
     def test_testar_sem_destino_recusa(self):
@@ -162,7 +162,7 @@ class Sozinho(unittest.TestCase):
         self.assertEqual(c[0]["path"], f"/core/api/services/notify/{PHONE}")
         n = ultima["novos"]
         self.assertEqual(c[0]["body"]["message"], f"Novidades em {n} {'item' if n == 1 else 'itens'}. Toque para abrir.")
-        self.assertEqual(c[0]["body"]["title"], "InventarIA")
+        self.assertEqual(c[0]["body"]["title"], "InventarIA · 🆕 Novidades")
         time.sleep(3)
         self.assertEqual(len(ha.calls("POST", "/core/api/services/notify/")), 1, "na mesma semana, não confere de novo")
 

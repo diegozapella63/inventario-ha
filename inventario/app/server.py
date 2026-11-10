@@ -3012,7 +3012,8 @@ def news_notice(n: int, test: bool = False) -> dict:
     "/novidades" para a tela por mensagem, e a tela vai para #/novidades)."""
     link = f"{ingress_path()}/novidades" if ingress_path() else None
     msg = f"Novidades em {n} {'item' if n == 1 else 'itens'}. Toque para abrir."
-    return {"title": "InventarIA" + (" (teste)" if test else ""), "message": msg, "link": link}
+    # como em todos os apps da família, o título começa pelo nome do app (no celular, todos chegam como Home Assistant)
+    return {"title": "InventarIA · 🆕 Novidades" + (" (teste)" if test else ""), "message": msg, "link": link}
 
 
 def send_news_notice(n: int, who: str | None = None, test: bool = False) -> int:
@@ -3034,7 +3035,7 @@ def send_news_notice(n: int, who: str | None = None, test: bool = False) -> int:
     if AI_MOCK and not SUPERVISOR_TOKEN:
         log.info("aviso simulado para %s: %s", ", ".join(phones), note["message"])  # dev/run.sh: sem Home Assistant
         return len(phones)
-    data = {"tag": "inventaria-novidades", "group": "inventaria", "channel": "Novidades"}
+    data = {"tag": "inventaria-novidades", "group": "inventaria", "channel": "Novidades", "notification_icon": "mdi:tag-outline"}  # o ícone do app
     if note["link"]:
         data.update(url=note["link"], clickAction=note["link"])
     sent, err = 0, None

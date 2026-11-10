@@ -123,11 +123,11 @@ class Aviso(UnitBase):
     def test_texto(self):
         with mock.patch.object(server.socket, "gethostname", return_value="a1b2c3d4-inventario"):
             n = server.news_notice(3)
-            self.assertEqual(n["title"], "InventarIA")
+            self.assertEqual(n["title"], "InventarIA · 🆕 Novidades", "o nome do app na frente, como em todos os apps da família")
             self.assertEqual(n["message"], "Novidades em 3 itens. Toque para abrir.")
             self.assertEqual(n["link"], "/app/a1b2c3d4_inventario/novidades", "abre o app em Novidades, no Home Assistant")
             self.assertEqual(server.news_notice(1)["message"], "Novidades em 1 item. Toque para abrir.")
-            self.assertEqual(server.news_notice(2, test=True)["title"], "InventarIA (teste)")
+            self.assertEqual(server.news_notice(2, test=True)["title"], "InventarIA · 🆕 Novidades (teste)")
 
     def test_fora_do_home_assistant_sem_link(self):
         with mock.patch.object(server.socket, "gethostname", return_value="meu-computador"):
@@ -140,7 +140,8 @@ class Aviso(UnitBase):
         c = ha.calls("POST", "/core/api/services/notify/")
         self.assertEqual([x["path"] for x in c], ["/core/api/services/notify/mobile_app_celular_da_ana"], "no celular da Ana")
         b = c[0]["body"]
-        self.assertEqual((b["title"], b["message"]), ("InventarIA", "Novidades em 3 itens. Toque para abrir."))
+        self.assertEqual((b["title"], b["message"]), ("InventarIA · 🆕 Novidades", "Novidades em 3 itens. Toque para abrir."))
+        self.assertEqual(b["data"]["notification_icon"], "mdi:tag-outline", "o ícone do app")
         self.assertEqual(b["data"]["url"], "/app/local_inventario/novidades", "no iPhone, tocar abre o app em Novidades")
         self.assertEqual(b["data"]["clickAction"], "/app/local_inventario/novidades", "no Android também")
         self.assertEqual(b["data"]["tag"], "inventaria-novidades", "um aviso novo troca o anterior, não empilha")
