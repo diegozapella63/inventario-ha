@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.46.0
+
+- **Valor de hoje, com a depreciação do GerencIA**: em **Mais > Configurações > Integrações > GerencIA**, ligue **Valor de hoje** (vem desligado; o cartão aparece quando o GerencIA 1.55.0 ou mais novo está instalado). Os valores perdem, por ano, a taxa de cada categoria que está no GerencIA (eletrônicos 20%, móveis 10%, imóveis 0%…), desde a data em que o valor mudou. O Início mostra **Patrimônio hoje**, e os cômodos, a busca, os gráficos e o relatório (também o PDF) usam o valor de hoje. Na ficha, embaixo do valor de hoje, fica o valor que você informou, a data e a taxa. O valor gravado não muda.
+
 ## 1.45.1
 
 - **Tema**: **Automático** agora se chama **Sistema** (segue o claro ou escuro do Home Assistant, como antes). O nome cabe ao lado do ícone e é o mesmo em todos os apps da família.

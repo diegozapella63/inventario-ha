@@ -183,6 +183,22 @@
   const bensGroup = (it) => (it.cat === "imoveis" || it.cat === "veiculos" ? it.cat : "");
   const bensOn = () => S.settings.bens !== false; // Mais > Configurações > Opções > Usar bens (desligar não apaga)
   const correriaOn = () => S.settings.correria === true; // Mais > Configurações > Integrações > CorrerIA (desligado de início)
+  // Valor de hoje (Mais > Configurações > Integrações > GerencIA, desligado de início): com a depreciação que o GerencIA
+  // publica (a perda por ano, em %, de cada categoria; negativa: valoriza), o valor perde a taxa por ano, composta, desde
+  // a data do valor (valueAt). A mesma conta do bens.valor_hoje do GerencIA e do valor_hoje do server.py. Só na tela: o
+  // valor gravado (e o da ficha, ao editar) não muda.
+  const deprecOn = () => S.settings.deprec === true && !!(S.gerencia && S.gerencia.taxas);
+  const taxaDe = (it) => { const t = (S.gerencia && S.gerencia.taxas) || {}, c = it.cat || "outros"; return c in t ? +t[c] : 10; };
+  const diaLocal = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "")); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
+  function valorHoje(it, hoje = new Date()) {
+    const v = +it.value || 0, d0 = diaLocal(it.valueAt || it.createdAt);
+    if (!v || !deprecOn() || !d0) return v;
+    const h = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+    return v * (1 - taxaDe(it) / 100) ** (Math.max(0, Math.round((h - d0) / 864e5)) / 365.25);
+  }
+  const taxaTxt = (t) => (t > 0 ? `−${String(+t).replace(".", ",")}%` : t < 0 ? `+${String(-t).replace(".", ",")}%` : "0%");
+  const dataCurta = (s) => { const d = diaLocal(s); return d ? `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}` : ""; };
+  const vl = (it) => (D && D.vh && D.vh.has(it.id) ? D.vh.get(it.id) : valorHoje(it));
   function derive() {
     const sorted = [...S.rooms].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const area = sorted.find((r) => r.kind === "bens") || null, bens = bensOn() ? area : null;
@@ -192,11 +208,12 @@
     const byRoom = new Map(all.map((r) => [r.id, []]));
     const photoItems = new Map();
     const catTotals = new Map();
+    const vh = new Map(S.items.map((it) => [it.id, valorHoje(it)]));
     let total = 0;
     for (const it of items) {
       if (!byRoom.has(it.room)) byRoom.set(it.room, []);
       byRoom.get(it.room).push(it);
-      const v = +it.value || 0;
+      const v = vh.get(it.id) || 0;
       total += v;
       const c = CAT[it.cat] ? it.cat : "outros";
       const ct = catTotals.get(c) || { value: 0, count: 0 };
@@ -207,13 +224,13 @@
     const roomTotals = new Map();
     for (const [rid, list] of byRoom) {
       list.sort((a, b) => (a.seq || 0) - (b.seq || 0));
-      roomTotals.set(rid, list.reduce((s, i) => s + (+i.value || 0), 0));
+      roomTotals.set(rid, list.reduce((s, i) => s + (vh.get(i.id) || 0), 0));
     }
     const files = new Set();
     for (const it of items) for (const p of it.photos || []) files.add(p);
     for (const r of rooms) for (const p of r.photos || []) files.add(p.file);
     const bensItems = bens ? byRoom.get(bens.id) || [] : [], bensTotal = bens ? roomTotals.get(bens.id) || 0 : 0;
-    D = { rooms, allRooms: all, bens, bensItems, bensTotal, houseTotal: total - bensTotal, houseCount: items.length - bensItems.length, items,
+    D = { vh, rooms, allRooms: all, bens, bensItems, bensTotal, houseTotal: total - bensTotal, houseCount: items.length - bensItems.length, items,
       roomById, byRoom, roomTotals, catTotals, photoItems, total, photoCount: files.size, itemById: new Map(items.map((i) => [i.id, i])) };
   }
   const isBens = (rid) => rid === BENS_NEW || (!!D.bens && rid === D.bens.id);
@@ -282,7 +299,7 @@
     Object.assign(S, {
       rooms: d.rooms || [], items: d.items || [], rev: d.rev || 0, updatedAt: d.updatedAt, user: d.user || null,
       version: d.version || "", features: d.features || {}, settings: d.settings || {}, loaded: true, error: null, stale: false,
-      correriaUso: d.correria_uso || null,
+      correriaUso: d.correria_uso || null, gerencia: d.gerencia || null,
     });
     applyCats(d.cats);
     derive();
@@ -749,7 +766,7 @@
     const inner = `${pick === null ? thumb : `<span class="tw">${thumb}<span class="pk" aria-hidden="true">${ic("check", "sm")}</span></span>`}
       <span class="ib"><span class="nm">${hl(it.name, toks)}</span>
         <span class="meta"><span class="mt soft">${esc(tagOf(it))}</span>${where ? `<span class="z">${where}</span>` : ""}</span></span>
-      <span class="iv"><span class="val">${money(it.value)}</span>${qty !== "1" ? `<span class="qty">${esc(qtyShort(it.qty))}</span>` : ""}</span>`;
+      <span class="iv"><span class="val">${money(vl(it))}</span>${qty !== "1" ? `<span class="qty">${esc(qtyShort(it.qty))}</span>` : ""}</span>`;
     if (pick !== null) return `<li><button type="button" class="irow selr" data-act="sel-toggle" data-id="${esc(it.id)}" aria-pressed="${pick === true}"${pick === "off" ? " disabled" : ""}>${inner}</button></li>`;
     return `<li><a class="irow" href="#/i/${encodeURIComponent(it.id)}">${inner}</a></li>`;
   }
@@ -787,7 +804,7 @@
       </section>`;
     }
     const n = D.items.length;
-    const byValue = [...D.items].sort((a, b) => (b.value || 0) - (a.value || 0));
+    const byValue = [...D.items].sort((a, b) => vl(b) - vl(a));
     const recent = [...D.items].sort((a, b) => parseDate(b.createdAt) - parseDate(a.createdAt)).slice(0, 6);
     const maxRoom = Math.max(0, ...D.rooms.map((r) => D.roomTotals.get(r.id) || 0));
     const bigRoom = D.rooms.find((r) => (D.roomTotals.get(r.id) || 0) === maxRoom);
@@ -799,7 +816,7 @@
           <svg class="string" viewBox="0 0 120 140" aria-hidden="true"><path d="M36 132 C 35 104, 28 50, 25 0"/></svg>
           <div class="tag" role="img" aria-label="Patrimônio: ${esc(money(D.total))} em ${esc(plural(n, "item", "itens"))}">
             <div class="tag-body">
-              <p class="tag-label">Patrimônio</p>
+              <p class="tag-label">${deprecOn() ? "Patrimônio hoje" : "Patrimônio"}</p>
               <p class="tag-value"><span class="cur">R$</span>${numTxt(Math.round(D.total))}</p>
               <p class="tag-sub">${plural(D.houseCount, "item", "itens")} em ${plural(D.rooms.length, "cômodo", "cômodos")}${D.bensItems.length ? ` e ${plural(D.bensItems.length, "bem", "bens")}` : ""}</p>
             </div>
@@ -811,7 +828,7 @@
         ${ic("search")}<input class="input" type="search" name="q" data-input="home-q" placeholder="Buscar entre ${esc(plural(n, "item", "itens"))}" aria-label="Buscar itens" autocomplete="off" enterkeyhint="search"><kbd>/</kbd>
       </form>
       <dl class="facts">
-        ${top ? `<div><dt>${secIc("gem")}Mais valioso</dt><dd><a href="#/i/${encodeURIComponent(top.id)}">${esc(top.name)}</a></dd><dd class="fv">${money(top.value)}</dd></div>` : ""}
+        ${top ? `<div><dt>${secIc("gem")}Mais valioso</dt><dd><a href="#/i/${encodeURIComponent(top.id)}">${esc(top.name)}</a></dd><dd class="fv">${money(vl(top))}</dd></div>` : ""}
         ${bigRoom ? `<div><dt>${secIc("pie")}Maior cômodo</dt><dd><a href="#/c/${encodeURIComponent(bigRoom.id)}">${esc(bigRoom.name)}</a></dd><dd class="fv">${pctFmt(pct(maxRoom, D.houseTotal))}</dd></div>` : ""}
         ${last ? `<div><dt>${secIc("clock")}Último cadastro</dt><dd><a href="#/i/${encodeURIComponent(last.id)}">${esc(last.name)}</a></dd><dd class="fv muted">${esc(ago(last.createdAt))}</dd></div>` : ""}
         <div><dt>${secIc("images")}Fotos</dt><dd>${plural(D.photoCount, "foto guardada", "fotos guardadas")}</dd><dd class="fv"></dd></div>
@@ -824,7 +841,7 @@
     </section>
     ${D.bensItems.length ? `<section class="sec" id="home-bens">
       <div class="sec-h"><h2>${secIc("home")}Bens</h2><a class="aside" href="#/bens">Ver todos</a></div>
-      <ul class="ilist">${[...D.bensItems].sort((a, b) => (+b.value || 0) - (+a.value || 0)).slice(0, 5).map((it) => itemRow(it, { mode: "bens" })).join("")}</ul>
+      <ul class="ilist">${[...D.bensItems].sort((a, b) => vl(b) - vl(a)).slice(0, 5).map((it) => itemRow(it, { mode: "bens" })).join("")}</ul>
     </section>` : ""}
     <section class="sec">
       <div class="sec-h"><h2>${secIc("clock")}Cadastrados recentemente</h2><a class="aside" href="#/buscar?ord=new">Ver todos</a></div>
@@ -886,7 +903,7 @@
     }
     const ordered = [...groups.entries()].sort((a, b) => Math.min(...a[1].map((i) => i.seq || 0)) - Math.min(...b[1].map((i) => i.seq || 0)));
     return ordered.map(([z, its]) => `<section class="zone">
-      <div class="zone-h"><h3>${hl(z, toks)}</h3><span class="zs">${plural(its.length, "item", "itens")}<b>${moneyR(its.reduce((s, i) => s + (+i.value || 0), 0))}</b></span></div>
+      <div class="zone-h"><h3>${hl(z, toks)}</h3><span class="zs">${plural(its.length, "item", "itens")}<b>${moneyR(its.reduce((s, i) => s + vl(i), 0))}</b></span></div>
       <ul class="ilist">${its.map((it) => itemRow(it, { toks, mode: "room" })).join("")}</ul></section>`).join("");
   }
   // -- Bens (Mais > Bens): Imóveis, Veículos e Outros, cada grupo com o total
@@ -897,11 +914,11 @@
       return `<div class="mscreen"><div class="empty">${emptyMark()}<h2>Nenhum bem ainda</h2>
         <p>Casa, apartamento, terreno, carro, moto: o que tem valor e fica fora de casa.</p><div class="acts">${add}</div></div></div>`;
     }
-    const groups = BENS_GROUPS.map(([k, name]) => [name, D.bensItems.filter((it) => bensGroup(it) === k).sort((a, b) => (+b.value || 0) - (+a.value || 0))])
+    const groups = BENS_GROUPS.map(([k, name]) => [name, D.bensItems.filter((it) => bensGroup(it) === k).sort((a, b) => vl(b) - vl(a))])
       .filter(([, its]) => its.length);
     return `<div class="mscreen bens">
       ${groups.map(([name, its]) => `<section class="zone">
-        <div class="zone-h"><h3>${esc(name)}</h3><span class="zs">${plural(its.length, "bem", "bens")}<b>${moneyR(its.reduce((t, i) => t + (+i.value || 0), 0))}</b></span></div>
+        <div class="zone-h"><h3>${esc(name)}</h3><span class="zs">${plural(its.length, "bem", "bens")}<b>${moneyR(its.reduce((t, i) => t + vl(i), 0))}</b></span></div>
         <ul class="ilist">${its.map((it) => itemRow(it, { mode: name === "Outros" ? "bens" : "room" })).join("")}</ul></section>`).join("")}
     </div>`;
   }
@@ -957,18 +974,18 @@
       return s;
     };
     const cmp = {
-      rel: (a, b) => score(b) - score(a) || (b.value || 0) - (a.value || 0),
-      val: (a, b) => (b.value || 0) - (a.value || 0),
-      valasc: (a, b) => (a.value || 0) - (b.value || 0),
+      rel: (a, b) => score(b) - score(a) || vl(b) - vl(a),
+      val: (a, b) => vl(b) - vl(a),
+      valasc: (a, b) => vl(a) - vl(b),
       az: (a, b) => a.name.localeCompare(b.name, "pt-BR"),
       new: (a, b) => parseDate(b.createdAt) - parseDate(a.createdAt),
       code: (a, b) => (D.roomById.get(a.room)?.order ?? 99) - (D.roomById.get(b.room)?.order ?? 99) || (a.seq || 0) - (b.seq || 0),
-    }[ord] || ((a, b) => (b.value || 0) - (a.value || 0));
+    }[ord] || ((a, b) => vl(b) - vl(a));
     return { list: [...list].sort(cmp), toks };
   }
   function resultsHtml(q) {
     const { list, toks } = searchItems(q);
-    const sum = list.reduce((s, i) => s + (+i.value || 0), 0);
+    const sum = list.reduce((s, i) => s + vl(i), 0);
     if (!list.length) {
       const filtered = q.room || q.cat;
       return `<div class="empty">${emptyMark()}<h2>${q.q ? `Nada encontrado para “${esc(q.q)}”` : "Nenhum item com esses filtros"}</h2>
@@ -984,7 +1001,7 @@
       <ul class="ilist">${shown.map((it) => itemRow(it, { toks })).join("")}</ul>${more}`;
     }
     const n = SEL.size, all = n > 0 && n === pickable.length;
-    const selSum = pickable.reduce((s, i) => s + (SEL.has(i.id) ? +i.value || 0 : 0), 0);
+    const selSum = pickable.reduce((s, i) => s + (SEL.has(i.id) ? vl(i) : 0), 0);
     return `<div class="ssum sel"><button type="button" class="btn ghost icon sm" data-act="sel-end" aria-label="Cancelar seleção">${ic("close")}</button>
         <span class="sel-n">${n ? plural(n, "selecionado", "selecionados") : "Selecionar"}</span>${n ? `<b>${moneyR(selSum)}</b>` : ""}
         <button type="button" class="btn ghost sm" data-act="sel-all">${all ? "Nenhum" : "Todos"}</button></div>
@@ -1138,8 +1155,8 @@
           <span class="bd-bar"><span class="bd-n">${int(b.n)}</span><i style="height:${b.n ? Math.max(3, (b.n / bmax) * 100).toFixed(1) : 0}%"></i></span>
           <span class="bd-l">${esc(b.label)}</span><span class="bd-v">${b.n ? moneyK(b.v) : "–"}</span></div>`).join("")}</div>
         ${c.items.length - c.valued.length ? `<p class="muted bands-cap">${plural(c.items.length - c.valued.length, "item está", "itens estão")} sem valor.</p>` : ""}`),
-      c.valued.length && graf("top", "gem", "Itens mais valiosos", hbars(c.valued.slice(0, 10).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: D.roomById.get(i.room)?.name || "", v: +i.value || 0, share: pctTxt(+i.value || 0, T) })))),
-      nb && graf("bens", "home", "Bens", hbars(c.bens.slice(0, 10).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: { imoveis: "Imóvel", veiculos: "Veículo" }[i.cat] || CAT[i.cat] || "Outro", v: +i.value || 0, share: pctTxt(+i.value || 0, D.bensTotal) })))),
+      c.valued.length && graf("top", "gem", "Itens mais valiosos", hbars(c.valued.slice(0, 10).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: D.roomById.get(i.room)?.name || "", v: vl(i), share: pctTxt(vl(i), T) })))),
+      nb && graf("bens", "home", "Bens", hbars(c.bens.slice(0, 10).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: { imoveis: "Imóvel", veiculos: "Veículo" }[i.cat] || CAT[i.cat] || "Outro", v: vl(i), share: pctTxt(vl(i), D.bensTotal) })))),
     ].filter(Boolean) : [];
     return `
     <div class="rep-tools no-print">
@@ -1148,7 +1165,7 @@
     </div>
     <article class="report">
       <header class="rcab">${APP_ICON}<div><div class="rapp"><span class="wm">Inventar<b>IA</b></span> · inventário da casa</div>
-        <h1>Relatório do inventário</h1><p class="rmeta">${plural(D.houseCount, "item", "itens")} em ${plural(D.rooms.length, "cômodo", "cômodos")} · ${when}</p></div></header>
+        <h1>Relatório do inventário</h1><p class="rmeta">${plural(D.houseCount, "item", "itens")} em ${plural(D.rooms.length, "cômodo", "cômodos")}${deprecOn() ? " · valor de hoje" : ""} · ${when}</p></div></header>
       <div class="rtotal">
         <div><span>${nb ? "Na casa" : "Patrimônio"}</span><b>${moneyR(D.houseTotal)}</b></div>
         <div><span>Itens</span><b>${int(D.houseCount)}</b></div>
@@ -1164,7 +1181,7 @@
           <table class="rtable"><thead><tr>${withPhotos ? '<th class="t"><span class="sr">Foto</span></th>' : ""}<th>Código</th><th>Item</th>${zc ? "<th>Zona</th>" : ""}<th class="r">Qtd.</th><th class="r">Valor</th></tr></thead><tbody>
           ${its.map((it) => `<tr>${withPhotos ? `<td class="t">${it.photos && it.photos[0] ? `<img src="${esc(src(it.photos[0]))}" alt="" width="44" height="44">` : ""}</td>` : ""}
             <td class="c">${esc(tagOf(it))}</td><td>${esc(it.name)}${it.details ? `<span class="d">${esc(snippet(it.details, 140))}</span>` : ""}${withPhotos && it.photos && it.photos[0] && (it.photoSrc || {})[it.photos[0]] ? `<span class="d">Foto ilustrativa, de ${esc(siteOf(it.photoSrc[it.photos[0]]))}</span>` : ""}</td>
-            ${zc ? `<td>${esc(it.zone || "")}</td>` : ""}<td class="r">${esc(qtyClean(it.qty))}</td><td class="r">${money(it.value)}</td></tr>`).join("")}
+            ${zc ? `<td>${esc(it.zone || "")}</td>` : ""}<td class="r">${esc(qtyClean(it.qty))}</td><td class="r">${money(vl(it))}</td></tr>`).join("")}
           </tbody><tfoot><tr>${withPhotos ? "<td></td>" : ""}<td colspan="${zc ? 4 : 3}">${bens ? "Total dos bens" : "Subtotal"}</td><td class="r">${money(D.roomTotals.get(r.id) || 0)}</td></tr></tfoot></table></section>`;
       }).join("")}
       ${D.items.length ? "" : `<p class="muted">Nenhum item cadastrado.</p>`}
@@ -1282,15 +1299,15 @@
     const house = D.items.filter((i) => !isBens(i.room));
     const rooms = D.rooms.map((r) => ({ r, v: D.roomTotals.get(r.id) || 0, n: (D.byRoom.get(r.id) || []).length })).filter((x) => x.n).sort((a, b) => b.v - a.v || b.n - a.n);
     const ct = new Map();
-    for (const i of house) { const k = CAT[i.cat] ? i.cat : "outros", t = ct.get(k) || { value: 0, count: 0 }; t.value += +i.value || 0; t.count++; ct.set(k, t); }
+    for (const i of house) { const k = CAT[i.cat] ? i.cat : "outros", t = ct.get(k) || { value: 0, count: 0 }; t.value += vl(i); t.count++; ct.set(k, t); }
     const cats = [...ct].map(([k, t]) => ({ k, name: CAT[k] || "Outros", v: t.value, n: t.count })).sort((a, b) => b.v - a.v || b.n - a.n);
-    const items = [...house].sort((a, b) => (+b.value || 0) - (+a.value || 0));
-    const valued = items.filter((i) => +i.value > 0);
+    const items = [...house].sort((a, b) => vl(b) - vl(a));
+    const valued = items.filter((i) => vl(i) > 0);
     const bands = BANDS.map(([lo, hi, label]) => {
-      const list = valued.filter((i) => +i.value >= lo && +i.value < hi);
-      return { label, n: list.length, v: list.reduce((s, i) => s + (+i.value || 0), 0) };
+      const list = valued.filter((i) => vl(i) >= lo && vl(i) < hi);
+      return { label, n: list.length, v: list.reduce((s, i) => s + vl(i), 0) };
     });
-    const top10 = items.slice(0, 10).reduce((s, i) => s + (+i.value || 0), 0);
+    const top10 = items.slice(0, 10).reduce((s, i) => s + vl(i), 0);
     let acc = 0, half = 0; // quantos cômodos somam metade
     for (const x of rooms) { if (acc * 2 >= total) break; acc += x.v; half++; }
     // patrimônio mês a mês, pela data de cadastro, do primeiro mês até hoje
@@ -1300,7 +1317,7 @@
     if (months.length >= 2) {
       const now = new Date(), last = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const add = new Map();
-      for (const i of D.items) { const m = ym(i.createdAt) || months[0]; add.set(m, (add.get(m) || 0) + (+i.value || 0)); }
+      for (const i of D.items) { const m = ym(i.createdAt) || months[0]; add.set(m, (add.get(m) || 0) + vl(i)); }
       let [y, mo] = months[0].split("-").map(Number), sum = 0;
       for (let k = 0; k < 120; k++) { // até 10 anos
         const key = `${y}-${String(mo).padStart(2, "0")}`;
@@ -1310,8 +1327,8 @@
         mo++; if (mo > 12) { mo = 1; y++; }
       }
     }
-    const bens = [...D.bensItems].sort((a, b) => (+b.value || 0) - (+a.value || 0));
-    const groups = BENS_GROUPS.map(([k, name]) => ({ k, name, v: bens.filter((i) => bensGroup(i) === k).reduce((s, i) => s + (+i.value || 0), 0) })).filter((g) => g.v > 0).sort((a, b) => b.v - a.v);
+    const bens = [...D.bensItems].sort((a, b) => vl(b) - vl(a));
+    const groups = BENS_GROUPS.map(([k, name]) => ({ k, name, v: bens.filter((i) => bensGroup(i) === k).reduce((s, i) => s + vl(i), 0) })).filter((g) => g.v > 0).sort((a, b) => b.v - a.v);
     return { total, rooms, cats, items, valued, bands, top10, half, series, bens, groups, photos: house.filter((i) => (i.photos || []).length).length };
   }
   function hbars(rows) { // barras de uma cor, da maior para a menor; cada linha leva a algum lugar
@@ -1330,9 +1347,9 @@
     const nb = c.bens.length, of = nb ? "do que há em casa" : "do patrimônio";
     const roomRows = c.rooms.map((x) => ({ href: `#/c/${encodeURIComponent(x.r.id)}`, tag: `<span class="mt soft">${esc(x.r.code)}</span>`, name: x.r.name,
       sub: plural(x.n, "item", "itens"), v: x.v, share: pctTxt(x.v, T) }));
-    const bensRows = c.bens.slice(0, 10).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: { imoveis: "Imóvel", veiculos: "Veículo" }[i.cat] || CAT[i.cat] || "Outro", v: +i.value || 0, share: pctTxt(+i.value || 0, D.bensTotal) }));
+    const bensRows = c.bens.slice(0, 10).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: { imoveis: "Imóvel", veiculos: "Veículo" }[i.cat] || CAT[i.cat] || "Outro", v: vl(i), share: pctTxt(vl(i), D.bensTotal) }));
     const catRows = c.cats.map((x) => ({ href: `#/buscar?cat=${encodeURIComponent(x.k)}&ord=val`, name: x.name, sub: plural(x.n, "item", "itens"), v: x.v, share: pctTxt(x.v, T) }));
-    const topRows = c.items.slice(0, 10).filter((i) => +i.value > 0).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: D.roomById.get(i.room)?.name || "", v: +i.value || 0, share: pctTxt(+i.value || 0, T) }));
+    const topRows = c.items.slice(0, 10).filter((i) => vl(i) > 0).map((i) => ({ href: `#/i/${encodeURIComponent(i.id)}`, name: i.name, sub: D.roomById.get(i.room)?.name || "", v: vl(i), share: pctTxt(vl(i), T) }));
     const lead = (t) => `<p class="lead">${t}</p>`;
     return `<div class="mscreen charts">
     <div class="kpis">
@@ -1580,8 +1597,16 @@
   const switchHtml = (key, on, labelledby) => `<label class="switch"><input type="checkbox" role="switch" data-input="${key}" aria-labelledby="${labelledby}"${on ? " checked" : ""}><span class="track" aria-hidden="true"></span></label>`;
   function moreIntegrations() {
     const on = aiOn();
-    // na ordem da família: os outros apps (aqui, nada a ligar) › CorrerIA › IA do Home Assistant › Falar › Uso da IA › Sensores
+    // na ordem da família: os outros apps (o GerencIA, quando publica a depreciação) › CorrerIA › IA do Home Assistant ›
+    // Falar › Uso da IA › Sensores
     return `
+    ${S.gerencia && S.gerencia.taxas ? `<section class="panel" id="p-gerencia">
+      <h2>${secIc("wallet")}GerencIA</h2>
+      <ul class="opts"><li><div class="ot"><b id="deprec-h">Valor de hoje</b><span>${deprecOn()
+        ? "Ligado: os valores perdem, por ano, a taxa de cada categoria do GerencIA."
+        : "Os valores com a depreciação de cada categoria, a do GerencIA."}</span></div>
+        <div class="oa">${switchHtml("deprec-on", deprecOn(), "deprec-h")}</div></li></ul>
+    </section>` : ""}
     <section class="panel" id="p-correria">
       <h2>${secIc("flash")}CorrerIA</h2>
       <ul class="opts"><li><div class="ot"><b id="correria-h">Usar com o CorrerIA</b><span>${correriaOn()
@@ -2496,7 +2521,8 @@
               <button type="button" class="btn sm" data-act="item-edit" data-id="${esc(it.id)}">${ic("plus", "sm")}Adicionar foto</button>
               ${aiOn() ? `<button type="button" class="btn sm" data-act="web-photo" data-id="${esc(it.id)}">${ic("search", "sm")}Buscar na internet</button>` : ""}</div></div></div>`}</div>
         <div class="ihead"><h1>${esc(it.name)}</h1>
-          <div class="ival"><span class="big">${money(it.value)}</span>${n && n > 1 ? `<span class="unit">${int(n)} unidades, ${money((+it.value || 0) / n)} cada</span>` : qtyClean(it.qty) !== "1" ? `<span class="unit">${esc(qtyLabel(it.qty))}</span>` : ""}</div></div>
+          <div class="ival"><span class="big">${money(vl(it))}</span>${n && n > 1 ? `<span class="unit">${int(n)} unidades, ${money(vl(it) / n)} cada</span>` : qtyClean(it.qty) !== "1" ? `<span class="unit">${esc(qtyLabel(it.qty))}</span>` : ""}
+            ${deprecOn() && +it.value && Math.abs(vl(it) - it.value) >= 0.005 ? `<span class="unit" data-slot="valor-gravado">${esc(`${money(+it.value)} em ${dataCurta(it.valueAt || it.createdAt)}, ${taxaTxt(taxaDe(it))} ao ano`)}</span>` : ""}</div></div>
         ${it.details ? `<p class="idet">${esc(it.details)}</p>` : ""}
         ${it.flag ? `<p class="inote">${ic("info")}<span>${esc(it.flag)}</span></p>` : ""}
         <dl class="props">
@@ -3366,7 +3392,7 @@
         <div class="vside">
           ${room ? `<div class="field"><label for="v-label" style="color:#c9cfd5">Legenda</label><input id="v-label" class="input" data-v-label value="${esc(p.label || "")}" placeholder="Ex.: Estante do lado da janela" style="background:#0f1113;color:#eef0f2;border-color:#3e464e"></div>` : ""}
           <div><h3>${its.length ? plural(its.length, "item nesta foto", "itens nesta foto") : "Nenhum item usa esta foto"}</h3>
-            ${its.length ? `<ul class="vlist">${its.map((it) => `<li><a href="#/i/${encodeURIComponent(it.id)}" data-v="item"><span>${esc(it.name)}</span><span class="v">${money(it.value)}</span></a></li>`).join("")}</ul>` : ""}</div>
+            ${its.length ? `<ul class="vlist">${its.map((it) => `<li><a href="#/i/${encodeURIComponent(it.id)}" data-v="item"><span>${esc(it.name)}</span><span class="v">${money(vl(it))}</span></a></li>`).join("")}</ul>` : ""}</div>
           ${room ? `<div class="vacts">
             <button type="button" class="btn primary" data-v="additem">${ic("plus")}Adicionar item com esta foto</button>
             ${aiOn() ? `<button type="button" class="btn" data-v="catalog">${ic("scan")}Catalogar esta foto com IA</button>` : ""}
@@ -3991,20 +4017,21 @@
       if (t.checked && !newsPara().length && me) patch.news_para = [me.id];
       saveNews(patch, t.checked ? "Aviso no celular ligado" : "Aviso no celular desligado");
     }
-    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on" || k === "bens-on" || k === "correria-on") {
-      const key = { "ai-on": "ai", "zones-on": "zones", "news-on": "news", "bens-on": "bens", "correria-on": "correria" }[k] || "ha_sensors", on = t.checked;
+    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on" || k === "bens-on" || k === "correria-on" || k === "deprec-on") {
+      const key = { "ai-on": "ai", "zones-on": "zones", "news-on": "news", "bens-on": "bens", "correria-on": "correria", "deprec-on": "deprec" }[k] || "ha_sensors", on = t.checked;
       t.disabled = true;
       try {
         await API.put("api/settings", { [key]: on });
         S.settings[key] = on;
         aiCache.at = 0;
-        if (key === "bens") derive(); // os bens entram ou saem de tudo (patrimônio, busca, gráficos, relatório)
+        if (key === "bens" || key === "deprec") derive(); // os bens (ou o valor de hoje) entram ou saem de tudo (patrimônio, busca, gráficos, relatório)
         renderView(false);
         toast(key === "ai" ? (on ? "IA ligada" : "IA desligada: os botões de IA ficaram escondidos")
           : key === "ha_sensors" ? (on ? "Sensor criado no Home Assistant" : "Sensores desligados: o sensor saiu do Home Assistant")
           : key === "news" ? (on ? "Novidades ligadas" : "Novidades desligadas")
           : key === "bens" ? (on ? "Bens ligados" : "Bens desligados: os bens gravados continuam guardados")
           : key === "correria" ? (on ? "CorrerIA ligado" : "CorrerIA desligado")
+          : key === "deprec" ? (on ? "Valor de hoje ligado" : "Valor de hoje desligado")
           : on ? "Zonas ligadas" : "Zonas desligadas: as zonas gravadas continuam guardadas");
       } catch (er) { t.checked = !on; fail(er); }
       finally { t.disabled = false; }

@@ -68,8 +68,9 @@ def qtd(q):
     return re.sub(r"^~\s*", "", str(q if q is not None else "1")).strip() or "1"
 
 
-def dados(rooms, items, cats, zonas=False, fotos=True, agora=None):
-    """Os números do relatório. rooms e items: os que contam (sem os bens com Usar bens desligado); cats: {id: nome}.
+def dados(rooms, items, cats, zonas=False, fotos=True, agora=None, hoje=False):
+    """Os números do relatório. rooms e items: os que contam (sem os bens com Usar bens desligado); cats: {id: nome};
+    hoje: os valores já são os de hoje, com a depreciação do GerencIA (a contagem diz).
     Devolve o cabeçalho, os números, os gráficos e as seções (os cômodos na ordem da casa; os bens por último)."""
     agora = agora or datetime.now()
     ordem = sorted(rooms, key=lambda r: r.get("order") or 0)
@@ -124,7 +125,7 @@ def dados(rooms, items, cats, zonas=False, fotos=True, agora=None):
     return {
         "quando": f"{agora.day:02d}/{agora.month:02d}/{agora.year} às {agora.hour:02d}:{agora.minute:02d}",
         "dia": agora.strftime("%Y-%m-%d"),
-        "contagem": f"{plural(len(casa), 'item', 'itens')} em {plural(len(comodos), 'cômodo', 'cômodos')}",
+        "contagem": f"{plural(len(casa), 'item', 'itens')} em {plural(len(comodos), 'cômodo', 'cômodos')}" + (" · valor de hoje" if hoje else ""),
         "numeros": [("Na casa" if bens else "Patrimônio", brl(casa_total, False)), ("Itens", _milhar(len(casa))),
                     ("Cômodos", _milhar(len(comodos)))] + ([("Bens", brl(bens_total, False))] if bens else []),
         "casa_total": casa_total, "bens_total": bens_total, "fotos": fotos,

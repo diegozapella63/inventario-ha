@@ -161,6 +161,16 @@ A ligação é automática, sem nada para configurar aqui: o InventarIA grava `s
 - **Bens** aparece para os outros apps ao lado dos cômodos, com os bens como itens: no ResolvIA e na CronologIA, uma tarefa pode ser ligada ao carro ou à casa da praia.
 - **GerencIA** (1.19.0 ou mais novo): soma os valores dos itens e dos bens no patrimônio, como **Bens da casa** (imóveis não perdem valor; veículos perdem 15% ao ano, e dá para mudar lá). Lê o valor e a data em que ele mudou e deprecia por categoria (eletrônicos perdem mais rápido que móveis, por exemplo). Dá para desligar lá, em **Mais > Integrações > Bens no InventarIA**.
 
+## Valor de hoje (GerencIA)
+
+Com o **GerencIA** (1.55.0 ou mais novo) no mesmo Home Assistant, aparece em **Mais > Configurações > Integrações** o cartão **GerencIA**, com **Valor de hoje** (vem desligado). Ligado:
+
+- cada valor perde, por ano, a taxa da categoria dele que está no GerencIA (em **Mais › Invest › Valor dos bens por ano**, lá), composta, desde a data em que o valor mudou aqui. Uma taxa negativa valoriza (um imóvel, por exemplo); uma categoria que o GerencIA não tem perde 10%;
+- o Início mostra **Patrimônio hoje**, e os cômodos, a busca, os gráficos e o relatório (também o PDF, que diz "valor de hoje") usam o valor de hoje;
+- a ficha do item mostra o valor de hoje e, embaixo, o valor que você informou, a data e a taxa ("R$ 1.800 em 02/10/2026, −20% ao ano").
+
+O valor gravado não muda: ao editar, você vê e muda o valor que informou, e os outros apps continuam recebendo esse valor. Desligar volta tudo para o valor gravado.
+
 ## CorrerIA
 
 O **CorrerIA** é o app da família que liga o inventário ao WhatsApp, ao Claude e ao Gemini. Pelo WhatsApp ou numa conversa com o Claude ou o Gemini, dá para perguntar "quanto vale o que tem na sala?", "onde está a bicicleta?" ou pedir "cadastra uma rede de R$ 150 na varanda".

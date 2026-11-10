@@ -40,7 +40,7 @@ import urllib.request
 import zipfile
 import zlib
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from html.parser import HTMLParser
 
 import ferramentas
@@ -71,6 +71,8 @@ DATA_DIR = os.environ.get("INV_DATA", "/data")
 SEED_DIR = os.environ.get("INV_SEED", "/app/seed")
 WEB_DIR = os.environ.get("INV_WEB", "/app/web")
 SHARE_DIR = os.environ.get("INV_SHARE", "/share/inventario")
+# o arquivo do GerencIA na pasta share: a depreciação de cada categoria, para o Valor de hoje
+GERENCIA_ARQ = os.environ.get("INV_GERENCIA") or os.path.join(os.path.dirname(SHARE_DIR.rstrip("/")), "gerencia", "integracao.json")
 MEDIA_ROOT = os.environ.get("INV_MEDIA", "/media")
 PORT = int(os.environ.get("INV_PORT", "8099"))
 ALLOWED_IPS = {ip.strip() for ip in os.environ.get("INV_ALLOW", "172.30.32.2").split(",") if ip.strip()}
@@ -1158,6 +1160,49 @@ def ai_enabled() -> bool:
 
 def zones_enabled() -> bool:
     return STORE.settings.get("zones") is True
+
+
+# ---- Valor de hoje: a depreciação do GerencIA (Mais > Configurações > Integrações > GerencIA, desligado de início).
+# O GerencIA publica em share/gerencia/integracao.json a perda de valor por ano, em %, de cada categoria daqui
+# ("depreciacao": {id: %}; negativa: valoriza). Ligado, a tela, o relatório e o PDF mostram o valor de hoje: o valor
+# perde a taxa por ano, composta, desde a data do valor (valueAt), a mesma conta do bens.valor_hoje do GerencIA (e do
+# valorHoje do app.js). O valor gravado não muda, e os outros apps continuam recebendo o valor gravado.
+_ger = {"mtime": None, "taxas": None}
+
+
+def gerencia_taxas() -> dict | None:
+    try:
+        mt = os.path.getmtime(GERENCIA_ARQ)
+    except OSError:
+        return None
+    if _ger["mtime"] != mt:
+        try:
+            with open(GERENCIA_ARQ, encoding="utf-8") as f:
+                dep = (json.load(f) or {}).get("depreciacao")
+        except (OSError, ValueError, AttributeError):
+            dep = None
+        taxas = {str(k): max(-50.0, min(100.0, float(v))) for k, v in dep.items()
+                 if isinstance(v, (int, float)) and not isinstance(v, bool)} if isinstance(dep, dict) else {}
+        _ger.update(mtime=mt, taxas=taxas or None)
+    return _ger["taxas"]
+
+
+def deprec_enabled() -> bool:
+    return STORE.settings.get("deprec") is True and gerencia_taxas() is not None
+
+
+def valor_hoje(valor, valor_em, taxa, hoje=None) -> float:
+    try:
+        d0 = date.fromisoformat(str(valor_em or "")[:10])
+    except ValueError:
+        return valor
+    anos = max(0, ((hoje or date.today()) - d0).days) / 365.25
+    return valor * (1 - taxa / 100) ** anos
+
+
+def item_hoje(it: dict, taxas: dict, hoje=None) -> float:
+    v = float(it.get("value") or 0)
+    return valor_hoje(v, it.get("valueAt") or it.get("createdAt"), taxas.get(it.get("cat") or "outros", 10), hoje) if v else 0.0
 
 
 def bens_enabled() -> bool:
@@ -3444,7 +3489,8 @@ def r_data(h, query):
                              "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "bens": bens_enabled(), "ha_sensors": sensors_enabled(),
                              "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target(), "correria": correria_enabled(),
                              "news_hora": news_hora(), "news_aviso": news_aviso(), "news_para": news_para_salvo(),
-                             "accent": app_accent(), "accent_daily": app_accent_daily()},
+                             "accent": app_accent(), "accent_daily": app_accent_daily(), "deprec": STORE.settings.get("deprec") is True},
+                "gerencia": {"taxas": gerencia_taxas()} if gerencia_taxas() else None,
                 "correria_uso": correria_uso() if correria_enabled() else None,
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
     h.send_json(out)
@@ -3670,7 +3716,7 @@ def r_settings_put(h, query):
             if e and not re.fullmatch(rx, e):
                 raise ApiError(400, msg)
             upd[key] = e
-    for key in ("ai", "zones", "ha_sensors", "news", "bens", "correria"):
+    for key in ("ai", "zones", "ha_sensors", "news", "bens", "correria", "deprec"):
         if key in body:
             if not isinstance(body[key], bool):
                 raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
@@ -3724,7 +3770,13 @@ def r_relatorio_pdf(h, query):
     fotos = um("fotos", "1") != "0"
     with STORE.lock:
         rooms, items = visible_data()
-        d = relatorio.dados(json.loads(json.dumps(rooms)), json.loads(json.dumps(items)), STORE.cat_map(), zonas=zones_enabled(), fotos=fotos)
+        rooms, items, cats = json.loads(json.dumps(rooms)), json.loads(json.dumps(items)), STORE.cat_map()
+    hoje = deprec_enabled()
+    if hoje:  # o valor de hoje, só no relatório (a cópia): o gravado não muda
+        taxas = gerencia_taxas()
+        for it in items:
+            it["value"] = round(item_hoje(it, taxas), 2)
+    d = relatorio.dados(rooms, items, cats, zonas=zones_enabled(), fotos=fotos, hoje=hoje)
 
     def ler(nome):
         if not nome or not SAFE_FILE.fullmatch(nome):
