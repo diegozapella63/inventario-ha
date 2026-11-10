@@ -1280,6 +1280,17 @@ dialog.camera::backdrop { background: #000; }
 @media (pointer: coarse) { .btn:not(.icon), .btn.sm:not(.icon) { height: var(--altura); } }
 .input, .select, .sfilters .select, .sbar .q .input, .homesearch .input { height: var(--altura); }
 .more-panel .opts .oa > .btn:not(.icon), .more-panel .opts .oa > .select, .mscreen .opts .oa > .btn:not(.icon) { height: var(--altura); }
+/* 1.51.0, o padrão da família: no celular, os botões (e as escolhas) das linhas de Mais e de Configurações na largura do
+   cartão; dois lado a lado dividem a linha. A partir de 1000 px, 280 px, alinhados como antes */
+@media (max-width: 999px) {
+  .more-panel .opts .oa:has(> .btn:not(.icon)), .more-panel .opts .oa:has(> .select), .mscreen .opts .oa:has(> .btn:not(.icon)) { flex: 1 1 100%; }
+  .more-panel .opts .oa > .btn:not(.icon), .more-panel .opts .oa > .select, .mscreen .opts .oa > .btn:not(.icon) { flex: 1 1 0; width: auto; max-width: none; justify-content: center; }
+}
+/* Sem foto: Adicionar foto e Buscar na internet do mesmo tamanho, um embaixo do outro */
+.gal-acts { display: grid; grid-template-columns: minmax(0, 1fr); width: min(100%, 300px); margin: 4px auto 0; }
+.gal-acts > .btn { width: 100%; justify-content: center; }
+/* Digitalizar com IA na largura toda, embaixo do texto */
+.aibox .aih > .btn { flex: 1 1 100%; justify-content: center; }
 .chip, .quem-p, .aviso-testar { min-height: var(--altura); }
 .seg { min-height: var(--altura); align-items: stretch; }
 .seg button { height: auto; }

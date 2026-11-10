@@ -78,7 +78,10 @@ async def body(r, p):
         sizes = await pg.evaluate(BUTTONS)
         if k in ("aparencia", "opcoes", "dados"):  # tema e cor: botões de escolha; Opções: só a chave das zonas; Dados: o padrão da família (e2e_backups)
             continue
-        r.check(sizes and all(w == 280 and h == 50 for w, h, _ in sizes), f"[{k}] botões 280×50 ({sorted({(w, h) for w, h, _ in sizes})})")
+        # 1.51.0: no celular, na largura do cartão (o padrão da família); a partir de 1000 px, 280 px
+        cel = await pg.evaluate("innerWidth < 1000")
+        larg = await pg.evaluate("Math.round(document.querySelector('#view section.panel .opts > li').getBoundingClientRect().width) - 8")
+        r.check(sizes and all((abs(w - larg) <= 2 if cel else w == 280) and h == 50 for w, h, _ in sizes), f"[{k}] botões {'na largura do cartão' if cel else '280'}×50 ({sorted({(w, h) for w, h, _ in sizes})}, {larg})")
         r.check(len({x for _, _, x in sizes}) == 1, f"[{k}] alinhados pela direita ({sorted({x for _, _, x in sizes})})")
         r.check(await pg.evaluate(OVERFLOW), f"[{k}] sem rolagem para o lado")
         await r.shot(pg, f"aba-{k}", full_page=True)

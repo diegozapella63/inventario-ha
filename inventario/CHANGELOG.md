@@ -1,5 +1,12 @@
 # Mudanças
 
+## 1.51.0
+
+- **Campos de texto** (como Detalhes): dá para aumentar puxando o canto, e o tamanho fica guardado no aparelho. Aberto de novo, o campo volta do tamanho que você deixou. O mesmo vale em todos os apps da família.
+- **Botões no celular**: nas telas de Mais e de Configurações, os botões ficam na largura do cartão (como Nova categoria e Conferir novidades), igual nos outros apps. No computador, continuam com 280 px.
+- **Digitalizar com IA** ocupa a largura toda, e, num item sem foto, **Adicionar foto** e **Buscar na internet** têm o mesmo tamanho.
+- **Novidades**: **Limpar novidades** foi para o fim da tela.
+
 ## 1.50.0
 
 - **Nova tarefa**: o prazo ganhou **Outra data**, que abre o mês para escolher qualquer dia (no visual do app, sem a janela do celular).

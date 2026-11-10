@@ -1472,14 +1472,16 @@
     <section class="panel" id="p-news">
       <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos eletrônicos.</p>
       <ul class="opts"><li><div class="ot"><b>Conferir todos</b><span>A IA escolhe, entre os eletrônicos, os que vale conferir.</span></div>
-        <div class="oa"><button type="button" class="btn primary" data-act="news-all">${ic("spark")}Conferir novidades</button></div></li>
-        <li><div class="ot"><b>Limpar</b><span>Apaga as novidades encontradas e as escolhas da IA.</span></div>
-        <div class="oa"><button type="button" class="btn" data-act="news-clear">${ic("trash")}Limpar novidades</button></div></li></ul>
+        <div class="oa"><button type="button" class="btn primary" data-act="news-all">${ic("spark")}Conferir novidades</button></div></li></ul>
       <div data-slot="news-job"></div>
     </section>
     <section class="panel" id="p-news-list">
       <h2>${secIc("tag")}Equipamentos</h2>
       <div data-slot="news-list"><p class="muted">Carregando…</p></div>
+    </section>
+    <section class="panel" id="p-news-clear">
+      <ul class="opts"><li><div class="ot"><b>Limpar</b><span>Apaga as novidades encontradas e as escolhas da IA.</span></div>
+        <div class="oa"><button type="button" class="btn" data-act="news-clear">${ic("trash")}Limpar novidades</button></div></li></ul>
     </section>`;
   }
   let newsOv = null, newsJob = null, newsTimer = null, newsNums = null;
@@ -3178,7 +3180,7 @@
         <div class="dlg-b chat-b" data-slot="msgs" aria-live="polite"></div>
         <form class="chat-f" data-chat>
           <p class="chat-ctx">Sobre ${esc(chatAbout(sc))}</p>
-          <div class="chat-in"><textarea class="input" name="t" rows="1" maxlength="2000" placeholder="Pergunte o que quiser" aria-label="Mensagem" enterkeyhint="send"></textarea>
+          <div class="chat-in"><textarea class="input" name="t" rows="1" data-size="off" maxlength="2000" placeholder="Pergunte o que quiser" aria-label="Mensagem" enterkeyhint="send"></textarea>
             ${voiceReady() ? `<button type="button" class="btn icon" data-mic aria-label="Falar a pergunta">${ic("mic")}</button>` : ""}
             <button type="submit" class="btn primary icon" aria-label="Enviar">${ic("send")}</button></div>
         </form></div>`,
