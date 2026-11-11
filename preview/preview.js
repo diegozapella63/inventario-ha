@@ -182,7 +182,7 @@
     if ((m = path.match(/^api\/cats\/([a-z0-9_-]+)$/))) {
       const cats = catsOf(d), cat = cats.find((c) => c.id === m[1]);
       if (!cat) fail("Esta categoria não existe mais.", 404);
-      if (cat.id === "eletronicos") fail(`Eletrônicos é a categoria das novidades: não dá para ${method === "PUT" ? "renomear" : "apagar"}.`);
+      if (["eletronicos", "utilidades", "veiculos"].includes(cat.id)) fail(`${cat.name} é uma categoria fixa (as novidades e os recursos): não dá para ${method === "PUT" ? "renomear" : "apagar"}.`);
       if (method === "PUT") {
         const name = String(body.name || "").trim().replace(/\s+/g, " ");
         if (!name) fail("Preencha o campo nome da categoria.");
@@ -373,6 +373,28 @@
       await wait(900);
       const last = [...(body.messages || [])].reverse().find((m) => m.role === "user");
       return { reply: `Exemplo da prévia: no Home Assistant, a IA responde de verdade, com os dados desta tela.\n- Você perguntou: “${String(last ? last.text : "").slice(0, 120)}”`, entity: "ai_task.exemplo" };
+    }
+    // Recursos (1.54.0): o que o equipamento tem, ditos pela IA (aqui, um exemplo)
+    if (method === "GET" && path.startsWith("api/recursos?item=")) {
+      aiOff();
+      return (ST.rec || {})[decodeURIComponent(path.slice("api/recursos?item=".length))] || {};
+    }
+    if (method === "POST" && path === "api/recursos") {
+      aiOff();
+      const it = d.items.find((i) => i.id === body.item);
+      if (!it) fail("Item não encontrado.", 404);
+      const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");
+      ST.jobs.set(id, { at: Date.now(), rec: true, item: it.id });
+      return { id };
+    }
+    if ((m = path.match(/^api\/recursos\/([a-f0-9]+)$/))) {
+      const j = ST.jobs.get(m[1]);
+      if (method === "DELETE") { ST.jobs.delete(m[1]); return { ok: true }; }
+      if (!j) fail("Esta busca terminou. Veja de novo.", 404);
+      if (Date.now() - j.at < 1200) return { stage: "busy", msg: "Procurando os recursos…" };
+      const rec = { recursos: [{ nome: "Wi-Fi", detalhe: "Exemplo da prévia: no Home Assistant, a IA diz os recursos deste modelo." }, { nome: "Timer", detalhe: "Programa a hora de ligar e desligar." }], fonte: "", at: new Date().toISOString() };
+      ST.rec = { ...(ST.rec || {}), [j.item]: rec };
+      return { stage: "done", msg: "", rec };
     }
     if (method === "POST" && path === "api/news") {
       aiOff();

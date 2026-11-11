@@ -1658,7 +1658,7 @@
 
   // -- uso da IA (igual ao do EconomIA): hoje, 7 dias e o mês, gráfico por dia e as últimas chamadas
   let usageData = null, usageSel = null;
-  const USAGE_KIND = { foto: "Digitalizar com IA", catalogo: "Catalogar itens", busca: "Buscar foto na internet", fala: "Falar", novidades: "Novidades", triagem: "Escolher equipamentos", chat: "Conversar" };
+  const USAGE_KIND = { foto: "Digitalizar com IA", catalogo: "Catalogar itens", busca: "Buscar foto na internet", fala: "Falar", novidades: "Novidades", triagem: "Escolher equipamentos", chat: "Conversar", recursos: "Recursos" };
   const USAGE_RES = { ok: "", cota: "cota excedida", formato: "fora do formato", sem_busca: "sem busca na web", erro: "erro" };
   const WEEKDAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1907,8 +1907,8 @@
           <div class="oa"><button type="button" class="btn" data-act="cat-new">${ic("plus")}Nova categoria</button></div></li>
         ${CATS.map(([k, v]) => {
           const n = D.catTotals.get(k)?.count || 0;
-          // Eletrônicos é a categoria das novidades: fica sempre, com o mesmo nome (sem Renomear nem Apagar)
-          if (k === "eletronicos") return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}</span></div></li>`;
+          // as fixas (sem Renomear nem Apagar): Eletrônicos (as novidades) e, desde a 1.54.0, Utilidades e Veículos (os Recursos)
+          if (FIXED_CATS.includes(k)) return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}</span></div></li>`;
           return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}</span></div>
             <div class="oa"><button type="button" class="btn icon" data-act="cat-edit" data-cat="${esc(k)}" aria-label="Renomear ${esc(v)}">${ic("edit")}</button>
               ${k === "outros" ? `<span class="cat-keep" aria-hidden="true"></span>` : `<button type="button" class="btn icon danger" data-act="cat-del" data-cat="${esc(k)}" aria-label="Apagar ${esc(v)}">${ic("trash")}</button>`}</div></li>`;
@@ -2380,6 +2380,63 @@
   }
   // na ficha: o que já foi conferido aparece direto; Novidades (ou Buscar de novo) procura ali mesmo. A busca segue no
   // servidor se a ficha fechar, e o resultado fica guardado.
+  // -- Recursos (1.54.0): a IA diz o que o equipamento tem (funções, modos, conexões), em Eletrônicos, Utilidades e Veículos,
+  // só com a IA ligada. Fica guardado no servidor até o item mudar; Ver de novo pergunta outra vez.
+  const REC_CATS = "eletronicos utilidades veiculos".split(" ");
+  const FIXED_CATS = REC_CATS;
+  const recOn = (it) => aiOn() && REC_CATS.includes(it.cat);
+  const IREC = { id: null, st: null, gen: 0, timer: null };
+  function itemRecHtml(it) {
+    const st = IREC.id === it.id ? IREC.st : null;
+    const btn = (icon, label) => `<button type="button" class="btn" data-act="item-rec" data-id="${esc(it.id)}">${ic(icon)}${label}</button>`;
+    if (!st) return btn("checks", "Recursos");
+    if (st.busy) return `<div class="wbusy"><span class="spin"></span><p><b>Procurando os recursos…</b><span>Pode levar até um minuto.</span></p></div>`;
+    if (st.error) return `<h3 class="inews-h">${ic("checks")}Recursos</h3><p class="formerr">${esc(st.error)}</p>${btn("refresh", "Ver de novo")}`;
+    const r = st.r || {};
+    const list = (r.recursos || []).map((x) => `<li><b>${esc(x.nome)}</b>${x.detalhe ? `<span>${esc(x.detalhe)}</span>` : ""}</li>`).join("");
+    const src = r.fonte ? `<p class="rec-src">Fonte: <a href="${esc(r.fonte)}" target="_blank" rel="noopener">${esc(r.site || r.fonte)}</a></p>` : "";
+    return `<h3 class="inews-h">${ic("checks")}Recursos</h3><ul class="rec-list">${list}</ul>${src}${btn("refresh", "Ver de novo")}`;
+  }
+  function paintItemRec() {
+    const slot = sheet && sheet.itemId === IREC.id && $('[data-slot="item-rec"]', sheet.dlg);
+    const it = IREC.id && D.itemById.get(IREC.id);
+    if (slot && it) slot.innerHTML = itemRecHtml(it);
+  }
+  function stopItemRec() { IREC.gen++; clearTimeout(IREC.timer); }
+  function loadItemRec(it) {
+    if (IREC.id === it.id) { paintItemRec(); return; } // a ficha foi redesenhada: fica como estava
+    stopItemRec();
+    const my = IREC.gen;
+    Object.assign(IREC, { id: it.id, st: null });
+    paintItemRec();
+    API.get(`api/recursos?item=${encodeURIComponent(it.id)}`).then((r) => {
+      if (my !== IREC.gen) return;
+      IREC.st = r && r.recursos && r.recursos.length ? { r } : null;
+      paintItemRec();
+    }).catch(() => {});
+  }
+  async function searchItemRec(it) {
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return; }
+    stopItemRec();
+    const my = IREC.gen;
+    Object.assign(IREC, { id: it.id, st: { busy: true } });
+    paintItemRec();
+    const done = (st) => { if (my === IREC.gen) { IREC.st = st; paintItemRec(); } };
+    let id;
+    try { id = (await API.post("api/recursos", { item: it.id })).id; }
+    catch (e) { done({ error: e.message }); return; }
+    const poll = async () => {
+      if (my !== IREC.gen) return;
+      let st;
+      try { st = await API.get(`api/recursos/${id}`); }
+      catch (e) { done({ error: e.message }); return; }
+      if (st.stage === "busy") { if (my === IREC.gen) IREC.timer = setTimeout(poll, 1200); return; }
+      API.del(`api/recursos/${id}`).catch(() => {});
+      if (st.stage === "error") { done({ error: st.msg }); return; }
+      done({ r: st.rec });
+    };
+    poll();
+  }
   const INEWS = { id: null, st: null, gen: 0, timer: null };
   function itemNewsHtml(it) {
     const st = INEWS.id === it.id ? INEWS.st : null;
@@ -2520,8 +2577,9 @@
       sheet = openDialog({ cls: "sheet", html, routed: true, label: it.name });
       sheet.itemId = it.id;
       sheet.onRouteClose = leaveItem;
-      sheet.onClose = () => { sheet = null; stopItemNews(); INEWS.id = null; };
+      sheet.onClose = () => { sheet = null; stopItemNews(); INEWS.id = null; stopItemRec(); IREC.id = null; };
     }
+    if (recOn(it)) loadItemRec(it);
     if (newsOn() && it.cat === "eletronicos") loadItemNews(it); // as novidades são só dos eletrônicos
     if (S.resolvia) loadTarefas(it);
   }
@@ -2675,6 +2733,7 @@
           <h3 class="inews-h">${ic("checks")}Tarefas no ResolvIA</h3>
           <div data-slot="tarefas-lista" aria-live="polite">${tarefasHtml(it)}</div>
           <button type="button" class="btn" data-act="tarefa-nova" data-id="${esc(it.id)}">${ic("plus")}Nova tarefa</button></div>` : ""}
+        ${recOn(it) ? `<div class="inews irec" data-slot="item-rec" aria-live="polite">${itemRecHtml(it)}</div>` : ""}
         ${newsOn() && it.cat === "eletronicos" ? `<div class="inews" data-slot="item-news" aria-live="polite">${itemNewsHtml(it)}</div>` : ""}
       </div>
       <div class="dlg-f">
@@ -4040,6 +4099,7 @@
       case "item-edit": if (item) openEditor({ item }); break;
       case "web-photo": if (item) addWebPhoto(item); break;
       case "item-news": if (item) searchItemNews(item); break;
+      case "item-rec": if (item) searchItemRec(item); break;
       case "item-dup": if (item) openEditor({ dup: item }); break;
       case "tarefa-nova": if (item) openTarefaNova(item); break;
       case "copy-field": copyField(b.dataset.target); break;

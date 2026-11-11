@@ -86,6 +86,7 @@ DATA_FILE = os.path.join(DATA_DIR, "inventario.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 USAGE_FILE = os.path.join(DATA_DIR, "uso_ia.json")
 NEWS_FILE = os.path.join(DATA_DIR, "novidades.json")  # novidades conferidas e a escolha da IA (não entra no inventário)
+REC_FILE = os.path.join(DATA_DIR, "recursos.json")  # os recursos de cada equipamento, ditos pela IA (não entra no inventário)
 PHOTOS_DIR = os.path.join(DATA_DIR, "photos")
 THUMBS_DIR = os.path.join(DATA_DIR, "thumbs")
 HISTORY_DIR = os.path.join(DATA_DIR, "history")
@@ -103,6 +104,10 @@ CATS = {
     "vestuario": "Roupas e calçados", "utilidades": "Utilidades", "imoveis": "Imóveis", "veiculos": "Veículos", "outros": "Outros",
 }
 BENS_CATS = ("imoveis", "veiculos")  # os bens fora de casa (casa, terreno, carro); o resto vai em Outros
+# as categorias fixas (sem Renomear nem Apagar): Eletrônicos (as novidades) e, desde a 1.54.0, Utilidades e Veículos
+# (os Recursos de cada equipamento, que a IA diz)
+FIXED_CATS = ("eletronicos", "utilidades", "veiculos")
+REC_CATS = ("eletronicos", "utilidades", "veiculos")
 SAFE_CAT = re.compile(r"[a-z0-9][a-z0-9_-]{0,40}")
 SAFE_FILE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,150}\.(?:jpe?g|png|webp)")
 SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,80}")
@@ -444,6 +449,9 @@ class Store:
         cs = clean_cats(self.data.get("cats")) or default_cats()
         if not any(c["id"] == "eletronicos" for c in cs):  # a das novidades sempre existe (uma lista antiga pode não ter)
             cs.insert(0, {"id": "eletronicos", "name": CATS["eletronicos"]})
+        # 1.54.0: Utilidades também sempre existe (os Recursos dos equipamentos), antes de Outros
+        if not any(c["id"] == "utilidades" for c in cs):
+            cs.insert(next((i for i, c in enumerate(cs) if c["id"] in ("imoveis", "veiculos", "outros")), len(cs)), {"id": "utilidades", "name": CATS["utilidades"]})
         return cs
 
     def cat_map(self) -> dict:
@@ -471,8 +479,8 @@ class Store:
 
     def update_cat(self, cid: str, body: dict) -> dict:
         with self.lock:
-            if cid == "eletronicos":
-                raise ApiError(400, "Eletrônicos é a categoria das novidades: não dá para renomear.")
+            if cid in FIXED_CATS:
+                raise ApiError(400, f"{CATS[cid]} é uma categoria fixa (as novidades e os recursos): não dá para renomear.")
             cats = self.cats()
             cat = next((c for c in cats if c["id"] == cid), None)
             if not cat:
@@ -487,8 +495,8 @@ class Store:
         with self.lock:
             if cid == "outros":
                 raise ApiError(400, "A categoria Outros não pode ser apagada.")
-            if cid == "eletronicos":
-                raise ApiError(400, "Eletrônicos é a categoria das novidades: não dá para apagar.")
+            if cid in FIXED_CATS:
+                raise ApiError(400, f"{CATS[cid]} é uma categoria fixa (as novidades e os recursos): não dá para apagar.")
             cats = self.cats()
             if not any(c["id"] == cid for c in cats):
                 raise ApiError(404, "Esta categoria não existe mais.")
@@ -2899,6 +2907,133 @@ def news_save_result(iid: str, found: dict):
         write_json_atomic(NEWS_FILE, d)
 
 
+# ---------- Recursos (1.54.0): a IA diz o que um equipamento tem (funções, conexões, modos), para quem usa no dia a dia.
+# Só em Eletrônicos, Utilidades e Veículos, só com a IA ligada; o resultado fica guardado até o item mudar (nome ou detalhes).
+REC_MAX = 12
+REC_LOCK = threading.Lock()
+MOCK_REC = {"produto": "Produto de exemplo", "recursos": [
+    {"nome": "Wi-Fi", "detalhe": "Liga na rede de casa e aceita comandos pelo aplicativo do fabricante."},
+    {"nome": "Modo econômico", "detalhe": "Gasta menos energia quando não precisa da potência toda."},
+    {"nome": "Timer", "detalhe": "Programa a hora de ligar e desligar."}], "fonte": "https://www.exemplo.com.br/manual"}
+
+
+def rec_prompt(name: str, details: str) -> str:
+    links = re.findall(r"https?://[^\s<>\"']+", details or "")
+    return "\n".join(filter(None, [
+        "Você conhece os equipamentos e os veículos de uma casa no Brasil.",
+        f"Produto: {name}",
+        f"Detalhes: {details}" if details else "",
+        "",
+        "Se puder, use a busca na web: a página do fabricante, o manual ou a ficha técnica deste modelo"
+        + (f" (comece por {', '.join(links[:2])})" if links else "") + ".",
+        f"Liste os recursos que este modelo tem e que a pessoa pode usar no dia a dia (funções, modos, conexões, ajustes, "
+        f"atalhos, o que ele faz sozinho), do mais útil para o menos: no máximo {REC_MAX}, cada um com um nome curto e uma "
+        "frase em português que diz para que serve ou como usar.",
+        "Não invente: só o que este modelo tem. Sem saber o modelo exato, liste os recursos comuns dessa linha e diga isso no "
+        "primeiro detalhe.",
+        "Responda somente com um objeto JSON, sem texto antes ou depois:",
+        '{"produto": "nome do produto que você identificou", "recursos": [{"nome": "nome curto", "detalhe": "uma frase"}], '
+        '"fonte": "endereço da página usada, ou vazio"}',
+    ]))
+
+
+def rec_clean(data) -> dict:
+    if not isinstance(data, dict):
+        data = {}
+    raw = data.get("recursos") or data.get("features") or []
+    out, seen = [], set()
+    for r in raw if isinstance(raw, list) else []:
+        if isinstance(r, str):
+            r = {"nome": r}
+        if not isinstance(r, dict):
+            continue
+        nome = " ".join(str(r.get("nome") or r.get("name") or "").split())[:60]
+        if not nome or fold(nome) in seen:
+            continue
+        seen.add(fold(nome))
+        out.append({"nome": nome, "detalhe": " ".join(str(r.get("detalhe") or r.get("detail") or "").split())[:240]})
+    fonte = _fix_url(data.get("fonte") or data.get("source") or "")
+    return {"produto": " ".join(str(data.get("produto") or "").split())[:200], "recursos": out[:REC_MAX],
+            "fonte": fonte or "", "site": site_of(fonte) if fonte else ""}
+
+
+def ai_find_rec(name: str, details: str, entity: str) -> dict:
+    prompt = rec_prompt(name, details)
+    with AiCall("recursos", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
+        if AI_MOCK:
+            time.sleep(0.3)
+            data = MOCK_REC
+            call.answer(data)
+        else:
+            raw = ai_call_text("InventarIA: recursos", prompt, entity)
+            call.answer(str(raw or "") if not isinstance(raw, dict) else raw)
+            try:
+                data = raw if isinstance(raw, dict) else extract_json(raw)
+            except ApiError:
+                call.result = "formato"
+                log.info("recursos: resposta da IA fora do formato: %s", " ".join(str(raw or "").split())[:400])
+                raise ApiError(502, "A IA respondeu fora do formato. Tente de novo.") from None
+    found = rec_clean(data)
+    if not found["recursos"]:
+        raise ApiError(502, "A IA não achou os recursos deste item. Ponha a marca e o modelo no nome ou nos detalhes e tente de novo.")
+    return found
+
+
+def rec_read() -> dict:
+    d = read_json(REC_FILE, None)
+    return d if isinstance(d, dict) else {}
+
+
+def rec_of(iid: str) -> dict:
+    """Os recursos guardados de um item (vazio quando o item mudou depois)."""
+    it = STORE.item(iid)
+    r = rec_read().get(iid)
+    if not it or not isinstance(r, dict) or r.get("sig") != item_sig(it):
+        return {}
+    return {"recursos": r.get("recursos") or [], "fonte": r.get("fonte") or "", "site": r.get("site") or "", "at": r.get("at")}
+
+
+def rec_save(iid: str, found: dict):
+    with REC_LOCK:
+        d = rec_read()
+        it = STORE.item(iid)
+        d = {k: v for k, v in d.items() if STORE.item(k)}  # itens que saíram do inventário saem daqui também
+        d[iid] = {"at": now_iso(), "sig": item_sig(it) if it else "", **found}
+        write_json_atomic(REC_FILE, d)
+
+
+def _rec_job_run(jid: str, iid: str, name: str, details: str, entity: str):
+    job = WEB_JOBS[jid]
+    try:
+        found = ai_find_rec(name, details, entity)
+        if not job.get("cancelled"):
+            rec_save(iid, found)
+            job.update(stage="done", msg="", rec={**found, "at": now_iso()})
+    except ApiError as e:
+        job.update(stage="error", msg=e.msg)
+    except Exception:  # noqa: BLE001
+        log.exception("recursos")
+        job.update(stage="error", msg="Não deu para ver os recursos agora. Tente de novo em instantes.")
+
+
+def rec_job_start(body: dict) -> dict:
+    need_ai_on()
+    it = STORE.item(str(body.get("item") or ""))
+    if not it:
+        raise ApiError(404, "Item não encontrado.")
+    if it.get("cat") not in REC_CATS:
+        raise ApiError(400, "Os recursos são dos eletrônicos, das utilidades e dos veículos.")
+    if not SUPERVISOR_TOKEN and not AI_MOCK:
+        raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
+    web_jobs_cleanup()
+    jid = secrets.token_hex(8)
+    details = " ".join(str(it.get("details") or "").split())[:300]
+    with WEB_LOCK:
+        WEB_JOBS[jid] = {"stage": "busy", "msg": "Procurando os recursos…", "results": [], "at": time.time(), "kind": "recursos"}
+    threading.Thread(target=_rec_job_run, args=(jid, it["id"], it["name"], details, search_entity()), daemon=True).start()
+    return {"id": jid}
+
+
 def news_overview() -> dict:
     """O que a aba Novidades mostra: as categorias, quem a IA escolheu, o que já foi conferido e a conferência em andamento."""
     d = news_read()
@@ -3878,6 +4013,20 @@ def r_news_notify_test(h, query):
     h.send_json({"ok": True, "sent": send_news_notice(2, who, test=True)})
 
 
+def r_rec_get(h, query):
+    need_ai_on()
+    h.send_json(rec_of((query.get("item") or [""])[0]))
+
+
+def r_rec_start(h, query):
+    h.send_json(rec_job_start(h.read_body()), 202)
+
+
+def r_rec_status(h, jid, query):
+    job = web_job(jid)
+    h.send_json({"stage": job["stage"], "msg": job["msg"], "rec": job.get("rec")})
+
+
 def r_news_cancel(h, jid, query):
     job = WEB_JOBS.get(jid)
     if job:
@@ -4352,6 +4501,10 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/news/all", r_news_all),
     ("GET", r"/api/news/people", r_news_people),
     ("POST", r"/api/news/notify-test", r_news_notify_test),
+    ("GET", r"/api/recursos", r_rec_get),
+    ("POST", r"/api/recursos", r_rec_start),
+    ("GET", r"/api/recursos/([a-f0-9]{16})", r_rec_status),
+    ("DELETE", r"/api/recursos/([a-f0-9]{16})", r_news_cancel),
     ("GET", r"/api/news/([a-f0-9]{16})", r_news_status),
     ("DELETE", r"/api/news/([a-f0-9]{16})", r_news_cancel),
     ("GET", r"/api/settings", r_settings_get),

@@ -1,5 +1,5 @@
 name: InventarIA
-version: "1.53.0"
+version: "1.54.0"
 slug: inventario
 description: Inventário da casa com fotos, valores, relatório em PDF e leitura de fotos por IA.
 url: "https://github.com/diegozapella63/inventario-ha/tree/main/inventario"

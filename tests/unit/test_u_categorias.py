@@ -258,14 +258,17 @@ class EletronicosFicaSempre(UnitBase):
 
     def test_lista_guardada_sem_eletronicos_ganha_de_volta(self):
         self.store.data["cats"] = [{"id": "moveis", "name": "Móveis"}, {"id": "outros", "name": "Outros"}]
-        self.assertEqual([c["id"] for c in self.store.cats()], ["eletronicos", "moveis", "outros"])
+        self.assertEqual([c["id"] for c in self.store.cats()], ["eletronicos", "moveis", "utilidades", "outros"], "1.54.0: Utilidades também volta")
 
     def test_nao_renomeia_nem_exclui(self):
-        for f, args, msg in ((self.store.update_cat, ("eletronicos", {"name": "Aparelhos"}), "renomear"), (self.store.delete_cat, ("eletronicos",), "apagar")):
-            with self.assertRaises(S.ApiError) as e:
-                f(*args)
-            self.assertEqual((e.exception.status, e.exception.msg), (400, f"Eletrônicos é a categoria das novidades: não dá para {msg}."))
-        self.assertEqual(self.store.cat_map()["eletronicos"], "Eletrônicos")
+        # 1.54.0: Utilidades e Veículos também são fixas (os Recursos)
+        self.store.data["cats"] = S.default_cats() + ([] if any(c["id"] == "veiculos" for c in S.default_cats()) else [{"id": "veiculos", "name": "Veículos"}])
+        for cid, nome in (("eletronicos", "Eletrônicos"), ("utilidades", "Utilidades"), ("veiculos", "Veículos")):
+            for f, args, msg in ((self.store.update_cat, (cid, {"name": "Aparelhos"}), "renomear"), (self.store.delete_cat, (cid,), "apagar")):
+                with self.assertRaises(S.ApiError) as e:
+                    f(*args)
+                self.assertEqual((e.exception.status, e.exception.msg), (400, f"{nome} é uma categoria fixa (as novidades e os recursos): não dá para {msg}."))
+            self.assertEqual(self.store.cat_map()[cid], nome)
 
 
 if __name__ == "__main__":

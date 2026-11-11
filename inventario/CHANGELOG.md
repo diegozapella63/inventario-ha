@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.54.0
+
+- **Recursos**: na ficha de um eletrônico, de uma utilidade ou de um veículo, o botão **Recursos** pede à IA o que o equipamento tem (funções, modos, conexões, ajustes), cada um com uma frase de para que serve. A lista fica guardada na ficha, com a fonte, até o item mudar; **Ver de novo** pergunta outra vez. Só com a IA ligada; entra no Uso da IA.
+- **Utilidades e Veículos fixas**: como Eletrônicos, sempre estão em Mais › Categorias, sem Renomear nem Apagar.
+
 ## 1.53.0
 
 - **Início agora se chama Agora** (a aba, a barra lateral e o título), com o ícone do relógio, como a primeira aba de todos os apps da família.

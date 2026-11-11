@@ -56,14 +56,14 @@ class Categorias(UnitBase):
         self.store.data["cats"] = [{"id": "moveis", "name": "Móveis"}, {"id": "eletronicos", "name": "Aparelhos"}, {"id": "outros", "name": "Outros"}]
         antes = {i["id"]: (i["cat"], i["value"]) for i in self.store.data["items"]}
         self.store.create_room({"kind": "bens"})
-        self.assertEqual([c["id"] for c in self.store.cats()], ["moveis", "eletronicos", "imoveis", "veiculos", "outros"])
+        self.assertEqual([c["id"] for c in self.store.cats()], ["moveis", "eletronicos", "utilidades", "imoveis", "veiculos", "outros"])
         self.assertEqual(self.store.cat_map()["eletronicos"], "Aparelhos", "o nome que a casa deu continua")
         self.assertEqual({i["id"]: (i["cat"], i["value"]) for i in self.store.data["items"]}, antes, "nenhum item muda")
 
     def test_lista_editada_com_imoveis_nao_repete(self):
         self.store.data["cats"] = [{"id": "imoveis", "name": "Casas"}, {"id": "outros", "name": "Outros"}]
         self.store.create_room({"kind": "bens"})
-        self.assertEqual([(c["id"], c["name"]) for c in self.store.cats()], [("eletronicos", "Eletrônicos"), ("imoveis", "Casas"), ("veiculos", "Veículos"), ("outros", "Outros")],
+        self.assertEqual([(c["id"], c["name"]) for c in self.store.cats()], [("eletronicos", "Eletrônicos"), ("utilidades", "Utilidades"), ("imoveis", "Casas"), ("veiculos", "Veículos"), ("outros", "Outros")],
                          "Eletrônicos (a das novidades) sempre existe")
 
     def test_lista_padrao_continua_padrao(self):

@@ -471,7 +471,7 @@ class Importar(DadosCase):
 
     def test_categorias_validas_ficam_e_invalidas_voltam_ao_padrao(self):
         self.app.ok("POST", "api/import", {"data": casa(cats=[{"id": "ferramentas", "name": "Ferramentas"}, {"id": "Inválida!", "name": "x"}])})
-        self.assertEqual(self.app.data()["cats"], [{"id": "eletronicos", "name": "Eletrônicos"}, {"id": "ferramentas", "name": "Ferramentas"}, {"id": "outros", "name": "Outros"}],
+        self.assertEqual(self.app.data()["cats"], [{"id": "eletronicos", "name": "Eletrônicos"}, {"id": "ferramentas", "name": "Ferramentas"}, {"id": "utilidades", "name": "Utilidades"}, {"id": "outros", "name": "Outros"}],
                          "Eletrônicos (a das novidades) sempre existe")
         self.app.ok("POST", "api/import", {"data": casa(cats=[{"id": "Inválida!", "name": "x"}])})
         self.assertEqual(len(self.app.data()["cats"]), 15)

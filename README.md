@@ -34,6 +34,7 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 - **Falar**: o microfone no alto da tela. Fale os itens e quanto valem; o Home Assistant transcreve com a fala para texto que você escolher (ou a do Assist) e a IA separa os itens para você conferir.
 - **Uso da IA**: chamadas de hoje, da semana e do mês, gráfico por dia, últimas chamadas com tokens estimados e, se você ligar, o sensor `sensor.inventaria_ia_hoje` no Home Assistant.
 - **Fotos da internet**: num item sem foto, a IA procura o produto no fabricante e nas lojas e o app mostra as fotos para você escolher. A foto fica marcada como ilustrativa, com o site de onde veio. Na mesma busca, a IA traz nome, detalhes, categoria e valor para preencher o item.
+- **Recursos** de cada eletrônico, utilidade ou veículo: a IA diz o que o equipamento tem (funções, modos, conexões), com a fonte.
 - **Novidades** de cada item ou de todos os eletrônicos de uma vez (a IA escolhe quais): atualizações, lançamentos, modelo novo, recalls e fim de suporte, com a fonte de cada um. Pode conferir sozinho a cada 7, 15 ou 30 dias, no horário que você escolher, e avisar no celular das pessoas da casa que você escolher quando achar algo novo.
 - **Conversar** com a IA a qualquer momento, ao lado do microfone, sobre o que está na tela ou qualquer outro assunto.
 - **Buscar** por nome, marca ou detalhe, sem se importar com acentos, com filtros por cômodo e categoria, e **Selecionar** para alterar o cômodo, a categoria e a zona de vários itens de uma vez.
