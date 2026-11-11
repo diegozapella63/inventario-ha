@@ -1281,6 +1281,9 @@ dialog.camera::backdrop { background: #000; }
 .btn:not(.icon), .btn.sm:not(.icon) { height: var(--altura); }
 @media (pointer: coarse) { .btn:not(.icon), .btn.sm:not(.icon) { height: var(--altura); } }
 .input, .select, .sfilters .select, .sbar .q .input, .homesearch .input { height: var(--altura); }
+/* 1.53.0: a text of one line that can be long (the name, the note, the task, the hint for the AI) shows all of it, growing
+   with the text; the corner makes it bigger (textareas.js), like the other apps of the family */
+textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh; padding: 12px; field-sizing: content; resize: vertical; display: block; line-height: 1.4; }
 .more-panel .opts .oa > .btn:not(.icon), .more-panel .opts .oa > .select, .mscreen .opts .oa > .btn:not(.icon) { height: var(--altura); }
 /* 1.51.0, o padrão da família: no celular, os botões (e as escolhas) das linhas de Mais e de Configurações na largura do
    cartão; dois lado a lado dividem a linha. A partir de 1000 px, 280 px, alinhados como antes */

@@ -612,7 +612,7 @@
     el.innerHTML = `
       <a class="brand" href="#/">${BRAND}<span class="brand-name">InventarIA</span></a>
       <nav class="nav" aria-label="Seções">
-        <a href="#/"${cr("home")}>${ic("home")}Início</a>
+        <a href="#/"${cr("home")}>${ic("clock")}Agora</a>
         <a href="#/buscar"${cr("search")}>${ic("search")}Buscar<kbd>/</kbd></a>
         <a href="#/comodos"${cr("rooms")}>${ic("rooms")}Cômodos</a>
         <a href="#/relatorio"${cr("report")}>${ic("report")}Relatório</a>
@@ -629,7 +629,7 @@
 
   function viewTitle(r) {
     if (r.name === "room") return D.roomById.get(r.id)?.name || "Cômodo";
-    return { home: "Início", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", bens: "Bens", charts: "Gráficos", news: "Novidades", cats: "Categorias", data: "Configurações", about: "Sobre" }[r.name] || "InventarIA";
+    return { home: "Agora", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", bens: "Bens", charts: "Gráficos", news: "Novidades", cats: "Categorias", data: "Configurações", about: "Sobre" }[r.name] || "InventarIA";
   }
   // Topo de cada tela, igual nos apps da família (EconomIA, ResolvIA): nome do app com "IA" na cor
   // do app, saudação ao usuário do Home Assistant e o título grande da tela.
@@ -2571,7 +2571,7 @@
       html: `<div class="dlg"><div class="dlg-h"><h2>Nova tarefa</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-tn><div class="form">
           <p class="muted" style="margin:0">${esc(it.name)}</p>
-          <div class="field"><label for="tn-nome">Tarefa</label><input id="tn-nome" class="input" name="tarefa" maxlength="255" placeholder="Ex.: Trocar o filtro" autocomplete="off"></div>
+          <div class="field"><label for="tn-nome">Tarefa</label><textarea id="tn-nome" class="input grow" rows="1" name="tarefa" maxlength="255" placeholder="Ex.: Trocar o filtro" autocomplete="off"></textarea></div>
           <div class="field"><span class="lbl" id="tn-l-lista">Lista</span>
             <div class="chips grid" role="radiogroup" aria-labelledby="tn-l-lista" data-slot="tn-listas"><p class="muted">Carregando…</p></div></div>
           <div class="field" data-tn-prazo hidden><span class="lbl" id="tn-l-prazo">Prazo</span>
@@ -2780,7 +2780,7 @@
             <div class="field"><span class="lbl">Fotos</span><div class="phs" data-slot="photos"></div>
               ${COARSE ? "" : `<p class="help">Também dá para arrastar ou colar (Ctrl+V).</p>`}</div>
             ${aiOn() ? `<div class="aibox" data-slot="ai"></div>` : ""}
-            <div class="field"><label for="f-name">Nome</label><input id="f-name" class="input" name="name" maxlength="200" value="${esc(F.name)}" placeholder="${bem ? "Ex.: Apartamento na praia" : "Ex.: Cafeteira Nespresso Inissia"}" enterkeyhint="next">
+            <div class="field"><label for="f-name">Nome</label><textarea id="f-name" class="input grow" rows="1" name="name" maxlength="200" placeholder="${bem ? "Ex.: Apartamento na praia" : "Ex.: Cafeteira Nespresso Inissia"}" enterkeyhint="next">${esc(F.name)}</textarea>
               <p class="err" data-err="name" hidden></p></div>
             <div class="field"><label for="f-details">Detalhes</label><textarea id="f-details" class="textarea" name="details" rows="3" maxlength="4000" placeholder="${bem ? "Endereço, modelo, ano e estado" : "Marca, modelo, cor, tamanho e estado"}">${esc(F.details)}</textarea></div>
             ${bem ? `<div class="field"><span class="lbl" id="f-tipo-l">Tipo</span><div class="seg tipo" role="group" aria-labelledby="f-tipo-l" data-slot="tipo">${tipoBtns()}</div></div>`
@@ -2792,7 +2792,7 @@
                 <p class="unit-hint" data-slot="unit"></p><p class="err" data-err="value" hidden></p></div>
             </div>
             <details class="more-fields"${F.flag ? " open" : ""}><summary>${ic("chev", "sm")}Observação</summary>
-              <div class="form"><div class="field"><label for="f-flag" class="sr">Observação</label><input id="f-flag" class="input" name="flag" maxlength="200" value="${esc(F.flag)}" placeholder="Algo para lembrar sobre este item"></div></div></details>
+              <div class="form"><div class="field"><label for="f-flag" class="sr">Observação</label><textarea id="f-flag" class="input grow" rows="1" name="flag" maxlength="200" placeholder="Algo para lembrar sobre este item">${esc(F.flag)}</textarea></div></div></details>
             <div class="formerr" data-slot="formerr" hidden></div>
           </div>
         </form>
@@ -2840,7 +2840,7 @@
       }
       box.innerHTML = `<div class="aih"><p>A IA lê a primeira foto e preenche os campos.</p>
           <button type="button" class="btn" data-ed="ai">${ic("scan")}Digitalizar com IA</button></div>
-        <input class="input" data-ed-hint placeholder="Dica para a IA (opcional), ex.: é uma cafeteira Oster" value="${esc(F.hint)}" maxlength="300" style="height:40px">`;
+        <textarea class="input grow" rows="1" data-ed-hint placeholder="Dica para a IA (opcional), ex.: é uma cafeteira Oster" maxlength="300" aria-label="Dica para a IA">${esc(F.hint)}</textarea>`;
     };
     const showErr = (msg) => { const el = slot("formerr"); el.hidden = !msg; el.innerHTML = msg || ""; if (msg) el.scrollIntoView({ block: "nearest", behavior: "smooth" }); };
     const fieldErr = (name, msg) => {
@@ -3311,7 +3311,7 @@
             ${zonesUse ? `<div class="field"><label for="c-zone">Zona (opcional)</label><input id="c-zone" class="input" data-ct-in="zone" data-sug="c-zones" value="${esc(C.zone)}" placeholder="Deixe vazio para a IA sugerir" autocomplete="off">
               <datalist id="c-zones">${zonesOf(C.room).map((z) => `<option value="${esc(z)}">`).join("")}</datalist></div>` : ""}
           </div>
-          <div class="field"><label for="c-hint">Dica para a IA (opcional)</label><input id="c-hint" class="input" data-ct-in="hint" value="${esc(C.hint)}" maxlength="300" placeholder="Ex.: são taças de cristal; o vaso é de cerâmica" autocomplete="off"></div>
+          <div class="field"><label for="c-hint">Dica para a IA (opcional)</label><textarea id="c-hint" class="input grow" rows="1" data-ct-in="hint" maxlength="300" placeholder="Ex.: são taças de cristal; o vaso é de cerâmica" autocomplete="off">${esc(C.hint)}</textarea></div>
         </div>`;
         foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
           <button type="button" class="btn primary" data-ct="read"${C.file ? "" : " disabled"}>${ic("scan")}Digitalizar com IA</button>`;
@@ -4180,6 +4180,14 @@
       finally { t.disabled = false; }
     }
   });
+  // 1.53.0: a text of one line in a box that shows all of it (textarea.grow): Enter doesn't break the line; inside a form
+  // it sends the form, as the field of one line did (a field with its own Enter, like the hint for the AI, goes first)
+  document.addEventListener("keydown", (e) => {
+    const t = e.target;
+    if (e.key !== "Enter" || e.shiftKey || e.isComposing || e.defaultPrevented || !(t instanceof HTMLTextAreaElement) || !t.classList.contains("grow")) return;
+    e.preventDefault();
+    if (t.form && t.form.requestSubmit) t.form.requestSubmit();
+  });
   document.addEventListener("keydown", (e) => {
     const tabBtn = e.target.closest && e.target.closest('.more-tabs [role="tab"]');
     if (tabBtn && ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
@@ -4204,7 +4212,7 @@
       else { focusSearch = true; nav("#/buscar"); }
     } else if (e.key === "n" || e.key === "N") { e.preventDefault(); openEditor({ room: base.name === "room" ? base.id : null }); }
   });
-  // Arrastar para o lado troca de aba no celular, como no ResolvIA e no CronologIA: Início ⇄ Buscar ⇄ Cômodos ⇄ Mais.
+  // Arrastar para o lado troca de aba no celular, como no ResolvIA e no CronologIA: Agora ⇄ Buscar ⇄ Cômodos ⇄ Mais.
   // Dentro de um cômodo, arrastar para a direita volta para Cômodos; no relatório, para Mais. Não vale começando na
   // borda da tela (é o Voltar do celular), num campo, numa fileira que rola para o lado ou com uma janela aberta.
   const SWIPE_TABS = [["home", "#/"], ["search", "#/buscar"], ["rooms", "#/comodos"], ["menu", "#/mais"]];

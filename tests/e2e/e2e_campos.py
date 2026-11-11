@@ -20,6 +20,8 @@ async def body(r, p):
     add = await pg.evaluate("""() => { const b = document.querySelector('.tabbar .tab-add'), c = (e) => { const r = e.getBoundingClientRect(); return r.top + r.height / 2; };
       return [b.textContent.trim(), b.getAttribute('aria-label'), Math.round(Math.abs(c(b.querySelector('.plus')) - c(document.querySelector('.tabbar [data-tab=home] .ic')) - 0))]; }""")
     r.check(add[0] == "" and add[1] == "Adicionar", f"Adicionar só com o + ({add})")
+    first = (await pg.text_content(".tabbar [data-tab=home]")).strip()
+    r.eq([first, (await pg.text_content(".page-title, h1")).strip() if await pg.locator(".page-title, h1").count() else ""][0], "Agora", "1.53.0: a primeira aba é Agora, como em todos os apps")
     await r.shot(pg, "barra")
     # Detalhes: aumentado, fica do tamanho na próxima vez
     await r.open(pg, f"#/i/{it['id']}", ".ihead")
@@ -35,6 +37,15 @@ async def body(r, p):
     await pg.wait_for_selector("#f-details")
     h = await pg.eval_on_selector("#f-details", "(e) => Math.round(parseFloat(e.style.height))")
     r.eq(h, 240, "aberto de novo, do tamanho que ficou")
+    # 1.53.0: o Nome mostra o texto todo (cresce com o texto) e o Enter salva, como antes
+    nome = "Cafeteira expresso automática com moedor de grãos, vaporizador de leite e reservatório de dois litros"
+    await pg.fill("#f-name", nome)
+    grown = await pg.eval_on_selector("#f-name", "(e) => [e.tagName, e.scrollHeight <= e.clientHeight + 2, e.clientHeight > 50]")
+    r.eq(grown, ["TEXTAREA", True, True], "o Nome longo à vista, inteiro")
+    await pg.press("#f-name", "Enter")
+    await pg.wait_for_timeout(800)
+    saved = next((i for i in r.data()["items"] if i["id"] == it["id"]), {}).get("name")
+    r.eq(saved, nome, "o Enter salva o item, sem quebrar a linha")
     # Digitalizar com IA na largura toda (com uma foto); sem foto, os dois botões do mesmo tamanho
     await pg.keyboard.press("Escape")
     await pg.wait_for_timeout(300)

@@ -5,7 +5,7 @@
 Um App do Home Assistant para fazer o **inventário da casa**: cômodos, itens, **fotos e valores**, com **relatório em PDF** e **leitura de fotos por IA**, pela integração de IA que você já usa no Home Assistant.
 
 <p align="center">
-  <img src="docs/inicio.png" width="24%" alt="Início com a etiqueta do patrimônio e os destaques">
+  <img src="docs/inicio.png" width="24%" alt="Agora com a etiqueta do patrimônio e os destaques">
   <img src="docs/graficos.png" width="24%" alt="Gráficos com o patrimônio e o valor de cada cômodo">
   <img src="docs/comodo.png" width="24%" alt="Sala de estar com fotos e itens por zona">
   <img src="docs/ia.png" width="24%" alt="Itens que a IA encontrou na foto de uma estante">
@@ -27,7 +27,7 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 
 ## O que tem
 
-- **Início** com a etiqueta do patrimônio, a busca, o item mais valioso, o maior cômodo, os últimos cadastros e a parte de cada cômodo no total.
+- **Agora** (a primeira aba) com a etiqueta do patrimônio, a busca, o item mais valioso, o maior cômodo, os últimos cadastros e a parte de cada cômodo no total.
 - **Cômodos** com foto, número de itens e valor. Em **Organizar**, as setas mudam a ordem. Cada foto do cômodo mostra os itens que estão nela. Se quiser, ligue as **zonas** para separar os itens de cada cômodo (sofá, estante, bancada), com o subtotal de cada uma.
 - **Cadastro de itens** com várias fotos (câmera, galeria, arrastar ou colar), quantidade e valor, e **categorias** que você renomeia, cria ou apaga. Na ficha do item, **Duplicar**, **Mover** e **Apagar**, com Desfazer.
 - **Leitura de fotos por IA**: a IA preenche um item a partir da foto, ou lista tudo o que aparece numa foto de prateleira, e você confere antes de salvar. Funciona com Anthropic Claude, OpenAI, Google Gemini ou um modelo local no Ollama, pela ação `ai_task.generate_data` do Home Assistant. Quem não quiser IA desliga numa chave e os botões somem.

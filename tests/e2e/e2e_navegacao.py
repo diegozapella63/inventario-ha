@@ -127,7 +127,7 @@ async def body(r, p):
     ctx, pg = await r.page(b, "pc", "light")
     await r.open(pg, "#/", ".tag")
     links = await pg.evaluate("[...document.querySelectorAll('.side nav a')].map(a => a.textContent.trim())")
-    r.check([x.rstrip("/") for x in links[:5]] == ["Início", "Buscar", "Cômodos", "Relatório", "Mais"] and links[1].endswith("/"),
+    r.check([x.rstrip("/") for x in links[:5]] == ["Agora", "Buscar", "Cômodos", "Relatório", "Mais"] and links[1].endswith("/"),
             f"menu lateral, com o atalho / da busca ({links})")
     await pg.click('.side .side-room >> nth=2')
     await pg.wait_for_timeout(300)

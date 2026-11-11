@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.53.0
+
+- **Início agora se chama Agora** (a aba, a barra lateral e o título), com o ícone do relógio, como a primeira aba de todos os apps da família.
+- **Campos que mostram o texto todo**: o **Nome** e o **Para lembrar** do item, a **Tarefa** da Nova tarefa e as dicas para a IA crescem com o texto (nada cortado) e aumentam puxando o canto; o Enter continua salvando.
+
 ## 1.52.0
 
 - **Adicionar só com o +**: o botão do meio da barra de baixo fica só com o ícone, sem o texto embaixo, como em todos os apps da família.

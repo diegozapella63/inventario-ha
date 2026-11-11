@@ -43,7 +43,7 @@ async def body(r, p):
         nav = await pg.evaluate("[...document.querySelectorAll('.side .nav a')].map(a => a.textContent.trim())")
         r.check(m["side"]["l"] == 0 and m["side"]["w"] == 272 and m["side"]["h"] == m["vh"] and not m["tabbar"] and not m["brandWord"],
                 f"{tag} barra lateral de 272 px na altura toda, sem a barra de abas embaixo nem o nome no alto")
-        r.eq(nav, ["Início", "Buscar/", "Cômodos", "Relatório", "Mais"], f"{tag} as seções na barra lateral, com o atalho / do Buscar")
+        r.eq(nav, ["Agora", "Buscar/", "Cômodos", "Relatório", "Mais"], f"{tag} as seções na barra lateral, com o atalho / do Buscar")
         rooms = await pg.evaluate("[...document.querySelectorAll('.side a.side-room')].map(a => [...a.children].map(c => c.textContent.trim()))")
         r.eq(rooms, want_rooms, f"{tag} os cômodos na ordem da casa, com o código e o valor")
         r.check(await pg.text_content(".side-h span") == "6" and (await pg.text_content(".side-foot")).strip() == f"Versão {d['version']}", f"{tag} quantos cômodos e a versão no pé")
