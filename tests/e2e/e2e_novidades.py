@@ -27,15 +27,18 @@ async def body(r, p):
 
     await r.open(pg, "#/i/sal-007", "dialog.sheet h1")
     btn = pg.locator('dialog.sheet [data-act="item-news"]')
-    r.eq(await btn.count(), 1, "a ficha tem o botão Novidades")
-    r.eq((await btn.text_content()).strip(), "Novidades", "com o nome curto")
+    r.eq(await btn.count(), 1, "a ficha tem o botão das Novidades")
+    r.eq((await btn.text_content()).strip(), "Buscar novidades", "Buscar novidades")
+    # 1.55.0: uma seção com título antes de buscar, como Tarefas no ResolvIA (antes, só o botão)
+    r.eq((await pg.text_content('dialog.sheet [data-slot="item-news"] .inews-h')).strip(), "Novidades", "a seção já tem o título antes de buscar")
+    r.eq((await pg.text_content('dialog.sheet [data-slot="item-news"] > .muted')).strip(), "Atualizações, recalls e modelos novos.", "e diz o que vem ali")
     await btn.click()
     await pg.wait_for_selector("dialog.sheet .inews .wbusy", timeout=4000)
     r.check("Procurando novidades" in await pg.text_content("dialog.sheet .inews .wbusy"), "enquanto busca, diz o que faz, na própria ficha")
     r.eq(await pg.locator("dialog.modal").count(), 0, "sem abrir outra janela")
     await r.shot(pg, "buscando")
     await pg.wait_for_selector("dialog.sheet .news li", timeout=10000)
-    r.eq((await pg.text_content("dialog.sheet .inews-h")).strip(), "Novidades", "as novidades aparecem na ficha, com título")
+    r.eq((await pg.text_content('dialog.sheet [data-slot="item-news"] .inews-h')).strip(), "Novidades", "as novidades aparecem na ficha, com título")
     rows = await pg.evaluate("""[...document.querySelectorAll('dialog.sheet .news li')].map(li => ({
         tipo: [...li.querySelectorAll('.pill')].map(p => p.textContent), data: li.querySelector('.news-date')?.textContent || '',
         titulo: li.querySelector('b').textContent, site: li.querySelector('a').textContent, href: li.querySelector('a').href,
@@ -53,7 +56,7 @@ async def body(r, p):
     r.check(foot.startswith("Buscado hoje"), f"quando foi buscado ({foot.strip()})")
     r.eq((await btn.text_content()).strip(), "Buscar de novo", "o botão vira Buscar de novo")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
-    await pg.locator("dialog.sheet .inews").scroll_into_view_if_needed()
+    await pg.locator('dialog.sheet [data-slot="item-news"]').scroll_into_view_if_needed()
     await r.shot(pg, "lista")
 
     # fechar e abrir a ficha: as novidades já aparecem, sem chamar a IA
@@ -72,7 +75,7 @@ async def body(r, p):
     await r.open(pg, "#/i/sal-009", "dialog.sheet h1")
     await pg.wait_for_timeout(400)
     r.eq(await pg.locator("dialog.sheet .news li").count(), 0, "outro item, sem as novidades do anterior")
-    r.eq((await pg.text_content('dialog.sheet [data-act="item-news"]')).strip(), "Novidades", "só o botão")
+    r.eq((await pg.text_content('dialog.sheet [data-act="item-news"]')).strip(), "Buscar novidades", "ainda não buscado")
 
     # fechar a ficha no meio da busca: a busca termina e fica guardada
     await pg.click('dialog.sheet [data-act="item-news"]')
@@ -102,7 +105,7 @@ async def body(r, p):
     for size, scheme in (("estreito", "light"), ("pc", "light")):
         ctx, pg = await r.page(b, size, scheme, accent="verde")
         await r.open(pg, "#/i/sal-007", "dialog.sheet .news li")
-        await pg.locator("dialog.sheet .inews").scroll_into_view_if_needed()
+        await pg.locator('dialog.sheet [data-slot="item-news"]').scroll_into_view_if_needed()
         r.check(await pg.evaluate(OVERFLOW), f"[{size}] sem rolagem para o lado")
         fits = await pg.evaluate("[...document.querySelectorAll('.news a')].every(a => a.getBoundingClientRect().right <= a.closest('li').getBoundingClientRect().right + 1)")
         r.check(fits, f"[{size}] links dentro da borda")

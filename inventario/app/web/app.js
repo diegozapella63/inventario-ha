@@ -2391,13 +2391,15 @@
   function itemRecHtml(it) {
     const st = IREC.id === it.id ? IREC.st : null;
     const btn = (icon, label) => `<button type="button" class="btn" data-act="item-rec" data-id="${esc(it.id)}">${ic(icon)}${label}</button>`;
-    if (!st) return btn("checks", "Recursos");
-    if (st.busy) return `<div class="wbusy"><span class="spin"></span><p><b>Procurando os recursos…</b><span>Pode levar até um minuto.</span></p></div>`;
-    if (st.error) return `<h3 class="inews-h">${ic("checks")}Recursos</h3><p class="formerr">${esc(st.error)}</p>${btn("refresh", "Ver de novo")}`;
+    // 1.55.0: uma seção com título, como Tarefas no ResolvIA e Novidades (antes, só o botão)
+    const head = `<h3 class="inews-h">${ic("sliders")}Recursos</h3>`;
+    if (!st) return `${head}<p class="muted">Funções, modos e conexões deste modelo.</p>${btn("spark", "Ver recursos")}`;
+    if (st.busy) return `${head}<div class="wbusy"><span class="spin"></span><p><b>Procurando os recursos…</b><span>Pode levar até um minuto.</span></p></div>`;
+    if (st.error) return `${head}<p class="formerr">${esc(st.error)}</p>${btn("refresh", "Ver de novo")}`;
     const r = st.r || {};
     const list = (r.recursos || []).map((x) => `<li><b>${esc(x.nome)}</b>${x.detalhe ? `<span>${esc(x.detalhe)}</span>` : ""}</li>`).join("");
     const src = r.fonte ? `<p class="rec-src">Fonte: <a href="${esc(r.fonte)}" target="_blank" rel="noopener">${esc(r.site || r.fonte)}</a></p>` : "";
-    return `<h3 class="inews-h">${ic("checks")}Recursos</h3><ul class="rec-list">${list}</ul>${src}${btn("refresh", "Ver de novo")}`;
+    return `${head}<ul class="rec-list">${list}</ul>${src}${btn("refresh", "Ver de novo")}`;
   }
   function paintItemRec() {
     const slot = sheet && sheet.itemId === IREC.id && $('[data-slot="item-rec"]', sheet.dlg);
@@ -2443,9 +2445,10 @@
   function itemNewsHtml(it) {
     const st = INEWS.id === it.id ? INEWS.st : null;
     const btn = (icon, label) => `<button type="button" class="btn" data-act="item-news" data-id="${esc(it.id)}">${ic(icon)}${label}</button>`;
-    if (!st) return btn("spark", "Novidades");
-    if (st.busy) return `<div class="wbusy"><span class="spin"></span><p><b>Procurando novidades…</b><span>Pode levar até um minuto.</span></p></div>`;
-    return `<h3 class="inews-h">${ic("spark")}Novidades</h3>${st.error ? `<p class="formerr">${esc(st.error)}</p>` : newsListHtml(st.r, it)}${btn("refresh", "Buscar de novo")}`;
+    const head = `<h3 class="inews-h">${ic("spark")}Novidades</h3>`;
+    if (!st) return `${head}<p class="muted">Atualizações, recalls e modelos novos.</p>${btn("search", "Buscar novidades")}`;
+    if (st.busy) return `${head}<div class="wbusy"><span class="spin"></span><p><b>Procurando novidades…</b><span>Pode levar até um minuto.</span></p></div>`;
+    return `${head}${st.error ? `<p class="formerr">${esc(st.error)}</p>` : newsListHtml(st.r, it)}${btn("refresh", "Buscar de novo")}`;
   }
   function paintItemNews() {
     const slot = sheet && sheet.itemId === INEWS.id && $('[data-slot="item-news"]', sheet.dlg);

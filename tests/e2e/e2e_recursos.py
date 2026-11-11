@@ -1,5 +1,5 @@
-"""1.54.0: Recursos. Na ficha de um eletrônico, de uma utilidade ou de um veículo, o botão Recursos (na largura toda, como
-o Novidades e o Nova tarefa) pede à IA o que o equipamento tem; a lista fica na ficha, com a fonte e Ver de novo. Um móvel
+"""1.54.0: Recursos. Na ficha de um eletrônico, de uma utilidade ou de um veículo, a seção Recursos (1.55.0: com título e
+ícone, como Tarefas no ResolvIA e Novidades) e o botão Ver recursos (na largura toda, como o Buscar novidades e o Nova tarefa) pede à IA o que o equipamento tem; a lista fica na ficha, com a fonte e Ver de novo. Um móvel
 não tem o botão; com a IA desligada, some. Em Mais › Categorias, Utilidades e Veículos ficam fixas, como Eletrônicos."""
 import e2e_lib
 from e2e_lib import OVERFLOW, main
@@ -13,11 +13,17 @@ async def body(r, p):
     ctx, pg = await r.page(b, "cel390", "dark")
     await r.open(pg, "#/i/sal-007", ".ihead")
     btn = pg.locator('dialog.sheet [data-act="item-rec"]')
-    r.eq((await btn.inner_text()).strip(), "Recursos", "um eletrônico: o botão Recursos")
+    r.eq((await btn.inner_text()).strip(), "Ver recursos", "um eletrônico: o botão Ver recursos")
+    # 1.55.0: uma seção com título e ícone, como Tarefas no ResolvIA e Novidades (antes, só o botão)
+    sec = pg.locator('dialog.sheet [data-slot="item-rec"]')
+    r.eq((await sec.locator(".inews-h").inner_text()).strip(), "Recursos", "a seção Recursos, com título")
+    r.eq(await sec.locator('.inews-h use[href="#i-sliders"]').count(), 1, "com o ícone dela")
+    r.eq((await sec.locator("> .muted").inner_text()).strip(), "Funções, modos e conexões deste modelo.", "e diz o que vem ali")
     w = await pg.evaluate("() => { const b = document.querySelector('dialog.sheet [data-act=\"item-rec\"]'), s = b.parentElement; return [Math.round(b.getBoundingClientRect().width), Math.round(s.getBoundingClientRect().width)]; }")
     r.check(abs(w[0] - w[1]) <= 2, f"na largura toda ({w})")
     await btn.click()
     await pg.wait_for_selector("dialog.sheet .rec-list li", timeout=8000)
+    r.eq(await sec.locator(".inews-h").count(), 1, "o título não repete")
     itens = [t.split("\n")[0] for t in await pg.locator("dialog.sheet .rec-list li").all_inner_texts()]
     r.eq(itens, ["Wi-Fi", "Modo econômico", "Timer"], "os recursos que a IA disse")
     r.check("exemplo.com.br" in await pg.locator("dialog.sheet .rec-src").inner_text(), "com a fonte")

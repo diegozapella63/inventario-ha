@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.55.1
+
+- **Recursos e Novidades na ficha** viram seções com título e ícone, como **Tarefas no ResolvIA**: antes de procurar, dizem o que vem ali (**Ver recursos** e **Buscar novidades**); antes, só aparecia o botão.
+
 ## 1.55.0
 
 - **Sensor do recall**: com **Sensores no Home Assistant** e as **Novidades** ligados, o `binary_sensor.inventaria_recall` liga quando as Novidades acham um recall de um item, com o item, o cômodo e a fonte. A aba **Documentação** traz um exemplo de automação.

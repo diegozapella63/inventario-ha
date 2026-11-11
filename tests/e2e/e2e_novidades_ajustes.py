@@ -127,7 +127,8 @@ async def body(r, p):
     await r.open(pg, "#/novidades", ".menu-list")
     r.check(pg.url.endswith("#/mais"), "o endereço de Novidades abre o menu Mais")
     await r.open(pg, "#/i/sal-007", "dialog.sheet h1")
-    r.eq(await pg.locator('dialog.sheet .inews, dialog.sheet [data-act="item-news"]').count(), 0, "a ficha fica sem Novidades")
+    r.eq(await pg.locator('dialog.sheet [data-slot="item-news"], dialog.sheet [data-act="item-news"]').count(), 0, "a ficha fica sem Novidades")
+    r.eq(await pg.locator('dialog.sheet [data-slot="item-rec"]').count(), 1, "os Recursos continuam (não dependem das Novidades)")
     r.api("PUT", "api/settings", {"news": True})
     await ctx.close()
 
