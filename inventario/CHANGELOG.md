@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.52.0
+
+- **Adicionar só com o +**: o botão do meio da barra de baixo fica só com o ícone, sem o texto embaixo, como em todos os apps da família.
+
 ## 1.51.0
 
 - **Campos de texto** (como Detalhes): dá para aumentar puxando o canto, e o tamanho fica guardado no aparelho. Aberto de novo, o campo volta do tamanho que você deixou. O mesmo vale em todos os apps da família.

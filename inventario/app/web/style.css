@@ -245,8 +245,10 @@ button.side-room:hover { color: var(--ink); }
 .tabbar .ic { width: 23px; height: 23px; }
 .tabbar [aria-current="page"] { color: var(--ink); font-weight: 600; }
 .tabbar [aria-current="page"] .ic { stroke: var(--tag-text); stroke-width: 2; }
+/* Adicionar só com o + (1.52.0, em todos os apps da família): o botão já se destaca, sem o texto embaixo */
+.tabbar .tab-add { justify-content: center; }
 .tabbar .tab-add .plus {
-  display: grid; place-items: center; width: 56px; height: 34px; border-radius: 12px;
+  display: grid; place-items: center; width: 60px; height: 42px; border-radius: 14px;
   background: var(--tag); color: var(--tag-ink); border: 1px solid var(--tag-edge); transition: transform 0.12s;
 }
 .tabbar .tab-add:active .plus { transform: scale(0.94); }

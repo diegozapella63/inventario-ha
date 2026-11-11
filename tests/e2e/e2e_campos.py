@@ -2,7 +2,7 @@
 aparelho (textareas.js, igual em todos os apps); aberto de novo, o campo volta como ficou. A caixa da conversa (que cresce
 sozinha) fica de fora. No celular, os botões das telas de Mais na largura do cartão (Nova categoria, Conferir novidades), o
 Limpar novidades no fim da tela, o Digitalizar com IA na largura toda e, sem foto, Adicionar foto e Buscar na internet do
-mesmo tamanho."""
+mesmo tamanho. 1.52.0: o Adicionar da barra de baixo só com o + (o nome no aria-label), no meio da barra."""
 import e2e_lib
 from e2e_lib import OVERFLOW, main
 
@@ -15,6 +15,12 @@ async def body(r, p):
     it = next(i for i in r.data()["items"] if not i.get("photos"))
     b = await r.browser(p)
     ctx, pg = await r.page(b, "cel390", "dark")
+    # o Adicionar só com o +, no meio da barra
+    await r.open(pg, "#/", ".tabbar .plus")
+    add = await pg.evaluate("""() => { const b = document.querySelector('.tabbar .tab-add'), c = (e) => { const r = e.getBoundingClientRect(); return r.top + r.height / 2; };
+      return [b.textContent.trim(), b.getAttribute('aria-label'), Math.round(Math.abs(c(b.querySelector('.plus')) - c(document.querySelector('.tabbar [data-tab=home] .ic')) - 0))]; }""")
+    r.check(add[0] == "" and add[1] == "Adicionar", f"Adicionar só com o + ({add})")
+    await r.shot(pg, "barra")
     # Detalhes: aumentado, fica do tamanho na próxima vez
     await r.open(pg, f"#/i/{it['id']}", ".ihead")
     await pg.click('dialog.sheet [data-act="item-edit"].primary')
