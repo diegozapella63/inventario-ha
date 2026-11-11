@@ -12,6 +12,7 @@ ACC = "document.documentElement.dataset.accent || 'ouro'"  # o Ouro é o padrão
 CHECKED = "document.querySelector('[data-input=accent]:checked').value"
 
 SENSOR = "sensor.inventaria_ia_hoje"
+RECALL = "binary_sensor.inventaria_recall"
 
 
 async def tab(pg, k):
@@ -77,20 +78,28 @@ async def body(r, p):
     # sensores no Home Assistant
     r.check(ha.state(SENSOR) is None, "sem o sensor até ligar")
     await pg.click('label.switch:has([data-input="sensors-on"])')
-    await pg.locator(".toast", has_text="Sensor criado").wait_for(timeout=8000)
+    await pg.locator(".toast", has_text="Sensores criados").wait_for(timeout=8000)
     for _ in range(30):
         if ha.state(SENSOR):
             break
         time.sleep(0.2)
     s = ha.state(SENSOR)
     r.check(s is not None and str(s["state"]) == "1" and s["attributes"]["imagens"] == 1, f"sensor criado com as chamadas de hoje ({s and s['state']})")
+    # 1.55.0: o do recall, com as Novidades ligadas
+    for _ in range(30):
+        if ha.state(RECALL):
+            break
+        time.sleep(0.2)
+    rc = ha.state(RECALL)
+    r.check(rc is not None and rc["state"] == "off" and rc["attributes"]["quantidade"] == 0, f"binary_sensor.inventaria_recall criado, desligado sem recall ({rc and rc['state']})")
+    r.check("binary_sensor.inventaria_recall" in await pg.text_content("#p-sensors"), "o cartão diz o sensor do recall")
     await pg.click('label.switch:has([data-input="sensors-on"])')
     await pg.locator(".toast", has_text="Sensores desligados").wait_for(timeout=8000)
     for _ in range(30):
         if ha.state(SENSOR) is None:
             break
         time.sleep(0.2)
-    r.check(ha.state(SENSOR) is None, "desligar tira o sensor do Home Assistant")
+    r.check(ha.state(SENSOR) is None and ha.state(RECALL) is None, "desligar tira os sensores do Home Assistant")
 
     # Usar IA desligada: some o que usa IA, e o Falar junto
     await pg.click('label.switch:has([data-input="ai-on"])')

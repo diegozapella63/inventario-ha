@@ -47,6 +47,7 @@ def reset_store():
     server._people_cache.update(at=0.0, value=None)
     server.WEB_JOBS.clear()
     server._usage_sensor.update(day=None, checked=0.0)
+    server._recall_sensor.update(sig=None, at=0.0)
     server.CONEXAO = server.Conexao()
     server.CORRERIA = server.correria_conexao()
 

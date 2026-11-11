@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.55.0
+
+- **Sensor do recall**: com **Sensores no Home Assistant** e as **Novidades** ligados, o `binary_sensor.inventaria_recall` liga quando as Novidades acham um recall de um item, com o item, o cômodo e a fonte. A aba **Documentação** traz um exemplo de automação.
+
 ## 1.54.0
 
 - **Recursos**: na ficha de um eletrônico, de uma utilidade ou de um veículo, o botão **Recursos** pede à IA o que o equipamento tem (funções, modos, conexões, ajustes), cada um com uma frase de para que serve. A lista fica guardada na ficha, com a fonte, até o item mudar; **Ver de novo** pergunta outra vez. Só com a IA ligada; entra no Uso da IA.

@@ -1617,6 +1617,74 @@ def remove_usage_sensor():
     _usage_sensor["day"] = None
 
 
+# -- binary_sensor.inventaria_recall (1.55.0): ligado quando as Novidades acharam um recall de um item (sem os boatos),
+# para um aviso ou um painel; com Sensores, a IA e as Novidades ligados. Republicado quando muda e a cada 15 minutos.
+RECALL_SENSOR = "binary_sensor.inventaria_recall"
+_recall_sensor = {"sig": None, "at": 0.0}
+
+
+def recall_state() -> dict:
+    d = news_read()
+    rooms, items = visible_data()
+    rname = {r["id"]: r.get("name") or "" for r in rooms}
+    out, seen = [], set()
+    for it in sorted(items, key=lambda i: fold(i.get("name") or "")):
+        v = d["itens"].get(it["id"])
+        news = v.get("news") if isinstance(v, dict) else None
+        for n in (news.get("novidades") or []) if isinstance(news, dict) else []:
+            if not isinstance(n, dict) or n.get("tipo") != "recall" or n.get("boato"):
+                continue
+            r = {"item": it.get("name") or "", "comodo": rname.get(it.get("room"), ""), "titulo": n.get("titulo") or "",
+                 "data": n.get("data") or None, "fonte": n.get("fonte") or None}
+            k = (r["item"], r["comodo"], r["titulo"])
+            if k not in seen:
+                seen.add(k)
+                out.append(r)
+    return {"state": "on" if out else "off", "attributes": {
+        "friendly_name": "InventarIA: recall", "device_class": "problem", "icon": "mdi:alert-octagon" if out else "mdi:shield-check-outline",
+        "quantidade": len(out), "itens": out[:20]}}
+
+
+def publish_recall_sensor(force: bool = False):
+    if not SUPERVISOR_TOKEN or AI_MOCK or not sensors_enabled() or not ai_enabled() or not news_enabled():
+        return
+    body = recall_state()
+    sig = json.dumps(body, sort_keys=True)
+    if not force and sig == _recall_sensor["sig"] and time.time() - _recall_sensor["at"] < 900:
+        return
+    try:
+        ha_request("POST", "/states/" + RECALL_SENSOR, body, timeout=10)
+        _recall_sensor.update(sig=sig, at=time.time())
+    except ApiError as e:
+        if _recall_sensor["sig"] is not None:
+            log.info("sensor de recall: %s", e.msg)
+        _recall_sensor["sig"] = None
+
+
+def remove_recall_sensor():
+    _recall_sensor.update(sig=None, at=0.0)
+    if not SUPERVISOR_TOKEN or AI_MOCK:
+        return
+    try:
+        ha_request("DELETE", "/states/" + RECALL_SENSOR, timeout=10)
+    except ApiError:
+        pass  # já não existia
+
+
+def publish_sensors():
+    """Sensores ligados (com a IA): o do uso da IA e o do recall (este só com as Novidades ligadas)."""
+    publish_usage_sensor()
+    if news_enabled():
+        publish_recall_sensor(force=True)
+    else:
+        remove_recall_sensor()
+
+
+def remove_sensors():
+    remove_usage_sensor()
+    remove_recall_sensor()
+
+
 def usage_sensor_loop():
     """Zera o sensor na virada do dia e o devolve quando o Home Assistant reinicia (estados da API não ficam salvos lá)."""
     cleaned = False
@@ -1627,10 +1695,14 @@ def usage_sensor_loop():
         if not sensors_enabled() or not ai_enabled():
             if not cleaned:  # as versões 1.9 e 1.10 criavam o sensor sem perguntar: tira uma vez
                 cleaned = True
-                remove_usage_sensor()
+                remove_sensors()
             continue
         cleaned = False
         try:
+            if news_enabled():
+                publish_recall_sensor()
+            elif _recall_sensor["sig"] is not None:
+                remove_recall_sensor()
             if _usage_sensor["day"] != usage_day():
                 publish_usage_sensor()
             elif time.time() - _usage_sensor["checked"] > 300:
@@ -4094,8 +4166,8 @@ def r_settings_put(h, query):
         _voice_cache["at"] = 0.0
     if "correria" in upd:  # grava ou apaga share/inventario/correria.json na hora
         correria_publicar()
-    if "ha_sensors" in upd or "ai" in upd:  # cria ou tira o sensor na hora
-        threading.Thread(target=publish_usage_sensor if sensors_enabled() and ai_enabled() else remove_usage_sensor, daemon=True).start()
+    if "ha_sensors" in upd or "ai" in upd or "news" in upd or "bens" in upd:  # cria ou tira os sensores na hora
+        threading.Thread(target=publish_sensors if sensors_enabled() and ai_enabled() else remove_sensors, daemon=True).start()
     h.send_json(STORE.settings)
 
 

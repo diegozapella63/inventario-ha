@@ -1641,7 +1641,9 @@
     <section class="panel" id="p-sensors">
       <h2>${secIc("gauge")}Sensores no Home Assistant</h2>
       <ul class="opts"><li><div class="ot"><b id="sensors-h">Criar os sensores</b><span>${sensorsOn()
-        ? '<span class="codepath">sensor.inventaria_ia_hoje</span>, com as chamadas de IA de hoje.'
+        ? '<span class="codepath">sensor.inventaria_ia_hoje</span>, com as chamadas de IA de hoje' + (newsOn()
+          ? ', e <span class="codepath">binary_sensor.inventaria_recall</span>, ligado com um recall nas Novidades.' : ".")
+        : newsOn() ? "As chamadas de IA de hoje e os recalls das Novidades, para painéis e automações."
         : "As chamadas de IA de hoje, para painéis e automações."}</span></div>
         <div class="oa">${switchHtml("sensors-on", sensorsOn(), "sensors-h")}</div></li></ul>
     </section>` : ""}
@@ -4230,7 +4232,7 @@
         if (key === "bens" || key === "deprec") derive(); // os bens (ou o valor de hoje) entram ou saem de tudo (patrimônio, busca, gráficos, relatório)
         renderView(false);
         toast(key === "ai" ? (on ? "IA ligada" : "IA desligada: os botões de IA ficaram escondidos")
-          : key === "ha_sensors" ? (on ? "Sensor criado no Home Assistant" : "Sensores desligados: o sensor saiu do Home Assistant")
+          : key === "ha_sensors" ? (on ? "Sensores criados no Home Assistant" : "Sensores desligados: saíram do Home Assistant")
           : key === "news" ? (on ? "Novidades ligadas" : "Novidades desligadas")
           : key === "bens" ? (on ? "Bens ligados" : "Bens desligados: os bens gravados continuam guardados")
           : key === "correria" ? (on ? "CorrerIA ligado" : "CorrerIA desligado")

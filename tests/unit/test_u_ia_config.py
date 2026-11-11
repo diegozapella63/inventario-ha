@@ -478,23 +478,29 @@ class RotasDeConfiguracao(UnitBase):
         return T.call_args.kwargs["target"]
 
     def test_sensores_ligados_publicam_o_sensor_na_hora(self):
-        self.assertIs(self.alvo_do_sensor({"ha_sensors": True}), S.publish_usage_sensor)
+        self.assertIs(self.alvo_do_sensor({"ha_sensors": True}), S.publish_sensors)
 
     def test_sensores_desligados_retiram_o_sensor(self):
         self.store.settings["ha_sensors"] = True
-        self.assertIs(self.alvo_do_sensor({"ha_sensors": False}), S.remove_usage_sensor)
+        self.assertIs(self.alvo_do_sensor({"ha_sensors": False}), S.remove_sensors)
 
     def test_ia_desligada_retira_o_sensor_mesmo_com_sensores_ligados(self):
         self.store.settings["ha_sensors"] = True
-        self.assertIs(self.alvo_do_sensor({"ai": False}), S.remove_usage_sensor)
+        self.assertIs(self.alvo_do_sensor({"ai": False}), S.remove_sensors)
 
     def test_ia_religada_com_sensores_ligados_publica_o_sensor(self):
         self.store.settings.update(ha_sensors=True, ai=False)
-        self.assertIs(self.alvo_do_sensor({"ai": True}), S.publish_usage_sensor)
+        self.assertIs(self.alvo_do_sensor({"ai": True}), S.publish_sensors)
 
     def test_sensores_ligados_com_ia_desligada_nao_publicam(self):
         self.store.settings["ai"] = False
-        self.assertIs(self.alvo_do_sensor({"ha_sensors": True}), S.remove_usage_sensor)
+        self.assertIs(self.alvo_do_sensor({"ha_sensors": True}), S.remove_sensors)
+
+    # 1.55.0: as Novidades e os Bens mudam o sensor do recall
+    def test_novidades_e_bens_republicam_os_sensores(self):
+        self.store.settings["ha_sensors"] = True
+        self.assertIs(self.alvo_do_sensor({"news": False}), S.publish_sensors)
+        self.assertIs(self.alvo_do_sensor({"bens": False}), S.publish_sensors)
 
     def test_outras_opcoes_nao_mexem_no_sensor(self):
         self.assertIsNone(self.alvo_do_sensor({"zones": True, "ai_entity": GOOGLE, "voice_stt": "stt.faster_whisper"}))

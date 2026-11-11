@@ -97,7 +97,21 @@ Em **Mais > Configurações > Integrações > Uso da IA** ficam as chamadas de h
 
 O Home Assistant não informa tokens nem custo, então o app conta as chamadas e estima os tokens pelo tamanho do texto (uns 4 caracteres por token). As imagens e a busca na web gastam mais do que essa estimativa. O consumo exato e o custo ficam no painel do provedor: Google Cloud Console para o Gemini, platform.openai.com/usage para a OpenAI e Claude Console para a Anthropic.
 
-Com **Sensores no Home Assistant** ligado (em **Mais > Configurações > Integrações**; vem desligado), o app cria no Home Assistant o sensor `sensor.inventaria_ia_hoje`, com as chamadas de hoje no estado e os detalhes nos atributos (`erros`, `cota_excedida`, `tokens_texto_estimados`, `imagens`, `por_tipo`, `ultimos_7_dias`, `este_mes` e `ultima_chamada`). Dá para pôr num painel ou numa automação, por exemplo para avisar quando passar de 50 chamadas no dia. O sensor zera na virada do dia; se o Home Assistant reiniciar, ele volta em alguns minutos. Desligando a opção, o sensor sai do Home Assistant na hora.
+Com **Sensores no Home Assistant** ligado (em **Mais > Configurações > Integrações**; vem desligado), o app cria no Home Assistant o sensor `sensor.inventaria_ia_hoje`, com as chamadas de hoje no estado e os detalhes nos atributos (`erros`, `cota_excedida`, `tokens_texto_estimados`, `imagens`, `por_tipo`, `ultimos_7_dias`, `este_mes` e `ultima_chamada`). Dá para pôr num painel ou numa automação, por exemplo para avisar quando passar de 50 chamadas no dia. O sensor zera na virada do dia; se o Home Assistant reiniciar, ele volta em alguns minutos. Desligando a opção, os sensores saem do Home Assistant na hora.
+
+Com as **Novidades** ligadas, o app cria também o `binary_sensor.inventaria_recall`: ligado quando as Novidades acharam um **recall** de um item (os boatos ficam de fora), com `quantidade` e `itens` (o item, o cômodo, o título, a data e a fonte de cada um). Ele muda em até um minuto depois de uma conferência; se o Home Assistant reiniciar, volta em até 15 minutos. Exemplo de automação:
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.inventaria_recall
+    to: "on"
+actions:
+  - action: notify.mobile_app_celular_da_ana
+    data:
+      title: "Recall: {{ state_attr('binary_sensor.inventaria_recall', 'itens')[0].item }}"
+      message: "{{ state_attr('binary_sensor.inventaria_recall', 'itens')[0].titulo }}"
+```
 
 ## Fotos da internet
 
