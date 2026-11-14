@@ -824,6 +824,11 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .news-out .nlist { margin-top: 8px; }
 .nrow.static { cursor: default; }
 .nrow.static:hover { background: none; }
+.nrow.static .switch { flex: none; }
+.app-det-b { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.app-det-b .ic { flex: none; color: var(--muted); }
+.app-det-b:hover b { text-decoration: underline; }
+.apps-det .nrow b, .apps-det .nrow .nm { white-space: normal; overflow-wrap: anywhere; } /* nada cortado: o nome e o porquê quebram a linha */
 .opts > li.apps-det-li { display: block; padding-top: 4px; }
 .apps-det { margin-top: 0; }
 .apps-det .help { margin: 6px 0 0; }

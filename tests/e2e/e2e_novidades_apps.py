@@ -39,8 +39,17 @@ async def body(r, p):
     r.eq((await pg.text_content(f"{det} .help")).strip(), "Com o sensor: Pessoa de Teste.", "os celulares com o sensor ligado")
     linhas = await pg.evaluate(TEXTS, f"{det} .nrow")
     r.eq(len(linhas), 5, "todos os apps que o sensor achou")
-    r.check(all("Pessoa de Teste · usado hoje" in x and x.endswith("Novo") for x in linhas), f"de quem, quando foi usado e Novo antes da IA escolher ({linhas[0]})")
+    r.check(all("Pessoa de Teste · usado hoje" in x and x.endswith("· novo") for x in linhas), f"de quem, quando foi usado e novo antes da IA escolher ({linhas[0]})")
     r.eq([x.split(" Pessoa")[0] for x in linhas][:2], ["Casa Conectada", "Configurações"], "em ordem de nome")
+    chaves = f"{det} [data-input='app-considerar']"
+    r.eq(await pg.evaluate(f"[...document.querySelectorAll(\"{chaves}\")].map(i => i.checked)"), [True] * 5, "1.57.0: cada um com a sua chave, ligada de início")
+    # 1.57.0: buscar as novidades de um app só, pela linha dele (um novo busca na hora)
+    await pg.click(f"{det} [data-act='app-open'][data-id='com.exemplo.musicaja']")
+    await pg.wait_for_selector("dialog.modal .news li", timeout=10000)
+    r.eq((await pg.text_content("dialog.modal .news-of")).strip(), "Música Já", "a linha abre as novidades do app")
+    await pg.click("dialog.modal [data-x]")
+    musica = await pg.text_content(f"{det} li:has([data-id='com.exemplo.musicaja']) .nm")
+    r.check("novo" not in musica, f"depois de buscar, não é mais novo ({musica.strip()})")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "opcoes")
     await pg.click('label.switch:has([data-input="news-auto"])')  # mexer em outra opção não fecha a lista
@@ -54,7 +63,8 @@ async def body(r, p):
     await pg.wait_for_selector('[data-slot="news-apps"] p', timeout=8000)
     r.check("dos eletrônicos e dos apps do celular" in await pg.text_content("#p-news .lead"), "o texto do alto fala dos apps")
     r.eq((await pg.text_content("#p-news-apps h2")).strip(), "Apps do celular", "a seção depois dos equipamentos")
-    r.check("Toque em Conferir novidades: a IA escolhe os apps." in await pg.text_content('[data-slot="news-apps"]'), "antes da primeira vez, diz o que fazer")
+    sl = await pg.text_content('[data-slot="news-apps"]')
+    r.check("Música Já" in sl and "4 apps novos entram na próxima conferência." in sl, f"o buscado sozinho já está na lista; os outros, na próxima ({sl.strip()[:80]})")
 
     # conferir todos: os equipamentos e os apps
     await pg.click('[data-act="news-all"]')
@@ -118,9 +128,28 @@ async def body(r, p):
     await r.open(pg, "#/config/opcoes", "#p-news-opts")
     await pg.wait_for_selector(det, timeout=8000)
     await pg.click(f"{det} summary")
-    estados = {x.split(" Pessoa")[0]: x.rsplit(" ", 1)[-1] for x in await pg.evaluate(TEXTS, f"{det} .nrow")}
-    r.eq(estados, {"Casa Conectada": "Acompanhado", "Configurações": "fora", "Mercadinho": "Acompanhado", "Música Já": "Acompanhado",
-                   "Tela inicial": "fora"}, "Acompanhado ou De fora")
+    estados = dict(await pg.evaluate(f"""[...document.querySelectorAll("{det} .nrow")].map(r => [r.querySelector('b').textContent, r.querySelector('input').checked])"""))
+    r.eq(estados, {"Casa Conectada": True, "Configurações": False, "Mercadinho": True, "Música Já": True, "Tela inicial": False},
+         "acompanhados ligados, os que a IA deixou de fora desligados")
+    r.check("a IA deixou de fora" in await pg.text_content(f"{det} li:has([data-id='com.android.settings']) .nm"), "com o porquê")
+    cortados = await pg.evaluate(f"""[...document.querySelectorAll("{det} .nrow b, {det} .nrow .nm")].filter(e => e.scrollWidth > e.clientWidth + 1).length""")
+    r.eq(cortados, 0, "nenhum texto cortado")
+    # desconsiderar um app: desligado, sai da pesquisa e vai para os deixados de fora
+    await pg.click(f"{det} li:has([data-id='com.exemplo.mercadinho']) label.switch")
+    await pg.locator(".toast", has_text="Mercadinho: deixado de fora").wait_for(timeout=4000)
+    r.check(await pg.locator(f"{det}[open]").count() == 1, "a lista continua aberta")
+    merc = next(a for a in r.api("GET", "api/news")["apps"]["lista"] if a["pacote"] == "com.exemplo.mercadinho")
+    r.eq((merc["conferir"], merc["manual"], merc["res"]), (False, True, None), "fica fora da pesquisa, pela escolha da pessoa")
+    r.check("a IA deixou de fora" not in await pg.text_content(f"{det} li:has([data-id='com.exemplo.mercadinho']) .nm"), "sem dizer que foi a IA")
+    # e trazer de volta um que a IA deixou de fora
+    await pg.click(f"{det} li:has([data-id='com.android.launcher3']) label.switch")
+    await pg.locator(".toast", has_text="Tela inicial: acompanhado").wait_for(timeout=4000)
+    tela = next(a for a in r.api("GET", "api/news")["apps"]["lista"] if a["pacote"] == "com.android.launcher3")
+    r.eq((tela["conferir"], tela["manual"]), (True, True), "a escolha da pessoa vale sobre a da IA")
+    await r.shot(pg, "opcoes-depois")
+    await r.open(pg, "#/novidades", "#p-news-apps")
+    await pg.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)
+    r.check("Mercadinho" not in [x[0] for x in await pg.evaluate(APPS)], "nas Novidades, o desconsiderado sai da lista")
 
     # desligada de novo: some da tela, e a API recusa
     r.api("PUT", "api/settings", {"news_apps": False})

@@ -1888,12 +1888,31 @@
     if (!A) return `<p class="help">Procurando os apps dos celulares…</p>`;
     const L = [...(A.lista || [])].sort((x, y) => x.nome.localeCompare(y.nome, "pt-BR"));
     if (!L.length) return `<p class="help">${A.sensores ? APPS_NENHUM : APPS_SEM_SENSOR}</p>`;
-    const st = (a) => (a.conferir === true || a.res ? "Acompanhado" : a.conferir === false ? "De fora" : "Novo");
+    // 1.57.0: cada app com a sua chave: desligada, fica fora da pesquisa das novidades (a escolha da pessoa vale sobre a da
+    // IA); ligada, é conferido. Um novo vem ligado (a IA ainda vai escolher); um que a IA deixou de fora vem desligado, com o porquê.
+    const on = (a) => a.conferir === true || !!a.res || (a.conferir == null && !a.manual);
+    const quando = (a) => (a.res ? "" : a.conferir == null ? "novo" : a.conferir === false && !a.manual ? "a IA deixou de fora" : "");
     return `<details class="news-out apps-det"${appsDetAberto ? " open" : ""}><summary>${ic("chev", "sm")}Apps detectados (${int(L.length)})</summary>
       ${(A.celulares || []).length ? `<p class="help">Com o sensor: ${esc(joinE(A.celulares))}.</p>` : ""}
-      <ul class="nlist">${L.map((a) => `<li><div class="nrow static"><span class="nb"><b>${esc(a.nome)}</b>
-        <span class="nm">${esc([joinE(a.pessoas || []), a.ultimo ? `usado ${whenShort(a.ultimo)}` : ""].filter(Boolean).join(" · "))}</span></span>
-        <span class="pill">${st(a)}</span></div></li>`).join("")}</ul></details>`;
+      <ul class="nlist">${L.map((a, i) => `<li><div class="nrow static"><button type="button" class="app-det-b" data-act="app-open" data-id="${esc(a.pacote)}" aria-label="Novidades de ${esc(a.nome)}">
+        <span class="nb"><b id="app-det-${i}">${esc(a.nome)}</b>
+        <span class="nm">${esc([joinE(a.pessoas || []), a.ultimo ? `usado ${whenShort(a.ultimo)}` : "", quando(a)].filter(Boolean).join(" · "))}</span></span>${ic("search")}</button>
+        <label class="switch"><input type="checkbox" role="switch" data-input="app-considerar" data-pkg="${esc(a.pacote)}" aria-labelledby="app-det-${i}"${on(a) ? " checked" : ""}><span class="track" aria-hidden="true"></span></label></div></li>`).join("")}</ul></details>`;
+  }
+  // a chave de um app: Acompanhar ou Deixar de fora (a mesma escolha da janela do app em Mais › Novidades)
+  async function considerarApp(t) {
+    const a = ((newsOv && newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === t.dataset.pkg);
+    if (!a) return;
+    t.disabled = true;
+    try {
+      newsOv = await API.put("api/news/app", { pacote: a.pacote, acompanhar: t.checked });
+      toast(`${a.nome}: ${t.checked ? "acompanhado" : "deixado de fora"}`);
+    } catch (er) { fail(er); }
+    paintAppsDet();
+  }
+  function paintAppsDet() {
+    const slot = $('#view [data-slot="apps-det"]');
+    if (slot) slot.innerHTML = appsDetHtml();
   }
   async function loadAppsDet() {
     if (!appsOn()) return;
@@ -2627,7 +2646,7 @@
     const update = (fn) => { // o app na lista das Novidades, sem ler tudo de novo
       const L = (newsOv && newsOv.apps && newsOv.apps.lista) || [];
       const k = L.findIndex((x) => x.pacote === a.pacote);
-      if (k >= 0) { L[k] = a = fn(L[k]); renderNews(); }
+      if (k >= 0) { L[k] = a = fn(L[k]); renderNews(); paintAppsDet(); }
     };
     async function poll(my) {
       let st;
@@ -2658,6 +2677,7 @@
       try { newsOv = await API.put("api/news/app", { pacote: a.pacote, acompanhar }); }
       catch (e) { fail(e); return; }
       renderNews();
+      paintAppsDet();
       if (acompanhar) { a = { ...a, conferir: true, manual: true }; start(); return; }
       requestClose(entry, { force: true });
       toast(`${a.nome}: deixado de fora`);
@@ -4347,6 +4367,7 @@
     }
     else if (k === "news-every") saveNews({ news_every: +t.value }, `Conferir a cada ${+t.value} dias`);
     else if (k === "news-hora") saveNews({ news_hora: t.value }, `Conferir às ${t.value}`);
+    else if (k === "app-considerar") considerarApp(t);
     else if (k === "news-apps") { if (await saveNews({ news_apps: t.checked }, t.checked ? "Apps do celular nas novidades" : "Apps do celular desligados") && t.checked) loadAppsDet(); }
     else if (k === "news-auto") saveNews({ news_every: t.checked ? 7 : 0 }, t.checked ? `Conferir sozinho: a cada 7 dias, às ${S.settings.news_hora || "10:00"}` : "Conferir sozinho desligado");
     else if (k === "news-aviso") {

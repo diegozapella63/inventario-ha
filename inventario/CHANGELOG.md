@@ -1,5 +1,11 @@
 # Mudanças
 
+## 1.57.0
+
+- **Apps detectados**: cada app tem a sua chave. Desligada, o app fica fora da pesquisa das novidades, e a sua escolha vale sobre a da IA. Ligada num app que a IA deixou de fora, ele volta a ser conferido.
+- **Buscar as novidades de um app só**: toque no nome dele (ou na lupa). Abre o que já foi achado ou, se ainda não foi conferido, busca na hora.
+- O nome e o porquê de cada app (como "a IA deixou de fora") não são mais cortados.
+
 ## 1.56.1
 
 - **Apps detectados**: em Mais > Configurações > Opções > Novidades, logo abaixo de **Apps do celular**, os apps que o sensor achou ficam recolhidos em **Apps detectados (n)**. Lá aparecem os celulares que têm o sensor ligado e, para cada app, de quem é o celular, quando foi usado e se é **Acompanhado**, **De fora** ou **Novo**. Sem nenhum app, ali mesmo aparece como ligar o sensor.
