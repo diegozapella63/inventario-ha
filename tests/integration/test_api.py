@@ -46,7 +46,7 @@ class Dados(ServerCase):
         self.assertEqual(d["user"], "Davi")
         self.assertEqual(d["settings"], {"ai_entity": "", "ai_search": "", "voice_stt": "", "ai": True, "zones": False, "ha_sensors": False,
                                          "news": True, "news_every": 0, "news_notify": "", "bens": True, "correria": False,
-                                         "news_hora": "10:00", "news_aviso": False, "news_para": [], "accent": None, "accent_daily": None, "deprec": False})
+                                         "news_hora": "10:00", "news_aviso": False, "news_para": [], "news_apps": False, "accent": None, "accent_daily": None, "deprec": False})
         self.assertIsNone(d["correria_uso"], "CorrerIA desligado: sem o último uso")
         self.assertIsNone(d["gerencia"], "sem o GerencIA: sem a depreciação")
         self.assertIsNone(d["atalho"], "fora do Home Assistant: sem o caminho do Atalho no celular")

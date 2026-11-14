@@ -169,6 +169,7 @@
   const aiOn = () => S.settings.ai !== false;
   const zonesOn = () => S.settings.zones === true;
   const newsOn = () => aiOn() && S.settings.news !== false; // Novidades: precisa da IA e pode ser desligada em Opções
+  const appsOn = () => newsOn() && S.settings.news_apps === true; // Apps do celular nas Novidades (1.56.0): desligado de início
   const sensorsOn = () => S.settings.ha_sensors === true; // sensores no Home Assistant: só com a opção ligada
   let D = null;
   const roomFilter = {};
@@ -1470,8 +1471,8 @@
   function moreNews() {
     return `
     <section class="panel" id="p-news">
-      <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos eletrônicos.</p>
-      <ul class="opts"><li><div class="ot"><b>Conferir todos</b><span>A IA escolhe, entre os eletrônicos, os que vale conferir.</span></div>
+      <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos eletrônicos${appsOn() ? " e dos apps do celular" : ""}.</p>
+      <ul class="opts"><li><div class="ot"><b>Conferir todos</b><span>${appsOn() ? "A IA escolhe os eletrônicos e os apps que vale conferir." : "A IA escolhe, entre os eletrônicos, os que vale conferir."}</span></div>
         <div class="oa"><button type="button" class="btn primary" data-act="news-all">${ic("spark")}Conferir novidades</button></div></li></ul>
       <div data-slot="news-job"></div>
     </section>
@@ -1479,6 +1480,10 @@
       <h2>${secIc("tag")}Equipamentos</h2>
       <div data-slot="news-list"><p class="muted">Carregando…</p></div>
     </section>
+    ${appsOn() ? `<section class="panel" id="p-news-apps">
+      <h2>${secIc("phone")}Apps do celular</h2>
+      <div data-slot="news-apps"><p class="muted">Carregando…</p></div>
+    </section>` : ""}
     <section class="panel" id="p-news-clear">
       <ul class="opts"><li><div class="ot"><b>Limpar</b><span>Apaga as novidades encontradas e as escolhas da IA.</span></div>
         <div class="oa"><button type="button" class="btn" data-act="news-clear">${ic("trash")}Limpar novidades</button></div></li></ul>
@@ -1529,6 +1534,10 @@
     const vistos = chosen.filter((g) => g.r);
     newsNums = { conferidos: vistos.length, com: vistos.filter((g) => newsCount(g.r) > 0).length };
     const out = newsGroups(D.items.filter((it) => tri[it.id] === false && !res[it.id] && ov.cats.includes(it.cat)), ov).sort(sortG);
+    const appsVistos = ((ov.apps && ov.apps.lista) || []).filter((a) => a.res);
+    newsNums.conferidos += appsVistos.length;
+    newsNums.com += appsVistos.filter((a) => newsCount(a.res) > 0).length;
+    renderNewsApps();
     // os deixados de fora no fim, recolhidos (o padrão dos apps para o que fica de fora): abertos, ficam abertos
     // enquanto a tela está aberta (conferir um por um não fecha a lista); ao voltar à tela, recolhidos de novo
     const wasOpen = !!$(".news-out[open]", ls);
@@ -1536,6 +1545,34 @@
         : `<p class="muted">${ov.pendentes ? "Toque em Conferir novidades: a IA escolhe os equipamentos." : "Nenhum item em Eletrônicos."}</p>`}
       ${out.length ? `<details class="news-out"${wasOpen ? " open" : ""}><summary>${ic("chev", "sm")}Deixados de fora pela IA (${int(out.length)})</summary><ul class="nlist">${out.map(newsRow).join("")}</ul></details>` : ""}`;
     if (!newsJob) renderNewsJob(null);
+  }
+  // Apps do celular (1.56.0): os que a IA (ou a pessoa) escolheu e os já conferidos, com de quem é o celular; os novos
+  // entram na próxima conferência; embaixo, recolhidos, os deixados de fora (pela IA ou pela pessoa)
+  function appRow(a) {
+    const r = a.res, n = newsCount(r);
+    const st = !r ? "Ainda não conferido" : `${n ? plural(n, "novidade", "novidades") : "Nada novo"} · ${whenShort(r.at)}`;
+    return `<li><button type="button" class="nrow" data-act="app-open" data-id="${esc(a.pacote)}">
+        <span class="nb"><b>${esc(a.nome)}</b><span class="nm">${esc([joinE(a.pessoas || []), st].filter(Boolean).join(" · "))}</span></span>
+        ${n ? `<span class="pill">${int(n)}</span>` : ""}${ic("chev", "sm")}</button></li>`;
+  }
+  function renderNewsApps() {
+    const sl = $('#view [data-slot="news-apps"]'), A = newsOv && newsOv.apps;
+    if (!sl || !A) return;
+    const L = A.lista || [];
+    const rank = (a) => (newsCount(a.res) ? 0 : !a.res ? 1 : 2);
+    const sortA = (x, y) => rank(x) - rank(y) || newsCount(y.res) - newsCount(x.res) || x.nome.localeCompare(y.nome, "pt-BR");
+    const chosen = L.filter((a) => a.conferir === true || a.res).sort(sortA);
+    const out = L.filter((a) => a.conferir === false && !a.res).sort(sortA);
+    const novos = L.filter((a) => a.conferir == null && !a.res).length;
+    const wasOpen = !!$(".news-out[open]", sl);
+    if (!L.length) {
+      sl.innerHTML = `<p class="muted">${A.sensores ? "Nenhum app ainda: abra no celular os apps que quer acompanhar."
+        : "Ligue o sensor Último app usado no app Home Assistant de cada celular: Configurações › Aplicativo complementar › Gerenciar sensores."}</p>`;
+      return;
+    }
+    sl.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map(appRow).join("")}</ul>` : ""}
+      ${novos ? `<p class="muted">${chosen.length ? `${plural(novos, "app novo entra", "apps novos entram")} na próxima conferência.` : "Toque em Conferir novidades: a IA escolhe os apps."}</p>` : ""}
+      ${out.length ? `<details class="news-out"${wasOpen ? " open" : ""}><summary>${ic("chev", "sm")}Deixados de fora (${int(out.length)})</summary><ul class="nlist">${out.map(appRow).join("")}</ul></details>` : ""}`;
   }
   function renderNewsJob(st) {
     const js = $('#view [data-slot="news-job"]');
@@ -1808,7 +1845,9 @@
       <h2>${secIc("spark")}Novidades</h2>
       <ul class="opts"><li><div class="ot"><b id="news-h">Usar novidades</b><span>Atualizações e recalls dos eletrônicos.</span></div>
         <div class="oa">${switchHtml("news-on", on, "news-h")}</div></li>
-      ${on ? `<li><div class="ot"><b id="news-auto-h">Conferir sozinho</b><span>A IA confere os eletrônicos de tempos em tempos.</span></div>
+      ${on ? `<li><div class="ot"><b id="news-apps-h">Apps do celular</b><span>As novidades dos apps que vocês usam, pelo sensor Último app usado do app Home Assistant.</span></div>
+        <div class="oa">${switchHtml("news-apps", appsOn(), "news-apps-h")}</div></li>` : ""}
+      ${on ? `<li><div class="ot"><b id="news-auto-h">Conferir sozinho</b><span>A IA confere os eletrônicos${appsOn() ? " e os apps" : ""} de tempos em tempos.</span></div>
         <div class="oa">${switchHtml("news-auto", !!every, "news-auto-h")}</div></li>` : ""}
       ${on && every ? `<li class="aviso-quando">
           <div class="field"><label for="news-hora">Horário</label><select id="news-hora" class="select" data-input="news-hora">${horas.map((x) => opt(x, x, hora)).join("")}</select></div>
@@ -2543,6 +2582,71 @@
     const saved = newsOv && newsOv.itens && newsOv.itens[it.id];
     if (saved) render(saved);
     else API.get("api/news").then((ov) => { newsOv = ov; const r = (ov.itens || {})[it.id]; if (my0 === gen) { if (r) render(r); else start(); } }).catch(() => { if (my0 === gen) start(); });
+  }
+  // a janela de um app do celular (1.56.0): as novidades guardadas (ou a busca, se ainda não foi conferido), Buscar de novo
+  // e Deixar de fora; um deixado de fora mostra só o Acompanhar, que volta a conferir
+  function openAppNews(a0) {
+    if (!appsOn()) return;
+    let job = null, timer = null, gen = 0, a = a0;
+    const entry = openDialog({
+      cls: "modal", label: "Novidades",
+      html: `<div class="dlg"><div class="dlg-h"><h2>Novidades</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <div class="dlg-b"><p class="news-of">${esc(a.nome)}</p><div data-slot="news" aria-live="polite"></div></div>
+        <div class="dlg-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Buscar de novo</button><span class="grow"></span>
+          <button type="button" class="btn" data-fora hidden>Deixar de fora</button><button type="button" class="btn primary" data-dentro hidden>Acompanhar</button></div></div>`,
+      onClose: () => { gen++; clearTimeout(timer); if (job) API.del(`api/news/${job}`).catch(() => {}); job = null; },
+    });
+    const dlg = entry.dlg, slot = $('[data-slot="news"]', dlg), again = $("[data-again]", dlg), fora = $("[data-fora]", dlg), dentro = $("[data-dentro]", dlg);
+    const show = (html, done) => { slot.innerHTML = html; again.hidden = !done; fora.hidden = !done; dentro.hidden = true; };
+    const error = (m) => show(`<p class="formerr">${esc(m)}</p>`, true);
+    const render = (r) => show(newsListHtml(r, { name: a.nome }), true);
+    const update = (fn) => { // o app na lista das Novidades, sem ler tudo de novo
+      const L = (newsOv && newsOv.apps && newsOv.apps.lista) || [];
+      const k = L.findIndex((x) => x.pacote === a.pacote);
+      if (k >= 0) { L[k] = a = fn(L[k]); renderNews(); }
+    };
+    async function poll(my) {
+      let st;
+      try { st = await API.get(`api/news/${job}`); }
+      catch (e) { if (my === gen) error(e.message); return; }
+      if (my !== gen) return;
+      if (st.stage === "busy") { timer = setTimeout(() => poll(my), 1200); return; }
+      API.del(`api/news/${job}`).catch(() => {});
+      job = null;
+      if (st.stage === "error") { error(st.msg); return; }
+      const r = { news: st.news, at: new Date().toISOString(), example: !!st.example };
+      update((x) => ({ ...x, res: r }));
+      render(r);
+    }
+    async function start() {
+      const my = ++gen;
+      clearTimeout(timer);
+      if (job) { API.del(`api/news/${job}`).catch(() => {}); job = null; }
+      show(`<div class="wbusy"><span class="spin lg"></span><p><b>Procurando novidades…</b><span>Pode levar até um minuto.</span></p></div>`, false);
+      try {
+        const r = await API.post("api/news/app", { pacote: a.pacote });
+        if (my !== gen) return;
+        job = r.id;
+        poll(my);
+      } catch (e) { if (my === gen) error(e.message); }
+    }
+    async function choose(acompanhar) {
+      try { newsOv = await API.put("api/news/app", { pacote: a.pacote, acompanhar }); }
+      catch (e) { fail(e); return; }
+      renderNews();
+      if (acompanhar) { a = { ...a, conferir: true, manual: true }; start(); return; }
+      requestClose(entry, { force: true });
+      toast(`${a.nome}: deixado de fora`);
+    }
+    dlg.addEventListener("click", (e) => {
+      if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
+      if (e.target.closest("[data-again]")) start();
+      if (e.target.closest("[data-fora]")) choose(false);
+      if (e.target.closest("[data-dentro]")) choose(true);
+    });
+    if (a.res) render(a.res);
+    else if (a.conferir === false) { slot.innerHTML = `<p class="muted">Deixado de fora das novidades.</p>`; dentro.hidden = false; }
+    else start();
   }
   async function addWebPhoto(it) {
     // na ficha, o item já existe: os dados da IA só completam o que está vazio (nunca o nome nem um valor já dado)
@@ -4136,6 +4240,7 @@
         API.post("api/news/notify-test", { who: "eu" }).then((r) => toast(r.sent > 1 ? `Aviso enviado para ${r.sent} celulares` : "Aviso enviado"), fail).finally(() => { b.disabled = !!newsTestWhy(); });
         break;
       case "news-open": { const it = D.itemById.get(b.dataset.id); if (it) openNews(it); break; }
+      case "app-open": { const a = ((newsOv && newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === b.dataset.id); if (a) openAppNews(a); break; }
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }
       case "ai-refresh": { const slot = $('#view [data-slot="ai-panel"]'); if (slot) { slot.innerHTML = `<p class="muted">Verificando…</p>`; renderAiPanel(slot, await aiStatus(true)); paintVoiceLead(); } break; }
       case "theme": setTheme(b.dataset.theme); break;
@@ -4218,6 +4323,7 @@
     }
     else if (k === "news-every") saveNews({ news_every: +t.value }, `Conferir a cada ${+t.value} dias`);
     else if (k === "news-hora") saveNews({ news_hora: t.value }, `Conferir às ${t.value}`);
+    else if (k === "news-apps") saveNews({ news_apps: t.checked }, t.checked ? "Apps do celular nas novidades" : "Apps do celular desligados");
     else if (k === "news-auto") saveNews({ news_every: t.checked ? 7 : 0 }, t.checked ? `Conferir sozinho: a cada 7 dias, às ${S.settings.news_hora || "10:00"}` : "Conferir sozinho desligado");
     else if (k === "news-aviso") {
       // ligou o aviso sem ninguém escolhido: começa com quem está usando o app (como no GerencIA)

@@ -10,8 +10,10 @@ Responde o que o InventarIA usa do Home Assistant, e guarda cada pedido para os 
 - POST /core/api/services/notify/<celular>    aviso no celular
 - GET  /core/api/stt/<entidade>               idiomas da fala para texto
 - POST /core/api/stt/<entidade>               áudio para texto (exige o cabeçalho escrito "X-Speech-Content", como o Supervisor)
+- GET  /core/api/history/period/<início>       o histórico de uma entidade (os apps do sensor Último app usado)
 - WS   /core/websocket                        auth + assist_pipeline/pipeline/list, config/entity_registry/list_for_display,
-                                              config/device_registry/list (os aparelhos dos rastreadores das pessoas)
+                                              config/device_registry/list (os aparelhos dos rastreadores das pessoas),
+                                              config/entity_registry/list (o registro completo: o sensor Último app usado)
 
 Uso:
     ha = FakeHA(media_root="/tmp/media")   # sobe numa porta livre
@@ -28,8 +30,9 @@ import os
 import socket
 import struct
 import threading
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 TOKEN = "token-de-teste"
 
@@ -81,6 +84,8 @@ class FakeHA:
         self.phones = ["mobile_app_celular_da_ana", "mobile_app_tablet_da_sala", "mobile_app_celular_velho"]  # notify.mobile_app_* (inventados)
         self.devices = json.loads(json.dumps(DEFAULT_DEVICES))  # config/device_registry/list
         self.trackers = json.loads(json.dumps(DEFAULT_TRACKERS))  # config/entity_registry/list_for_display (os rastreadores)
+        self.registry = None  # config/entity_registry/list: None = os rastreadores (com device_id); uma lista troca tudo
+        self.history = {}  # entidade -> [estados] do GET /history/period (só os depois do início, mais o de antes, como o HA)
         self.notify_status = 200
         self.todo_items = {}  # todo.x -> [{summary, uid, status, due?}] (todo.add_item e todo.get_items)
         self.events = []  # [(tipo, dados)] dos eventos disparados (POST /api/events/<tipo>)
@@ -138,6 +143,18 @@ class FakeHA:
                     eid = unquote(path.rsplit("/", 1)[1])
                     st = next((s for s in fake.states if s["entity_id"] == eid), None)
                     return self._send(200, st) if st else self._send(404, {"message": "Entity not found."})
+                if path.startswith("/core/api/history/period/"):
+                    q = parse_qs(urlparse(self.path).query)
+                    start = unquote(path[len("/core/api/history/period/"):])
+                    eid = (q.get("filter_entity_id") or [""])[0]
+                    lst = fake.history.get(eid)
+                    if lst is None:
+                        return self._send(200, [])
+                    t0 = datetime.fromisoformat(start)
+                    before = [x for x in lst if datetime.fromisoformat(x["last_changed"]) <= t0]
+                    after = [x for x in lst if datetime.fromisoformat(x["last_changed"]) > t0]
+                    first = [dict(before[-1], last_changed=start, last_updated=start)] if before else []  # o de antes, com a hora do início
+                    return self._send(200, [first + after] if first + after else [])
                 if path == "/core/api/services":
                     return self._send(200, [{"domain": "notify", "services": {**{p: {} for p in fake.phones}, "notify": {}, "persistent_notification": {}}},
                                             {"domain": "light", "services": {"turn_on": {}}}])
@@ -292,6 +309,10 @@ class FakeHA:
                 send({"id": cmd.get("id"), "type": "result", "success": True, "result": self.pipelines})
             elif cmd.get("type") == "config/entity_registry/list_for_display":
                 send({"id": cmd.get("id"), "type": "result", "success": True, "result": {"entity_categories": {}, "entities": self.trackers}})
+            elif cmd.get("type") == "config/entity_registry/list":
+                reg = self.registry if self.registry is not None else [{"entity_id": t["ei"], "device_id": t["di"], "platform": "mobile_app" if t["di"] == "d-ana" else "ping",
+                                                                       "unique_id": t["ei"]} for t in self.trackers]
+                send({"id": cmd.get("id"), "type": "result", "success": True, "result": reg})
             elif cmd.get("type") == "config/device_registry/list":
                 send({"id": cmd.get("id"), "type": "result", "success": True, "result": self.devices})
             else:

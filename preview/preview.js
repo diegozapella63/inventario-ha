@@ -10,7 +10,7 @@
   const CATS = { has: (k) => ST.data && catsOf(ST.data).some((c) => c.id === k) };
   const foldName = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const ST = { data: null, rev: 1, blobs: new Map(), jobs: new Map(), settings: { ai_entity: "", ai_search: "", ai: true, zones: false, ha_sensors: false, voice_stt: "", news: true, news_every: 0, news_notify: "", bens: true, correria: false },
-    news: { itens: {}, triagem: {}, ultima: null } };
+    news: { itens: {}, triagem: {}, ultima: null, apps: {}, apps_triagem: {} } };
   const now = () => new Date().toISOString();
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -109,7 +109,7 @@
     if (method === "GET" && path === "api/data") {
       const st = ST.settings;
       return { ...clone(d), rev: ST.rev, version: "%%V%%", user: null, features: { ai: true, share: false },
-        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false, correria: st.correria === true, accent: st.accent ?? null, accent_daily: st.accent_daily ?? null, news_hora: st.news_hora || "10:00", news_aviso: st.news_aviso === true, news_para: st.news_para || [] }, correria_uso: null };
+        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false, correria: st.correria === true, accent: st.accent ?? null, accent_daily: st.accent_daily ?? null, news_hora: st.news_hora || "10:00", news_aviso: st.news_aviso === true, news_para: st.news_para || [], news_apps: st.news_apps === true }, correria_uso: null };
     }
     if (method === "GET" && path === "api/rev") return { rev: ST.rev, correria_uso: null };
     if (method === "POST" && path === "api/items") {
@@ -320,9 +320,22 @@
     };
     const sameGroup = (it) => d.items.filter((x) => groupKey(x) === groupKey(it));
     const newsJobOf = () => [...ST.jobs.entries()].find(([, j]) => j.lote && !j.done);
+    // Apps do celular (1.56.0): os apps de exemplo de dois celulares (no Home Assistant, vêm do sensor Último app usado)
+    const APPS = [["com.exemplo.casaconectada", "Casa Conectada", ["Ana"]], ["com.exemplo.musicaja", "Música Já", ["Ana", "Beto"]],
+      ["com.exemplo.mercadinho", "Mercadinho", ["Beto"]], ["com.android.launcher3", "Tela inicial", ["Ana", "Beto"]]];
+    const appsOn = () => ST.settings.news_apps === true && ST.settings.news !== false;
+    const exampleAppNews = (name) => ({ produto: name, novidades: [
+      { tipo: "atualizacao", titulo: "Novo modo de economia de bateria", resumo: "Exemplo da prévia: no Home Assistant, a IA busca as novidades deste app.", data: `${new Date().getFullYear()}-10`, fonte: "https://exemplo.com/blog", site: "exemplo.com", boato: false }] });
+    const appsList = () => ({ sensores: 2, lista: APPS.map(([pacote, nome, pessoas]) => {
+      const t = ST.news.apps_triagem[pacote];
+      return { pacote, nome, pessoas, ultimo: new Date().toISOString(), conferir: t ? t.conferir : null, manual: !!(t && t.manual), res: ST.news.apps[pacote] || null };
+    }) });
     const newsTick = (j) => { // a conferência anda com o relógio: um item a cada 0,7 s
       const n = Math.min(j.todo.length, Math.floor((Date.now() - j.at) / 700));
-      for (const it of j.todo.slice(j.saved, n)) for (const x of sameGroup(it)) ST.news.itens[x.id] = { at: new Date().toISOString(), news: exampleNews(it.name) };
+      for (const it of j.todo.slice(j.saved, n)) {
+        if (it.app) ST.news.apps[it.app] = { at: new Date().toISOString(), news: exampleAppNews(it.name) };
+        else for (const x of sameGroup(it)) ST.news.itens[x.id] = { at: new Date().toISOString(), news: exampleNews(it.name) };
+      }
       j.saved = n;
       if (n >= j.todo.length && !j.done) { j.done = true; ST.news.ultima = { at: new Date().toISOString(), conferidos: n, com_novidades: n, selecionados: n, em_dia: 0, erros: 0 }; }
       return n;
@@ -339,12 +352,29 @@
       const lj = newsJobOf();
       const grupos = Object.fromEntries(d.items.filter((i) => cats.includes(i.cat) || i.id in ST.news.itens).map((i) => [i.id, groupKey(i)]));
       return { cats, triagem: { ...tri }, grupos, pendentes: d.items.filter((i) => cats.includes(i.cat) && !(i.id in tri)).length,
-        itens: { ...ST.news.itens }, ultima: ST.news.ultima, job: lj ? { id: lj[0], stage: "busy", msg: "Conferindo…", progress: null, summary: null } : null };
+        itens: { ...ST.news.itens }, ultima: ST.news.ultima, job: lj ? { id: lj[0], stage: "busy", msg: "Conferindo…", progress: null, summary: null } : null,
+        apps: appsOn() ? appsList() : null };
     }
     if (method === "DELETE" && path === "api/news") {
       for (const [id, j] of ST.jobs) if (j.lote) { j.done = true; ST.jobs.delete(id); }
-      ST.news = { itens: {}, triagem: {}, ultima: null };
+      const manual = Object.fromEntries(Object.entries(ST.news.apps_triagem).filter(([, v]) => v.manual)); // a escolha da pessoa fica
+      ST.news = { itens: {}, triagem: {}, ultima: null, apps: {}, apps_triagem: manual };
       return handle("GET", "api/news", {});
+    }
+    if (method === "PUT" && path === "api/news/app") {
+      const a = APPS.find((x) => x[0] === body.pacote);
+      if (!a) fail("App não encontrado.", 404);
+      ST.news.apps_triagem[a[0]] = { conferir: body.acompanhar === true, manual: true };
+      if (body.acompanhar !== true) delete ST.news.apps[a[0]];
+      return handle("GET", "api/news", {});
+    }
+    if (method === "POST" && path === "api/news/app") {
+      aiOff();
+      const a = APPS.find((x) => x[0] === body.pacote);
+      if (!a) fail("App não encontrado.", 404);
+      const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");
+      ST.jobs.set(id, { at: Date.now(), news: true, name: a[1], app: a[0] });
+      return { id };
     }
     if (method === "POST" && path === "api/news/all") {
       aiOff();
@@ -356,6 +386,10 @@
       const seen = new Set();
       const todo = d.items.filter((i) => cats.includes(i.cat) && (ST.news.triagem[i.id] || ST.news.itens[i.id]) && !(ST.news.itens[i.id] && Date.parse(ST.news.itens[i.id].at) > week))
         .filter((i) => !seen.has(groupKey(i)) && seen.add(groupKey(i))); // uma busca por equipamento
+      if (appsOn()) { // e os apps: a "IA" deixa a tela inicial de fora
+        for (const [p] of APPS) if (!ST.news.apps_triagem[p]) ST.news.apps_triagem[p] = { conferir: !/launcher/.test(p) };
+        for (const [p, name] of APPS) if ((ST.news.apps_triagem[p].conferir || ST.news.apps[p]) && !(ST.news.apps[p] && Date.parse(ST.news.apps[p].at) > week)) todo.push({ name, app: p });
+      }
       const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");
       ST.jobs.set(id, { lote: true, at: Date.now(), todo, saved: 0, done: false });
       return { id };
@@ -410,6 +444,7 @@
       if (!j) fail("Esta busca terminou. Busque de novo.", 404);
       aiOff();
       if (Date.now() - j.at < 1600) return { stage: "busy", msg: "Procurando novidades…" };
+      if (j.app) { const news = exampleAppNews(j.name); ST.news.apps[j.app] = { at: new Date().toISOString(), news }; return { stage: "done", msg: "", example: true, news }; }
       const news = exampleNews(j.name);
       const it = d.items.find((i) => i.id === j.item);
       for (const x of it ? sameGroup(it) : [{ id: j.item }]) ST.news.itens[x.id] = { at: new Date().toISOString(), news };

@@ -87,6 +87,7 @@ SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 USAGE_FILE = os.path.join(DATA_DIR, "uso_ia.json")
 NEWS_FILE = os.path.join(DATA_DIR, "novidades.json")  # novidades conferidas e a escolha da IA (não entra no inventário)
 REC_FILE = os.path.join(DATA_DIR, "recursos.json")  # os recursos de cada equipamento, ditos pela IA (não entra no inventário)
+APPS_FILE = os.path.join(DATA_DIR, "apps.json")  # os apps usados nos celulares, pelo sensor Último app usado (não entra no inventário)
 PHOTOS_DIR = os.path.join(DATA_DIR, "photos")
 THUMBS_DIR = os.path.join(DATA_DIR, "thumbs")
 HISTORY_DIR = os.path.join(DATA_DIR, "history")
@@ -2833,15 +2834,16 @@ def news_clean(data) -> dict:
     return {"produto": " ".join(str(data.get("produto") or data.get("product") or "").split())[:200], "novidades": out[:NEWS_MAX]}
 
 
-def ai_find_news(name: str, details: str, entity: str) -> dict:
-    prompt = news_prompt(name, details)
+def ai_find_news(name: str, details: str, entity: str, prompt: str | None = None, task: str = "InventarIA: novidades") -> dict:
+    """As novidades de um equipamento (ou, com outro pedido, de um app do celular), pela IA com busca na web."""
+    prompt = prompt or news_prompt(name, details)
     with AiCall("novidades", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
         if AI_MOCK:
             time.sleep(0.4)
             data = read_json(os.environ.get("INV_MOCK_NEWS") or "", None) or MOCK_NEWS
             call.answer(data)
         else:
-            raw = ai_call_text("InventarIA: novidades", prompt, entity)
+            raw = ai_call_text(task, prompt, entity)
             call.answer(str(raw or ""))
             try:
                 data = extract_json(raw)
@@ -2940,10 +2942,10 @@ def news_read() -> dict:
     d = read_json_ok(NEWS_FILE, {}) or {}
     if not isinstance(d, dict):
         d = {}
-    for k in ("itens", "triagem"):
+    for k in ("itens", "triagem", "apps", "apps_triagem"):  # apps: as novidades de cada app do celular; apps_triagem: a escolha
         if not isinstance(d.get(k), dict):
             d[k] = {}
-    for v in d["itens"].values():  # guardadas antes do limite: ficam só as mais recentes
+    for v in [*d["itens"].values(), *d["apps"].values()]:  # guardadas antes do limite: ficam só as mais recentes
         news = v.get("news") if isinstance(v, dict) else None
         if isinstance(news, dict) and isinstance(news.get("novidades"), list):  # guardadas antes: as mesmas regras de agora
             news["novidades"] = [n for n in news["novidades"] if isinstance(n, dict) and news_recent(str(n.get("data") or ""))][:NEWS_MAX]
@@ -2966,8 +2968,9 @@ def news_clear() -> dict:
         if job.get("kind") == "lote":
             job.update(cancelled=True, cleared=True)
             WEB_JOBS.pop(jid, None)
-    with NEWS_LOCK:
-        write_json_atomic(NEWS_FILE, {"itens": {}, "triagem": {}})
+    with NEWS_LOCK:  # dos apps, fica o que a pessoa escolheu (Acompanhar e Deixar de fora): não é escolha da IA
+        manual = {k: v for k, v in news_read()["apps_triagem"].items() if isinstance(v, dict) and v.get("manual")}
+        write_json_atomic(NEWS_FILE, {"itens": {}, "triagem": {}, "apps": {}, "apps_triagem": manual})
     return news_overview()
 
 
@@ -3118,7 +3121,7 @@ def news_overview() -> dict:
     return {"cats": cats, "triagem": {k: bool(v.get("conferir")) for k, v in tri.items()}, "grupos": grupos,
             "pendentes": sum(1 for i in STORE.data["items"] if i.get("cat") in cats and i["id"] not in tri),
             "itens": {k: {"at": v.get("at"), "news": v.get("news")} for k, v in d["itens"].items() if k in ids and isinstance(v, dict)},
-            "ultima": d.get("ultima"), "job": job}
+            "ultima": d.get("ultima"), "job": job, "apps": apps_overview() if apps_enabled() else None}
 
 
 def triage_prompt(items: list[dict]) -> str:
@@ -3217,17 +3220,44 @@ def _news_batch_run(jid: str):
                             d2["itens"][m["id"]] = {**src, "sig": item_sig(m)}
                     write_json_atomic(NEWS_FILE, d2)
         todo.sort(key=lambda ms: max(checked_at(m) for m in ms))
-        job["progress"] = {"feitos": 0, "total": len(todo), "atual": ""}
+        # os apps do celular (com a opção ligada): lê o histórico dos sensores, a IA escolhe os que ainda não viu e entram
+        # na mesma conferência, depois dos equipamentos, com o mesmo intervalo
+        sel_apps, apps_todo, apps = [], [], {}
+        if apps_enabled():
+            job["msg"] = "Lendo os apps dos celulares…"
+            try:
+                apps_collect(force=True)
+            except ApiError as e:
+                log.info("apps do celular: %s", e.msg)
+            apps_triage_pending(job)
+            if job.get("cleared"):
+                return
+            apps, d = apps_read()["apps"], news_read()
+            tri_a = d["apps_triagem"]
+            sel_apps = apps_selected(d, apps)
+            app_at = lambda p: _ts((d["apps"].get(p) or {}).get("at"))  # noqa: E731
+            apps_todo = sorted((p for p in sel_apps if app_at(p) < fresh), key=app_at)
+        total = len(todo) + len(apps_todo)
+        job["progress"] = {"feitos": 0, "total": total, "atual": ""}
         entity = search_entity()
-        for n, members in enumerate(todo):
+        novos_apps = []
+        fila = [("item", ms) for ms in todo] + [("app", p) for p in apps_todo]
+        for n, (tipo, alvo) in enumerate(fila):
             if job.get("cancelled"):
                 break
             need_ai_on()
-            it = min(members, key=lambda m: (len(m["name"]), m["name"]))  # o nome mais curto: "Lâmpada", não "Lâmpadas"
-            job["progress"] = {"feitos": n, "total": len(todo), "atual": it["name"]}
-            job["msg"] = f"Conferindo {n + 1} de {len(todo)}: {it['name']}"
+            if tipo == "item":
+                it = min(alvo, key=lambda m: (len(m["name"]), m["name"]))  # o nome mais curto: "Lâmpada", não "Lâmpadas"
+                nome = it["name"]
+            else:
+                nome = app_name(alvo, apps, tri_a)
+            job["progress"] = {"feitos": n, "total": total, "atual": nome}
+            job["msg"] = f"Conferindo {n + 1} de {total}: {nome}"
             try:
-                res = ai_find_news(it["name"], " ".join(str(it.get("details") or "").split())[:300], entity)
+                if tipo == "item":
+                    res = ai_find_news(it["name"], " ".join(str(it.get("details") or "").split())[:300], entity)
+                else:
+                    res = ai_find_app_news(nome, alvo, entity)
             except ApiError as e:
                 if is_quota(e.msg) or "busca na web" in e.msg or e.status == 409:
                     raise  # a cota acabou, a IA não busca na web ou a IA foi desligada: as próximas também não vão
@@ -3235,24 +3265,29 @@ def _news_batch_run(jid: str):
                 continue
             if job.get("cleared"):  # Limpar novidades no meio: nada mais é gravado
                 return
-            if news_new_entries((news_read()["itens"].get(it["id"]) or {}).get("news"), res):
-                novos.append(it["name"])
-            for m in members:
-                news_save_result(m["id"], res)
+            if tipo == "item":
+                if news_new_entries((news_read()["itens"].get(it["id"]) or {}).get("news"), res):
+                    novos.append(nome)
+                for m in alvo:
+                    news_save_result(m["id"], res)
+            else:
+                if news_new_entries((news_read()["apps"].get(alvo) or {}).get("news"), res):
+                    novos_apps.append(nome)
+                app_news_save(alvo, res)
             done += 1
             found += 1 if res["novidades"] else 0
-        summary = {"selecionados": len(groups), "conferidos": done, "com_novidades": found, "em_dia": len(groups) - len(todo), "erros": errors,
-                   "novos": len(novos)}
+        summary = {"selecionados": len(groups) + len(sel_apps), "conferidos": done, "com_novidades": found,
+                   "em_dia": len(groups) - len(todo) + len(sel_apps) - len(apps_todo), "erros": errors, "novos": len(novos) + len(novos_apps)}
         if job.get("cleared"):
             return
         with NEWS_LOCK:
             d = news_read()
             d["ultima"] = {"at": now_iso(), **summary}
             write_json_atomic(NEWS_FILE, d)
-        job.update(stage="done", msg="", summary=summary, progress={"feitos": done, "total": len(todo), "atual": ""})
-        if job.get("auto") and novos and news_aviso() and news_para():
+        job.update(stage="done", msg="", summary=summary, progress={"feitos": done, "total": total, "atual": ""})
+        if job.get("auto") and (novos or novos_apps) and news_aviso() and news_para():
             try:
-                send_news_notice(len(novos))
+                send_news_notice(len(novos), apps=len(novos_apps))
             except ApiError as e:
                 log.warning("aviso das novidades: %s", e.msg)
     except ApiError as e:
@@ -3274,6 +3309,353 @@ def news_new_entries(before, after) -> list[dict]:
     return [n for n in (after or {}).get("novidades") or [] if n.get("fonte") not in seen and fold(n.get("titulo") or "") not in seen]
 
 
+# ---------- Apps do celular (1.56.0): as novidades dos apps que a casa usa, pelo sensor Último app usado do app Home
+# Assistant no Android (o pacote do app aberto; ligado em Configurações › Aplicativo complementar › Gerenciar sensores).
+# O app junta, pelo histórico do Home Assistant, os apps que apareceram em cada celular; a IA escolhe os que vale
+# acompanhar (fora a tela inicial, as configurações, o teclado...) e as Novidades conferem como os eletrônicos.
+APPS_LOCK = threading.Lock()
+PKG_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+")  # com.amazon.dee.app
+APPS_SENSOR_RE = re.compile(r"sensor\.[a-z0-9_]+_(last_used_app|ultimo_app_usado|ultimo_aplicativo_usado)")
+APPS_HIST_DAYS = 10  # o Home Assistant guarda 10 dias de histórico (o padrão)
+APPS_READ_EVERY = 600  # de quanto em quanto tempo (s), no máximo, a tela das Novidades lê o histórico de novo
+APPS_MAX = 300
+MOCK_APPS = [  # sem Home Assistant (dev/run.sh e testes): apps inventados, de um celular de teste
+    ("com.exemplo.casaconectada", "Casa Conectada"), ("com.exemplo.musicaja", "Música Já"), ("com.exemplo.mercadinho", "Mercadinho"),
+    ("com.android.launcher3", "Tela inicial"), ("com.android.settings", "Configurações")]
+MOCK_APPS_FORA = re.compile(r"launcher|systemui|settings|inputmethod|keyboard|packageinstaller|permissioncontroller|^android$")
+MOCK_APP_NEWS = {"produto": "App de exemplo", "novidades": [
+    {"tipo": "atualizacao", "titulo": "Novo modo de economia de bateria", "resumo": "A versão nova gasta menos bateria quando o app fica "
+     "aberto em segundo plano.", "data": "2026-10-20", "fonte": "https://exemplo.com/blog/bateria", "boato": False},
+    {"tipo": "outro", "titulo": "Plano família chega ao Brasil", "resumo": "Até seis pessoas na mesma assinatura.", "data": "2026-09",
+     "fonte": "https://exemplo.com/planos", "boato": False}]}
+
+
+def apps_enabled() -> bool:
+    """Apps do celular (Configurações › Opções › Novidades): desligado de início; só com as Novidades (e a IA) ligadas."""
+    return STORE.settings.get("news_apps") is True and news_enabled() and ai_enabled()
+
+
+def apps_read() -> dict:
+    d = read_json_ok(APPS_FILE, {}) or {}
+    if not isinstance(d, dict):
+        d = {}
+    for k in ("apps", "lido"):
+        if not isinstance(d.get(k), dict):
+            d[k] = {}
+    return d
+
+
+def _ts(v) -> float:
+    try:
+        return datetime.fromisoformat(str(v)).timestamp() if v else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def apps_sensors() -> tuple[list[dict], dict]:
+    """Os sensores Último app usado dos celulares e as pessoas de cada um, [{entity, pessoas}], e os estados de agora
+    ({entity_id: estado}). Pelo registro do Home
+    Assistant (do mobile_app, com o unique_id terminado em last_used_app: o nome da entidade muda com a língua do celular)
+    e, sem o registro, pelo nome da entidade. A pessoa é a dona do rastreador do mesmo aparelho."""
+    states = ha_request("GET", "/states", timeout=15) or []
+    states = [s for s in states if isinstance(s, dict)] if isinstance(states, list) else []
+    try:
+        reg = ha_ws({"type": "config/entity_registry/list"}, timeout=15)
+    except (ApiError, OSError, ValueError):
+        reg = None
+    reg = [e for e in reg if isinstance(e, dict)] if isinstance(reg, list) else None
+    found = {}  # entidade -> aparelho (o id no registro, ou o nome do aparelho tirado da entidade)
+    if reg is not None:
+        for e in reg:
+            eid = str(e.get("entity_id") or "")
+            if (e.get("platform") == "mobile_app" and str(e.get("unique_id") or "").endswith("last_used_app")
+                    and eid.startswith("sensor.") and not e.get("disabled_by")):
+                found[eid] = e.get("device_id") or eid
+    for st in states:
+        m = APPS_SENSOR_RE.fullmatch(str(st.get("entity_id") or ""))
+        if m and st["entity_id"] not in found:
+            found[st["entity_id"]] = st["entity_id"][7:m.start(1) - 1]  # sensor.celular_da_ana_last_used_app -> celular_da_ana
+    dev_of = {str(e.get("entity_id") or ""): e.get("device_id") for e in reg or []}
+    out = []
+    for eid, dev in found.items():
+        pessoas = []
+        for st in states:
+            if re.fullmatch(r"person\.[a-z0-9_]+", str(st.get("entity_id") or "")):
+                a = st.get("attributes") or {}
+                trackers = a.get("device_trackers") if isinstance(a.get("device_trackers"), list) else []
+                if any(dev_of.get(t) == dev or str(t) == f"device_tracker.{dev}" for t in trackers):
+                    pessoas.append(str(a.get("friendly_name") or st["entity_id"][7:]))
+        out.append({"entity": eid, "pessoas": pessoas})
+    return out, {s.get("entity_id"): s for s in states}
+
+
+def _app_label(attrs) -> str:
+    """O nome do app que o sensor manda junto (Label), quando vem."""
+    if isinstance(attrs, dict):
+        for k in ("Label", "label", "app_label", "App label"):
+            if isinstance(attrs.get(k), str) and attrs[k].strip():
+                return " ".join(attrs[k].split())[:80]
+    return ""
+
+
+def _app_seen(apps: dict, pkg: str, when: str, label: str, pessoas: list[str]):
+    """Mais um uso do app: quantas vezes apareceu, em quantos dias, o último, de quem."""
+    a = apps.setdefault(pkg, {"nome": "", "vezes": 0, "dias": 0, "dia": "", "primeiro": when, "ultimo": when, "pessoas": []})
+    a["vezes"] += 1
+    dia = (when or "")[:10]
+    if dia and dia != a.get("dia"):
+        a["dias"] = int(a.get("dias") or 0) + 1
+        a["dia"] = dia
+    if _ts(when) >= _ts(a.get("ultimo")):
+        a["ultimo"] = when
+    if label:
+        a["nome"] = label
+    for p in pessoas:
+        if p not in a["pessoas"]:
+            a["pessoas"].append(p)
+
+
+def apps_collect(force: bool = False) -> dict:
+    """Lê o histórico de cada sensor desde a última leitura (na primeira, os últimos 10 dias) e junta os apps em apps.json.
+    Sem histórico (o sensor fora do registro do Home Assistant), vale o estado de agora. Sem Home Assistant (dev/run.sh),
+    os apps de exemplo."""
+    with APPS_LOCK:
+        d = apps_read()
+        if not force and time.time() - _ts(d.get("lido_em")) < APPS_READ_EVERY:
+            return d
+        agora = datetime.now().astimezone()
+        if AI_MOCK and not SUPERVISOR_TOKEN:
+            if not d["apps"]:
+                for pkg, nome in MOCK_APPS:
+                    _app_seen(d["apps"], pkg, agora.isoformat(timespec="seconds"), nome, ["Pessoa de Teste"])
+            d.update(lido_em=agora.isoformat(timespec="seconds"), sensores=1)
+            write_json_atomic(APPS_FILE, d)
+            return d
+        sensors, states = apps_sensors()
+        for s in sensors:
+            eid = s["entity"]
+            desde = d["lido"].get(eid) or (agora - timedelta(days=APPS_HIST_DAYS)).isoformat(timespec="seconds")
+            q = urllib.parse.urlencode({"filter_entity_id": eid, "end_time": agora.isoformat(timespec="seconds")})
+            try:
+                hist = ha_request("GET", f"/history/period/{urllib.parse.quote(desde)}?{q}", timeout=30)
+            except ApiError as e:
+                log.info("apps do celular: histórico de %s: %s", eid, e.msg)
+                hist = None
+            lista = hist[0] if isinstance(hist, list) and hist and isinstance(hist[0], list) else []
+            if not lista and eid in states:
+                lista = [states[eid]]
+            for st in lista:
+                pkg = str((st or {}).get("state") or "")
+                when = str(st.get("last_changed") or st.get("last_updated") or "")
+                if not PKG_RE.fullmatch(pkg) or _ts(when) <= _ts(desde):  # o primeiro é o de antes da leitura: já contado
+                    continue
+                _app_seen(d["apps"], pkg, when, _app_label(st.get("attributes")), s["pessoas"])
+            d["lido"][eid] = agora.isoformat(timespec="seconds")
+        if len(d["apps"]) > APPS_MAX:  # os usados há mais tempo saem primeiro
+            for k in sorted(d["apps"], key=lambda k: _ts(d["apps"][k].get("ultimo")))[:len(d["apps"]) - APPS_MAX]:
+                del d["apps"][k]
+        d.update(lido_em=agora.isoformat(timespec="seconds"), sensores=len(sensors))
+        write_json_atomic(APPS_FILE, d)
+        return d
+
+
+def apps_triage_prompt(apps: list[tuple[str, str]]) -> str:
+    return "\n".join([
+        "Você ajuda a acompanhar as novidades dos aplicativos que uma família usa no celular (Android, no Brasil).",
+        "Para cada pacote abaixo, diga o nome do app como aparece na loja e se vale acompanhar as novidades dele "
+        "(recursos novos, mudanças, planos e preços, fim de recurso).",
+        "Não vale para as partes do sistema do celular: tela inicial, configurações, teclado, interface do sistema, instalador "
+        "de apps, permissões, serviços do Google ou do fabricante que a pessoa não abre.",
+        "",
+        "Apps (pacote: nome, quando se sabe):",
+        *[f"{p}" + (f": {n}" if n else "") for p, n in apps],
+        "",
+        'Responda somente com um objeto JSON, sem texto antes ou depois: {"apps": [{"pacote": "com.exemplo.app", "nome": "Nome do app", '
+        '"conferir": true}]}, com todos os pacotes da lista.',
+    ])
+
+
+def ai_apps_triage(apps: list[tuple[str, str]]) -> dict:
+    """{pacote: {"conferir", "nome"}} para cada app, numa pergunta à IA (sem busca na web) para cada bloco."""
+    out = {}
+    entity = photo_entity()
+    for k in range(0, len(apps), TRIAGE_CHUNK):
+        part = apps[k:k + TRIAGE_CHUNK]
+        prompt = apps_triage_prompt(part)
+        with AiCall("triagem", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
+            if AI_MOCK:
+                data = {"apps": [{"pacote": p, "nome": n or p.rsplit(".", 1)[-1].capitalize(), "conferir": not MOCK_APPS_FORA.search(p)} for p, n in part]}
+                call.answer(data)
+            else:
+                raw = ai_call_text("InventarIA: escolher apps", prompt, entity, timeout=180)
+                if raw is None:
+                    call.result = "formato"
+                    raise ApiError(502, "A IA não devolveu resposta.")
+                call.answer(raw)
+                try:
+                    data = extract_json(raw)
+                except ApiError:
+                    call.result = "formato"
+                    raise
+        got = data.get("apps") if isinstance(data, dict) else data
+        names = dict(part)
+        for x in got if isinstance(got, list) else []:
+            p = str(x.get("pacote") or x.get("package") or "") if isinstance(x, dict) else ""
+            if p in names:
+                out[p] = {"conferir": x.get("conferir") is True, "nome": " ".join(str(x.get("nome") or names[p] or "").split())[:80]}
+        for p, n in part:  # um que a IA não devolveu fica de fora (ela vê de novo na próxima, se a pessoa não escolher antes)
+            out.setdefault(p, {"conferir": False, "nome": n, "faltou": True})
+    return out
+
+
+def app_news_prompt(nome: str, pacote: str) -> str:
+    return "\n".join([
+        "Você acompanha os aplicativos de celular de uma família no Brasil.",
+        f"Aplicativo: {nome} (Android, pacote {pacote})",
+        f"Hoje é {news_today().isoformat()}.",
+        "",
+        "Use a busca na web agora.",
+        "Procure no site e no blog oficial do app ou da empresa, na página dele na Google Play e em sites de tecnologia e de "
+        "notícias confiáveis o que mudou nos últimos 12 meses e o que já foi anunciado para os próximos meses:",
+        "- recursos novos e mudanças que a pessoa vai ver no app;",
+        "- novidades do serviço do app (planos, preços, o que entra ou sai), mesmo que saiam em outro app ou no site da mesma empresa;",
+        "- fim de um recurso, do app ou do suporte a versões antigas do Android.",
+        "Só o que vale no Brasil: deixe de fora o que é só de outro país ou só de teste fechado (beta, acesso antecipado), a não "
+        "ser que diga quando chega aqui. Deixe de fora o texto genérico de atualização da loja (correções de erros e melhorias).",
+        "Cada novidade precisa de uma fonte que apareceu na busca. Não invente: sem fonte, deixe de fora. "
+        "Rumor ou vazamento só entra marcado como boato.",
+        "Responda somente com um objeto JSON, sem texto antes ou depois:",
+        '{"produto": "nome do app", "novidades": [{"tipo": "atualizacao, lancamento, suporte ou outro", '
+        '"titulo": "frase curta em português", "resumo": "uma ou duas frases em português", "data": "AAAA-MM-DD, AAAA-MM ou vazio", '
+        '"fonte": "endereço da página", "boato": false}]}',
+        f"Só as {NEWS_MAX} novidades mais recentes, da mais nova para a mais antiga.",
+        'Se não achar nada, responda {"produto": "...", "novidades": []}.',
+        'Se não conseguir usar a busca na web, responda apenas {"erro": "sem_busca"}.',
+    ])
+
+
+def ai_find_app_news(nome: str, pacote: str, entity: str) -> dict:
+    if AI_MOCK and not os.environ.get("INV_MOCK_NEWS"):
+        with AiCall("novidades", "ai_task.simulado", app_news_prompt(nome, pacote)) as call:
+            time.sleep(0.2)
+            call.answer(MOCK_APP_NEWS)
+        return news_clean(MOCK_APP_NEWS)
+    return ai_find_news(nome, "", entity, prompt=app_news_prompt(nome, pacote), task="InventarIA: novidades de app")
+
+
+def app_name(pkg: str, apps: dict | None = None, tri: dict | None = None) -> str:
+    """O nome do app: o que a IA deu, o que o sensor mandou ou, sem nenhum, o fim do pacote."""
+    t = (tri or {}).get(pkg) or {}
+    a = (apps or {}).get(pkg) or {}
+    return t.get("nome") or a.get("nome") or pkg.rsplit(".", 1)[-1]
+
+
+def apps_overview(collect: bool = True) -> dict:
+    """Os apps para a tela das Novidades: [{pacote, nome, pessoas, ultimo, conferir (da IA ou da pessoa; None se ainda não
+    viu), manual, res}], e quantos sensores achou na última leitura."""
+    if collect:
+        try:
+            apps_collect()
+        except ApiError as e:
+            log.info("apps do celular: %s", e.msg)
+    a = apps_read()
+    d = news_read()
+    tri, res = d["apps_triagem"], d["apps"]
+    lista = []
+    for pkg, v in a["apps"].items():
+        t = tri.get(pkg) if isinstance(tri.get(pkg), dict) else {}
+        r = res.get(pkg) if isinstance(res.get(pkg), dict) else None
+        lista.append({"pacote": pkg, "nome": app_name(pkg, a["apps"], tri), "pessoas": v.get("pessoas") or [], "ultimo": v.get("ultimo"),
+                      "conferir": t.get("conferir") if "conferir" in t and not t.get("faltou") else None, "manual": bool(t.get("manual")),
+                      "res": {"at": r.get("at"), "news": r.get("news")} if r else None})
+    return {"sensores": a.get("sensores"), "lido_em": a.get("lido_em"), "lista": lista}
+
+
+def apps_selected(d: dict, apps: dict) -> list[str]:
+    """Os apps que as Novidades conferem: os que a IA ou a pessoa escolheu e os que já foram conferidos."""
+    return [p for p in apps if (d["apps_triagem"].get(p) or {}).get("conferir") or p in d["apps"]]
+
+
+def apps_triage_pending(job: dict | None = None):
+    """A IA escolhe os apps que ainda não viu (uma pergunta só, sem busca na web); a escolha da pessoa fica."""
+    apps = apps_read()["apps"]
+    d = news_read()
+    nao = [p for p in apps if not isinstance(d["apps_triagem"].get(p), dict) or d["apps_triagem"][p].get("faltou")]
+    if not nao:
+        return
+    if job is not None:
+        job["msg"] = "A IA está escolhendo os apps…"
+    got = ai_apps_triage([(p, apps[p].get("nome") or "") for p in nao])
+    with NEWS_LOCK:
+        d = news_read()
+        for p, v in got.items():
+            if not (d["apps_triagem"].get(p) or {}).get("manual"):
+                d["apps_triagem"][p] = v
+        write_json_atomic(NEWS_FILE, d)
+
+
+def app_news_save(pkg: str, found: dict):
+    with NEWS_LOCK:
+        d = news_read()
+        d["apps"][pkg] = {"at": now_iso(), "news": found}
+        write_json_atomic(NEWS_FILE, d)
+
+
+def need_apps_on():
+    need_news_on()
+    if not apps_enabled():
+        raise ApiError(409, "Os apps do celular estão desligados. Para usar, ligue em Mais > Configurações > Opções.")
+
+
+def _app_news_job_run(jid: str, pkg: str, nome: str, entity: str):
+    job = WEB_JOBS[jid]
+    try:
+        found = ai_find_app_news(nome, pkg, entity)
+        if not job.get("cancelled"):
+            app_news_save(pkg, found)
+            job.update(stage="done", msg="", news=found)
+    except ApiError as e:
+        job.update(stage="error", msg=e.msg)
+    except Exception:  # noqa: BLE001
+        log.exception("novidades de app")
+        job.update(stage="error", msg="Não deu para buscar agora. Tente de novo em instantes.")
+
+
+def app_news_job_start(body: dict) -> dict:
+    """Conferir um app (a janela dele em Mais › Novidades): um deixado de fora conferido passa para a lista."""
+    need_apps_on()
+    pkg = str(body.get("pacote") or "")
+    apps = apps_read()["apps"]
+    if pkg not in apps:
+        raise ApiError(404, "App não encontrado.")
+    if not SUPERVISOR_TOKEN and not AI_MOCK:
+        raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
+    web_jobs_cleanup()
+    jid = secrets.token_hex(8)
+    with WEB_LOCK:
+        WEB_JOBS[jid] = {"stage": "busy", "msg": "Procurando novidades…", "results": [], "news": None, "at": time.time(), "kind": "novidades"}
+    threading.Thread(target=_app_news_job_run, args=(jid, pkg, app_name(pkg, apps, news_read()["apps_triagem"]), search_entity()), daemon=True).start()
+    return {"id": jid}
+
+
+def app_choice(body: dict) -> dict:
+    """Acompanhar ou Deixar de fora um app (a escolha da pessoa vale sobre a da IA). Deixado de fora, sai o que já foi achado."""
+    need_apps_on()
+    pkg = str(body.get("pacote") or "")
+    apps = apps_read()["apps"]
+    if pkg not in apps:
+        raise ApiError(404, "App não encontrado.")
+    if not isinstance(body.get("acompanhar"), bool):
+        raise ApiError(400, "Diga se é para acompanhar o app.")
+    with NEWS_LOCK:
+        d = news_read()
+        d["apps_triagem"][pkg] = {"conferir": body["acompanhar"], "nome": app_name(pkg, apps, d["apps_triagem"]), "manual": True}
+        if not body["acompanhar"]:
+            d["apps"].pop(pkg, None)
+        write_json_atomic(NEWS_FILE, d)
+    return news_overview()
+
+
 def ingress_path() -> str | None:
     """O endereço do app dentro do Home Assistant (/app/<slug>, desde o 2026.2), pelo nome da máquina ("a1b2c3d4-inventario").
     É também o caminho do Atalho no celular (Configurações › Opções); INV_HOST troca o nome da máquina (testes)."""
@@ -3281,16 +3663,17 @@ def ingress_path() -> str | None:
     return f"/app/{h.replace('-', '_', 1)}" if re.fullmatch(r"[a-z0-9]+-inventario", h) else None
 
 
-def news_notice(n: int, test: bool = False) -> dict:
-    """O aviso: "Novidades em 3 itens. Toque para abrir.", que abre o InventarIA em Novidades (o Home Assistant passa o
-    "/novidades" para a tela por mensagem, e a tela vai para #/novidades)."""
+def news_notice(n: int, test: bool = False, apps: int = 0) -> dict:
+    """O aviso: "Novidades em 3 itens e 1 app. Toque para abrir.", que abre o InventarIA em Novidades (o Home Assistant
+    passa o "/novidades" para a tela por mensagem, e a tela vai para #/novidades)."""
     link = f"{ingress_path()}/novidades" if ingress_path() else None
-    msg = f"Novidades em {n} {'item' if n == 1 else 'itens'}. Toque para abrir."
+    partes = ([f"{n} {'item' if n == 1 else 'itens'}"] if n else []) + ([f"{apps} {'app' if apps == 1 else 'apps'}"] if apps else [])
+    msg = f"Novidades em {' e '.join(partes) or '0 itens'}. Toque para abrir."
     # como em todos os apps da família, o título começa pelo nome do app (no celular, todos chegam como Home Assistant)
     return {"title": "InventarIA · 🆕 Novidades" + (" (teste)" if test else ""), "message": msg, "link": link}
 
 
-def send_news_notice(n: int, who: str | None = None, test: bool = False) -> int:
+def send_news_notice(n: int, who: str | None = None, test: bool = False, apps: int = 0) -> int:
     """Manda o aviso para os celulares de quem recebe: as pessoas escolhidas em Quem recebe (sem who) ou, no Testar,
     todos ou uma pessoa. Quem não tem celular fica de fora. Devolve quantos celulares receberam."""
     if who:
@@ -3305,7 +3688,7 @@ def send_news_notice(n: int, who: str | None = None, test: bool = False) -> int:
         phones = list(dict.fromkeys(ph for x in para for ph in (people.get(x) or {}).get("phones", [])))
         if not phones:
             raise ApiError(400, "Ninguém escolhido tem celular ligado no Home Assistant (Configurações > Pessoas).")
-    note = news_notice(n, test)
+    note = news_notice(n, test, apps)
     if AI_MOCK and not SUPERVISOR_TOKEN:
         log.info("aviso simulado para %s: %s", ", ".join(phones), note["message"])  # dev/run.sh: sem Home Assistant
         return len(phones)
@@ -3883,6 +4266,7 @@ def r_data(h, query):
                              "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "bens": bens_enabled(), "ha_sensors": sensors_enabled(),
                              "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target(), "correria": correria_enabled(),
                              "news_hora": news_hora(), "news_aviso": news_aviso(), "news_para": news_para_salvo(),
+                             "news_apps": STORE.settings.get("news_apps") is True,
                              "accent": app_accent(), "accent_daily": app_accent_daily(), "deprec": STORE.settings.get("deprec") is True},
                 "gerencia": {"taxas": gerencia_taxas()} if gerencia_taxas() else None, "resolvia": resolvia_on(), "atalho": ingress_path(),
                 "correria_uso": correria_uso() if correria_enabled() else None,
@@ -4099,6 +4483,14 @@ def r_rec_status(h, jid, query):
     h.send_json({"stage": job["stage"], "msg": job["msg"], "rec": job.get("rec")})
 
 
+def r_news_app_start(h, query):
+    h.send_json(app_news_job_start(h.read_body()), 202)
+
+
+def r_news_app_choice(h, query):
+    h.send_json(app_choice(h.read_body()))
+
+
 def r_news_cancel(h, jid, query):
     job = WEB_JOBS.get(jid)
     if job:
@@ -4124,7 +4516,7 @@ def r_settings_put(h, query):
             if e and not re.fullmatch(rx, e):
                 raise ApiError(400, msg)
             upd[key] = e
-    for key in ("ai", "zones", "ha_sensors", "news", "bens", "correria", "deprec"):
+    for key in ("ai", "zones", "ha_sensors", "news", "news_apps", "bens", "correria", "deprec"):
         if key in body:
             if not isinstance(body[key], bool):
                 raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
@@ -4571,6 +4963,8 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/news", r_news_start),
     ("DELETE", r"/api/news", r_news_clear),
     ("POST", r"/api/news/all", r_news_all),
+    ("POST", r"/api/news/app", r_news_app_start),
+    ("PUT", r"/api/news/app", r_news_app_choice),
     ("GET", r"/api/news/people", r_news_people),
     ("POST", r"/api/news/notify-test", r_news_notify_test),
     ("GET", r"/api/recursos", r_rec_get),

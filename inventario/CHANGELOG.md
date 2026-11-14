@@ -1,5 +1,11 @@
 # Mudanças
 
+## 1.56.0
+
+- **Novidades dos apps do celular**: ligue **Apps do celular** em Mais > Configurações > Opções > Novidades. O InventarIA junta os apps que vocês usam no celular, pelo sensor **Último app usado** do app Home Assistant, e a IA busca as novidades de cada um: recursos novos, mudanças, planos e preços, fim de recurso. Fica de fora o que é só de outro país ou só de teste fechado.
+- Em **Mais > Novidades** aparece a seção **Apps do celular**, com de quem é o celular. A IA deixa de fora a tela inicial, as configurações e o teclado, recolhidos em **Deixados de fora (n)**. Tocar num app mostra o que foi achado, com **Buscar de novo** e **Deixar de fora**; um deixado de fora volta com **Acompanhar**.
+- **Conferir novidades**, **Conferir sozinho** e o aviso no celular valem para os apps também ("Novidades em 2 itens e 1 app").
+
 ## 1.55.1
 
 - **Recursos e Novidades na ficha** viram seções com título e ícone, como **Tarefas no ResolvIA**: antes de procurar, dizem o que vem ali (**Ver recursos** e **Buscar novidades**); antes, só aparecia o botão.
