@@ -14,10 +14,13 @@
  * Um app pode dizer as cores: window.__selectSheet.theme = () => ({ dark, accent, bg, fg, muted }). Sem isso, elas vêm
  * das variáveis do app (--rv-accent/--a/--accent, --rv-surface/--surface/--card, --rv-text/--text/--fg/--ink,
  * --rv-muted/--muted/--mut) e o tema, do fundo atrás da caixa.
+ *
+ * O título da janela tem um ícone, como as seções dos apps: o que o app disser em window.__selectSheet.icon = (select) =>
+ * '<svg…>' (ou nada), senão o ícone do título da caixa (o <svg> do label dela), senão o de uma lista.
  */
 (() => {
   if (typeof window === "undefined" || window.__selectSheet) return;
-  const api = (window.__selectSheet = { theme: null, isOpen: () => !!cur });
+  const api = (window.__selectSheet = { theme: null, icon: null, isOpen: () => !!cur });
   let cur = null; // {sel, wrap, pending, byBack}
   let lastTouch = 0;
   let touch0 = null;
@@ -33,7 +36,9 @@ dialog.ss-wrap::backdrop{background:transparent}
 .ss-wrap.in .ss-back{opacity:1}
 .ss-wrap.in .ss-sheet{transform:none}
 .ss-grab{width:40px;height:4px;border-radius:2px;background:var(--ss-line2);margin:10px auto 2px;flex:none}
-.ss-head{display:flex;align-items:center;gap:8px;padding:6px 10px 8px 20px;flex:none}
+.ss-head{display:flex;align-items:center;gap:10px;padding:6px 10px 8px 16px;flex:none}
+.ss-ic{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:9px;background:var(--ss-soft);color:var(--ss-a)}
+.ss-ic svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .ss-head b{flex:1;font-size:17px;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .ss-x{width:40px;height:40px;border-radius:50%;border:0;background:transparent;color:var(--ss-mut);display:grid;place-items:center;cursor:pointer;flex:none}
 .ss-x:hover{background:var(--ss-soft2)}
@@ -52,6 +57,7 @@ dialog.ss-wrap::backdrop{background:transparent}
 `;
   const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
   const ICON_OK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+  const ICON_LIST = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>';
 
   const addCss = () => {
     if (document.getElementById("ss-css")) return;
@@ -138,6 +144,28 @@ dialog.ss-wrap::backdrop{background:transparent}
     return "";
   }
 
+  /** The icon of the title: the app's, the one in the box's label, or a list. */
+  function iconOf(sel) {
+    try {
+      const own = api.icon && api.icon(sel);
+      if (own) return own;
+    } catch {
+      /* the app's function failed: the next one */
+    }
+    const root = sel.getRootNode();
+    const labs = [];
+    const by = sel.getAttribute("aria-labelledby");
+    if (by && root.getElementById) by.split(/\s+/).forEach((id) => labs.push(root.getElementById(id)));
+    if (sel.id && root.querySelector) labs.push(root.querySelector(`label[for="${CSS.escape(sel.id)}"]`));
+    const lab = sel.closest("label, .field, .campo");
+    if (lab) labs.push(lab.querySelector("label, .lbl, .flabel, .label, legend, b, span"));
+    for (const l of labs) {
+      const svg = l && !l.contains(sel) && l.querySelector("svg");
+      if (svg) return svg.outerHTML;
+    }
+    return ICON_LIST;
+  }
+
   // a box inside a modal window (<dialog> opened with showModal: on top of everything, the rest of the page inert)
   function inModal(sel) {
     const d = sel.closest ? sel.closest("dialog") : null;
@@ -162,7 +190,7 @@ dialog.ss-wrap::backdrop{background:transparent}
     sheet.setAttribute("role", "dialog");
     sheet.setAttribute("aria-modal", "true");
     if (title) sheet.setAttribute("aria-label", title);
-    sheet.innerHTML = `<div class="ss-grab"></div><div class="ss-head"><b></b><button type="button" class="ss-x" aria-label="Fechar">${ICON_X}</button></div><div class="ss-list" role="listbox"></div>`;
+    sheet.innerHTML = `<div class="ss-grab"></div><div class="ss-head"><span class="ss-ic" aria-hidden="true">${iconOf(sel)}</span><b></b><button type="button" class="ss-x" aria-label="Fechar">${ICON_X}</button></div><div class="ss-list" role="listbox"></div>`;
     sheet.querySelector(".ss-head b").textContent = title;
     const list = sheet.querySelector(".ss-list");
     let selectedBtn = null;

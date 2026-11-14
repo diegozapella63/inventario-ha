@@ -11,7 +11,11 @@ PESSOAS = "[...document.querySelectorAll('.quem-p')].map(b => [b.querySelector('
 GEO = """(() => { const r = (e) => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), b.width, Math.round(b.height)]; };
   const li = document.querySelector('.aviso-quem');
   return { quando: [...document.querySelectorAll('.aviso-quando select')].map(r), quem: [...document.querySelectorAll('.quem-p')].map(r),
-           testar: r(document.querySelector('[data-act=news-notify-test]')), largura: li.getBoundingClientRect().width - parseFloat(getComputedStyle(li).paddingLeft) - parseFloat(getComputedStyle(li).paddingRight) }; })()"""
+           testar: r(document.querySelector('[data-act=news-notify-test]')), largura: li.clientWidth - parseFloat(getComputedStyle(li).paddingLeft) - parseFloat(getComputedStyle(li).paddingRight) }; })()"""
+# cada quadro de sub-opções: a chave logo acima dele, se está dentro, quanto recua e se tem borda
+SUB = """[...document.querySelectorAll('#p-news-opts .sub-box')].map(b => { const li = b.closest('li'), cima = li.previousElementSibling;
+  const sw = cima && cima.querySelector('[data-input]'), r = b.getBoundingClientRect(), rc = cima.getBoundingClientRect();
+  return [sw && sw.dataset.input, !!(b.querySelector('.aviso-testar, select')), Math.round(r.left - rc.left), parseFloat(getComputedStyle(b).borderTopWidth) > 0]; })"""
 # o painel do app no Home Assistant (/app/<app>/novidades): a tela pede as propriedades e recebe o resto do endereço
 HA_PANEL = """<!doctype html><body style="margin:0"><iframe id="ha" src="%s" style="border:0;width:100vw;height:100vh"></iframe><script>
 let path = "/novidades";
@@ -54,6 +58,11 @@ async def body(r, p):
         ws = {round(w) for _, _, w, _ in geo["quem"]}
         r.check(len(ws) == 1 and len({y for _, y, _, _ in geo["quem"][:2]}) == 1, f"{size} {scheme}: os botões das pessoas do mesmo tamanho, lado a lado ({geo['quem']})")
         r.check(abs(geo["testar"][2] - geo["largura"]) < 1 and geo["testar"][1] > max(y for _, y, _, _ in geo["quem"]), f"{size} {scheme}: Testar no meu celular na largura toda, embaixo ({geo['testar']}, {geo['largura']})")
+        # 1.59.1: as opções de cada chave num quadro recuado logo abaixo dela (Horário e A cada do Conferir sozinho; Quem
+        # recebe e Testar do Avisar no celular), como Apps detectados
+        sub = await pg.evaluate(SUB)
+        r.eq([x[0] for x in sub], ["news-auto", "news-aviso"], f"{size} {scheme}: um quadro embaixo de Conferir sozinho e outro embaixo de Avisar no celular")
+        r.check(all(x[1] and x[2] > 10 and x[3] for x in sub), f"{size} {scheme}: os quadros recuados, com a borda ({sub})")
         r.check(await pg.evaluate(OVERFLOW), f"{size} {scheme}: sem rolagem para o lado")
         await r.shot(pg, f"opcoes-{size}-{scheme}", full_page=True)
         await ctx.close()

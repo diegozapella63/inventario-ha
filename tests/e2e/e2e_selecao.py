@@ -53,6 +53,8 @@ async def body(r, p):
         sheet = pg.locator(".ss-wrap.in .ss-sheet")
         r.eq(await sheet.count(), 1, f"{scheme}: tocar abre a janela")
         r.eq((await sheet.locator(".ss-head b").inner_text()).strip(), "Cômodo", f"{scheme}: o título é o nome da caixa")
+        # 1.59.1: o título com o ícone, como as seções (o dos cômodos, o mesmo da aba Cômodos)
+        r.eq(await sheet.locator(".ss-head .ss-ic use").get_attribute("href"), "#i-rooms", f"{scheme}: o título com o ícone do que se escolhe")
         r.eq([t.strip() for t in await sheet.locator(".ss-opt").all_inner_texts()], opts, f"{scheme}: as opções em linhas")
         r.eq([t.strip() for t in await sheet.locator(".ss-opt.on").all_inner_texts()], [opts[0]], f"{scheme}: a atual marcada")
         cores = await pg.evaluate(f"""(() => {{ const hex = {HEX}, c = getComputedStyle(document.documentElement), s = document.querySelector('.ss-sheet');
@@ -97,6 +99,7 @@ async def body(r, p):
     await pg.wait_for_timeout(600)  # os painéis de baixo (Falar, Uso da IA) terminam de carregar: a caixa não muda de lugar
     await tap(pg, ai)
     r.eq((await pg.locator(".ss-wrap.in .ss-head b").inner_text()).strip(), "IA para ler fotos", "Integrações: o título")
+    r.eq(await pg.locator(".ss-wrap.in .ss-head .ss-ic use").get_attribute("href"), "#i-camera", "Integrações: com o ícone")
     want = await pg.locator(f"{ai} option").nth(1).get_attribute("value")
     await tap(pg, ".ss-opt >> nth=1")
     await pg.wait_for_timeout(700)

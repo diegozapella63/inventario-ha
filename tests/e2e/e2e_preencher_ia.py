@@ -49,7 +49,11 @@ async def body(r, p):
 
     # -- sem foto: avisa que precisa de uma
     await new_item()
-    r.eq(" ".join((await pg.text_content(".aibox")).split()), "Com uma foto, a IA preenche os campos.", "sem foto: diz que a IA precisa de uma foto")
+    r.eq(" ".join((await pg.text_content(".phs .ph-dica")).split()), "Com uma foto, a IA preenche os campos.", "sem foto: diz que a IA precisa de uma foto")
+    # 1.59.1: o aviso no espaço vazio ao lado dos botões das fotos, sem uma linha só para ele
+    geo = await pg.evaluate("""(() => { const g = document.querySelector('.phs'), d = g.querySelector('.ph-dica'), b = g.querySelector('[data-ed="web"]').getBoundingClientRect(), r = d.getBoundingClientRect();
+      return [Math.round(r.top) === Math.round(b.top), r.left > b.right, Math.round(r.right) === Math.round(g.getBoundingClientRect().right), document.querySelector('.aibox').hidden]; })()""")
+    r.eq(geo, [True, True, True, True], "sem foto: o aviso ao lado de Buscar na internet, até o fim da fileira, sem o quadro de baixo")
     r.check(await pg.locator('[data-ed="ai"], [data-ed-hint]').count() == 0, "sem foto: sem o botão nem a dica")
     await r.shot(pg, "sem-foto")
 
@@ -114,7 +118,7 @@ async def body(r, p):
     r.check(sent[-1]["file"] != sent[-2]["file"], "outra foto como capa: a IA lê a nova primeira foto")
     for _ in range(2):
         await pg.click('[data-ed="rmphoto"][data-i="0"]')
-    r.eq(" ".join((await pg.text_content(".aibox")).split()), "Com uma foto, a IA preenche os campos.", "tirar as fotos: volta o aviso")
+    r.eq(" ".join((await pg.text_content(".phs .ph-dica")).split()), "Com uma foto, a IA preenche os campos.", "tirar as fotos: volta o aviso")
     await pg.click('[data-ed="cancel"]')
     await pg.click('[data-r="1"]')
     await ctx.close()

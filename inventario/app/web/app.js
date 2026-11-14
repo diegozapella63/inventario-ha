@@ -507,7 +507,7 @@
       let answer = false;
       const entry = openDialog({
         cls: "modal narrow", label: title,
-        html: `<div class="dlg"><div class="dlg-h"><h2>${esc(title)}</h2></div>
+        html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT(danger ? "trash" : "info", `${esc(title)}`)}</h2></div>
           ${body ? `<div class="dlg-b"><p style="margin:0">${body}</p></div>` : ""}
           <div class="dlg-f"><span class="grow"></span><button type="button" class="btn ghost" data-r="0">${ic("close")}${esc(cancel)}</button>
           <button type="button" class="btn ${danger ? "danger" : "primary"}" data-r="1">${ic(danger ? "trash" : "check")}${esc(ok)}</button></div></div>`,
@@ -634,6 +634,8 @@
   }
   // Topo de cada tela, igual nos apps da família (EconomIA, ResolvIA): nome do app com "IA" na cor
   // do app, saudação ao usuário do Home Assistant e o título grande da tela.
+  // 1.59.1: o título de cada tela com o ícone (o mesmo da linha do Mais ou da aba de baixo), como as seções
+  const PAGE_IC = { home: "clock", search: "search", rooms: "rooms", menu: "more", bens: "home", charts: "bars", news: "spark", cats: "grid", data: "gear", about: "info" };
   const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", menu: "data", bens: "data", charts: "data", news: "data", cats: "data", data: "data", report: "data", about: "data" };
   function renderTop() {
     const el = $("#topbar");
@@ -655,7 +657,7 @@
           <button type="button" class="btn primary wide" data-act="item-new">${ic("plus")}Adicionar item</button></div>` : ""}
       </div>
       ${up ? `<a class="uplink" href="${up[0]}">${ic("back", "sm")}${up[1]}</a>` : ""}
-      ${title ? `<h1 class="page-title">${esc(title)}</h1>` : ""}
+      ${title ? `<h1 class="page-title">${PAGE_IC[r.name] ? `<span class="sec-ic" aria-hidden="true">${ic(PAGE_IC[r.name])}</span>` : ""}${esc(title)}</h1>` : ""}
       ${sub ? `<p class="page-sub">${sub}</p>` : ""}`;
     $$(".tabbar [data-tab]").forEach((a) => {
       if (a.dataset.tab === TAB_OF[r.name]) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
@@ -784,6 +786,15 @@
 
   // -- início
   const secIc = (name) => `<span class="sec-ic" aria-hidden="true">${ic(name)}</span>`;
+  // 1.59.1: a janela de uma caixa de seleção (selectsheet.js) abre com o ícone do que se escolhe, como as seções
+  const SS_IC = { "search-tipo": "layers", "search-room": "rooms", "search-cat": "grid", "search-ord": "sort", "ai-entity": "camera", "ai-search": "search",
+    "voice-stt": "mic", room: "rooms", cat: "grid", "news-hora": "clock", "news-every": "refresh" };
+  if (window.__selectSheet) window.__selectSheet.icon = (sel) => {
+    const k = SS_IC[sel.dataset.input] || SS_IC[sel.dataset.rf] || SS_IC[sel.dataset.ctIn] || SS_IC[sel.name];
+    return k ? ic(k) : null;
+  };
+  // 1.59.1: o título de toda janela com o ícone, como as seções (Novo cômodo, Novo item, Mover item…)
+  const dlgT = (icone, titulo) => `<span class="dlg-ic" aria-hidden="true">${ic(icone)}</span><span class="dlg-tt">${titulo}</span>`;
   // 1.59.0: o ícone pequeno antes do título de cada linha de Mais e de Configurações (padrão da família)
   const oti = (name) => `<span class="ot-ic" aria-hidden="true">${ic(name)}</span>`;
   function viewHome() {
@@ -906,7 +917,7 @@
     }
     const ordered = [...groups.entries()].sort((a, b) => Math.min(...a[1].map((i) => i.seq || 0)) - Math.min(...b[1].map((i) => i.seq || 0)));
     return ordered.map(([z, its]) => `<section class="zone">
-      <div class="zone-h"><h3>${hl(z, toks)}</h3><span class="zs">${plural(its.length, "item", "itens")}<b>${moneyR(its.reduce((s, i) => s + vl(i), 0))}</b></span></div>
+      <div class="zone-h"><h3><span class="zone-ic" aria-hidden="true">${ic("pin")}</span>${hl(z, toks)}</h3><span class="zs">${plural(its.length, "item", "itens")}<b>${moneyR(its.reduce((s, i) => s + vl(i), 0))}</b></span></div>
       <ul class="ilist">${its.map((it) => itemRow(it, { toks, mode: "room" })).join("")}</ul></section>`).join("");
   }
   // -- Bens (Mais > Bens): Imóveis, Veículos e Outros, cada grupo com o total
@@ -921,7 +932,7 @@
       .filter(([, its]) => its.length);
     return `<div class="mscreen bens">
       ${groups.map(([name, its]) => `<section class="zone">
-        <div class="zone-h"><h3>${esc(name)}</h3><span class="zs">${plural(its.length, "bem", "bens")}<b>${moneyR(its.reduce((t, i) => t + vl(i), 0))}</b></span></div>
+        <div class="zone-h"><h3><span class="zone-ic" aria-hidden="true">${ic({ "Imóveis": "home", "Veículos": "car" }[name] || "gem")}</span>${esc(name)}</h3><span class="zs">${plural(its.length, "bem", "bens")}<b>${moneyR(its.reduce((t, i) => t + vl(i), 0))}</b></span></div>
         <ul class="ilist">${its.map((it) => itemRow(it, { mode: name === "Outros" ? "bens" : "room" })).join("")}</ul></section>`).join("")}
     </div>`;
   }
@@ -1055,7 +1066,7 @@
     };
     const entry = openDialog({
       cls: "modal narrow", label: `Alterar ${n}`,
-      html: `<div class="dlg"><div class="dlg-h"><h2>Alterar ${n}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("edit", `Alterar ${n}`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-bk><div class="form">
           <div class="field" data-f="room"><span class="lbl" id="bk-l-room">Cômodo</span>
             <div class="chips" role="radiogroup" aria-labelledby="bk-l-room">${chip("bk-room", KEEP, "Manter", true)}${D.rooms.map((r) => chip("bk-room", r.id, esc(r.name))).join("")}</div>
@@ -1852,14 +1863,14 @@
       ${on ? `<li${appsOn() ? ' class="tem-sub"' : ""}><div class="ot"><b id="news-apps-h">${oti("phone")}Apps do celular</b><span>As novidades dos apps que vocês usam, pelo sensor Último app usado do app Home Assistant.</span></div>
         <div class="oa">${switchHtml("news-apps", appsOn(), "news-apps-h")}</div></li>` : ""}
       ${appsOn() ? `<li class="apps-det-li" data-slot="apps-det">${appsDetHtml()}</li>` : ""}
-      ${on ? `<li><div class="ot"><b id="news-auto-h">${oti("clock")}Conferir sozinho</b><span>A IA confere os eletrônicos${appsOn() ? " e os apps" : ""} de tempos em tempos.</span></div>
+      ${on ? `<li${every ? ' class="tem-sub"' : ""}><div class="ot"><b id="news-auto-h">${oti("clock")}Conferir sozinho</b><span>A IA confere os eletrônicos${appsOn() ? " e os apps" : ""} de tempos em tempos.</span></div>
         <div class="oa">${switchHtml("news-auto", !!every, "news-auto-h")}</div></li>` : ""}
-      ${on && every ? `<li class="aviso-quando">
+      ${on && every ? `<li class="sub"><div class="sub-box aviso-quando">
           <div class="field"><label for="news-hora">${oti("clock")}Horário</label><select id="news-hora" class="select" data-input="news-hora">${horas.map((x) => opt(x, x, hora)).join("")}</select></div>
-          <div class="field"><label for="news-every">${oti("refresh")}A cada</label><select id="news-every" class="select" data-input="news-every">${NEWS_EVERY.map(([k, v]) => opt(k, v, every)).join("")}</select></div></li>
-        <li><div class="ot"><b id="news-aviso-h">${oti("send")}Avisar no celular</b><span>Quando a conferência sozinha achar novidade.</span></div>
+          <div class="field"><label for="news-every">${oti("refresh")}A cada</label><select id="news-every" class="select" data-input="news-every">${NEWS_EVERY.map(([k, v]) => opt(k, v, every)).join("")}</select></div></div></li>
+        <li${aviso ? ' class="tem-sub"' : ""}><div class="ot"><b id="news-aviso-h">${oti("send")}Avisar no celular</b><span>Quando a conferência sozinha achar novidade.</span></div>
           <div class="oa">${switchHtml("news-aviso", aviso, "news-aviso-h")}</div></li>
-        ${aviso ? `<li class="aviso-quem" data-slot="news-quem">${quemRecebe()}</li>` : ""}` : ""}
+        ${aviso ? `<li class="sub"><div class="sub-box aviso-quem" data-slot="news-quem">${quemRecebe()}</div></li>` : ""}` : ""}
       </ul>
     </section>`;
   }
@@ -1917,7 +1928,7 @@
     const F = { fotos: [], texto: "", step: "entrada", lidos: [], erro: "", lendo: false };
     const entry = openDialog({
       cls: "modal", label: "Encontrar apps com IA",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Encontrar apps com IA</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("spark", `Encontrar apps com IA`)}</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b" data-slot="af"></div><div class="dlg-f" data-slot="af-f"></div></div>`,
     });
     const dlg = entry.dlg, body = $('[data-slot="af"]', dlg), foot = $('[data-slot="af-f"]', dlg);
@@ -2111,7 +2122,7 @@
     const old = id ? CAT[id] : "";
     const entry = openDialog({
       cls: "modal narrow", label: id ? "Renomear categoria" : "Nova categoria",
-      html: `<div class="dlg"><div class="dlg-h"><h2>${id ? "Renomear categoria" : "Nova categoria"}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("tag", `${id ? "Renomear categoria" : "Nova categoria"}`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-cn><div class="form">
           <div class="field"><label for="cn-name">Nome</label><textarea id="cn-name" class="input grow" rows="1" name="name" maxlength="60" placeholder="Ex.: Ferramentas" autocomplete="off">${esc(old)}</textarea></div>
           <div class="formerr" data-err hidden></div>
@@ -2251,7 +2262,7 @@
     if (st.reason === "error") { toast(aiReasonText(st), { error: true }); return false; } // a IA está configurada, o Home Assistant só não respondeu
     const entry = openDialog({
       cls: "modal narrow", label: "Leitura por IA",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Leitura por IA</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("scan", `Leitura por IA`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b"><p style="margin-top:0"><span class="status ${st.reason === "no_vision" ? "warn" : "bad"}"><i></i>${esc(aiReasonText(st))}</span></p>
         <p>Configure no Home Assistant:</p>${AI_STEPS}</div>
         <div class="dlg-f"><a class="btn" href="#/config/integracoes" data-x>${ic("gear")}Abrir Integrações</a><button class="btn primary" data-x>${ic("check")}Entendi</button></div></div>`,
@@ -2420,7 +2431,7 @@
       let chosen = [];
       const entry = openDialog({
         cls: "modal wide", label: "Fotos do cômodo",
-        html: `<div class="dlg"><div class="dlg-h"><h2>Fotos de ${esc(r?.name || "cômodo")}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("images", `Fotos de ${esc(r?.name || "cômodo")}`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
           <div class="dlg-b">${photos.length ? `<div class="pick">${photos.map((p, k) => `<label><input type="checkbox" value="${esc(p.file)}" aria-label="${esc(p.label || `Foto ${k + 1}`)}"><img src="${esc(src(p.file))}" alt="" loading="lazy">${p.label ? `<span>${esc(p.label)}</span>` : ""}</label>`).join("")}</div>`
             : `<p class="muted" style="margin:0">Este cômodo ainda não tem outras fotos.</p>`}</div>
           <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok disabled>${ic("check")}Usar fotos</button></div></div>`,
@@ -2463,7 +2474,7 @@
       let job = null, timer = null, chosen = null, results = [], got = null, gen = 0, product = null;
       const entry = openDialog({
         cls: "modal", label: "Buscar foto na internet",
-        html: `<div class="dlg"><div class="dlg-h"><h2>Buscar foto na internet</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("search", `Buscar foto na internet`)}</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
           <div class="dlg-b"><form class="wq" data-wq><label class="sr" for="wq">O que buscar</label>
             <input id="wq" class="input" name="q" value="${esc(name)}" maxlength="200" autocomplete="off" enterkeyhint="search">
             <button type="submit" class="btn" data-go>${ic("search")}<span class="lbl">Buscar</span></button></form>
@@ -2686,7 +2697,7 @@
     let job = null, timer = null, gen = 0;
     const entry = openDialog({
       cls: "modal", label: "Novidades",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Novidades</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("spark", `Novidades`)}</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b"><p class="news-of">${esc(it.name)}</p><div data-slot="news" aria-live="polite"></div></div>
         <div class="dlg-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Buscar de novo</button><span class="grow"></span>
           <button type="button" class="btn primary" data-item>${ic("external")}Ver item</button></div></div>`,
@@ -2739,7 +2750,7 @@
     let job = null, timer = null, gen = 0, a = a0;
     const entry = openDialog({
       cls: "modal", label: "Novidades",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Novidades</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("spark", `Novidades`)}</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b"><p class="news-of">${esc(a.nome)}</p><div data-slot="news" aria-live="polite"></div></div>
         <div class="dlg-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Buscar de novo</button><span class="grow"></span>
           <button type="button" class="btn" data-fora hidden>${ic("archive")}Deixar de fora</button><button type="button" class="btn primary" data-dentro hidden>${ic("plus")}Acompanhar</button></div></div>`,
@@ -2885,7 +2896,7 @@
   function openTarefaNova(it) {
     const entry = openDialog({
       cls: "modal narrow", label: "Nova tarefa no ResolvIA",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Nova tarefa</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("checks", `Nova tarefa`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-tn><div class="form">
           <p class="muted" style="margin:0">${esc(it.name)}</p>
           <div class="field"><label for="tn-nome">Tarefa</label><textarea id="tn-nome" class="input grow" rows="1" name="tarefa" maxlength="255" placeholder="Ex.: Trocar o filtro" autocomplete="off"></textarea></div>
@@ -3032,7 +3043,7 @@
     const zonesFor = (rid) => zonesOf(rid).map((z) => `<option value="${esc(z)}">`).join("");
     const entry = openDialog({
       cls: "modal narrow", label: "Mover item",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Mover item</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("move", `Mover item`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-mv><div class="form">
           <p class="muted" style="margin:0">${esc(it.name)}</p>
           <div class="field"><label for="mv-room">Para o cômodo</label><select id="mv-room" class="select" name="room">${roomOptions(it.room)}</select>
@@ -3092,7 +3103,7 @@
     const entry = openDialog({
       cls: "modal", label: title,
       html: `<div class="dlg">
-        <div class="dlg-h"><h2>${title}</h2><button type="button" class="btn ghost icon" data-ed="cancel" aria-label="Fechar">${ic("close")}</button></div>
+        <div class="dlg-h"><h2>${dlgT(what === "bem" ? "gem" : "package", `${title}`)}</h2><button type="button" class="btn ghost icon" data-ed="cancel" aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b drop" data-ed-form novalidate autocomplete="off">
           <div class="form">
             <div class="field"><span class="lbl">Fotos</span><div class="phs" data-slot="photos"></div>
@@ -3142,9 +3153,20 @@
         + (CAMERA ? `<button type="button" class="add" data-ed="camera">${ic("camera")}Tirar foto</button>` : "")
         + `<button type="button" class="add" data-ed="upload">${ic(COARSE ? "image" : "upload")}Escolher fotos</button>`
         + (hasRoomPhotos ? `<button type="button" class="add" data-ed="roomphotos">${ic("images")}Fotos do cômodo</button>` : "")
-        + (F.photos.length < 12 && aiOn() ? `<button type="button" class="add" data-ed="web">${ic("search")}Buscar na internet</button>` : "");
+        + (F.photos.length < 12 && aiOn() ? `<button type="button" class="add" data-ed="web">${ic("search")}Buscar na internet</button>` : "")
+        // 1.59.1: sem foto, o aviso da IA fica no espaço vazio ao lado dos botões (sem uma linha só para ele)
+        + (aiOn() && !F.photos.length && !F.uploading && !F.aiBusy ? `<p class="ph-dica">${ic("scan", "sm")}<span>Com uma foto, a IA preenche os campos.</span></p>` : "");
+      fitDica();
       renderAi();
     };
+    // o aviso ocupa o resto da última fileira (o número de colunas muda com a largura da janela)
+    const fitDica = () => {
+      const g = slot("photos"), d = g && $(".ph-dica", g);
+      if (!d) return;
+      const cols = getComputedStyle(g).gridTemplateColumns.split(" ").filter(Boolean).length || 1, n = g.children.length - 1;
+      d.style.gridColumn = `span ${cols - (n % cols)}`;
+    };
+    if (window.ResizeObserver) new ResizeObserver(fitDica).observe(slot("photos"));
     const renderAi = async () => {
       const box = slot("ai");
       if (!box) return;
@@ -3152,10 +3174,8 @@
         box.innerHTML = `<div class="aih"><p><b>Lendo a foto…</b> Pode levar até um minuto.</p><button type="button" class="btn" disabled><span class="spin"></span>Lendo</button></div>`;
         return;
       }
-      if (!F.photos.length) {
-        box.innerHTML = `<div class="aih"><p>${ic("scan", "sm")} Com uma foto, a IA preenche os campos.</p></div>`;
-        return;
-      }
+      box.hidden = !F.photos.length;  // sem foto, o aviso fica ao lado dos botões das fotos
+      if (!F.photos.length) { box.innerHTML = ""; return; }
       box.innerHTML = `<div class="aih"><p>A IA lê a primeira foto e preenche os campos.</p>
           <button type="button" class="btn" data-ed="ai">${ic("scan")}Digitalizar com IA</button></div>
         <textarea class="input grow" rows="1" data-ed-hint placeholder="Dica para a IA (opcional), ex.: é uma cafeteira Oster" maxlength="300" aria-label="Dica para a IA">${esc(F.hint)}</textarea>`;
@@ -3492,7 +3512,7 @@
     let rec = null;
     const entry = openDialog({
       cls: "sheet chat", label: "Conversar",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Conversar</h2>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("chat", `Conversar`)}</h2>
           <button type="button" class="btn ghost sm" data-new${CHAT.msgs.length ? "" : " hidden"}>${ic("plus", "sm")}Nova conversa</button>
           <button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b chat-b" data-slot="msgs" aria-live="polite"></div>
@@ -3578,7 +3598,7 @@
     const title = voice ? "Falar" : "Catalogar itens com IA";
     const entry = openDialog({
       cls: "modal wide", label: title,
-      html: `<div class="dlg"><div class="dlg-h"><h2>${title}</h2><button type="button" class="btn ghost icon" data-ct="cancel" aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT(voice ? "mic" : "scan", `${title}`)}</h2><button type="button" class="btn ghost icon" data-ct="cancel" aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b drop" data-slot="body"></div><div class="dlg-f" data-slot="foot"></div></div>`,
       guard: async () => C.step !== "review" || !C.results.some((r) => r.on) || confirmBox({ title: "Descartar os itens encontrados?", body: voice ? "Os itens do que você falou ainda não foram adicionados." : "Os itens lidos pela IA ainda não foram adicionados.", ok: "Descartar", cancel: "Voltar", danger: true }),
       onClose: () => { C.token++; stopRec(); },
@@ -3921,7 +3941,7 @@
   function openRoomNew() {
     const entry = openDialog({
       cls: "modal narrow", label: "Novo cômodo",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Novo cômodo</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("rooms", `Novo cômodo`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-rn><div class="form">
           <div class="field"><label for="rn-name">Nome</label><textarea id="rn-name" class="input grow" rows="1" name="name" maxlength="60" placeholder="Ex.: Garagem" autocomplete="off"></textarea></div>
           <div class="field"><label for="rn-code">Código</label><input id="rn-code" class="input" name="code" maxlength="4" style="text-transform:uppercase;max-width:140px" autocomplete="off">
@@ -3957,7 +3977,7 @@
     const count = (D.byRoom.get(id) || []).length;
     const entry = openDialog({
       cls: "modal", label: "Editar cômodo",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Editar cômodo</h2><button class="btn ghost icon" data-re="cancel" aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("rooms", `Editar cômodo`)}</h2><button class="btn ghost icon" data-re="cancel" aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b drop" data-re-form><div class="form">
           <div class="row2" style="grid-template-columns:1fr 120px">
             <div class="field"><label for="re-name">Nome</label><textarea id="re-name" class="input grow" rows="1" name="name" maxlength="60">${esc(R.name)}</textarea></div>
@@ -4077,7 +4097,7 @@
     if (opts.length === 1) { openEditor({ room: rid }); return; } // sem IA e sem Falar: direto no item, sem um menu de uma linha só
     const entry = openDialog({
       cls: "modal narrow", label: "Adicionar",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Adicionar</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("plus", `Adicionar`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b" style="padding:8px 12px 16px"><ul class="opts" style="border-top:0">
           ${opts.map(([go, icon, title, sub], i) => `<li style="padding:0;border:0"><button class="rrow nocode" data-go="${go}" style="grid-template-columns:auto 1fr;padding:14px 8px${i === opts.length - 1 ? ";border-bottom:0" : ""}">${ic(icon, "lg")}<span class="rn">${title}<small style="display:block;margin:2px 0 0">${sub}</small></span></button></li>`).join("")}
         </ul></div></div>`,
@@ -4124,7 +4144,7 @@
   async function openVersions() {
     const entry = openDialog({
       cls: "modal narrow", label: "Versões anteriores",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Versões anteriores</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("history", `Versões anteriores`)}</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b" data-slot="versions"><p class="muted" style="margin:0">Carregando…</p></div></div>`,
     });
     const slot = $('[data-slot="versions"]', entry.dlg);
@@ -4163,7 +4183,7 @@
     const stop = () => Object.assign(new Error("cancelado"), { cancelled: true });
     const entry = openDialog({
       cls: "modal narrow", label: "Importando inventário",
-      html: `<div class="dlg"><div class="dlg-h"><h2>Importando inventário</h2></div>
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("upload", `Importando inventário`)}</h2></div>
         <div class="dlg-b"><p style="margin:0 0 12px;overflow-wrap:anywhere"><b data-name>${esc(many ? plural(files.length, "arquivo", "arquivos") : files[0].name)}</b></p>
           <div class="prog" role="progressbar" aria-label="Progresso do envio" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
           <p class="muted" data-st style="margin:10px 0 0">Preparando o envio…</p>

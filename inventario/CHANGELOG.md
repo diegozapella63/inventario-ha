@@ -1,5 +1,12 @@
 # Mudanças
 
+## 1.59.1
+
+- **Linhas**: volta uma linha fina no fim de cada seção principal (GerencIA, CorrerIA, IA do Home Assistant…). Entre as opções de uma seção continua sem linha.
+- **Sub-opções num quadro**: o Horário e o A cada ficam num quadro recuado embaixo de **Conferir sozinho**, e o Quem recebe e o Testar no meu celular embaixo de **Avisar no celular**, como o Apps detectados.
+- **Mais ícones**: o título de cada tela (Bens, Gráficos, Cômodos…), os grupos (Imóveis, Veículos, as zonas de um cômodo), o título de cada janela (Novo cômodo, Novo item, Mover item…) e o título da lista de cada caixa de seleção (Cômodo, Categoria, Ordenar…).
+- **Novo item**: o aviso "Com uma foto, a IA preenche os campos." fica no espaço vazio ao lado dos botões das fotos, sem uma linha só para ele.
+
 ## 1.59.0
 
 - **Encontrar apps com IA** (em Configurações › Opções › Apps detectados): mande prints da lista de apps do celular (ou cole os nomes), a IA lê e você marca quais entram. Eles ficam em Apps detectados, acompanhados, com "pela IA".

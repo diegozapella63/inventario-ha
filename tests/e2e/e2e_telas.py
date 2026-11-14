@@ -58,7 +58,7 @@ CHECK = """() => {
     if (ox > 2 && oy > 2) bad.push('botões um sobre o outro: ' + (a.textContent.trim() || a.getAttribute('aria-label')).slice(0, 20) + ' / ' + (c.textContent.trim() || c.getAttribute('aria-label')).slice(0, 20));
   }
   // 1.59.0 (padrão da família): toda seção com o cabeçalho com ícone; toda linha com título com ícone; todo botão com texto
-  // com ícone; sem linha entre as linhas de opções nem no fim das listas
+  // com ícone; sem linha entre as linhas de opções nem no fim das listas (a linha fica só no fim de cada seção principal)
   for (const sec of document.querySelectorAll('#view section.panel')) {
     if (!sec.offsetParent) continue;
     const h = sec.querySelector(':scope > h2');
@@ -77,6 +77,20 @@ CHECK = """() => {
   for (const l of document.querySelectorAll('.opts, .nlist')) {
     const last = l.lastElementChild, el = last && (last.querySelector(':scope > .nrow') || last);
     if (el && el.offsetParent && parseFloat(getComputedStyle(el).borderBottomWidth) > 0) { bad.push('linha no fim da lista: ' + (l.className)); break; }
+  }
+  // 1.59.1: o título da tela, os grupos (zonas, Imóveis, Veículos) e o título de cada janela com o ícone
+  const pt = document.querySelector('#topbar .page-title');
+  if (pt && pt.offsetParent && !pt.querySelector('.sec-ic')) bad.push('título da tela sem ícone: ' + pt.textContent.trim());
+  for (const h of document.querySelectorAll('#view .zone-h h3')) if (h.offsetParent && !h.querySelector('.zone-ic')) bad.push('grupo sem ícone: ' + h.textContent.trim());
+  for (const h of document.querySelectorAll('dialog[open] .dlg-h h2:not(.sr)')) if (!h.querySelector('.dlg-ic')) bad.push('janela sem ícone no título: ' + h.textContent.trim());
+  // 1.59.1: uma linha fina no fim de cada seção principal, menos a última da tela
+  for (const box of document.querySelectorAll('#view .more-panel, #view .mscreen')) {
+    const secs = [...box.querySelectorAll(':scope > section.panel')].filter(x => x.offsetParent);
+    secs.forEach((sec, i) => {
+      const linha = parseFloat(getComputedStyle(sec).borderBottomWidth) > 0;
+      if (i < secs.length - 1 && !linha) bad.push('seção sem a linha no fim: ' + (sec.id || sec.className));
+      if (i === secs.length - 1 && linha) bad.push('linha no fim da última seção: ' + (sec.id || sec.className));
+    });
   }
   return bad;
 }"""
