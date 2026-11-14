@@ -35,6 +35,11 @@ async def body(r, p):
     await r.open(pg, "#/config/integracoes", ".more-tabs")
     await pg.wait_for_selector('#p-ai .status.ok', timeout=10000)
     r.eq((await pg.text_content("#p-ai .status")).strip(), "Pronta para ler fotos", "a IA do Home Assistant está pronta")
+    # 1.59.2: o que depende de Usar IA (o estado, o Verificar de novo e as IAs) fica num quadro recuado, logo abaixo dela
+    caixa = await pg.evaluate("""(() => { const b = document.querySelector('#p-ai .sub-box'), sw = document.querySelector('#p-ai [data-input=ai-on]').closest('li');
+      return b && [!!b.querySelector('.status'), !!b.querySelector('[data-act=ai-refresh]'), !!b.querySelector('[data-input=ai-entity]'), !!b.querySelector('[data-input=ai-search]'),
+        Math.round(b.getBoundingClientRect().left - sw.getBoundingClientRect().left) > 10, b.getBoundingClientRect().top >= sw.getBoundingClientRect().bottom - 1]; })()""")
+    r.eq(caixa, [True, True, True, True, True, True], "Usar IA: o estado, o Verificar de novo e as IAs num quadro recuado embaixo dela")
     opts = await pg.evaluate("[...document.querySelectorAll('[data-input=ai-entity] option')].map(o => [o.textContent, o.disabled])")
     r.eq(opts, [["Padrão do Home Assistant", False], ["Google AI Task", False], ["IA só de texto (não lê fotos)", True]], "IA para ler fotos: a que não lê fotos fica desligada")
     await pg.select_option('[data-input="ai-entity"]', "ai_task.google_ai_task")
@@ -156,12 +161,12 @@ async def body(r, p):
         r.eq(await pg.evaluate(ACC), "ouro", "3 de novembro de 2026: Ouro")
         r.eq(await pg.evaluate(CHECKED), "ouro", "a cor do dia é a marcada")
         r.eq(r.data()["settings"]["accent"], None, "ninguém escolheu: a casa continua sem cor gravada")
-        box = await pg.evaluate("(() => { const s = document.querySelector('#p-accent .switch').getBoundingClientRect(), z = document.querySelector('#p-accent .swatches').getBoundingClientRect(); return [Math.round(innerWidth - s.right), s.bottom <= z.top]; })()")
+        box = await pg.evaluate("(() => { const s = document.querySelector('#p-accent .switch').getBoundingClientRect(), z = document.querySelector('#p-accent .swatches').getBoundingClientRect(); return [Math.round(document.querySelector('#p-accent').getBoundingClientRect().right - s.right), s.bottom <= z.top]; })()")
         r.check(box[1] and box[0] <= 24, f"a chave fica à direita, acima das cores ({box})")
         r.check(await pg.evaluate(OVERFLOW), "as 12 cores cabem na largura")
         await r.shot(pg, "cor-do-dia", full_page=True)
         await pg.set_viewport_size({"width": 320, "height": 700})
-        box = await pg.evaluate("(() => { const s = document.querySelector('#p-accent .switch').getBoundingClientRect(), t = document.querySelector('#daily-h').getBoundingClientRect(); return [Math.round(innerWidth - s.right), s.top < t.bottom]; })()")
+        box = await pg.evaluate("(() => { const s = document.querySelector('#p-accent .switch').getBoundingClientRect(), t = document.querySelector('#daily-h').getBoundingClientRect(); return [Math.round(document.querySelector('#p-accent').getBoundingClientRect().right - s.right), s.top < t.bottom]; })()")
         r.check(box[1] and box[0] <= 24, f"no celular de 320 px, a chave continua à direita, na linha do nome ({box})")
         cut = await pg.evaluate("[...document.querySelectorAll('.sw span')].filter(e => e.scrollWidth > e.parentElement.clientWidth + 1).map(e => e.textContent)")
         r.check(not cut and await pg.evaluate(OVERFLOW), f"em 320 px, os nomes das cores inteiros ({cut})")

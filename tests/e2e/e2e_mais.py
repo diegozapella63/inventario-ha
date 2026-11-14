@@ -9,8 +9,11 @@ import zipfile
 from e2e_lib import OVERFLOW, TMP, main
 
 # botões e seleções das linhas de Mais: 280 × 50 (1.45: a altura da família) e com a borda direita alinhada (ou a largura toda, no celular estreito)
+# cada botão: largura, altura, a folga até a direita da linha dele e a largura de dentro da linha (1.60.0: os da IA ficam no
+# quadro de Usar IA, mais estreito que o cartão)
 BUTTONS = """(() => [...document.querySelectorAll('.more-panel .opts .oa > .btn:not(.icon), .more-panel .opts .oa > .select')]
-  .filter(e => e.offsetParent).map(e => { const b = e.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height), Math.round(b.right)]; }))()"""
+  .filter(e => e.offsetParent).map(e => { const b = e.getBoundingClientRect(), li = e.closest('li'), r = li.getBoundingClientRect(), st = getComputedStyle(li);
+    return [Math.round(b.width), Math.round(b.height), Math.round(r.right - parseFloat(st.paddingRight) - b.right), Math.round(r.width - parseFloat(st.paddingLeft) - parseFloat(st.paddingRight))]; }))()"""
 
 
 async def tab(pg, k):
@@ -80,9 +83,8 @@ async def body(r, p):
             continue
         # 1.51.0: no celular, na largura do cartão (o padrão da família); a partir de 1000 px, 280 px
         cel = await pg.evaluate("innerWidth < 1000")
-        larg = await pg.evaluate("Math.round(document.querySelector('#view section.panel .opts > li').getBoundingClientRect().width) - 8")
-        r.check(sizes and all((abs(w - larg) <= 2 if cel else w == 280) and h == 50 for w, h, _ in sizes), f"[{k}] botões {'na largura do cartão' if cel else '280'}×50 ({sorted({(w, h) for w, h, _ in sizes})}, {larg})")
-        r.check(len({x for _, _, x in sizes}) == 1, f"[{k}] alinhados pela direita ({sorted({x for _, _, x in sizes})})")
+        r.check(sizes and all((abs(w - larg) <= 2 if cel else w == 280) and h == 50 for w, h, _, larg in sizes), f"[{k}] botões {'na largura do cartão' if cel else '280'}×50 ({sizes})")
+        r.check(all(abs(x) <= 1 for _, _, x, _ in sizes), f"[{k}] alinhados pela direita ({sorted({x for _, _, x, _ in sizes})})")
         r.check(await pg.evaluate(OVERFLOW), f"[{k}] sem rolagem para o lado")
         await r.shot(pg, f"aba-{k}", full_page=True)
     # teclado nas abas
@@ -99,7 +101,7 @@ async def body(r, p):
     for k in ("integracoes", "dados", "aparencia", "opcoes"):
         await tab(pg, k)
         sizes = await pg.evaluate(BUTTONS)
-        r.check(all(h == 50 for _, h, _ in sizes) and len({w for w, _, _ in sizes}) <= 1, f"[estreito {k}] botões iguais ({sorted({(w, h) for w, h, _ in sizes})})")
+        r.check(all(h == 50 and abs(w - larg) <= 2 for w, h, _, larg in sizes), f"[estreito {k}] botões na largura da linha ({sizes})")
         r.check(await pg.evaluate(OVERFLOW), f"[estreito {k}] sem rolagem para o lado")
     await r.shot(pg, "estreito-dados", full_page=True)
     await ctx.close()

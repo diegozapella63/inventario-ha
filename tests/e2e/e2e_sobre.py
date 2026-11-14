@@ -102,8 +102,9 @@ async def body(r, p):
         r.check(len(links) == 8 and all(x == ["_blank", "noopener"] for x in links), f"{tag} os 8 links abrem fora (target=_blank, rel=noopener) ({len(links)})")
         gh = pg.locator(".about a.ab-github")
         r.eq([await gh.get_attribute("href"), (await gh.text_content()).strip()], [GH, "Meu GitHub"], f"{tag} o botão Meu GitHub")
-        gb, lb = await gh.bounding_box(), await pg.locator(".about-apps").bounding_box()
-        r.check(abs(gb["width"] - lb["width"]) <= 1 and abs(gb["x"] - lb["x"]) <= 1, f"{tag} Meu GitHub da largura da lista ({gb['width']:.0f} / {lb['width']:.0f})")
+        # 1.60.0: a lista fica num cartão; o Meu GitHub, embaixo, da largura do cartão (como no CorrerIA)
+        gb, lb = await gh.bounding_box(), await pg.evaluate("(r => ({x: r.x, width: r.width}))(document.querySelector('.about-apps').closest('section').getBoundingClientRect())")
+        r.check(abs(gb["width"] - lb["width"]) <= 1 and abs(gb["x"] - lb["x"]) <= 1, f"{tag} Meu GitHub da largura do cartão dos apps ({gb['width']:.0f} / {lb['width']:.0f})")
         r.check("primary" in (await gh.get_attribute("class")), f"{tag} na cor do app")
 
         # nada passa da borda

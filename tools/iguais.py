@@ -31,7 +31,7 @@ def _lib(nome, apps=LIT):
 GRUPOS = [
     ("as caixas de seleção no visual do app", [
         "gerencia-ha/gerencia/app/www/selectsheet.js", "inventario-ha/inventario/app/web/selectsheet.js",
-        "economia-ha/economia/pagina/selectsheet.js", *_src("selectsheet.js")]),
+        "economia-ha/economia/pagina/selectsheet.js", "correria-ha/correria/app/www/selectsheet.js", *_src("selectsheet.js")]),
     ("os campos de texto que a pessoa aumenta (o tamanho guardado)", [
         "gerencia-ha/gerencia/app/www/textareas.js", "inventario-ha/inventario/app/web/textareas.js",
         "economia-ha/economia/pagina/textareas.js", "correria-ha/correria/app/www/textareas.js", *_src("textareas.js")]),

@@ -97,6 +97,11 @@ async def body(r, p):
     ha.stt_text = "quantos itens tem a cozinha"
     await r.open(pg, "#/", ".tag")
     await pg.click(".chat-top")
+    await pg.wait_for_selector("dialog.chat .chat-f")
+    await pg.wait_for_timeout(350)  # a janela entra subindo
+    r.eq(await pg.locator(".chat-ctx").count(), 0, "1.60.0: no Agora, sem o óbvio (Sobre o inventário)")
+    g = await pg.evaluate("(() => { const d = document.querySelector('dialog.chat').getBoundingClientRect(); return [Math.round(d.bottom), innerHeight, Math.round(d.top), Math.round(d.width), innerWidth, getComputedStyle(document.querySelector('dialog.chat')).borderTopLeftRadius]; })()")
+    r.check(abs(g[0] - g[1]) <= 1 and g[2] > g[1] * 0.15 and g[3] == g[4] and g[5] != "0px", f"1.60.0: no celular, uma janela que sobe de baixo, sem a tela toda, como nos outros apps ({g})")
     await pg.click("[data-new]") if await pg.is_visible("[data-new]") else None
     await pg.click("dialog.chat [data-mic]")
     await pg.wait_for_selector("dialog.chat [data-mic].on", timeout=8000)
@@ -106,14 +111,14 @@ async def body(r, p):
     r.check(True, "ditar: o que foi falado vira a pergunta")
     await ctx.close()
 
-    # computador: à direita, encostada na borda
+    # computador: no meio da tela
     ctx, pg = await r.page(b, "pc", "light")
     await r.open(pg, "#/buscar?q=geladeira", ".sbar")
     await pg.click(".chat-top")
     await pg.wait_for_selector("dialog.chat .chat-ideas")
     await pg.wait_for_timeout(300)  # a janela entra deslizando
-    g = await pg.evaluate("(() => { const d = document.querySelector('dialog.chat').getBoundingClientRect(); return [Math.round(d.right), innerWidth, Math.round(d.width)]; })()")
-    r.check(abs(g[0] - g[1]) <= 1 and g[2] <= 481, f"no computador, à direita ({g})")
+    g = await pg.evaluate("(() => { const d = document.querySelector('dialog.chat').getBoundingClientRect(); return [Math.round(d.left + d.right), innerWidth, Math.round(d.width), Math.round(d.height), innerHeight]; })()")
+    r.check(abs(g[0] - g[1]) <= 2 and g[2] <= 561 and g[3] < g[4] * 0.9, f"1.60.0: no computador, no meio da tela, como nos outros apps ({g})")
     r.eq((await pg.text_content(".chat-ctx")).strip(), "Sobre a busca “geladeira”", "da busca, a conversa é sobre a busca")
     try:
         await pg.wait_for_function("document.activeElement && document.activeElement.matches('dialog.chat textarea')", timeout=2000)

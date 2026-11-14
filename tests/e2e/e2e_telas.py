@@ -83,14 +83,17 @@ CHECK = """() => {
   if (pt && pt.offsetParent && !pt.querySelector('.sec-ic')) bad.push('título da tela sem ícone: ' + pt.textContent.trim());
   for (const h of document.querySelectorAll('#view .zone-h h3')) if (h.offsetParent && !h.querySelector('.zone-ic')) bad.push('grupo sem ícone: ' + h.textContent.trim());
   for (const h of document.querySelectorAll('dialog[open] .dlg-h h2:not(.sr)')) if (!h.querySelector('.dlg-ic')) bad.push('janela sem ícone no título: ' + h.textContent.trim());
-  // 1.59.1: uma linha fina no fim de cada seção principal, menos a última da tela
-  for (const box of document.querySelectorAll('#view .more-panel, #view .mscreen')) {
-    const secs = [...box.querySelectorAll(':scope > section.panel')].filter(x => x.offsetParent);
-    secs.forEach((sec, i) => {
-      const linha = parseFloat(getComputedStyle(sec).borderBottomWidth) > 0;
-      if (i < secs.length - 1 && !linha) bad.push('seção sem a linha no fim: ' + (sec.id || sec.className));
-      if (i === secs.length - 1 && linha) bad.push('linha no fim da última seção: ' + (sec.id || sec.className));
-    });
+  // 1.60.0: as abas que não cabem mostram a seta do lado de onde há mais; as que cabem, nenhuma
+  const tb = document.querySelector('#view .tabs-wrap > .more-tabs');
+  if (tb && tb.offsetParent) {
+    const w = tb.parentElement, mais = tb.scrollWidth > tb.clientWidth + 2;
+    if (mais !== (w.classList.contains('tem-dir') || w.classList.contains('tem-esq'))) bad.push('abas: a seta não bate com o que cabe (' + w.className + ')');
+  }
+  // 1.60.0 (o padrão do GerencIA): cada seção principal num cartão, com a borda e os cantos arredondados
+  for (const sec of document.querySelectorAll('#view .more-panel > section.panel, #view .mscreen > section.panel')) {
+    if (!sec.offsetParent) continue;
+    const st = getComputedStyle(sec);
+    if (!(parseFloat(st.borderTopWidth) > 0 && parseFloat(st.borderBottomWidth) > 0 && parseFloat(st.borderTopLeftRadius) >= 12)) bad.push('seção fora do cartão: ' + (sec.id || sec.className));
   }
   return bad;
 }"""

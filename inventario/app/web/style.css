@@ -352,7 +352,8 @@ html:has(dialog[open]) { overflow: hidden; scrollbar-gutter: auto; }
 @media (min-width: 700px) { .mic-top, .chat-top { margin: 0; } }
 .chat-top + .mic-top { margin-left: -4px; }
 /* Conversar: a janela da conversa (à direita no computador, a tela toda no celular) */
-dialog.sheet.chat { width: min(480px, 100vw); }
+/* 1.60.0: a Conversar como nos outros apps: uma janela que sobe de baixo (no computador, no meio), sem ocupar a tela toda */
+dialog.modal.chat { width: min(560px, calc(100vw - 32px)); height: min(78dvh, 680px); }
 .chat .dlg-h h2 { flex: 1; }
 .chat-b { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
 .msg { max-width: 86%; padding: 10px 13px; border-radius: 14px; font-size: 15.5px; line-height: 1.45; overflow-wrap: anywhere; }
@@ -727,7 +728,7 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 @media (max-width: 699px) {
   dialog.sheet { width: 100vw; border-left: 0; }
   dialog.sheet[open] { animation: slideup 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
-  dialog.modal, dialog.modal.wide, dialog.modal.narrow { width: 100vw; max-height: 94dvh; margin: auto 0 0; border-radius: 16px 16px 0 0; }
+  dialog.modal, dialog.modal.wide, dialog.modal.narrow, dialog.modal.chat { width: 100vw; max-height: 94dvh; margin: auto 0 0; border-radius: 16px 16px 0 0; }
   dialog.modal[open] { animation: slideup 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
 }
 @keyframes slideup { from { transform: translateY(40px); opacity: 0; } }
@@ -845,6 +846,14 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .opts > li.apps-det-li, .opts > li.sub { display: block; padding: 0 4px 14px 22px; }
 .apps-det { margin-top: 0; padding: 4px 14px 6px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
 .sub-box { padding: 12px 14px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.sub-op { padding: 0 4px 14px 22px; } /* o quadro fora de uma lista (o da IA, embaixo de Usar IA) */
+.sub-box > .opts > li:first-child { padding-top: 0; }
+.sub-box > .opts > li:last-child { padding-bottom: 0; }
+.sub-box > p.muted { margin: 0; }
+.sub-box .opts .ot { min-width: 0; flex-basis: 100%; }
+.sub-box .opts .oa { flex: 1 1 100%; min-width: 0; }
+.more-panel .sub-box .opts .oa > .select, .more-panel .sub-box .opts .oa > .btn:not(.icon) { flex: 1 1 100%; width: 100%; min-width: 0; max-width: 100%; }
+@media (min-width: 1000px) { .more-panel .sub-box .opts .oa > .select, .more-panel .sub-box .opts .oa > .btn:not(.icon) { flex: none; width: 280px; } .sub-box .opts .ot { flex-basis: auto; flex: 1; } .sub-box .opts .oa { flex: none; } }
 .apps-det > summary { width: 100%; }
 .apps-det .help { margin: 4px 0 8px; }
 .app-det-l { list-style: none; margin: 0; padding: 0; }
@@ -985,8 +994,14 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .pick span { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 8px 6px; font-size: 12px; color: #fff; background: linear-gradient(transparent, rgba(0, 0, 0, 0.7)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- Mais: abas no alto, como no CronologIA e no ResolvIA */
+.tabs-wrap { position: sticky; top: 0; z-index: 15; margin: 20px 0 4px; }
+.tabs-fim { position: absolute; top: 1px; bottom: 1px; z-index: 1; width: 52px; display: none; align-items: center; pointer-events: none; color: var(--ink-2); }
+.tabs-fim.dir { right: 1px; justify-content: flex-end; padding-right: 8px; border-radius: 0 13px 13px 0; background: linear-gradient(to right, transparent, var(--surface-2) 62%); }
+.tabs-fim.esq { left: 1px; justify-content: flex-start; padding-left: 8px; border-radius: 13px 0 0 13px; background: linear-gradient(to left, transparent, var(--surface-2) 62%); }
+.tabs-fim .ic { width: 18px; height: 18px; }
+.tabs-wrap.tem-dir > .tabs-fim.dir, .tabs-wrap.tem-esq > .tabs-fim.esq { display: flex; }
 .more-tabs {
-  position: sticky; top: 0; z-index: 15; display: flex; gap: 4px; padding: 4px; margin: 20px 0 4px;
+  position: relative; display: flex; gap: 4px; padding: 4px; margin: 0;
   border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); box-shadow: 0 0 0 8px var(--paper);
 }
 /* cinco abas: cada uma com o nome inteiro; em celular estreito a barra rola para o lado (como no ResolvIA) */
@@ -1004,8 +1019,11 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 /* o conteúdo da aba ocupa ao menos a tela: trocar de aba com a página rolada mantém as abas no alto, sem pular */
 .more-panel { min-height: calc(100vh - 120px); min-height: calc(100dvh - 120px); }
 .more-panel > .panel:first-child, .mscreen > .panel:first-child { margin-top: 22px; }
-/* 1.59.1: uma linha fina no fim de cada seção principal (a última, não); entre as opções de uma seção, nenhuma */
-.more-panel > .panel:has(~ .panel), .mscreen > .panel:has(~ .panel) { padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+/* 1.60.0 (padrão da família, o do GerencIA): cada seção principal num cartão (fundo, borda e cantos arredondados);
+   entre as opções de uma seção, nenhuma linha */
+.more-panel > .panel, .mscreen > .panel { margin-top: 18px; padding: 20px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
+.more-panel > .panel:first-child, .mscreen > .panel:first-child { margin-top: 22px; }
+@media (max-width: 380px) { .more-panel > .panel, .mscreen > .panel { padding: 18px 14px; } }
 .foot { margin: 44px 0 0; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .foot b { font: 600 19px/1.3 var(--font-c); letter-spacing: 0.01em; }
 

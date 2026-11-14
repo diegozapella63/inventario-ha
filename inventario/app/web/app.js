@@ -665,6 +665,15 @@
   }
 
   // ------------------------------------------------------------------ renderização das telas
+  // 1.60.0 (padrão da família): quando as abas não cabem, a ponta de onde há mais some aos poucos, com uma seta
+  function markTabs() {
+    const t = $("#view .tabs-wrap > .more-tabs");
+    if (!t) return;
+    t.parentElement.classList.toggle("tem-esq", t.scrollLeft > 2);
+    t.parentElement.classList.toggle("tem-dir", t.scrollLeft + t.clientWidth < t.scrollWidth - 2);
+  }
+  document.addEventListener("scroll", (e) => { if (e.target.classList && e.target.classList.contains("more-tabs")) markTabs(); }, true);
+  window.addEventListener("resize", () => markTabs());
   function renderView(navigated) {
     const view = $("#view");
     const key = hashOf(base);
@@ -696,6 +705,7 @@
     rendered = key;
     renderSide();
     renderTop();
+    markTabs();
     document.title = base.name === "home" ? "InventarIA" : `InventarIA – ${viewTitle(base)}`;
     if (navigated) {
       const memo = scrollMemo.get(key);
@@ -1463,9 +1473,9 @@
     const label = ALL_TABS.find(([k]) => k === tab)[1];
     const bodies = { dados: () => moreExport() + moreData(), integracoes: moreIntegrations, aparencia: moreLook, opcoes: moreOptions };
     return `<div class="more-anchor" aria-hidden="true"></div>
-    <div class="more-tabs" role="tablist" aria-label="Seções de Configurações">
+    <div class="tabs-wrap"><div class="more-tabs" role="tablist" aria-label="Seções de Configurações">
       ${moreTabs().map(([k, l, i]) => `<button type="button" role="tab" id="mt-${k}" aria-controls="mp" aria-selected="${k === tab}" tabindex="${k === tab ? 0 : -1}" data-act="more-tab" data-tab="${k}">${ic(i, "sm")}<span>${l}</span></button>`).join("")}
-    </div>
+    </div><span class="tabs-fim esq" aria-hidden="true">${ic("back", "sm")}</span><span class="tabs-fim dir" aria-hidden="true">${ic("chev", "sm")}</span></div>
     <div class="more-panel" id="mp" role="tabpanel" aria-labelledby="mt-${tab}" aria-label="${label}">${bodies[tab]()}</div>
     <p class="foot"><b>InventarIA</b><br>${PREVIEW ? "Prévia do app do Home Assistant: as alterações ficam só nesta tela." : `v${esc(S.version)}, com os dados em arquivos abertos (JSON e JPG) dentro do Home Assistant.`}</p>`;
   }
@@ -1676,9 +1686,9 @@
     <section class="panel" id="p-ai">
       <h2>${secIc("scan")}IA do Home Assistant</h2>
       <p class="lead">A IA configurada no Home Assistant: Claude, OpenAI, Gemini ou Ollama.</p>
-      <ul class="opts"><li><div class="ot"><b id="ai-on-h">${oti("spark")}Usar IA</b><span>${on ? "Ler fotos, catalogar e buscar na internet." : "Os botões de IA e o Falar ficam escondidos."}</span></div>
+      <ul class="opts"><li${on ? ' class="tem-sub"' : ""}><div class="ot"><b id="ai-on-h">${oti("spark")}Usar IA</b><span>${on ? "Ler fotos, catalogar e buscar na internet." : "Os botões de IA e o Falar ficam escondidos."}</span></div>
         <div class="oa">${switchHtml("ai-on", on, "ai-on-h")}</div></li></ul>
-      ${on ? `<div data-slot="ai-panel"><p class="muted">Verificando…</p></div>` : ""}
+      ${on ? `<div class="sub-op"><div class="sub-box" data-slot="ai-panel"><p class="muted">Verificando…</p></div></div>` : ""}
     </section>
     ${on ? `<section class="panel" id="p-voice">
       <h2>${secIc("mic")}Falar</h2>
@@ -3494,7 +3504,7 @@
     if (sc.room) return D.roomById.get(sc.room)?.name || "este cômodo";
     if (sc.view === "search") return sc.q ? `a busca “${sc.q}”` : "a busca";
     if (sc.view === "news") return "as novidades dos eletrônicos";
-    return { home: "o inventário", rooms: "os cômodos", report: "o relatório", data: "o inventário", menu: "o inventário" }[sc.view] || "o inventário";
+    return ""; // 1.60.0: fora de um item, de um cômodo, da busca ou das novidades, nada (já se sabe que é o inventário)
   }
   function chatIdeas(sc) {
     if (sc.item) return ["Vale a pena pôr no seguro?", "Como conservar melhor?", "Quanto vale hoje, mais ou menos?"];
@@ -3511,13 +3521,13 @@
     const sc = chatScreen();
     let rec = null;
     const entry = openDialog({
-      cls: "sheet chat", label: "Conversar",
+      cls: "modal chat", label: "Conversar",
       html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("chat", `Conversar`)}</h2>
           <button type="button" class="btn ghost sm" data-new${CHAT.msgs.length ? "" : " hidden"}>${ic("plus", "sm")}Nova conversa</button>
           <button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b chat-b" data-slot="msgs" aria-live="polite"></div>
         <form class="chat-f" data-chat>
-          <p class="chat-ctx">Sobre ${esc(chatAbout(sc))}</p>
+          ${chatAbout(sc) ? `<p class="chat-ctx">Sobre ${esc(chatAbout(sc))}</p>` : ""}
           <div class="chat-in"><textarea class="input" name="t" rows="1" data-size="off" maxlength="2000" placeholder="Pergunte o que quiser" aria-label="Mensagem" enterkeyhint="send"></textarea>
             ${voiceReady() ? `<button type="button" class="btn icon" data-mic aria-label="Falar a pergunta">${ic("mic")}</button>` : ""}
             <button type="submit" class="btn primary icon" aria-label="Enviar">${ic("send")}</button></div>

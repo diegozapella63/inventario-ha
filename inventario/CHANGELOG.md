@@ -1,5 +1,12 @@
 # Mudanças
 
+## 1.60.0
+
+- **Seções em cartões**, como no GerencIA: em Mais e em Configurações, cada seção fica num cartão (fundo, borda e cantos arredondados), no lugar das linhas.
+- **IA do Home Assistant**: o estado, o Verificar de novo e as escolhas de IA (para ler fotos e para buscar fotos) ficam num quadro embaixo de **Usar IA**.
+- **Conversar** abre como uma janela que sobe de baixo (no computador, no meio da tela), igual à dos outros apps, sem ocupar a tela toda. Saiu o "Sobre o inventário" do pé; a linha só aparece quando a conversa é sobre um cômodo, um item, a busca ou as novidades.
+- **Configurações**: quando as abas não cabem, a ponta de onde há mais some aos poucos, com uma seta.
+
 ## 1.59.1
 
 - **Linhas**: volta uma linha fina no fim de cada seção principal (GerencIA, CorrerIA, IA do Home Assistant…). Entre as opções de uma seção continua sem linha.
