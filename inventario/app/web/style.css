@@ -825,13 +825,26 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .nrow.static { cursor: default; }
 .nrow.static:hover { background: none; }
 .nrow.static .switch { flex: none; }
-.app-det-b { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.app-det-b .ic { flex: none; color: var(--muted); }
-.app-det-b:hover b { text-decoration: underline; }
-.apps-det .nrow b, .apps-det .nrow .nm { white-space: normal; overflow-wrap: anywhere; } /* nada cortado: o nome e o porquê quebram a linha */
-.opts > li.apps-det-li { display: block; padding-top: 4px; }
-.apps-det { margin-top: 0; }
-.apps-det .help { margin: 6px 0 0; }
+/* Apps detectados (1.58.0): uma sub-opção de Apps do celular, num quadro recuado logo abaixo dela; cada app com o nome, de
+   quem é, o Ver novidades (um botão como os outros, do tamanho do texto) e a chave; os desligados no fim, em Inativos (n) */
+.opts > li.tem-sub { border-bottom: 0; padding-bottom: 6px; }
+.opts > li.apps-det-li { display: block; padding: 0 4px 14px 22px; }
+.apps-det { margin-top: 0; padding: 4px 14px 6px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.apps-det > summary { width: 100%; }
+.apps-det .help { margin: 4px 0 8px; }
+.app-det-l { list-style: none; margin: 0; padding: 0; }
+.app-det { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.app-det-t { display: grid; gap: 2px; min-width: 0; justify-items: start; }
+.app-det-t b { font-weight: 500; overflow-wrap: anywhere; } /* nada cortado: o nome e o porquê quebram a linha */
+.app-det-t .nm { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+.app-det-t .app-det-b { margin-top: 8px; width: auto; padding: 0 14px; }
+.apps-inativos { margin-top: 4px; border-top: 1px solid var(--line); }
+.apps-inativos .app-det-l { margin-top: 2px; }
+/* Conferir (1.58.0): Todas as novidades na largura toda e, embaixo, Só equipamentos e Só apps dividindo a linha */
+#p-news .opts .oa.news-tres { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; flex: 1 1 100%; }
+#p-news .opts .oa.news-tres > .btn { width: auto; max-width: none; min-width: 0; justify-content: center; }
+#p-news .opts .oa.news-tres > .btn.primary { grid-column: 1 / -1; }
+@media (min-width: 1000px) { #p-news .opts .oa.news-tres { flex: none; width: 400px; } }
 .inews { margin-top: 18px; }
 .inews-h { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 17px; font-weight: 700; }
 .inews-h .ic { color: var(--tag-text); }

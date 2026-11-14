@@ -1473,7 +1473,9 @@
     <section class="panel" id="p-news">
       <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos eletrônicos${appsOn() ? " e dos apps do celular" : ""}.</p>
       <ul class="opts"><li><div class="ot"><b>Conferir todos</b><span>${appsOn() ? "A IA escolhe os eletrônicos e os apps que vale conferir." : "A IA escolhe, entre os eletrônicos, os que vale conferir."}</span></div>
-        <div class="oa"><button type="button" class="btn primary" data-act="news-all">${ic("spark")}Conferir novidades</button></div></li></ul>
+        ${appsOn() ? `<div class="oa news-tres"><button type="button" class="btn primary" data-act="news-all" data-so="">${ic("spark")}Todas as novidades</button>
+          <button type="button" class="btn" data-act="news-all" data-so="itens">${ic("tag")}Só equipamentos</button><button type="button" class="btn" data-act="news-all" data-so="apps">${ic("phone")}Só apps</button></div>`
+          : `<div class="oa"><button type="button" class="btn primary" data-act="news-all" data-so="">${ic("spark")}Conferir novidades</button></div>`}</li></ul>
       <div data-slot="news-job"></div>
     </section>
     <section class="panel" id="p-news-list">
@@ -1564,22 +1566,19 @@
     const rank = (a) => (newsCount(a.res) ? 0 : !a.res ? 1 : 2);
     const sortA = (x, y) => rank(x) - rank(y) || newsCount(y.res) - newsCount(x.res) || x.nome.localeCompare(y.nome, "pt-BR");
     const chosen = L.filter((a) => a.conferir === true || a.res).sort(sortA);
-    const out = L.filter((a) => a.conferir === false && !a.res).sort(sortA);
     const novos = L.filter((a) => a.conferir == null && !a.res).length;
-    const wasOpen = !!$(".news-out[open]", sl);
     if (!L.length) {
       sl.innerHTML = `<p class="muted">${A.sensores ? APPS_NENHUM : APPS_SEM_SENSOR}</p>`;
       return;
     }
     sl.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map(appRow).join("")}</ul>` : ""}
-      ${novos ? `<p class="muted">${chosen.length ? `${plural(novos, "app novo entra", "apps novos entram")} na próxima conferência.` : "Toque em Conferir novidades: a IA escolhe os apps."}</p>` : ""}
-      ${out.length ? `<details class="news-out"${wasOpen ? " open" : ""}><summary>${ic("chev", "sm")}Deixados de fora (${int(out.length)})</summary><ul class="nlist">${out.map(appRow).join("")}</ul></details>` : ""}`;
+      ${novos ? `<p class="muted">${chosen.length ? `${plural(novos, "app novo entra", "apps novos entram")} na próxima conferência.` : "Toque em Todas as novidades ou Só apps: a IA escolhe os apps."}</p>` : ""}
+      ${!chosen.length && !novos ? `<p class="muted">Nenhum app acompanhado. Ligue os apps em Configurações › Opções › Apps detectados.</p>` : ""}`;
   }
   function renderNewsJob(st) {
     const js = $('#view [data-slot="news-job"]');
     if (!js) return;
-    const btn = $('#view [data-act="news-all"]');
-    if (btn) btn.disabled = !!(st && st.stage === "busy");
+    for (const btn of $$('#view [data-act="news-all"]')) btn.disabled = !!(st && st.stage === "busy");
     if (st && st.stage === "busy") {
       const p = st.progress || {}, pct = p.total ? Math.round((p.feitos / p.total) * 100) : 0;
       js.innerHTML = `<div class="njob" aria-live="polite"><p><span class="spin"></span><span>${esc(st.msg || "Conferindo…")}</span></p>
@@ -1593,8 +1592,8 @@
     const u = newsOv && newsOv.ultima, c = newsNums;
     js.innerHTML = u ? `<p class="muted njob">Conferido ${esc(whenShort(u.at))}: ${c && c.conferidos ? `${int(c.com)} de ${int(c.conferidos)} com novidades` : "nada para conferir agora"}.</p>` : "";
   }
-  async function startNewsAll() {
-    try { const r = await API.post("api/news/all", {}); newsJob = r.id; renderNewsJob({ stage: "busy", msg: "Começando…" }); pollNewsAll(); }
+  async function startNewsAll(so = "") {
+    try { const r = await API.post("api/news/all", { so }); newsJob = r.id; renderNewsJob({ stage: "busy", msg: "Começando…" }); pollNewsAll(); }
     catch (e) { fail(e); }
   }
   async function pollNewsAll() {
@@ -1846,7 +1845,7 @@
       <h2>${secIc("spark")}Novidades</h2>
       <ul class="opts"><li><div class="ot"><b id="news-h">Usar novidades</b><span>Atualizações e recalls dos eletrônicos.</span></div>
         <div class="oa">${switchHtml("news-on", on, "news-h")}</div></li>
-      ${on ? `<li><div class="ot"><b id="news-apps-h">Apps do celular</b><span>As novidades dos apps que vocês usam, pelo sensor Último app usado do app Home Assistant.</span></div>
+      ${on ? `<li${appsOn() ? ' class="tem-sub"' : ""}><div class="ot"><b id="news-apps-h">Apps do celular</b><span>As novidades dos apps que vocês usam, pelo sensor Último app usado do app Home Assistant.</span></div>
         <div class="oa">${switchHtml("news-apps", appsOn(), "news-apps-h")}</div></li>` : ""}
       ${appsOn() ? `<li class="apps-det-li" data-slot="apps-det">${appsDetHtml()}</li>` : ""}
       ${on ? `<li><div class="ot"><b id="news-auto-h">Conferir sozinho</b><span>A IA confere os eletrônicos${appsOn() ? " e os apps" : ""} de tempos em tempos.</span></div>
@@ -1882,7 +1881,7 @@
   }
   // Opções › Novidades (1.56.1): logo abaixo de Apps do celular, os apps que o sensor achou, recolhidos em Apps detectados (n),
   // com os celulares que têm o sensor ligado e, de cada app, de quem, quando foi usado e se é acompanhado; sem app, o que fazer
-  let appsDetAberto = false;
+  let appsDetAberto = false, appsInatAberto = false;
   function appsDetHtml() {
     const A = newsOv && newsOv.apps;
     if (!A) return `<p class="help">Procurando os apps dos celulares…</p>`;
@@ -1892,12 +1891,19 @@
     // IA); ligada, é conferido. Um novo vem ligado (a IA ainda vai escolher); um que a IA deixou de fora vem desligado, com o porquê.
     const on = (a) => a.conferir === true || !!a.res || (a.conferir == null && !a.manual);
     const quando = (a) => (a.res ? "" : a.conferir == null ? "novo" : a.conferir === false && !a.manual ? "a IA deixou de fora" : "");
+    const row = (a) => {
+      const id = "app-det-" + a.pacote.replace(/[^a-z0-9]/gi, "-");
+      return `<li class="app-det"><div class="app-det-t"><b id="${id}">${esc(a.nome)}</b>
+        <span class="nm">${esc([joinE(a.pessoas || []), a.ultimo ? `usado ${whenShort(a.ultimo)}` : "", quando(a)].filter(Boolean).join(" · "))}</span>
+        <button type="button" class="btn sm app-det-b" data-act="app-open" data-id="${esc(a.pacote)}" aria-label="Ver novidades de ${esc(a.nome)}">${ic("spark", "sm")}Ver novidades</button></div>
+        <label class="switch"><input type="checkbox" role="switch" data-input="app-considerar" data-pkg="${esc(a.pacote)}" aria-labelledby="${id}"${on(a) ? " checked" : ""}><span class="track" aria-hidden="true"></span></label></li>`;
+    };
+    const ativos = L.filter(on), inativos = L.filter((a) => !on(a));
     return `<details class="news-out apps-det"${appsDetAberto ? " open" : ""}><summary>${ic("chev", "sm")}Apps detectados (${int(L.length)})</summary>
       ${(A.celulares || []).length ? `<p class="help">Com o sensor: ${esc(joinE(A.celulares))}.</p>` : ""}
-      <ul class="nlist">${L.map((a, i) => `<li><div class="nrow static"><button type="button" class="app-det-b" data-act="app-open" data-id="${esc(a.pacote)}" aria-label="Novidades de ${esc(a.nome)}">
-        <span class="nb"><b id="app-det-${i}">${esc(a.nome)}</b>
-        <span class="nm">${esc([joinE(a.pessoas || []), a.ultimo ? `usado ${whenShort(a.ultimo)}` : "", quando(a)].filter(Boolean).join(" · "))}</span></span>${ic("search")}</button>
-        <label class="switch"><input type="checkbox" role="switch" data-input="app-considerar" data-pkg="${esc(a.pacote)}" aria-labelledby="app-det-${i}"${on(a) ? " checked" : ""}><span class="track" aria-hidden="true"></span></label></div></li>`).join("")}</ul></details>`;
+      ${ativos.length ? `<ul class="app-det-l">${ativos.map(row).join("")}</ul>` : ""}
+      ${inativos.length ? `<details class="news-out apps-inativos"${appsInatAberto ? " open" : ""}><summary>${ic("chev", "sm")}Inativos (${int(inativos.length)})</summary>
+        <ul class="app-det-l">${inativos.map(row).join("")}</ul></details>` : ""}</details>`;
   }
   // a chave de um app: Acompanhar ou Deixar de fora (a mesma escolha da janela do app em Mais › Novidades)
   async function considerarApp(t) {
@@ -1920,7 +1926,11 @@
     const slot = $('#view [data-slot="apps-det"]');
     if (slot) slot.innerHTML = appsDetHtml();
   }
-  document.addEventListener("toggle", (e) => { if (e.target.classList && e.target.classList.contains("apps-det")) appsDetAberto = e.target.open; }, true);
+  document.addEventListener("toggle", (e) => {
+    if (!e.target.classList) return;
+    if (e.target.classList.contains("apps-det")) appsDetAberto = e.target.open;
+    if (e.target.classList.contains("apps-inativos")) appsInatAberto = e.target.open;
+  }, true);
   async function loadNewsTargets() {
     if (newsPeople || !newsOn()) return;
     try { newsPeople = (await API.get("api/news/people")).people || []; } catch { newsPeople = []; }
@@ -4274,14 +4284,14 @@
       case "backup-create": createBackup(b); break;
       case "backup-restore": restoreBackup(b.dataset.name); break;
       case "versions": openVersions(); break;
-      case "news-all": startNewsAll(); break;
+      case "news-all": startNewsAll(b.dataset.so || ""); break;
       case "news-cancel": cancelNewsAll(); break;
       case "news-clear": clearNews(); break;
       case "erase-all": eraseAll(); break;
       case "news-pessoa": toggleNewsPessoa(b.dataset.id); break;
       case "news-notify-test":
         b.disabled = true;
-        API.post("api/news/notify-test", { who: "eu" }).then((r) => toast(r.sent > 1 ? `Aviso enviado para ${r.sent} celulares` : "Aviso enviado"), fail).finally(() => { b.disabled = !!newsTestWhy(); });
+        API.post("api/news/notify-test", { who: "eu" }).then(() => toast("Aviso enviado para o seu celular."), fail).finally(() => { b.disabled = !!newsTestWhy(); });
         break;
       case "news-open": { const it = D.itemById.get(b.dataset.id); if (it) openNews(it); break; }
       case "app-open": { const a = ((newsOv && newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === b.dataset.id); if (a) openAppNews(a); break; }

@@ -380,13 +380,14 @@
       aiOff();
       const live = newsJobOf();
       if (live) return { id: live[0] };
-      const cats = newsCats();
+      const so = (body && body.so) || ""; // Todas as novidades, Só equipamentos (itens) ou Só apps (apps)
+      const cats = so === "apps" ? [] : newsCats();
       for (const i of d.items) if (cats.includes(i.cat) && !(i.id in ST.news.triagem)) ST.news.triagem[i.id] = PICK.test(plain(i.name));
       const week = Date.now() - 7 * 864e5;
       const seen = new Set();
       const todo = d.items.filter((i) => cats.includes(i.cat) && (ST.news.triagem[i.id] || ST.news.itens[i.id]) && !(ST.news.itens[i.id] && Date.parse(ST.news.itens[i.id].at) > week))
         .filter((i) => !seen.has(groupKey(i)) && seen.add(groupKey(i))); // uma busca por equipamento
-      if (appsOn()) { // e os apps: a "IA" deixa a tela inicial de fora
+      if (appsOn() && so !== "itens") { // e os apps: a "IA" deixa a tela inicial de fora
         for (const [p] of APPS) if (!ST.news.apps_triagem[p]) ST.news.apps_triagem[p] = { conferir: !/launcher/.test(p) };
         for (const [p, name] of APPS) if ((ST.news.apps_triagem[p].conferir || ST.news.apps[p]) && !(ST.news.apps[p] && Date.parse(ST.news.apps[p].at) > week)) todo.push({ name, app: p });
       }

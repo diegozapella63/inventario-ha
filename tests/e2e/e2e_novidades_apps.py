@@ -1,7 +1,8 @@
 """Novidades › Apps do celular (1.56.0): a opção em Configurações › Opções (desligada de início), a seção Apps do celular
 em Mais › Novidades (sem o Home Assistant, os apps de exemplo de um celular de teste), conferir todos com os apps, a janela
-de um app (o guardado, sem chamar a IA), Deixar de fora (vai para os deixados de fora, recolhidos) e Acompanhar (volta e
-busca), no celular de 320 px e no computador, no escuro e no claro."""
+de um app (o guardado, sem chamar a IA), Deixar de fora (sai das Novidades e vai para Inativos, nas Opções) e Acompanhar
+(volta e busca); 1.58.0: Todas as novidades, Só equipamentos e Só apps; Apps detectados como sub-opção, com Ver novidades e
+os desligados em Inativos (n); no celular de 320 px e no computador, no escuro e no claro."""
 from e2e_lib import OVERFLOW, TEXTS, main
 
 APPS = "[...document.querySelectorAll('#p-news-apps [data-slot=\"news-apps\"] > .nlist .nrow')].map(b => [b.querySelector('b').textContent, b.querySelector('.nm').textContent, [...b.querySelectorAll('.pill')].map(p => p.textContent)])"
@@ -37,10 +38,20 @@ async def body(r, p):
     r.eq((await pg.text_content(f"{det} summary")).strip(), "Apps detectados (5)", "com a contagem")
     await pg.click(f"{det} summary")
     r.eq((await pg.text_content(f"{det} .help")).strip(), "Com o sensor: Pessoa de Teste.", "os celulares com o sensor ligado")
-    linhas = await pg.evaluate(TEXTS, f"{det} .nrow")
+    linhas = await pg.evaluate(TEXTS, f"{det} .app-det .nm")
     r.eq(len(linhas), 5, "todos os apps que o sensor achou")
-    r.check(all("Pessoa de Teste · usado hoje" in x and x.endswith("· novo") for x in linhas), f"de quem, quando foi usado e novo antes da IA escolher ({linhas[0]})")
-    r.eq([x.split(" Pessoa")[0] for x in linhas][:2], ["Casa Conectada", "Configurações"], "em ordem de nome")
+    r.check(all(x.startswith("Pessoa de Teste · usado hoje") and x.endswith("· novo") for x in linhas), f"de quem, quando foi usado e novo antes da IA escolher ({linhas[0]})")
+    r.eq((await pg.evaluate(TEXTS, f"{det} .app-det b"))[:2], ["Casa Conectada", "Configurações"], "em ordem de nome")
+    # 1.58.0: uma sub-opção de Apps do celular: um quadro recuado, sem a linha entre os dois
+    sub = await pg.evaluate("""(() => { const o = document.querySelector('#p-news-opts [data-input="news-apps"]').closest('li'), d = document.querySelector('#p-news-opts .apps-det');
+      const a = o.querySelector('.ot').getBoundingClientRect(), b = d.getBoundingClientRect();
+      return [Math.round(b.left - a.left), getComputedStyle(o).borderBottomStyle, getComputedStyle(d).borderTopStyle, getComputedStyle(d).borderRadius]; })()""")
+    r.check(sub[0] >= 12 and sub[1] == "none" and sub[2] == "solid" and sub[3] != "0px", f"Apps detectados recuado num quadro, logo abaixo de Apps do celular ({sub})")
+    # o Ver novidades: um botão como os outros dos apps, do tamanho do texto (no lugar da lupa)
+    bts = await pg.evaluate(f"""[...document.querySelectorAll("{det} .app-det-b")].map(b => [b.textContent.trim(), b.classList.contains('btn'), Math.round(b.getBoundingClientRect().height), Math.round(b.getBoundingClientRect().width)])""")
+    r.eq({x[0] for x in bts}, {"Ver novidades"}, "cada app com o Ver novidades")
+    r.check(all(x[1] and x[2] >= 44 and x[3] < 200 for x in bts), f"um botão do app, do tamanho do texto ({bts[0]})")
+    r.eq(await pg.locator(f"{det} .app-det .ic use[href='#i-search']").count(), 0, "sem a lupa")
     chaves = f"{det} [data-input='app-considerar']"
     r.eq(await pg.evaluate(f"[...document.querySelectorAll(\"{chaves}\")].map(i => i.checked)"), [True] * 5, "1.57.0: cada um com a sua chave, ligada de início")
     # 1.57.0: buscar as novidades de um app só, pela linha dele (um novo busca na hora)
@@ -66,17 +77,19 @@ async def body(r, p):
     sl = await pg.text_content('[data-slot="news-apps"]')
     r.check("Música Já" in sl and "4 apps novos entram na próxima conferência." in sl, f"o buscado sozinho já está na lista; os outros, na próxima ({sl.strip()[:80]})")
 
+    # 1.58.0: Todas as novidades na largura toda; Só equipamentos e Só apps embaixo, dividindo a linha
+    bts = await pg.evaluate("""[...document.querySelectorAll('#p-news [data-act="news-all"]')].map(b => [b.textContent.trim(), b.dataset.so, Math.round(b.getBoundingClientRect().width), Math.round(b.getBoundingClientRect().top)])""")
+    r.eq([(x[0], x[1]) for x in bts], [("Todas as novidades", ""), ("Só equipamentos", "itens"), ("Só apps", "apps")], "os três botões")
+    r.check(bts[1][3] == bts[2][3] > bts[0][3] and abs(bts[1][2] - bts[2][2]) <= 1 and bts[0][2] > bts[1][2] * 1.8, f"Todas em cima, os outros dois lado a lado do mesmo tamanho ({bts})")
     # conferir todos: os equipamentos e os apps
-    await pg.click('[data-act="news-all"]')
+    await pg.click('[data-act="news-all"][data-so=""]')
     await pg.locator(".toast", has_text="Conferidos").wait_for(timeout=60000)
     await pg.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)
     rows = await pg.evaluate(APPS)
     r.eq([x[0] for x in rows], ["Casa Conectada", "Mercadinho", "Música Já"], "os apps que a IA escolheu, em ordem")
     r.check(all(x[1].startswith("Pessoa de Teste · 2 novidades · hoje") for x in rows), f"de quem é o celular, quantas novidades e quando ({rows[0][1]})")
     r.check(all(x[2] == ["2"] for x in rows), "o número de novidades ao lado")
-    fora = await pg.evaluate("""(() => { const d = document.querySelector('#p-news-apps .news-out'); return d ? [d.open, d.querySelector('summary').textContent.trim(),
-      d === d.parentElement.lastElementChild] : null; })()""")
-    r.eq(fora, [False, "Deixados de fora (2)", True], "a tela inicial e as configurações no fim, recolhidos, com a contagem")
+    r.eq(await pg.locator("#p-news-apps .news-out").count(), 0, "1.58.0: sem os deixados de fora aqui (ficam nas Opções, em Inativos)")
     foot = await pg.text_content('[data-slot="news-job"]')
     r.check("com novidades" in foot, f"o resumo conta os apps também ({foot.strip()})")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
@@ -92,16 +105,31 @@ async def body(r, p):
     r.eq(await pg.evaluate(TEXTS, "dialog.modal .dlg-f button:not([hidden])"), ["Buscar de novo", "Deixar de fora"], "Buscar de novo e Deixar de fora")
     await r.shot(pg, "janela")
 
-    # Deixar de fora: fecha e o app vai para os deixados de fora
+    # Deixar de fora: fecha e o app sai das Novidades
     await pg.click("dialog.modal [data-fora]")
     await pg.locator(".toast", has_text="Casa Conectada: deixado de fora").wait_for(timeout=4000)
     r.eq(await pg.locator("dialog.modal").count(), 0, "a janela fecha")
     r.eq([x[0] for x in await pg.evaluate(APPS)], ["Mercadinho", "Música Já"], "sai da lista")
-    r.eq((await pg.text_content("#p-news-apps .news-out summary")).strip(), "Deixados de fora (3)", "e entra nos deixados de fora")
+    r.eq(await pg.locator("#p-news-apps .news-out").count(), 0, "sem os deixados de fora aqui")
 
-    # Acompanhar: de dentro dos deixados de fora, volta e busca
-    await pg.click("#p-news-apps .news-out summary")
-    await pg.locator("#p-news-apps .news-out .nrow", has_text="Casa Conectada").click()
+    # Só apps: confere só os apps (os da semana já estão em dia: termina sem buscar nada)
+    corpos = []
+    pg.on("request", lambda q: corpos.append(q.post_data) if q.method == "POST" and q.url.endswith("/api/news/all") else None)
+    await pg.click('[data-act="news-all"][data-so="apps"]')
+    await pg.locator(".toast", has_text="Conferid").wait_for(timeout=30000)
+    r.eq(corpos, ['{"so":"apps"}'], "Só apps pede só os apps")
+
+    # Acompanhar: nas Opções, em Inativos, o Ver novidades do app deixado de fora; volta e busca
+    await r.open(pg, "#/config/opcoes", "#p-news-opts")
+    await pg.wait_for_selector(det, timeout=8000)
+    if not await pg.eval_on_selector(det, "d => d.open"):
+        await pg.click(f"{det} summary")
+    inat = f"{det} .apps-inativos"
+    r.eq((await pg.text_content(f"{inat} > summary")).strip(), "Inativos (3)", "os desligados no fim, em Inativos, com a contagem")
+    r.check(not await pg.eval_on_selector(inat, "d => d.open"), "recolhidos")
+    r.eq(await pg.evaluate(TEXTS, f"{inat} .app-det b"), ["Casa Conectada", "Configurações", "Tela inicial"], "o deixado de fora e os que a IA deixou")
+    await pg.click(f"{inat} > summary")
+    await pg.click(f"{inat} [data-act='app-open'][data-id='com.exemplo.casaconectada']")
     await pg.wait_for_selector("dialog.modal [data-dentro]:not([hidden])", timeout=4000)
     r.check("Deixado de fora das novidades." in await pg.text_content("dialog.modal .dlg-b"), "um deixado de fora diz isso")
     r.eq(await pg.evaluate(TEXTS, "dialog.modal .dlg-f button:not([hidden])"), ["Acompanhar"], "e só oferece Acompanhar")
@@ -109,9 +137,12 @@ async def body(r, p):
     await pg.click("dialog.modal [data-dentro]")
     await pg.wait_for_selector("dialog.modal .news li", timeout=10000)
     r.check(any("/api/news/app" in u for u in sent), "Acompanhar busca as novidades")
-    r.check(await pg.locator("#p-news-apps .news-out[open]").count() == 1, "os deixados de fora continuam abertos enquanto a tela está aberta")
     await pg.click("dialog.modal [data-x]")
-    r.check("Casa Conectada" in [x[0] for x in await pg.evaluate(APPS)], "volta para a lista")
+    r.check("Casa Conectada" not in await pg.evaluate(TEXTS, f"{inat} .app-det b"), "sai dos Inativos")
+    r.check(await pg.locator(f"{inat}[open]").count() == 1, "Inativos continua aberto enquanto a tela está aberta")
+    await r.open(pg, "#/novidades", "#p-news-apps")
+    await pg.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)
+    r.check("Casa Conectada" in [x[0] for x in await pg.evaluate(APPS)], "volta para a lista das Novidades")
 
     # celular pequeno, claro, e computador
     ctx2, pg2 = await r.page(b, "estreito", "light", accent="verde")
@@ -128,16 +159,20 @@ async def body(r, p):
     await r.open(pg, "#/config/opcoes", "#p-news-opts")
     await pg.wait_for_selector(det, timeout=8000)
     await pg.click(f"{det} summary")
-    estados = dict(await pg.evaluate(f"""[...document.querySelectorAll("{det} .nrow")].map(r => [r.querySelector('b').textContent, r.querySelector('input').checked])"""))
+    if not await pg.eval_on_selector(inat, "d => d.open"):
+        await pg.click(f"{inat} > summary")
+    estados = dict(await pg.evaluate(f"""[...document.querySelectorAll("{det} .app-det")].map(r => [r.querySelector('b').textContent, r.querySelector('input').checked])"""))
     r.eq(estados, {"Casa Conectada": True, "Configurações": False, "Mercadinho": True, "Música Já": True, "Tela inicial": False},
          "acompanhados ligados, os que a IA deixou de fora desligados")
+    r.eq(await pg.evaluate(TEXTS, f"{det} > .app-det-l .app-det b"), ["Casa Conectada", "Mercadinho", "Música Já"], "os ligados primeiro")
     r.check("a IA deixou de fora" in await pg.text_content(f"{det} li:has([data-id='com.android.settings']) .nm"), "com o porquê")
-    cortados = await pg.evaluate(f"""[...document.querySelectorAll("{det} .nrow b, {det} .nrow .nm")].filter(e => e.scrollWidth > e.clientWidth + 1).length""")
+    cortados = await pg.evaluate(f"""[...document.querySelectorAll("{det} .app-det b, {det} .app-det .nm")].filter(e => e.scrollWidth > e.clientWidth + 1).length""")
     r.eq(cortados, 0, "nenhum texto cortado")
-    # desconsiderar um app: desligado, sai da pesquisa e vai para os deixados de fora
+    # desconsiderar um app: desligado, sai da pesquisa e vai para Inativos
     await pg.click(f"{det} li:has([data-id='com.exemplo.mercadinho']) label.switch")
     await pg.locator(".toast", has_text="Mercadinho: deixado de fora").wait_for(timeout=4000)
     r.check(await pg.locator(f"{det}[open]").count() == 1, "a lista continua aberta")
+    r.check("Mercadinho" in await pg.evaluate(TEXTS, f"{inat} .app-det b"), "vai para Inativos")
     merc = next(a for a in r.api("GET", "api/news")["apps"]["lista"] if a["pacote"] == "com.exemplo.mercadinho")
     r.eq((merc["conferir"], merc["manual"], merc["res"]), (False, True, None), "fica fora da pesquisa, pela escolha da pessoa")
     r.check("a IA deixou de fora" not in await pg.text_content(f"{det} li:has([data-id='com.exemplo.mercadinho']) .nm"), "sem dizer que foi a IA")
@@ -146,6 +181,8 @@ async def body(r, p):
     await pg.locator(".toast", has_text="Tela inicial: acompanhado").wait_for(timeout=4000)
     tela = next(a for a in r.api("GET", "api/news")["apps"]["lista"] if a["pacote"] == "com.android.launcher3")
     r.eq((tela["conferir"], tela["manual"]), (True, True), "a escolha da pessoa vale sobre a da IA")
+    r.check("Tela inicial" in await pg.evaluate(TEXTS, f"{det} > .app-det-l .app-det b"), "ligado, sai de Inativos")
+    r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "opcoes-depois")
     await r.open(pg, "#/novidades", "#p-news-apps")
     await pg.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)

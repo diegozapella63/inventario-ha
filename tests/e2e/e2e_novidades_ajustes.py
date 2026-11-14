@@ -89,6 +89,7 @@ async def body(r, p):
     n = len(ha.calls("POST", "/core/api/services/notify/"))
     await test.click()
     await pg.locator(".toast", has_text="Aviso enviado").wait_for(timeout=8000)
+    r.eq((await pg.locator(".toast").last.text_content()).strip(), "Aviso enviado para o seu celular.", "como nos outros apps, sem contar os aparelhos")
     c = ha.calls("POST", "/core/api/services/notify/")
     r.eq(len(c), n + 1, "Testar no meu celular manda um aviso só")
     r.eq(c[-1]["path"], f"/core/api/services/notify/{PHONE}", "no meu celular (o ligado à Ana, quem está na tela)")

@@ -1,5 +1,12 @@
 # Mudanças
 
+## 1.58.0
+
+- **Novidades**: três botões, **Todas as novidades**, **Só equipamentos** e **Só apps** (com Apps do celular ligado; sem os apps, fica o Conferir novidades).
+- **Apps do celular** nas Novidades: os deixados de fora saíram daqui. Eles ficam em **Configurações › Opções › Apps detectados**.
+- **Apps detectados** aparece como parte de **Apps do celular**: num quadro recuado, logo abaixo dela. Cada app tem o botão **Ver novidades** (no lugar da lupa), e os desligados vão para o fim, recolhidos em **Inativos (n)**.
+- **Testar no meu celular** diz "Aviso enviado para o seu celular.", como nos outros apps, sem contar os aparelhos. O teste vai para todos os aparelhos com o app Home Assistant ligados a você (Configurações > Pessoas), mesmo que não estejam em Quem recebe.
+
 ## 1.57.0
 
 - **Apps detectados**: cada app tem a sua chave. Desligada, o app fica fora da pesquisa das novidades, e a sua escolha vale sobre a da IA. Ligada num app que a IA deixou de fora, ele volta a ser conferido.

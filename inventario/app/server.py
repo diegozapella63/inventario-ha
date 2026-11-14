@@ -3175,9 +3175,10 @@ def _news_batch_run(jid: str):
     job = WEB_JOBS[jid]
     done = found = errors = 0
     novos = []  # equipamentos com alguma novidade que não estava guardada (para o aviso)
+    so = job.get("so") or ""  # 1.58.0: "itens" (Só equipamentos), "apps" (Só apps) ou "" (Todas as novidades)
     try:
         cats = news_cats()
-        cands = [i for i in STORE.sorted_items() if i.get("cat") in cats]
+        cands = [i for i in STORE.sorted_items() if i.get("cat") in cats] if so != "apps" else []
         d = news_read()
         todo_tri = [i for i in cands if (d["triagem"].get(i["id"]) or {}).get("sig") != item_sig(i)]
         if todo_tri:
@@ -3223,7 +3224,7 @@ def _news_batch_run(jid: str):
         # os apps do celular (com a opção ligada): lê o histórico dos sensores, a IA escolhe os que ainda não viu e entram
         # na mesma conferência, depois dos equipamentos, com o mesmo intervalo
         sel_apps, apps_todo, apps = [], [], {}
-        if apps_enabled():
+        if apps_enabled() and so != "itens":
             job["msg"] = "Lendo os apps dos celulares…"
             try:
                 apps_collect(force=True)
@@ -3854,8 +3855,13 @@ def news_auto_loop():
             log.exception("novidades sozinho")
 
 
-def news_batch_start(auto: bool = False) -> dict:
+def news_batch_start(auto: bool = False, so: str = "") -> dict:
+    """A conferência de todos (so ""), só dos equipamentos ("itens") ou só dos apps do celular ("apps")."""
     need_news_on()
+    if so not in ("", "itens", "apps"):
+        raise ApiError(400, "Escolha o que conferir: todas as novidades, só os equipamentos ou só os apps.")
+    if so == "apps" and not apps_enabled():
+        raise ApiError(409, "Ligue Apps do celular em Mais > Configurações > Opções.")
     if not SUPERVISOR_TOKEN and not AI_MOCK:
         raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
     with WEB_LOCK:
@@ -3865,7 +3871,7 @@ def news_batch_start(auto: bool = False) -> dict:
     web_jobs_cleanup()
     jid = secrets.token_hex(8)
     with WEB_LOCK:
-        WEB_JOBS[jid] = {"stage": "busy", "msg": "Começando…", "results": [], "at": time.time(), "kind": "lote", "auto": auto,
+        WEB_JOBS[jid] = {"stage": "busy", "msg": "Começando…", "results": [], "at": time.time(), "kind": "lote", "auto": auto, "so": so,
                          "progress": {"feitos": 0, "total": 0, "atual": ""}}
     threading.Thread(target=_news_batch_run, args=(jid,), daemon=True).start()
     return {"id": jid}
@@ -4458,8 +4464,8 @@ def r_news_clear(h, query):
 
 
 def r_news_all(h, query):
-    h.read_body()
-    h.send_json(news_batch_start(), 202)
+    body = h.read_body()
+    h.send_json(news_batch_start(so=str(body.get("so") or "")), 202)
 
 
 def r_news_people(h, query):

@@ -224,8 +224,8 @@ class Lote(UnitBase):
             p.start()
             self.addCleanup(p.stop)
 
-    def run_batch(self, auto=False):
-        jid = server.news_batch_start(auto=auto)["id"]
+    def run_batch(self, auto=False, so=""):
+        jid = server.news_batch_start(auto=auto, so=so)["id"]
         t0 = time.time()
         while server.WEB_JOBS[jid]["stage"] == "busy":
             if time.time() - t0 > 10:
@@ -259,6 +259,23 @@ class Lote(UnitBase):
         server.news_clear()
         self.store.settings["news_apps"] = True
         return n
+
+    def test_so_apps_e_so_equipamentos(self):
+        """1.58.0: Só apps confere só os apps; Só equipamentos, só os equipamentos."""
+        self.store.settings["news_apps"] = True
+        job = self.run_batch(so="apps")
+        d = server.news_read()
+        self.assertEqual((sorted(d["apps"]), d["itens"], d["triagem"]), (sorted([CASA, MUSICA, MERCADO]), {}, {}), "nenhum equipamento")
+        self.assertEqual(job["summary"]["conferidos"], 3)
+        server.news_clear()
+        job = self.run_batch(so="itens")
+        d = server.news_read()
+        self.assertEqual(d["apps"], {}, "nenhum app")
+        self.assertTrue(d["itens"])
+        self.assertGreater(job["summary"]["conferidos"], 0)
+        self.assertApiError(400, server.news_batch_start, so="tudo", msg_part="Escolha o que conferir")
+        self.store.settings["news_apps"] = False
+        self.assertApiError(409, server.news_batch_start, so="apps", msg_part="Ligue Apps do celular")
 
     def test_na_semana_nao_confere_de_novo(self):
         self.store.settings["news_apps"] = True
