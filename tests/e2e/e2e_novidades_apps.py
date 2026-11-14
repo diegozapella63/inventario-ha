@@ -19,8 +19,9 @@ async def body(r, p):
     await r.open(pg, "#/config/opcoes", "#p-news-opts")
     sw = '[data-input="news-apps"]'
     r.check(not await pg.is_checked(sw), "Apps do celular começa desligado")
-    txt = await pg.text_content("#p-news-opts")
+    txt = await pg.text_content("#p-apps")
     r.check("Apps do celular" in txt and "Último app usado" in txt, "diz de onde vêm os apps (o sensor do app Home Assistant)")
+    r.eq((await pg.text_content("#p-apps h2")).strip(), "Apps do celular", "1.61.0: uma seção própria, depois de Novidades")
     await r.open(pg, "#/novidades", "#p-news")
     r.eq(await pg.locator("#p-news-apps").count(), 0, "desligada: sem a seção dos apps")
     r.check("apps" not in await pg.text_content("#p-news .lead"), "e o texto fala só dos eletrônicos")
@@ -32,10 +33,10 @@ async def body(r, p):
     r.check(r.data()["settings"]["news_apps"] is True, "fica gravado")
     r.check("eletrônicos e os apps" in await pg.text_content("#p-news-opts"), "o Conferir sozinho também fala dos apps")
     # 1.56.1: logo abaixo da opção, os apps detectados, recolhidos
-    det = "#p-news-opts .apps-det"
+    det = "#p-apps .apps-det"
     await pg.wait_for_selector(det, timeout=8000)
-    pos = await pg.evaluate("""(() => { const li = document.querySelector('#p-news-opts .apps-det').closest('li'); const prev = li.previousElementSibling;
-      return [!!prev.querySelector('[data-input="news-apps"]'), document.querySelector('#p-news-opts .apps-det').open]; })()""")
+    pos = await pg.evaluate("""(() => { const li = document.querySelector('#p-apps .apps-det').closest('li'); const prev = li.previousElementSibling;
+      return [!!prev.querySelector('[data-input="news-apps"]'), document.querySelector('#p-apps .apps-det').open]; })()""")
     r.eq(pos, [True, False], "Apps detectados logo abaixo da opção, recolhido")
     r.eq((await pg.text_content(f"{det} summary")).strip(), "Apps detectados (5)", "com a contagem")
     await pg.click(f"{det} summary")
@@ -45,7 +46,7 @@ async def body(r, p):
     r.check(all(x.startswith("Pessoa de Teste · usado hoje") and x.endswith("· novo") for x in linhas), f"de quem, quando foi usado e novo antes da IA escolher ({linhas[0]})")
     r.eq((await pg.evaluate(TEXTS, f"{det} .app-det b"))[:2], ["Casa Conectada", "Configurações"], "em ordem de nome")
     # 1.58.0: uma sub-opção de Apps do celular: um quadro recuado, sem a linha entre os dois
-    sub = await pg.evaluate("""(() => { const o = document.querySelector('#p-news-opts [data-input="news-apps"]').closest('li'), d = document.querySelector('#p-news-opts .apps-det');
+    sub = await pg.evaluate("""(() => { const o = document.querySelector('#p-apps [data-input="news-apps"]').closest('li'), d = document.querySelector('#p-apps .apps-det');
       const a = o.querySelector('.ot').getBoundingClientRect(), b = d.getBoundingClientRect();
       return [Math.round(b.left - a.left), getComputedStyle(o).borderBottomStyle, getComputedStyle(d).borderTopStyle, getComputedStyle(d).borderRadius]; })()""")
     r.check(sub[0] >= 12 and sub[1] == "none" and sub[2] == "solid" and sub[3] != "0px", f"Apps detectados recuado num quadro, logo abaixo de Apps do celular ({sub})")

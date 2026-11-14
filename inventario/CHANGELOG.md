@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.61.0
+
+- **Contrair e expandir as seções**: em Mais e em Configurações, um toque no cabeçalho de uma seção fecha ou abre (a seta no canto mostra). O aparelho lembra as que ficaram fechadas para a próxima vez.
+- **Apps do celular** ganhou uma seção própria em Configurações › Opções, logo depois de Novidades, com o Apps detectados embaixo da chave.
+
 ## 1.60.1
 
 - **Cor do app**: as cores ficam sem o fundo em cada uma, direto no cartão.

@@ -1024,6 +1024,13 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .more-panel > .panel, .mscreen > .panel { margin-top: 18px; padding: 20px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
 .more-panel > .panel:first-child, .mscreen > .panel:first-child { margin-top: 22px; }
 @media (max-width: 380px) { .more-panel > .panel, .mscreen > .panel { padding: 18px 14px; } }
+/* 1.61.0: cada seção contrai e expande num toque no cabeçalho (a seta no canto) */
+.panel.dobra > h2 { cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; }
+.panel.dobra > h2 .fold-ic { margin-left: auto; display: grid; place-items: center; width: 32px; height: 32px; flex: none; color: var(--muted); transition: transform 0.15s; transform: rotate(90deg); }
+.panel.dobra.fechada > h2 .fold-ic { transform: none; }
+.panel.dobra.fechada > :not(h2) { display: none !important; }
+.panel.dobra.fechada > h2 { margin-bottom: 0; }
+.panel.dobra > h2:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 10px; }
 .foot { margin: 44px 0 0; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .foot b { font: 600 19px/1.3 var(--font-c); letter-spacing: 0.01em; }
 

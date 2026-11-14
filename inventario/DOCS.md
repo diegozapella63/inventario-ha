@@ -156,6 +156,10 @@ Com **Apps do celular** ligado (Mais > Configurações > Opções > Novidades, d
 - Tocar num app mostra as novidades, com **Buscar de novo** e **Deixar de fora** (sai da lista e da conferência). Num deixado de fora (aberto pelo **Ver novidades** em Inativos), **Acompanhar** o traz de volta e busca na hora. A sua escolha vale sobre a da IA e fica mesmo depois de **Limpar novidades**.
 - Com os apps, **Mais > Novidades** tem três botões: **Todas as novidades** (os equipamentos e os apps), **Só equipamentos** e **Só apps**. **Conferir sozinho** e **Avisar no celular** valem para os apps também: o aviso diz, por exemplo, "Novidades em 2 itens e 1 app".
 
+## Seções que fecham
+
+Em Mais e em Configurações, um toque no cabeçalho de uma seção fecha ou abre a seção. O aparelho lembra quais ficaram fechadas.
+
 ## Conversar
 
 O balão ao lado do microfone, no alto da tela (e na ficha do item), abre uma conversa com a IA. Pergunte sobre o que está na tela ("qual o item mais caro daqui?", "vale pôr no seguro?") ou sobre qualquer outro assunto. A IA recebe o resumo da casa e o que está na tela: o item, o cômodo com os itens, a busca ou as novidades. Ela responde, mas não muda o inventário.

@@ -87,6 +87,19 @@ async def body(r, p):
         r.check(all(abs(x) <= 1 for _, _, x, _ in sizes), f"[{k}] alinhados pela direita ({sorted({x for _, _, x, _ in sizes})})")
         r.check(await pg.evaluate(OVERFLOW), f"[{k}] sem rolagem para o lado")
         await r.shot(pg, f"aba-{k}", full_page=True)
+    # 1.61.0: toda seção contrai e expande no cabeçalho, com a seta; o aparelho lembra a que ficou fechada
+    await tab(pg, "opcoes")
+    secs = await pg.evaluate("[...document.querySelectorAll('.more-panel > section.panel')].map(s => [s.id, !!s.querySelector(':scope > h2 .fold-ic'), s.querySelector(':scope > h2').getAttribute('aria-expanded')])")
+    r.check(secs and all(x[1] and x[2] == "true" for x in secs), f"cada seção com a seta, aberta de início ({secs})")
+    alvo = secs[0][0]
+    await pg.click(f"#{alvo} > h2")
+    fech = await pg.evaluate(f"(s => [s.classList.contains('fechada'), [...s.children].filter(c => c.tagName !== 'H2').every(c => !c.getClientRects().length), s.querySelector('h2').getAttribute('aria-expanded')])(document.getElementById('{alvo}'))")
+    r.eq(fech, [True, True, "false"], "um toque no cabeçalho fecha a seção (só o cabeçalho fica)")
+    await pg.reload()
+    await pg.wait_for_selector(f"#{alvo}")
+    r.check(await pg.evaluate(f"document.getElementById('{alvo}').classList.contains('fechada')"), "fechada continua fechada (o aparelho lembra)")
+    await pg.click(f"#{alvo} > h2")
+    r.check(not await pg.evaluate(f"document.getElementById('{alvo}').classList.contains('fechada')"), "outro toque abre")
     # teclado nas abas
     await pg.focus("#mt-integracoes")
     await pg.keyboard.press("ArrowRight")

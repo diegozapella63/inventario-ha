@@ -665,6 +665,38 @@
   }
 
   // ------------------------------------------------------------------ renderização das telas
+  // 1.61.0 (padrão da família): toda seção (cartão) contrai e expande num toque no cabeçalho, com a seta no canto; o
+  // aparelho lembra as que ficaram fechadas (pela seção: o id dela ou o título)
+  const foldKey = (sec) => sec.id || ((sec.querySelector(":scope > h2") || {}).textContent || "").trim();
+  function foldPanels() {
+    const shut = new Set(LS.get("fechadas", []));
+    $$("#view .more-panel > section.panel, #view .mscreen > section.panel").forEach((sec) => {
+      const h = sec.querySelector(":scope > h2");
+      if (!h) return;
+      if (!h.querySelector(".fold-ic")) h.insertAdjacentHTML("beforeend", `<span class="fold-ic" aria-hidden="true">${ic("chev", "sm")}</span>`);
+      const closed = shut.has(foldKey(sec));
+      sec.classList.add("dobra");
+      sec.classList.toggle("fechada", closed);
+      h.setAttribute("role", "button");
+      h.setAttribute("tabindex", "0");
+      h.setAttribute("aria-expanded", String(!closed));
+    });
+  }
+  function toggleFold(h) {
+    const sec = h.closest("section.panel"), key = foldKey(sec), shut = new Set(LS.get("fechadas", []));
+    const closed = !sec.classList.contains("fechada");
+    if (closed) shut.add(key); else shut.delete(key);
+    LS.set("fechadas", [...shut]);
+    sec.classList.toggle("fechada", closed);
+    h.setAttribute("aria-expanded", String(!closed));
+  }
+  document.addEventListener("click", (e) => {
+    const h = e.target.closest && e.target.closest("section.panel.dobra > h2");
+    if (h && !e.target.closest("button, a, input, label, select, summary")) toggleFold(h);
+  });
+  document.addEventListener("keydown", (e) => {
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("section.panel.dobra > h2")) { e.preventDefault(); toggleFold(e.target); }
+  });
   // 1.60.0 (padrão da família): quando as abas não cabem, a ponta de onde há mais some aos poucos, com uma seta
   function markTabs() {
     const t = $("#view .tabs-wrap > .more-tabs");
@@ -714,6 +746,7 @@
     renderSide();
     renderTop();
     markTabs();
+    foldPanels();
     document.title = base.name === "home" ? "InventarIA" : `InventarIA – ${viewTitle(base)}`;
     if (navigated) {
       const memo = scrollMemo.get(key);
@@ -1878,9 +1911,6 @@
       <h2>${secIc("spark")}Novidades</h2>
       <ul class="opts"><li><div class="ot"><b id="news-h">${oti("spark")}Usar novidades</b><span>Atualizações e recalls dos eletrônicos.</span></div>
         <div class="oa">${switchHtml("news-on", on, "news-h")}</div></li>
-      ${on ? `<li${appsOn() ? ' class="tem-sub"' : ""}><div class="ot"><b id="news-apps-h">${oti("phone")}Apps do celular</b><span>As novidades dos apps que vocês usam, pelo sensor Último app usado do app Home Assistant.</span></div>
-        <div class="oa">${switchHtml("news-apps", appsOn(), "news-apps-h")}</div></li>` : ""}
-      ${appsOn() ? `<li class="apps-det-li" data-slot="apps-det">${appsDetHtml()}</li>` : ""}
       ${on ? `<li${every ? ' class="tem-sub"' : ""}><div class="ot"><b id="news-auto-h">${oti("clock")}Conferir sozinho</b><span>A IA confere os eletrônicos${appsOn() ? " e os apps" : ""} de tempos em tempos.</span></div>
         <div class="oa">${switchHtml("news-auto", !!every, "news-auto-h")}</div></li>` : ""}
       ${on && every ? `<li class="sub"><div class="sub-box aviso-quando">
@@ -1890,7 +1920,14 @@
           <div class="oa">${switchHtml("news-aviso", aviso, "news-aviso-h")}</div></li>
         ${aviso ? `<li class="sub"><div class="sub-box aviso-quem" data-slot="news-quem">${quemRecebe()}</div></li>` : ""}` : ""}
       </ul>
-    </section>`;
+    </section>
+    ${on ? `<section class="panel" id="p-apps">
+      <h2>${secIc("phone")}Apps do celular</h2>
+      <p class="lead">As novidades dos apps que vocês usam, pelo sensor Último app usado do app Home Assistant.</p>
+      <ul class="opts"><li${appsOn() ? ' class="tem-sub"' : ""}><div class="ot"><b id="news-apps-h">${oti("phone")}Usar os apps do celular</b><span>${appsOn() ? "Ligado: a IA confere as novidades deles também." : "Desligado."}</span></div>
+        <div class="oa">${switchHtml("news-apps", appsOn(), "news-apps-h")}</div></li>
+      ${appsOn() ? `<li class="apps-det-li" data-slot="apps-det">${appsDetHtml()}</li>` : ""}</ul>
+    </section>` : ""}`;
   }
   // Testar no meu celular: o aviso vai para o celular de quem está na tela (como nos outros apps); sem celular, fica inativo
   function newsTestWhy() {
