@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.60.1
+
+- **Cor do app**: as cores ficam sem o fundo em cada uma, direto no cartão.
+- **Configurações**: a seta das abas acompanha a largura delas quando a fonte do app termina de carregar.
+
 ## 1.60.0
 
 - **Seções em cartões**, como no GerencIA: em Mais e em Configurações, cada seção fica num cartão (fundo, borda e cantos arredondados), no lugar das linhas.

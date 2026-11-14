@@ -671,6 +671,14 @@
     if (!t) return;
     t.parentElement.classList.toggle("tem-esq", t.scrollLeft > 2);
     t.parentElement.classList.toggle("tem-dir", t.scrollLeft + t.clientWidth < t.scrollWidth - 2);
+    // 1.60.1: a largura das abas muda quando a fonte do app termina de carregar: o tamanho de cada uma é acompanhado
+    if (window.ResizeObserver && (!markTabs.ro || markTabs.t !== t)) {
+      if (markTabs.ro) markTabs.ro.disconnect();
+      markTabs.ro = new ResizeObserver(() => markTabs());
+      markTabs.ro.observe(t);
+      t.querySelectorAll("button").forEach((b) => markTabs.ro.observe(b));
+      markTabs.t = t;
+    }
   }
   document.addEventListener("scroll", (e) => { if (e.target.classList && e.target.classList.contains("more-tabs")) markTabs(); }, true);
   window.addEventListener("resize", () => markTabs());

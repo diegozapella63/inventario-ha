@@ -164,6 +164,8 @@ async def body(r, p):
         box = await pg.evaluate("(() => { const s = document.querySelector('#p-accent .switch').getBoundingClientRect(), z = document.querySelector('#p-accent .swatches').getBoundingClientRect(); return [Math.round(document.querySelector('#p-accent').getBoundingClientRect().right - s.right), s.bottom <= z.top]; })()")
         r.check(box[1] and box[0] <= 24, f"a chave fica à direita, acima das cores ({box})")
         r.check(await pg.evaluate(OVERFLOW), "as 12 cores cabem na largura")
+        bg = await pg.evaluate("[getComputedStyle(document.querySelector('#p-accent .sw:not(.on)')).backgroundColor, getComputedStyle(document.querySelector('#p-accent')).backgroundColor]")
+        r.eq(bg[0], bg[1], "1.60.1: as cores sem fundo próprio (o do cartão)")
         await r.shot(pg, "cor-do-dia", full_page=True)
         await pg.set_viewport_size({"width": 320, "height": 700})
         box = await pg.evaluate("(() => { const s = document.querySelector('#p-accent .switch').getBoundingClientRect(), t = document.querySelector('#daily-h').getBoundingClientRect(); return [Math.round(document.querySelector('#p-accent').getBoundingClientRect().right - s.right), s.top < t.bottom]; })()")

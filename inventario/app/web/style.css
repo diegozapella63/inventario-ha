@@ -1161,7 +1161,7 @@ summary .ot-ic { margin-right: 2px; } /* os recolhidos também: a seta e o ícon
 .swatches { flex: 1 1 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: -6px -4px 0; min-width: 0; }
 @media (min-width: 520px) { .swatches { grid-template-columns: repeat(6, minmax(0, 76px)); } }
 .opts + .swatches { margin-top: 10px; } /* abaixo da Cor do dia */
-.sw { --sw-bg: var(--paper); position: relative; display: grid; justify-items: center; gap: 4px; padding: 8px 2px 7px; border-radius: 10px; background: var(--sw-bg); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sw { --sw-bg: var(--surface); /* 1.60.1: a cor do cartão (sem o fundo em cada uma) */ position: relative; display: grid; justify-items: center; gap: 4px; padding: 8px 2px 7px; border-radius: 10px; background: var(--sw-bg); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 @media (hover: hover) { .sw:hover { --sw-bg: var(--surface-2); } }
 .sw input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .sw svg { width: 48px; height: 36px; overflow: visible; }
