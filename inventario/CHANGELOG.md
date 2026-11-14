@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.56.1
+
+- **Apps detectados**: em Mais > Configurações > Opções > Novidades, logo abaixo de **Apps do celular**, os apps que o sensor achou ficam recolhidos em **Apps detectados (n)**. Lá aparecem os celulares que têm o sensor ligado e, para cada app, de quem é o celular, quando foi usado e se é **Acompanhado**, **De fora** ou **Novo**. Sem nenhum app, ali mesmo aparece como ligar o sensor.
+
 ## 1.56.0
 
 - **Novidades dos apps do celular**: ligue **Apps do celular** em Mais > Configurações > Opções > Novidades. O InventarIA junta os apps que vocês usam no celular, pelo sensor **Último app usado** do app Home Assistant, e a IA busca as novidades de cada um: recursos novos, mudanças, planos e preços, fim de recurso. Fica de fora o que é só de outro país ou só de teste fechado.

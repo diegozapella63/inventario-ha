@@ -822,6 +822,11 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .news-out summary::-webkit-details-marker { display: none; }
 .news-out[open] summary .ic { transform: rotate(90deg); }
 .news-out .nlist { margin-top: 8px; }
+.nrow.static { cursor: default; }
+.nrow.static:hover { background: none; }
+.opts > li.apps-det-li { display: block; padding-top: 4px; }
+.apps-det { margin-top: 0; }
+.apps-det .help { margin: 6px 0 0; }
 .inews { margin-top: 18px; }
 .inews-h { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 17px; font-weight: 700; }
 .inews-h .ic { color: var(--tag-text); }

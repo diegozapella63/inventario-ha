@@ -3428,7 +3428,8 @@ def apps_collect(force: bool = False) -> dict:
             if not d["apps"]:
                 for pkg, nome in MOCK_APPS:
                     _app_seen(d["apps"], pkg, agora.isoformat(timespec="seconds"), nome, ["Pessoa de Teste"])
-            d.update(lido_em=agora.isoformat(timespec="seconds"), sensores=1)
+            d.update(lido_em=agora.isoformat(timespec="seconds"), sensores=1,
+                     celulares=[{"entity": "sensor.celular_de_teste_last_used_app", "pessoas": ["Pessoa de Teste"]}])
             write_json_atomic(APPS_FILE, d)
             return d
         sensors, states = apps_sensors()
@@ -3454,7 +3455,7 @@ def apps_collect(force: bool = False) -> dict:
         if len(d["apps"]) > APPS_MAX:  # os usados há mais tempo saem primeiro
             for k in sorted(d["apps"], key=lambda k: _ts(d["apps"][k].get("ultimo")))[:len(d["apps"]) - APPS_MAX]:
                 del d["apps"][k]
-        d.update(lido_em=agora.isoformat(timespec="seconds"), sensores=len(sensors))
+        d.update(lido_em=agora.isoformat(timespec="seconds"), sensores=len(sensors), celulares=sensors)
         write_json_atomic(APPS_FILE, d)
         return d
 
@@ -3543,6 +3544,15 @@ def ai_find_app_news(nome: str, pacote: str, entity: str) -> dict:
     return ai_find_news(nome, "", entity, prompt=app_news_prompt(nome, pacote), task="InventarIA: novidades de app")
 
 
+def celular_nome(s: dict) -> str:
+    """Um celular com o sensor, para a tela: as pessoas dele ("Ana e Beto") ou, sem pessoa, o nome do aparelho."""
+    p = [str(x) for x in s.get("pessoas") or [] if x] if isinstance(s, dict) else []
+    if p:
+        return p[0] if len(p) == 1 else f"{', '.join(p[:-1])} e {p[-1]}"
+    e = str((s or {}).get("entity") or "") if isinstance(s, dict) else ""
+    return re.sub(r"_(last_used_app|ultimo_app_usado|ultimo_aplicativo_usado)$", "", e[7:]).replace("_", " ") or "um celular"
+
+
 def app_name(pkg: str, apps: dict | None = None, tri: dict | None = None) -> str:
     """O nome do app: o que a IA deu, o que o sensor mandou ou, sem nenhum, o fim do pacote."""
     t = (tri or {}).get(pkg) or {}
@@ -3568,7 +3578,8 @@ def apps_overview(collect: bool = True) -> dict:
         lista.append({"pacote": pkg, "nome": app_name(pkg, a["apps"], tri), "pessoas": v.get("pessoas") or [], "ultimo": v.get("ultimo"),
                       "conferir": t.get("conferir") if "conferir" in t and not t.get("faltou") else None, "manual": bool(t.get("manual")),
                       "res": {"at": r.get("at"), "news": r.get("news")} if r else None})
-    return {"sensores": a.get("sensores"), "lido_em": a.get("lido_em"), "lista": lista}
+    return {"sensores": a.get("sensores"), "lido_em": a.get("lido_em"), "lista": lista,
+            "celulares": [celular_nome(c) for c in a.get("celulares") or [] if isinstance(c, dict)]}
 
 
 def apps_selected(d: dict, apps: dict) -> list[str]:

@@ -28,7 +28,26 @@ async def body(r, p):
     r.check(await pg.is_checked(sw), "liga")
     r.check(r.data()["settings"]["news_apps"] is True, "fica gravado")
     r.check("eletrônicos e os apps" in await pg.text_content("#p-news-opts"), "o Conferir sozinho também fala dos apps")
+    # 1.56.1: logo abaixo da opção, os apps detectados, recolhidos
+    det = "#p-news-opts .apps-det"
+    await pg.wait_for_selector(det, timeout=8000)
+    pos = await pg.evaluate("""(() => { const li = document.querySelector('#p-news-opts .apps-det').closest('li'); const prev = li.previousElementSibling;
+      return [!!prev.querySelector('[data-input="news-apps"]'), document.querySelector('#p-news-opts .apps-det').open]; })()""")
+    r.eq(pos, [True, False], "Apps detectados logo abaixo da opção, recolhido")
+    r.eq((await pg.text_content(f"{det} summary")).strip(), "Apps detectados (5)", "com a contagem")
+    await pg.click(f"{det} summary")
+    r.eq((await pg.text_content(f"{det} .help")).strip(), "Com o sensor: Pessoa de Teste.", "os celulares com o sensor ligado")
+    linhas = await pg.evaluate(TEXTS, f"{det} .nrow")
+    r.eq(len(linhas), 5, "todos os apps que o sensor achou")
+    r.check(all("Pessoa de Teste · usado hoje" in x and x.endswith("Novo") for x in linhas), f"de quem, quando foi usado e Novo antes da IA escolher ({linhas[0]})")
+    r.eq([x.split(" Pessoa")[0] for x in linhas][:2], ["Casa Conectada", "Configurações"], "em ordem de nome")
+    r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "opcoes")
+    await pg.click('label.switch:has([data-input="news-auto"])')  # mexer em outra opção não fecha a lista
+    await pg.wait_for_selector(f"{det}[open]", timeout=4000)
+    r.check(True, "aberto, fica aberto enquanto a tela está aberta")
+    await pg.click('label.switch:has([data-input="news-auto"])')
+    await pg.locator(".toast", has_text="Conferir sozinho desligado").wait_for(timeout=4000)
 
     # a seção na tela das Novidades, antes da primeira conferência
     await r.open(pg, "#/novidades", "#p-news-apps")
@@ -94,6 +113,14 @@ async def body(r, p):
     await r.open(pg3, "#/novidades", "#p-news-apps")
     await pg3.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)
     await r.shot(pg3, "computador", full_page=True)
+
+    # nas Opções, depois da conferência: quem é acompanhado e quem ficou de fora
+    await r.open(pg, "#/config/opcoes", "#p-news-opts")
+    await pg.wait_for_selector(det, timeout=8000)
+    await pg.click(f"{det} summary")
+    estados = {x.split(" Pessoa")[0]: x.rsplit(" ", 1)[-1] for x in await pg.evaluate(TEXTS, f"{det} .nrow")}
+    r.eq(estados, {"Casa Conectada": "Acompanhado", "Configurações": "fora", "Mercadinho": "Acompanhado", "Música Já": "Acompanhado",
+                   "Tela inicial": "fora"}, "Acompanhado ou De fora")
 
     # desligada de novo: some da tela, e a API recusa
     r.api("PUT", "api/settings", {"news_apps": False})

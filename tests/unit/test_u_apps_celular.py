@@ -70,6 +70,9 @@ class Coleta(ComHA):
         self.assertEqual((a["nome"], a["vezes"], a["dias"], a["pessoas"]), ("Casa Conectada", 2, 2, ["Ana"]))
         self.assertEqual((d["apps"][MUSICA]["nome"], d["apps"][MUSICA]["vezes"]), ("Música Já", 1))
         self.assertEqual(d["sensores"], 1)
+        self.assertEqual(d["celulares"], [{"entity": SENSOR, "pessoas": ["Ana"]}], "os celulares com o sensor, para as Opções")
+        with mock.patch.object(server, "apps_collect", lambda force=False: d):
+            self.assertEqual(server.apps_overview()["celulares"], ["Ana"])
         self.assertTrue(os.path.isfile(server.APPS_FILE))
         self.assertIn("filter_entity_id=" + SENSOR, self.historicos()[0]["path"])
 
@@ -132,6 +135,13 @@ class SemHA(UnitBase):
         self.assertEqual(server.app_name(CASA, {CASA: {"nome": "Do sensor"}}, {CASA: {"nome": "Da IA"}}), "Da IA")
         self.assertEqual(server.app_name(CASA, {CASA: {"nome": "Do sensor"}}, {}), "Do sensor")
         self.assertEqual(server.app_name(CASA, {}, {}), "casaconectada")
+
+    def test_nome_do_celular(self):
+        self.assertEqual(server.celular_nome({"entity": "sensor.x_last_used_app", "pessoas": ["Ana"]}), "Ana")
+        self.assertEqual(server.celular_nome({"entity": "sensor.x_last_used_app", "pessoas": ["Ana", "Beto", "Carla"]}), "Ana, Beto e Carla")
+        self.assertEqual(server.celular_nome({"entity": "sensor.tablet_da_sala_last_used_app", "pessoas": []}), "tablet da sala", "sem pessoa: o aparelho")
+        self.assertEqual(server.celular_nome({"entity": "sensor.celular_velho_ultimo_aplicativo_usado"}), "celular velho")
+        self.assertEqual(server.celular_nome({}), "um celular")
 
     def test_rotulo_do_sensor(self):
         self.assertEqual(server._app_label({"Label": "  Casa   Conectada "}), "Casa Conectada")

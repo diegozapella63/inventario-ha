@@ -326,7 +326,7 @@
     const appsOn = () => ST.settings.news_apps === true && ST.settings.news !== false;
     const exampleAppNews = (name) => ({ produto: name, novidades: [
       { tipo: "atualizacao", titulo: "Novo modo de economia de bateria", resumo: "Exemplo da prévia: no Home Assistant, a IA busca as novidades deste app.", data: `${new Date().getFullYear()}-10`, fonte: "https://exemplo.com/blog", site: "exemplo.com", boato: false }] });
-    const appsList = () => ({ sensores: 2, lista: APPS.map(([pacote, nome, pessoas]) => {
+    const appsList = () => ({ sensores: 2, celulares: ["Ana", "Beto"], lista: APPS.map(([pacote, nome, pessoas]) => {
       const t = ST.news.apps_triagem[pacote];
       return { pacote, nome, pessoas, ultimo: new Date().toISOString(), conferir: t ? t.conferir : null, manual: !!(t && t.manual), res: ST.news.apps[pacote] || null };
     }) });

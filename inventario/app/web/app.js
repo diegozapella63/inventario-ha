@@ -1548,6 +1548,8 @@
   }
   // Apps do celular (1.56.0): os que a IA (ou a pessoa) escolheu e os já conferidos, com de quem é o celular; os novos
   // entram na próxima conferência; embaixo, recolhidos, os deixados de fora (pela IA ou pela pessoa)
+  const APPS_SEM_SENSOR = "Ligue o sensor Último app usado no app Home Assistant de cada celular: Configurações › Aplicativo complementar › Gerenciar sensores.";
+  const APPS_NENHUM = "Nenhum app ainda: abra no celular os apps que quer acompanhar.";
   function appRow(a) {
     const r = a.res, n = newsCount(r);
     const st = !r ? "Ainda não conferido" : `${n ? plural(n, "novidade", "novidades") : "Nada novo"} · ${whenShort(r.at)}`;
@@ -1566,8 +1568,7 @@
     const novos = L.filter((a) => a.conferir == null && !a.res).length;
     const wasOpen = !!$(".news-out[open]", sl);
     if (!L.length) {
-      sl.innerHTML = `<p class="muted">${A.sensores ? "Nenhum app ainda: abra no celular os apps que quer acompanhar."
-        : "Ligue o sensor Último app usado no app Home Assistant de cada celular: Configurações › Aplicativo complementar › Gerenciar sensores."}</p>`;
+      sl.innerHTML = `<p class="muted">${A.sensores ? APPS_NENHUM : APPS_SEM_SENSOR}</p>`;
       return;
     }
     sl.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map(appRow).join("")}</ul>` : ""}
@@ -1847,6 +1848,7 @@
         <div class="oa">${switchHtml("news-on", on, "news-h")}</div></li>
       ${on ? `<li><div class="ot"><b id="news-apps-h">Apps do celular</b><span>As novidades dos apps que vocês usam, pelo sensor Último app usado do app Home Assistant.</span></div>
         <div class="oa">${switchHtml("news-apps", appsOn(), "news-apps-h")}</div></li>` : ""}
+      ${appsOn() ? `<li class="apps-det-li" data-slot="apps-det">${appsDetHtml()}</li>` : ""}
       ${on ? `<li><div class="ot"><b id="news-auto-h">Conferir sozinho</b><span>A IA confere os eletrônicos${appsOn() ? " e os apps" : ""} de tempos em tempos.</span></div>
         <div class="oa">${switchHtml("news-auto", !!every, "news-auto-h")}</div></li>` : ""}
       ${on && every ? `<li class="aviso-quando">
@@ -1878,6 +1880,28 @@
     const why = newsTestWhy();
     return `${h}</div><button type="button" class="btn block aviso-testar" data-act="news-notify-test"${why ? " disabled" : ""}>${ic("send")}Testar no meu celular</button>${why ? `<p class="help">${esc(why)}</p>` : ""}`;
   }
+  // Opções › Novidades (1.56.1): logo abaixo de Apps do celular, os apps que o sensor achou, recolhidos em Apps detectados (n),
+  // com os celulares que têm o sensor ligado e, de cada app, de quem, quando foi usado e se é acompanhado; sem app, o que fazer
+  let appsDetAberto = false;
+  function appsDetHtml() {
+    const A = newsOv && newsOv.apps;
+    if (!A) return `<p class="help">Procurando os apps dos celulares…</p>`;
+    const L = [...(A.lista || [])].sort((x, y) => x.nome.localeCompare(y.nome, "pt-BR"));
+    if (!L.length) return `<p class="help">${A.sensores ? APPS_NENHUM : APPS_SEM_SENSOR}</p>`;
+    const st = (a) => (a.conferir === true || a.res ? "Acompanhado" : a.conferir === false ? "De fora" : "Novo");
+    return `<details class="news-out apps-det"${appsDetAberto ? " open" : ""}><summary>${ic("chev", "sm")}Apps detectados (${int(L.length)})</summary>
+      ${(A.celulares || []).length ? `<p class="help">Com o sensor: ${esc(joinE(A.celulares))}.</p>` : ""}
+      <ul class="nlist">${L.map((a) => `<li><div class="nrow static"><span class="nb"><b>${esc(a.nome)}</b>
+        <span class="nm">${esc([joinE(a.pessoas || []), a.ultimo ? `usado ${whenShort(a.ultimo)}` : ""].filter(Boolean).join(" · "))}</span></span>
+        <span class="pill">${st(a)}</span></div></li>`).join("")}</ul></details>`;
+  }
+  async function loadAppsDet() {
+    if (!appsOn()) return;
+    try { newsOv = await API.get("api/news"); } catch { if (!newsOv) newsOv = { apps: { lista: [], sensores: 0 } }; }
+    const slot = $('#view [data-slot="apps-det"]');
+    if (slot) slot.innerHTML = appsDetHtml();
+  }
+  document.addEventListener("toggle", (e) => { if (e.target.classList && e.target.classList.contains("apps-det")) appsDetAberto = e.target.open; }, true);
   async function loadNewsTargets() {
     if (newsPeople || !newsOn()) return;
     try { newsPeople = (await API.get("api/news/people")).people || []; } catch { newsPeople = []; }
@@ -2020,7 +2044,7 @@
 
   async function loadDataPanels() {
     const tab = moreTab(base.tab);
-    if (tab === "opcoes") loadNewsTargets();
+    if (tab === "opcoes") { loadNewsTargets(); loadAppsDet(); }
     const bslot = tab === "dados" ? $('#view [data-slot="backups"]') : null;
     const aslot = tab === "integracoes" ? $('#view [data-slot="ai-panel"]') : null;
     if (bslot) try {
@@ -4323,7 +4347,7 @@
     }
     else if (k === "news-every") saveNews({ news_every: +t.value }, `Conferir a cada ${+t.value} dias`);
     else if (k === "news-hora") saveNews({ news_hora: t.value }, `Conferir às ${t.value}`);
-    else if (k === "news-apps") saveNews({ news_apps: t.checked }, t.checked ? "Apps do celular nas novidades" : "Apps do celular desligados");
+    else if (k === "news-apps") { if (await saveNews({ news_apps: t.checked }, t.checked ? "Apps do celular nas novidades" : "Apps do celular desligados") && t.checked) loadAppsDet(); }
     else if (k === "news-auto") saveNews({ news_every: t.checked ? 7 : 0 }, t.checked ? `Conferir sozinho: a cada 7 dias, às ${S.settings.news_hora || "10:00"}` : "Conferir sozinho desligado");
     else if (k === "news-aviso") {
       // ligou o aviso sem ninguém escolhido: começa com quem está usando o app (como no GerencIA)
