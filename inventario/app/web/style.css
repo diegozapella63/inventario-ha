@@ -422,7 +422,7 @@ button.chip { font: inherit; font-size: 14.5px; text-align: left; }
 .uso-ult summary { display: inline-flex; align-items: center; gap: 6px; padding: 6px 0; color: var(--tag-text); font-weight: 600; cursor: pointer; list-style: none; }
 .uso-ult summary::-webkit-details-marker { display: none; }
 .uso-ult summary .ic { transition: transform 0.15s; }
-.uso-ult[open] summary .ic { transform: rotate(90deg); }
+.uso-ult[open] summary > .ic { transform: rotate(90deg); }
 .uso-ult ul { list-style: none; margin: 4px 0 0; padding: 0; }
 .uso-ult li { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
 .uso-ult li b { color: var(--ink); font-weight: 600; }
@@ -820,14 +820,15 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .news-out { margin-top: 18px; }
 .news-out summary { display: inline-flex; align-items: center; gap: 6px; padding: 6px 0; color: var(--ink-2); font-weight: 600; cursor: pointer; list-style: none; }
 .news-out summary::-webkit-details-marker { display: none; }
-.news-out[open] summary .ic { transform: rotate(90deg); }
+.news-out[open] > summary > .ic { transform: rotate(90deg); }
 .news-out .nlist { margin-top: 8px; }
+.nlist > li:last-child > .nrow { border-bottom: 0; } /* sem a linha do fim: a próxima seção já começa com o cabeçalho */
 .nrow.static { cursor: default; }
 .nrow.static:hover { background: none; }
 .nrow.static .switch { flex: none; }
 /* Apps detectados (1.58.0): uma sub-opção de Apps do celular, num quadro recuado logo abaixo dela; cada app com o nome, de
    quem é, o Ver novidades (um botão como os outros, do tamanho do texto) e a chave; os desligados no fim, em Inativos (n) */
-.opts > li.tem-sub { border-bottom: 0; padding-bottom: 6px; }
+.opts > li.tem-sub { padding-bottom: 6px; }
 .opts > li.apps-det-li { display: block; padding: 0 4px 14px 22px; }
 .apps-det { margin-top: 0; padding: 4px 14px 6px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
 .apps-det > summary { width: 100%; }
@@ -837,7 +838,8 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .app-det-t { display: grid; gap: 2px; min-width: 0; justify-items: start; }
 .app-det-t b { font-weight: 500; overflow-wrap: anywhere; } /* nada cortado: o nome e o porquê quebram a linha */
 .app-det-t .nm { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
-.app-det-t .app-det-b { margin-top: 8px; width: auto; padding: 0 14px; }
+.app-det > .app-det-b { grid-column: 1 / -1; width: 100%; justify-content: center; } /* 1.58.1: na largura toda, como os outros */
+@media (min-width: 1000px) { .app-det > .app-det-b { width: 280px; justify-self: end; } }
 .apps-inativos { margin-top: 4px; border-top: 1px solid var(--line); }
 .apps-inativos .app-det-l { margin-top: 2px; }
 /* Conferir (1.58.0): Todas as novidades na largura toda e, embaixo, Só equipamentos e Só apps dividindo a linha */
@@ -891,7 +893,7 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .unit-hint { font-size: 13px; color: var(--muted); margin: 0; min-height: 1em; }
 details.more-fields > summary { cursor: pointer; color: var(--ink-2); font-weight: 500; list-style: none; display: inline-flex; align-items: center; gap: 6px; }
 details.more-fields > summary::-webkit-details-marker { display: none; }
-details.more-fields[open] > summary .ic { transform: rotate(90deg); }
+details.more-fields[open] > summary > .ic { transform: rotate(90deg); }
 details.more-fields .form { margin-top: 14px; }
 
 /* catalogar com IA */
@@ -1038,7 +1040,7 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .area-tab { margin-top: 12px; }
 .area-tab summary { display: inline-flex; align-items: center; gap: 6px; padding: 6px 0; color: var(--ink-2); font-weight: 600; cursor: pointer; list-style: none; }
 .area-tab summary::-webkit-details-marker { display: none; }
-.area-tab[open] summary .ic { transform: rotate(90deg); }
+.area-tab[open] summary > .ic { transform: rotate(90deg); }
 .area-tab table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 14px; font-variant-numeric: tabular-nums; }
 .area-tab th { text-align: right; color: var(--muted); font-weight: 500; font-size: 13px; padding: 6px 4px; border-bottom: 1px solid var(--line); }
 .area-tab td { text-align: right; padding: 7px 4px; border-bottom: 1px solid var(--line); }
@@ -1087,12 +1089,24 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .ab-github .ic { width: 19px; height: 19px; }
 .panel > h2 { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; font: 600 25px/1.1 var(--font-c); letter-spacing: 0.005em; }
 .panel > p.lead { margin: 0 0 14px; color: var(--muted); max-width: 64ch; }
-.opts { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-.opts > li { display: flex; align-items: center; gap: 16px; padding: 14px 4px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+/* 1.59.0 (padrão da família): dentro de uma seção, as linhas de opções não têm linha entre elas (o ícone de cada uma marca
+   onde começa); as listas de dados (categorias, backups, versões, novidades) continuam com a linha fina entre as entradas,
+   sem a do fim */
+.opts { list-style: none; margin: 0; padding: 0; }
+.opts > li { display: flex; align-items: center; gap: 16px; padding: 12px 4px; flex-wrap: wrap; }
+.opts.cats, .opts.bk-lista, .opts.versions { border-top: 1px solid var(--line); }
+.opts.cats > li, .opts.bk-lista > li, .opts.versions > li { border-bottom: 1px solid var(--line); }
+.opts.cats > li:last-child, .opts.bk-lista > li:last-child, .opts.versions > li:last-child { border-bottom: 0; }
+.ot-ic { display: inline-grid; place-items: center; flex: none; color: var(--tag-text); }
+.ot-ic .ic { width: 18px; height: 18px; stroke-width: 2; }
+.opts .ot b:has(> .ot-ic) { display: flex; align-items: center; gap: 8px; }
+.opts .ot:has(> b > .ot-ic) > span { display: block; padding-left: 26px; }
+.field > label:has(> .ot-ic), .field > .lbl:has(> .ot-ic) { display: inline-flex; align-items: center; gap: 8px; }
+summary .ot-ic { margin-right: 2px; } /* os recolhidos também: a seta e o ícone antes do nome */
 .opts .ot { flex: 1; min-width: 220px; }
 .opts > li:has(> .oa > .switch) .ot { min-width: 0; } /* a chave fica à direita, mesmo no celular estreito */
 .opts .ot b { display: block; font-weight: 600; }
-.opts .ot span { color: var(--muted); font-size: 14px; }
+.opts .ot > span { color: var(--muted); font-size: 14px; }
 .opts .oa { display: flex; gap: 8px; flex-wrap: wrap; }
 .status { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
 .status i { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); }
@@ -1334,3 +1348,19 @@ textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh;
 .seg.themes button .ic { width: 18px; height: 18px; flex: none; }
 @media (max-width: 380px) { .seg.themes button .ic { display: none; } }
 .found .input, .found .select { height: 38px; }
+
+/* Encontrar apps com IA (1.59.0): o botão em Apps detectados, os prints escolhidos e a lista para marcar */
+.app-det-ia { width: 100%; justify-content: center; margin: 4px 0 10px; }
+.af-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+.af-foto { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); aspect-ratio: 9 / 16; background: var(--surface-2); }
+.af-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.af-foto .btn { position: absolute; top: 4px; right: 4px; width: 32px; height: 32px; min-height: 0; padding: 0; background: var(--surface); }
+.apps-achados { list-style: none; margin: 0; padding: 0; }
+.apps-achados li { padding: 10px 2px; border-bottom: 1px solid var(--line); }
+.apps-achados li:last-child { border-bottom: 0; }
+.apps-achados .check > span { display: grid; gap: 2px; }
+.apps-achados .check small { color: var(--muted); font-size: 13px; }
+.apps-achados .check.ja { opacity: 0.6; cursor: default; }
+/* 1.59.0: todo botão com texto tem ícone (padrão da família): os que não são .btn também alinham o ícone */
+.toast button, .phs .ph .mkcover, .cam-done, button.chip, [data-ed="tipo"] { display: inline-flex; align-items: center; gap: 6px; }
+.phs .ph .mkcover .ic { width: 13px; height: 13px; }

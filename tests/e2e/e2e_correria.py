@@ -36,7 +36,7 @@ async def body(r, p):
     r.eq(" ".join((await card.locator("h2").text_content()).split()), "CorrerIA", "com o título CorrerIA")
     sw = pg.get_by_role("switch", name="Usar com o CorrerIA")
     r.check(not await sw.is_checked(), "desligado de início")
-    r.eq(" ".join((await card.locator(".ot span").text_content()).split()), "Para o WhatsApp, o Claude e o Gemini lerem e mudarem o inventário.",
+    r.eq(" ".join((await card.locator(".ot > span").text_content()).split()), "Para o WhatsApp, o Claude e o Gemini lerem e mudarem o inventário.",
          "desligado: o que ele faz, numa linha")
     r.eq(await card.locator('[data-slot="correria-uso"]').count(), 0, "desligado: sem a linha do último uso")
     r.check(not os.path.exists(share), "desligado: sem share/inventario/correria.json")
@@ -55,7 +55,7 @@ async def body(r, p):
     with open(share, encoding="utf-8") as f:
         info = json.load(f)
     r.eq((info["app"], info["ferramentas"]), ("inventario", "/api/integracao/ferramentas"), "o arquivo do contrato do CorrerIA")
-    r.eq(" ".join((await card.locator(".ot span").text_content()).split()), "Ligado: pelo WhatsApp, o Claude e o Gemini leem e mudam o inventário.",
+    r.eq(" ".join((await card.locator(".ot > span").text_content()).split()), "Ligado: pelo WhatsApp, o Claude e o Gemini leem e mudam o inventário.",
          "ligado: diz que está ligado")
     uso = card.locator('[data-slot="correria-uso"]')
     r.eq((await uso.text_content()).strip(), "Ainda não foi usado. Conecte no app CorrerIA.", "antes do primeiro uso, diz onde conectar")

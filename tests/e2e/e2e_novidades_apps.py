@@ -3,7 +3,9 @@ em Mais › Novidades (sem o Home Assistant, os apps de exemplo de um celular de
 de um app (o guardado, sem chamar a IA), Deixar de fora (sai das Novidades e vai para Inativos, nas Opções) e Acompanhar
 (volta e busca); 1.58.0: Todas as novidades, Só equipamentos e Só apps; Apps detectados como sub-opção, com Ver novidades e
 os desligados em Inativos (n); no celular de 320 px e no computador, no escuro e no claro."""
-from e2e_lib import OVERFLOW, TEXTS, main
+import os
+
+from e2e_lib import OVERFLOW, TEXTS, helpers, main
 
 APPS = "[...document.querySelectorAll('#p-news-apps [data-slot=\"news-apps\"] > .nlist .nrow')].map(b => [b.querySelector('b').textContent, b.querySelector('.nm').textContent, [...b.querySelectorAll('.pill')].map(p => p.textContent)])"
 
@@ -47,10 +49,11 @@ async def body(r, p):
       const a = o.querySelector('.ot').getBoundingClientRect(), b = d.getBoundingClientRect();
       return [Math.round(b.left - a.left), getComputedStyle(o).borderBottomStyle, getComputedStyle(d).borderTopStyle, getComputedStyle(d).borderRadius]; })()""")
     r.check(sub[0] >= 12 and sub[1] == "none" and sub[2] == "solid" and sub[3] != "0px", f"Apps detectados recuado num quadro, logo abaixo de Apps do celular ({sub})")
-    # o Ver novidades: um botão como os outros dos apps, do tamanho do texto (no lugar da lupa)
-    bts = await pg.evaluate(f"""[...document.querySelectorAll("{det} .app-det-b")].map(b => [b.textContent.trim(), b.classList.contains('btn'), Math.round(b.getBoundingClientRect().height), Math.round(b.getBoundingClientRect().width)])""")
+    # o Ver novidades: um botão como os outros dos apps (no lugar da lupa); 1.58.1: na largura toda da linha, embaixo
+    bts = await pg.evaluate(f"""[...document.querySelectorAll("{det} .app-det-b")].map(b => {{ const li = b.closest('li').getBoundingClientRect(), r = b.getBoundingClientRect();
+      return [b.textContent.trim(), b.classList.contains('btn'), Math.round(r.height), Math.round(li.width - r.width), r.top > b.closest('li').querySelector('.switch').getBoundingClientRect().bottom - 1]; }})""")
     r.eq({x[0] for x in bts}, {"Ver novidades"}, "cada app com o Ver novidades")
-    r.check(all(x[1] and x[2] >= 44 and x[3] < 200 for x in bts), f"um botão do app, do tamanho do texto ({bts[0]})")
+    r.check(all(x[1] and x[2] >= 44 and x[3] <= 1 and x[4] for x in bts), f"um botão do app, na largura toda, embaixo do nome e da chave ({bts[0]})")
     r.eq(await pg.locator(f"{det} .app-det .ic use[href='#i-search']").count(), 0, "sem a lupa")
     chaves = f"{det} [data-input='app-considerar']"
     r.eq(await pg.evaluate(f"[...document.querySelectorAll(\"{chaves}\")].map(i => i.checked)"), [True] * 5, "1.57.0: cada um com a sua chave, ligada de início")
@@ -184,6 +187,31 @@ async def body(r, p):
     r.check("Tela inicial" in await pg.evaluate(TEXTS, f"{det} > .app-det-l .app-det b"), "ligado, sai de Inativos")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "opcoes-depois")
+    # 1.59.0: Encontrar apps com IA: um print (e os nomes colados), a IA lê, a pessoa marca e eles entram em Apps detectados
+    await pg.click(f"{det} [data-act='apps-ia']")
+    await pg.wait_for_selector("dialog.modal [data-af-act='fotos']", timeout=4000)
+    r.eq((await pg.text_content("dialog.modal .dlg-h h2")).strip(), "Encontrar apps com IA", "a janela")
+    r.check(await pg.is_disabled("dialog.modal [data-af-act='ler']"), "sem print nem texto, nada a ler")
+    async with pg.expect_file_chooser() as fc:
+        await pg.click("dialog.modal [data-af-act='fotos']")
+    await (await fc.value).set_files(os.path.join(helpers.FIXTURE, "thumbs", "sala-1.jpg"))
+    await pg.wait_for_selector("dialog.modal .af-foto img", timeout=4000)
+    await pg.fill("dialog.modal #af-txt", "Banco Lua, Mapa Fácil")
+    await pg.click("dialog.modal [data-af-act='ler']")
+    await pg.wait_for_selector("dialog.modal .apps-achados", timeout=10000)
+    achados = await pg.evaluate("""[...document.querySelectorAll('dialog.modal .apps-achados li')].map(l => [l.querySelector('b').textContent, l.querySelector('input').checked, l.querySelector('input').disabled, (l.querySelector('small') || {}).textContent || ''])""")
+    r.eq(achados, [["Casa Conectada", False, True, "já está em Apps detectados"], ["Banco Lua", True, False, ""], ["Mapa Fácil", True, False, ""],
+                   ["Configurações", False, True, "já está em Apps detectados"]], "o que já está vem marcado e desligado; o resto, marcado")
+    r.eq((await pg.text_content("dialog.modal [data-af-act='add']")).strip(), "Adicionar 2 apps", "Adicionar com a contagem")
+    await r.shot(pg, "encontrar")
+    await pg.click("dialog.modal [data-af-act='add']")
+    await pg.locator(".toast", has_text="2 apps adicionados").wait_for(timeout=4000)
+    r.eq(await pg.locator("dialog.modal").count(), 0, "a janela fecha")
+    nomes = await pg.evaluate(TEXTS, f"{det} > .app-det-l .app-det b")
+    r.check("Banco Lua" in nomes and "Mapa Fácil" in nomes, f"entram em Apps detectados, ligados ({nomes})")
+    r.check("pela IA" in await pg.text_content(f"{det} li:has([data-id='ia.mapa_facil']) .nm"), "com pela IA")
+    r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
+
     await r.open(pg, "#/novidades", "#p-news-apps")
     await pg.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)
     r.check("Mercadinho" not in [x[0] for x in await pg.evaluate(APPS)], "nas Novidades, o desconsiderado sai da lista")

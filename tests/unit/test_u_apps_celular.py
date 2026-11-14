@@ -334,3 +334,69 @@ class Aviso(UnitBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+PNG = "data:image/png;base64," + __import__("base64").b64encode(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32).decode()
+
+
+class Encontrar(UnitBase):
+    """1.59.0: Encontrar apps com IA: os prints (ou os nomes colados) lidos pela IA, a pessoa escolhe e eles entram em Apps
+    detectados, acompanhados. Apps e nomes inventados."""
+
+    def setUp(self):
+        super().setUp()
+        self.store.settings["news_apps"] = True
+
+    def test_simulada_marca_o_que_ja_esta(self):
+        with mock.patch.object(server, "AI_MOCK", True), mock.patch.object(server.time, "sleep", lambda s: None):
+            server.apps_collect(force=True)
+            got = server.apps_ler({"texto": "Banco Lua, Mapa Fácil"})["apps"]
+        self.assertEqual([(x["nome"], x["id"], x["ja"], x["sistema"]) for x in got], [
+            ("Casa Conectada", CASA, True, False), ("Banco Lua", "com.exemplo.bancolua", False, False),
+            ("Mapa Fácil", "ia.mapa_facil", False, False), ("Configurações", "com.android.settings", True, True)])
+
+    def test_validacoes(self):
+        self.assertApiError(400, server.apps_ler, {}, msg_part="Escolha os prints")
+        self.assertApiError(400, server.apps_ler, {"fotos": [PNG] * 7}, msg_part="No máximo 6")
+        self.assertApiError(400, server.apps_ler, {"fotos": ["não é base64!"]}, msg_part="não abriu")
+        self.assertApiError(400, server.apps_ler, {"fotos": [__import__("base64").b64encode(b"GIF89a....").decode()]}, msg_part="JPG ou PNG")
+        self.store.settings["news_apps"] = False
+        self.assertApiError(409, server.apps_ler, {"texto": "x"})
+        self.assertApiError(409, server.apps_adicionar, {"apps": [{"nome": "x"}]})
+
+    def test_com_o_home_assistant(self):
+        ha = self.fake_ha()
+        ha.ai_reply = lambda kind, payload: json.dumps({"apps": [
+            {"nome": "Banco  Lua", "pacote": "com.exemplo.bancolua"}, {"nome": "banco lua", "pacote": ""},
+            {"nome": "Mapa Fácil", "pacote": "não é pacote"}, {"nome": "", "pacote": "com.x.y"}, "lixo",
+            {"nome": "Relógio", "pacote": "ia.truque", "sistema": True}]})
+        got = server.apps_ler({"fotos": [PNG], "texto": "e o Mapa Fácil"})["apps"]
+        self.assertEqual([(x["nome"], x["id"], x["sistema"]) for x in got],
+                         [("Banco Lua", "com.exemplo.bancolua", False), ("Mapa Fácil", "ia.mapa_facil", False), ("Relógio", "ia.relogio", True)],
+                         "sem repetir, sem nome vazio; o pacote que não parece de verdade vira ia.<nome>")
+        pedido = ha.calls("POST", "/core/api/services/ai_task")[-1]
+        b = pedido["body"]
+        self.assertEqual((b["task_name"], len(b["attachments"]), b["attachments"][0]["media_content_type"]), ("InventarIA: encontrar apps", 1, "image/png"))
+        self.assertEqual(pedido.get("attachments_present"), [True], "o print existe em /media enquanto a IA lê")
+        self.assertIn("e o Mapa Fácil", b["instructions"])
+        self.assertEqual(os.listdir(os.path.join(server.MEDIA_ROOT, server.AI_TMP_REL)), [], "e sai de lá depois")
+        ha.ai_reply = lambda kind, payload: "isto não é JSON"
+        self.assertApiError(502, server.apps_ler, {"texto": "Banco Lua"})
+        self.assertIn("Aplicativo: Mapa Fácil (Android)", server.app_news_prompt("Mapa Fácil", "ia.mapa_facil"))
+        self.assertIn("pacote com.exemplo.bancolua", server.app_news_prompt("Banco Lua", "com.exemplo.bancolua"))
+
+    def test_adicionar(self):
+        with mock.patch.object(server, "AI_MOCK", True):
+            server.apps_collect(force=True)
+            r = server.apps_adicionar({"apps": [{"id": "ia.mapa_facil", "nome": "Mapa Fácil", "pacote": ""},
+                                                {"nome": "Banco Lua", "pacote": "com.exemplo.bancolua"},
+                                                {"nome": "Casa Conectada", "pacote": CASA}]}, "u-qualquer")
+        self.assertEqual(r["adicionados"], 2, "o que já estava fica como estava")
+        lista = {a["pacote"]: a for a in r["apps"]["lista"]}
+        banco = lista["com.exemplo.bancolua"]
+        self.assertEqual((banco["nome"], banco["ia"], banco["conferir"], banco["manual"], banco["ultimo"], banco["pessoas"]),
+                         ("Banco Lua", True, True, True, None, ["Pessoa de Teste"]), "acompanhado, de quem adicionou, sem uso")
+        self.assertIn("ia.mapa_facil", lista)
+        self.assertNotIn("ia", lista[CASA])
+        self.assertIn("ia.mapa_facil", server.apps_selected(server.news_read(), server.apps_read()["apps"]), "entra na próxima conferência")
+        self.assertApiError(400, server.apps_adicionar, {"apps": []}, msg_part="Escolha os apps")

@@ -322,7 +322,7 @@
     const box = toastBox();
     const el = document.createElement("div");
     el.className = "toast" + (opts.error ? " err" : "");
-    el.innerHTML = `<span class="tmsg">${esc(msg)}</span>${opts.action ? `<button type="button">${esc(opts.action)}</button>` : ""}`;
+    el.innerHTML = `<span class="tmsg">${esc(msg)}</span>${opts.action ? `<button type="button">${ic(opts.icon || "back", "sm")}${esc(opts.action)}</button>` : ""}`;
     let done = false;
     const close = () => { if (!done) { done = true; el.remove(); } };
     if (opts.action) el.querySelector("button").addEventListener("click", () => { close(); opts.onAction && opts.onAction(); });
@@ -509,8 +509,8 @@
         cls: "modal narrow", label: title,
         html: `<div class="dlg"><div class="dlg-h"><h2>${esc(title)}</h2></div>
           ${body ? `<div class="dlg-b"><p style="margin:0">${body}</p></div>` : ""}
-          <div class="dlg-f"><span class="grow"></span><button type="button" class="btn ghost" data-r="0">${esc(cancel)}</button>
-          <button type="button" class="btn ${danger ? "danger" : "primary"}" data-r="1">${esc(ok)}</button></div></div>`,
+          <div class="dlg-f"><span class="grow"></span><button type="button" class="btn ghost" data-r="0">${ic("close")}${esc(cancel)}</button>
+          <button type="button" class="btn ${danger ? "danger" : "primary"}" data-r="1">${ic(danger ? "trash" : "check")}${esc(ok)}</button></div></div>`,
         onClose: () => resolve(answer),
       });
       entry.dlg.addEventListener("click", (e) => {
@@ -688,7 +688,7 @@
       }
     } catch (e) {
       console.error(e);
-      html = `<div class="empty"><h2>Algo deu errado nesta tela</h2><p>${esc(e.message)}</p><div class="acts"><a class="btn" href="#/">Voltar ao início</a></div></div>`;
+      html = `<div class="empty"><h2>Algo deu errado nesta tela</h2><p>${esc(e.message)}</p><div class="acts"><a class="btn" href="#/">${ic("home")}Voltar ao início</a></div></div>`;
     }
     view.innerHTML = html;
     rendered = key;
@@ -784,6 +784,8 @@
 
   // -- início
   const secIc = (name) => `<span class="sec-ic" aria-hidden="true">${ic(name)}</span>`;
+  // 1.59.0: o ícone pequeno antes do título de cada linha de Mais e de Configurações (padrão da família)
+  const oti = (name) => `<span class="ot-ic" aria-hidden="true">${ic(name)}</span>`;
   function viewHome() {
     if (!D.rooms.length) {
       return `<section class="hero welcome">
@@ -854,7 +856,7 @@
   // -- cômodo
   function viewRoom(id) {
     const r = D.roomById.get(id);
-    if (!r) return `<div class="empty">${emptyMark()}<h2>Cômodo não encontrado</h2><p>Ele pode ter sido apagado ou renomeado.</p><div class="acts"><a class="btn" href="#/comodos">Ver os cômodos</a></div></div>`;
+    if (!r) return `<div class="empty">${emptyMark()}<h2>Cômodo não encontrado</h2><p>Ele pode ter sido apagado ou renomeado.</p><div class="acts"><a class="btn" href="#/comodos">${ic("rooms")}Ver os cômodos</a></div></div>`;
     const list = D.byRoom.get(id) || [];
     const total = D.roomTotals.get(id) || 0;
     const photos = r.photos || [];
@@ -991,12 +993,12 @@
       const filtered = q.room || q.cat;
       return `<div class="empty">${emptyMark()}<h2>${q.q ? `Nada encontrado para “${esc(q.q)}”` : "Nenhum item com esses filtros"}</h2>
         <p>${filtered ? "Tente limpar os filtros de cômodo e categoria." : "Tente outra palavra, como a marca ou o tipo do objeto."}</p>
-        ${filtered ? `<div class="acts"><button class="btn" data-act="search-reset">Limpar filtros</button></div>` : ""}</div>`;
+        ${filtered ? `<div class="acts"><button class="btn" data-act="search-reset">${ic("close")}Limpar filtros</button></div>` : ""}</div>`;
     }
     const shown = list.slice(0, searchLimit);
     const pickable = list.filter((i) => !isBens(i.room)); // os bens não têm cômodo nem categoria: ficam de fora
     if (SEL) { const ok = new Set(pickable.map((i) => i.id)); for (const id of [...SEL]) if (!ok.has(id)) SEL.delete(id); } // só o que está na lista
-    const more = list.length > shown.length ? `<div class="more"><button class="btn" data-act="more-results">Mostrar mais ${int(Math.min(120, list.length - shown.length))}</button></div>` : "";
+    const more = list.length > shown.length ? `<div class="more"><button class="btn" data-act="more-results">${ic("down")}Mostrar mais ${int(Math.min(120, list.length - shown.length))}</button></div>` : "";
     if (!SEL) {
       return `<div class="ssum"><span>${plural(list.length, "item", "itens")}</span>${pickable.length ? `<button type="button" class="btn ghost sm sel-go" data-act="sel-start">${ic("checks", "sm")}Selecionar</button>` : ""}<b>${moneyR(sum)}</b></div>
       <ul class="ilist">${shown.map((it) => itemRow(it, { toks })).join("")}</ul>${more}`;
@@ -1005,7 +1007,7 @@
     const selSum = pickable.reduce((s, i) => s + (SEL.has(i.id) ? vl(i) : 0), 0);
     return `<div class="ssum sel"><button type="button" class="btn ghost icon sm" data-act="sel-end" aria-label="Cancelar seleção">${ic("close")}</button>
         <span class="sel-n">${n ? plural(n, "selecionado", "selecionados") : "Selecionar"}</span>${n ? `<b>${moneyR(selSum)}</b>` : ""}
-        <button type="button" class="btn ghost sm" data-act="sel-all">${all ? "Nenhum" : "Todos"}</button></div>
+        <button type="button" class="btn ghost sm" data-act="sel-all">${ic("checks", "sm")}${all ? "Nenhum" : "Todos"}</button></div>
       <ul class="ilist">${shown.map((it) => itemRow(it, { toks, pick: isBens(it.room) ? "off" : SEL.has(it.id) })).join("")}</ul>${more}
       <div class="selbar"><button type="button" class="btn primary" data-act="sel-change"${n ? "" : " disabled"}>${ic("edit")}${n ? `Alterar ${plural(n, "item", "itens")}` : "Alterar"}</button></div>`;
   }
@@ -1064,7 +1066,7 @@
             <div class="chips" id="bk-zones" role="radiogroup" aria-labelledby="bk-l-zone">${zoneChips("")}</div>
             <input id="bk-zone-new" class="input" placeholder="Nome da zona" maxlength="120" autocomplete="off" aria-label="Nome da zona" hidden></div>` : ""}
         </div></form>
-        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok disabled>Aplicar</button></div></div>`,
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok disabled>${ic("check")}Aplicar</button></div></div>`,
     });
     const dlg = entry.dlg;
     const val = (name) => { const r = $(`input[name="${name}"]:checked`, dlg); return r ? r.value : KEEP; };
@@ -1161,7 +1163,7 @@
     ].filter(Boolean) : [];
     return `
     <div class="rep-tools no-print">
-      <label class="btn rep-fotos"><input type="checkbox" role="switch" data-input="rep-photos"${withPhotos ? " checked" : ""}><span>Mostrar fotos</span></label>
+      <label class="btn rep-fotos"><input type="checkbox" role="switch" data-input="rep-photos"${withPhotos ? " checked" : ""}>${ic("image", "sm")}<span>Mostrar fotos</span></label>
       <a class="btn primary" data-act="rep-pdf" href="${esc(reportPdfHref(withPhotos))}" download="inventario-${day}.pdf">${ic("download")}Baixar PDF</a>
     </div>
     <article class="report">
@@ -1396,7 +1398,7 @@
       <h2>${secIc("history")}Patrimônio mês a mês</h2>
       ${lead(`Pela data de cadastro: ${moneyR(c.series[c.series.length - 1].v)} em ${esc(c.series[c.series.length - 1].label)}.`)}
       <div class="area" data-slot="area" role="img" aria-label="${esc(`Patrimônio cadastrado mês a mês, de ${c.series[0].label} a ${c.series[c.series.length - 1].label}: de ${moneyR(c.series[0].v)} a ${moneyR(c.series[c.series.length - 1].v)}`)}"></div>
-      <details class="area-tab"><summary>${ic("chev", "sm")}Ver mês a mês</summary>
+      <details class="area-tab"><summary>${ic("chev", "sm")}${oti("calendar")}Ver mês a mês</summary>
         <table><thead><tr><th>Mês</th><th>Cadastrado</th><th>Total</th></tr></thead><tbody>
         ${c.series.map((x) => `<tr><td>${esc(x.label)}</td><td>${moneyR(x.add)}</td><td>${moneyR(x.v)}</td></tr>`).join("")}</tbody></table></details>
     </section>` : ""}
@@ -1461,9 +1463,9 @@
     <section class="panel" id="p-export">
       <h2>${secIc("download")}Exportar</h2>
       <ul class="opts">
-        <li><div class="ot"><b>Planilha (CSV)</b><span>Abre no Excel e no Google Planilhas.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="csv">${ic("download")}Baixar CSV</button></div></li>
-        <li><div class="ot"><b>Dados completos (JSON)</b><span>Todos os campos.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="json">${ic("download")}Baixar JSON</button></div></li>
-        <li><div class="ot"><b>Tudo com fotos (ZIP)</b><span>JSON, CSV e fotos.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="zip">${ic("download")}Baixar ZIP</button></div></li>
+        <li><div class="ot"><b>${oti("grid")}Planilha (CSV)</b><span>Abre no Excel e no Google Planilhas.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="csv">${ic("download")}Baixar CSV</button></div></li>
+        <li><div class="ot"><b>${oti("report")}Dados completos (JSON)</b><span>Todos os campos.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="json">${ic("download")}Baixar JSON</button></div></li>
+        <li><div class="ot"><b>${oti("archive")}Tudo com fotos (ZIP)</b><span>JSON, CSV e fotos.</span></div><div class="oa"><button class="btn" data-act="export" data-kind="zip">${ic("download")}Baixar ZIP</button></div></li>
       </ul>
     </section>`;
   }
@@ -1471,8 +1473,9 @@
   function moreNews() {
     return `
     <section class="panel" id="p-news">
+      <h2>${secIc("spark")}Conferir novidades</h2>
       <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos eletrônicos${appsOn() ? " e dos apps do celular" : ""}.</p>
-      <ul class="opts"><li><div class="ot"><b>Conferir todos</b><span>${appsOn() ? "A IA escolhe os eletrônicos e os apps que vale conferir." : "A IA escolhe, entre os eletrônicos, os que vale conferir."}</span></div>
+      <ul class="opts"><li><div class="ot"><b>${oti("checks")}Todos de uma vez</b><span>${appsOn() ? "A IA escolhe os eletrônicos e os apps que vale conferir." : "A IA escolhe, entre os eletrônicos, os que vale conferir."}</span></div>
         ${appsOn() ? `<div class="oa news-tres"><button type="button" class="btn primary" data-act="news-all" data-so="">${ic("spark")}Todas as novidades</button>
           <button type="button" class="btn" data-act="news-all" data-so="itens">${ic("tag")}Só equipamentos</button><button type="button" class="btn" data-act="news-all" data-so="apps">${ic("phone")}Só apps</button></div>`
           : `<div class="oa"><button type="button" class="btn primary" data-act="news-all" data-so="">${ic("spark")}Conferir novidades</button></div>`}</li></ul>
@@ -1487,7 +1490,8 @@
       <div data-slot="news-apps"><p class="muted">Carregando…</p></div>
     </section>` : ""}
     <section class="panel" id="p-news-clear">
-      <ul class="opts"><li><div class="ot"><b>Limpar</b><span>Apaga as novidades encontradas e as escolhas da IA.</span></div>
+      <h2>${secIc("trash")}Limpar</h2>
+      <ul class="opts"><li><div class="ot"><b>${oti("trash")}Apagar o que foi achado</b><span>As novidades encontradas e as escolhas da IA.</span></div>
         <div class="oa"><button type="button" class="btn" data-act="news-clear">${ic("trash")}Limpar novidades</button></div></li></ul>
     </section>`;
   }
@@ -1545,7 +1549,7 @@
     const wasOpen = !!$(".news-out[open]", ls);
     ls.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map(newsRow).join("")}</ul>`
         : `<p class="muted">${ov.pendentes ? "Toque em Conferir novidades: a IA escolhe os equipamentos." : "Nenhum item em Eletrônicos."}</p>`}
-      ${out.length ? `<details class="news-out"${wasOpen ? " open" : ""}><summary>${ic("chev", "sm")}Deixados de fora pela IA (${int(out.length)})</summary><ul class="nlist">${out.map(newsRow).join("")}</ul></details>` : ""}`;
+      ${out.length ? `<details class="news-out"${wasOpen ? " open" : ""}><summary>${ic("chev", "sm")}${oti("archive")}Deixados de fora pela IA (${int(out.length)})</summary><ul class="nlist">${out.map(newsRow).join("")}</ul></details>` : ""}`;
     if (!newsJob) renderNewsJob(null);
   }
   // Apps do celular (1.56.0): os que a IA (ou a pessoa) escolheu e os já conferidos, com de quem é o celular; os novos
@@ -1583,7 +1587,7 @@
       const p = st.progress || {}, pct = p.total ? Math.round((p.feitos / p.total) * 100) : 0;
       js.innerHTML = `<div class="njob" aria-live="polite"><p><span class="spin"></span><span>${esc(st.msg || "Conferindo…")}</span></p>
         <div class="prog" role="progressbar" aria-label="Progresso" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>
-        <button type="button" class="btn sm" data-act="news-cancel">Parar</button></div>`;
+        <button type="button" class="btn sm" data-act="news-cancel">${ic("close", "sm")}Parar</button></div>`;
       return;
     }
     if (st && st.stage === "error") { js.innerHTML = `<p class="formerr njob">${esc(st.msg)}</p>`; return; }
@@ -1645,14 +1649,14 @@
     return `
     ${S.gerencia && S.gerencia.taxas ? `<section class="panel" id="p-gerencia">
       <h2>${secIc("wallet")}GerencIA</h2>
-      <ul class="opts"><li><div class="ot"><b id="deprec-h">Valor de hoje</b><span>${deprecOn()
+      <ul class="opts"><li><div class="ot"><b id="deprec-h">${oti("wallet")}Valor de hoje</b><span>${deprecOn()
         ? "Ligado: os valores perdem, por ano, a taxa de cada categoria do GerencIA."
         : "Os valores com a depreciação de cada categoria, a do GerencIA."}</span></div>
         <div class="oa">${switchHtml("deprec-on", deprecOn(), "deprec-h")}</div></li></ul>
     </section>` : ""}
     <section class="panel" id="p-correria">
       <h2>${secIc("flash")}CorrerIA</h2>
-      <ul class="opts"><li><div class="ot"><b id="correria-h">Usar com o CorrerIA</b><span>${correriaOn()
+      <ul class="opts"><li><div class="ot"><b id="correria-h">${oti("chat")}Usar com o CorrerIA</b><span>${correriaOn()
         ? "Ligado: pelo WhatsApp, o Claude e o Gemini leem e mudam o inventário."
         : "Para o WhatsApp, o Claude e o Gemini lerem e mudarem o inventário."}</span></div>
         <div class="oa">${switchHtml("correria-on", correriaOn(), "correria-h")}</div></li></ul>
@@ -1661,7 +1665,7 @@
     <section class="panel" id="p-ai">
       <h2>${secIc("scan")}IA do Home Assistant</h2>
       <p class="lead">A IA configurada no Home Assistant: Claude, OpenAI, Gemini ou Ollama.</p>
-      <ul class="opts"><li><div class="ot"><b id="ai-on-h">Usar IA</b><span>${on ? "Ler fotos, catalogar e buscar na internet." : "Os botões de IA e o Falar ficam escondidos."}</span></div>
+      <ul class="opts"><li><div class="ot"><b id="ai-on-h">${oti("spark")}Usar IA</b><span>${on ? "Ler fotos, catalogar e buscar na internet." : "Os botões de IA e o Falar ficam escondidos."}</span></div>
         <div class="oa">${switchHtml("ai-on", on, "ai-on-h")}</div></li></ul>
       ${on ? `<div data-slot="ai-panel"><p class="muted">Verificando…</p></div>` : ""}
     </section>
@@ -1677,7 +1681,7 @@
     </section>
     <section class="panel" id="p-sensors">
       <h2>${secIc("gauge")}Sensores no Home Assistant</h2>
-      <ul class="opts"><li><div class="ot"><b id="sensors-h">Criar os sensores</b><span>${sensorsOn()
+      <ul class="opts"><li><div class="ot"><b id="sensors-h">${oti("gauge")}Criar os sensores</b><span>${sensorsOn()
         ? '<span class="codepath">sensor.inventaria_ia_hoje</span>, com as chamadas de IA de hoje' + (newsOn()
           ? ', e <span class="codepath">binary_sensor.inventaria_recall</span>, ligado com um recall nas Novidades.' : ".")
         : newsOn() ? "As chamadas de IA de hoje e os recalls das Novidades, para painéis e automações."
@@ -1697,7 +1701,7 @@
 
   // -- uso da IA (igual ao do EconomIA): hoje, 7 dias e o mês, gráfico por dia e as últimas chamadas
   let usageData = null, usageSel = null;
-  const USAGE_KIND = { foto: "Digitalizar com IA", catalogo: "Catalogar itens", busca: "Buscar foto na internet", fala: "Falar", novidades: "Novidades", triagem: "Escolher equipamentos", chat: "Conversar", recursos: "Recursos" };
+  const USAGE_KIND = { foto: "Digitalizar com IA", catalogo: "Catalogar itens", busca: "Buscar foto na internet", fala: "Falar", novidades: "Novidades", triagem: "Escolher equipamentos", chat: "Conversar", recursos: "Recursos", apps: "Encontrar apps" };
   const USAGE_RES = { ok: "", cota: "cota excedida", formato: "fora do formato", sem_busca: "sem busca na web", erro: "erro" };
   const WEEKDAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1771,7 +1775,7 @@
       <div class="uso-dias" aria-hidden="true">${u.days.map((d) => `<span>${d.day === today ? "hoje" : weekday(d.day)}</span>`).join("")}</div>
       <p class="uso-cap" aria-live="polite">${dayLong(sel.day)}: <b>${plural(sel.calls || 0, "chamada", "chamadas")}</b>${sel.errors ? `, ${int(sel.errors)} com erro` : ""}${sel.quota ? `, ${int(sel.quota)} sem cota` : ""}.</p>
       ${kinds.length ? `<ul class="uso-tipos" aria-label="Nos últimos 7 dias">${kinds.map(([k, n]) => `<li>${esc(USAGE_KIND[k] || k)} <b>${int(n)}</b></li>`).join("")}</ul>` : ""}
-      <details class="uso-ult"><summary>${ic("chev", "sm")}Últimas chamadas</summary><ul>${recent || "<li>Nenhuma chamada ainda.</li>"}</ul></details>
+      <details class="uso-ult"><summary>${ic("chev", "sm")}${oti("history")}Últimas chamadas</summary><ul>${recent || "<li>Nenhuma chamada ainda.</li>"}</ul></details>
       <p class="help">${provTxt} A estimativa conta só o texto.</p>`;
   }
   function moreData() {
@@ -1816,7 +1820,7 @@
     <section class="panel" id="p-accent">
       <h2 id="accent-h">${secIc("palette")}Cor do app</h2>
       <p class="lead">Vale para todos os aparelhos.</p>
-      <ul class="opts"><li><div class="ot"><b id="daily-h">Cor do dia</b><span>Muda a cor do app todo dia.</span></div>
+      <ul class="opts"><li><div class="ot"><b id="daily-h">${oti("calendar")}Cor do dia</b><span>Muda a cor do app todo dia.</span></div>
         <div class="oa">${switchHtml("accent-daily", accentDaily(), "daily-h")}</div></li></ul>
       <div class="swatches" role="radiogroup" aria-labelledby="accent-h">${ACCENTS.map(([k, v]) => `<label class="sw" data-accent="${k}"><input type="radio" name="accent" value="${k}" data-input="accent"${k === accent ? " checked" : ""}>${SWATCH}<span>${v}</span></label>`).join("")}</div>
     </section>`;
@@ -1843,17 +1847,17 @@
     return `
     <section class="panel" id="p-news-opts">
       <h2>${secIc("spark")}Novidades</h2>
-      <ul class="opts"><li><div class="ot"><b id="news-h">Usar novidades</b><span>Atualizações e recalls dos eletrônicos.</span></div>
+      <ul class="opts"><li><div class="ot"><b id="news-h">${oti("spark")}Usar novidades</b><span>Atualizações e recalls dos eletrônicos.</span></div>
         <div class="oa">${switchHtml("news-on", on, "news-h")}</div></li>
-      ${on ? `<li${appsOn() ? ' class="tem-sub"' : ""}><div class="ot"><b id="news-apps-h">Apps do celular</b><span>As novidades dos apps que vocês usam, pelo sensor Último app usado do app Home Assistant.</span></div>
+      ${on ? `<li${appsOn() ? ' class="tem-sub"' : ""}><div class="ot"><b id="news-apps-h">${oti("phone")}Apps do celular</b><span>As novidades dos apps que vocês usam, pelo sensor Último app usado do app Home Assistant.</span></div>
         <div class="oa">${switchHtml("news-apps", appsOn(), "news-apps-h")}</div></li>` : ""}
       ${appsOn() ? `<li class="apps-det-li" data-slot="apps-det">${appsDetHtml()}</li>` : ""}
-      ${on ? `<li><div class="ot"><b id="news-auto-h">Conferir sozinho</b><span>A IA confere os eletrônicos${appsOn() ? " e os apps" : ""} de tempos em tempos.</span></div>
+      ${on ? `<li><div class="ot"><b id="news-auto-h">${oti("clock")}Conferir sozinho</b><span>A IA confere os eletrônicos${appsOn() ? " e os apps" : ""} de tempos em tempos.</span></div>
         <div class="oa">${switchHtml("news-auto", !!every, "news-auto-h")}</div></li>` : ""}
       ${on && every ? `<li class="aviso-quando">
-          <div class="field"><label for="news-hora">Horário</label><select id="news-hora" class="select" data-input="news-hora">${horas.map((x) => opt(x, x, hora)).join("")}</select></div>
-          <div class="field"><label for="news-every">A cada</label><select id="news-every" class="select" data-input="news-every">${NEWS_EVERY.map(([k, v]) => opt(k, v, every)).join("")}</select></div></li>
-        <li><div class="ot"><b id="news-aviso-h">Avisar no celular</b><span>Quando a conferência sozinha achar novidade.</span></div>
+          <div class="field"><label for="news-hora">${oti("clock")}Horário</label><select id="news-hora" class="select" data-input="news-hora">${horas.map((x) => opt(x, x, hora)).join("")}</select></div>
+          <div class="field"><label for="news-every">${oti("refresh")}A cada</label><select id="news-every" class="select" data-input="news-every">${NEWS_EVERY.map(([k, v]) => opt(k, v, every)).join("")}</select></div></li>
+        <li><div class="ot"><b id="news-aviso-h">${oti("send")}Avisar no celular</b><span>Quando a conferência sozinha achar novidade.</span></div>
           <div class="oa">${switchHtml("news-aviso", aviso, "news-aviso-h")}</div></li>
         ${aviso ? `<li class="aviso-quem" data-slot="news-quem">${quemRecebe()}</li>` : ""}` : ""}
       </ul>
@@ -1867,7 +1871,7 @@
   }
   function quemRecebe() {
     const P = newsPeople, para = new Set(newsPara());
-    let h = `<div class="field"><span class="lbl" id="quem-l">Quem recebe</span>`;
+    let h = `<div class="field"><span class="lbl" id="quem-l">${oti("user")}Quem recebe</span>`;
     if (!P) h += `<p class="help">Procurando as pessoas da casa…</p>`;
     else if (!P.length) h += `<p class="help">Nenhuma pessoa da casa no Home Assistant.</p>`;
     else {
@@ -1886,24 +1890,115 @@
     const A = newsOv && newsOv.apps;
     if (!A) return `<p class="help">Procurando os apps dos celulares…</p>`;
     const L = [...(A.lista || [])].sort((x, y) => x.nome.localeCompare(y.nome, "pt-BR"));
-    if (!L.length) return `<p class="help">${A.sensores ? APPS_NENHUM : APPS_SEM_SENSOR}</p>`;
+    if (!L.length) return `<p class="help">${A.sensores ? APPS_NENHUM : APPS_SEM_SENSOR}</p>${encontrarBtn()}`;
     // 1.57.0: cada app com a sua chave: desligada, fica fora da pesquisa das novidades (a escolha da pessoa vale sobre a da
     // IA); ligada, é conferido. Um novo vem ligado (a IA ainda vai escolher); um que a IA deixou de fora vem desligado, com o porquê.
     const on = (a) => a.conferir === true || !!a.res || (a.conferir == null && !a.manual);
     const quando = (a) => (a.res ? "" : a.conferir == null ? "novo" : a.conferir === false && !a.manual ? "a IA deixou de fora" : "");
     const row = (a) => {
       const id = "app-det-" + a.pacote.replace(/[^a-z0-9]/gi, "-");
+      // 1.58.1: o Ver novidades na largura toda, embaixo do nome e da chave (como os outros botões dos apps)
       return `<li class="app-det"><div class="app-det-t"><b id="${id}">${esc(a.nome)}</b>
-        <span class="nm">${esc([joinE(a.pessoas || []), a.ultimo ? `usado ${whenShort(a.ultimo)}` : "", quando(a)].filter(Boolean).join(" · "))}</span>
-        <button type="button" class="btn sm app-det-b" data-act="app-open" data-id="${esc(a.pacote)}" aria-label="Ver novidades de ${esc(a.nome)}">${ic("spark", "sm")}Ver novidades</button></div>
-        <label class="switch"><input type="checkbox" role="switch" data-input="app-considerar" data-pkg="${esc(a.pacote)}" aria-labelledby="${id}"${on(a) ? " checked" : ""}><span class="track" aria-hidden="true"></span></label></li>`;
+        <span class="nm">${esc([joinE(a.pessoas || []), a.ultimo ? `usado ${whenShort(a.ultimo)}` : a.ia ? "pela IA" : "", quando(a)].filter(Boolean).join(" · "))}</span></div>
+        <label class="switch"><input type="checkbox" role="switch" data-input="app-considerar" data-pkg="${esc(a.pacote)}" aria-labelledby="${id}"${on(a) ? " checked" : ""}><span class="track" aria-hidden="true"></span></label>
+        <button type="button" class="btn app-det-b" data-act="app-open" data-id="${esc(a.pacote)}" aria-label="Ver novidades de ${esc(a.nome)}">${ic("spark", "sm")}Ver novidades</button></li>`;
     };
     const ativos = L.filter(on), inativos = L.filter((a) => !on(a));
-    return `<details class="news-out apps-det"${appsDetAberto ? " open" : ""}><summary>${ic("chev", "sm")}Apps detectados (${int(L.length)})</summary>
-      ${(A.celulares || []).length ? `<p class="help">Com o sensor: ${esc(joinE(A.celulares))}.</p>` : ""}
+    return `<details class="news-out apps-det"${appsDetAberto ? " open" : ""}><summary>${ic("chev", "sm")}${oti("phone")}Apps detectados (${int(L.length)})</summary>
+      ${(A.celulares || []).length ? `<p class="help">Com o sensor: ${esc(joinE(A.celulares))}.</p>` : ""}${encontrarBtn()}
       ${ativos.length ? `<ul class="app-det-l">${ativos.map(row).join("")}</ul>` : ""}
-      ${inativos.length ? `<details class="news-out apps-inativos"${appsInatAberto ? " open" : ""}><summary>${ic("chev", "sm")}Inativos (${int(inativos.length)})</summary>
+      ${inativos.length ? `<details class="news-out apps-inativos"${appsInatAberto ? " open" : ""}><summary>${ic("chev", "sm")}${oti("archive")}Inativos (${int(inativos.length)})</summary>
         <ul class="app-det-l">${inativos.map(row).join("")}</ul></details>` : ""}</details>`;
+  }
+  // Encontrar apps com IA (1.59.0): prints da lista de apps do celular ou os nomes colados; a IA lê, a pessoa marca quais
+  // entram em Apps detectados (acompanhados). Só com a IA ligada.
+  const encontrarBtn = () => (aiOn() ? `<button type="button" class="btn block app-det-ia" data-act="apps-ia">${ic("spark")}Encontrar apps com IA</button>` : "");
+  function openAppsFinder() {
+    const F = { fotos: [], texto: "", step: "entrada", lidos: [], erro: "", lendo: false };
+    const entry = openDialog({
+      cls: "modal", label: "Encontrar apps com IA",
+      html: `<div class="dlg"><div class="dlg-h"><h2>Encontrar apps com IA</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <div class="dlg-b" data-slot="af"></div><div class="dlg-f" data-slot="af-f"></div></div>`,
+    });
+    const dlg = entry.dlg, body = $('[data-slot="af"]', dlg), foot = $('[data-slot="af-f"]', dlg);
+    const pode = () => F.fotos.length > 0 || F.texto.trim().length > 0;
+    function render() {
+      if (F.step === "lendo") {
+        body.innerHTML = `<div class="ai-wait"><span class="spin lg"></span><b>Lendo com IA…</b><span>Pode levar até um minuto.</span></div>`;
+        foot.innerHTML = "";
+        return;
+      }
+      if (F.step === "revisao") {
+        const n = F.lidos.filter((x) => x.on).length;
+        body.innerHTML = F.lidos.length ? `<ul class="apps-achados">${F.lidos.map((x, i) => `<li><label class="check${x.ja ? " ja" : ""}"><input type="checkbox" data-af="${i}"${x.on ? " checked" : ""}${x.ja ? " disabled" : ""}>
+            <span><b>${esc(x.nome)}</b>${x.ja ? "<small>já está em Apps detectados</small>" : x.sistema ? "<small>do sistema</small>" : ""}</span></label></li>`).join("")}</ul>`
+          : `<p class="muted">A IA não achou apps.</p>`;
+        foot.innerHTML = `<button type="button" class="btn" data-af-act="voltar">${ic("back")}Voltar</button><span class="grow"></span>
+          <button type="button" class="btn primary" data-af-act="add"${n ? "" : " disabled"}>${ic("plus")}${n === 1 ? "Adicionar 1 app" : n ? `Adicionar ${n} apps` : "Adicionar"}</button>`;
+        return;
+      }
+      body.innerHTML = `<div class="form">
+          ${F.fotos.length ? `<div class="af-fotos">${F.fotos.map((f, i) => `<div class="af-foto"><img src="${f}" alt="Print ${i + 1}"><button type="button" class="btn ghost icon" data-af-rm="${i}" aria-label="Tirar o print ${i + 1}">${ic("close", "sm")}</button></div>`).join("")}</div>` : ""}
+          <button type="button" class="btn block" data-af-act="fotos"${F.fotos.length >= 6 ? " disabled" : ""}>${ic("image")}Escolher fotos</button>
+          <div class="field"><label for="af-txt">${oti("chat")}Colar mensagem</label><textarea id="af-txt" class="input grow" rows="2" data-af-in maxlength="4000" placeholder="Ex.: Banco Lua, Mapa Fácil">${esc(F.texto)}</textarea></div>
+          ${F.erro ? `<p class="formerr">${esc(F.erro)}</p>` : ""}</div>`;
+      foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-x>${ic("close")}Cancelar</button>
+        <button type="button" class="btn primary" data-af-act="ler"${pode() ? "" : " disabled"}>${ic("spark")}Ler com IA</button>`;
+    }
+    async function addFiles(files) {
+      for (const f of imageFiles(files).slice(0, 6 - F.fotos.length)) {
+        let img, url;
+        try {
+          try { img = await createImageBitmap(f); } catch { url = URL.createObjectURL(f); img = await loadImg(url); }
+          F.fotos.push("data:image/jpeg;base64," + await b64(await toJpeg(img, 1600, 0.85)));
+        } catch (e) { fail(e); }
+        finally { if (url) URL.revokeObjectURL(url); if (img && img.close) img.close(); }
+      }
+      if (document.contains(dlg)) render();
+    }
+    async function ler() {
+      F.erro = ""; F.step = "lendo"; render();
+      try {
+        const r = await API.post("api/news/apps/ler", { fotos: F.fotos, texto: F.texto.trim() });
+        F.lidos = (r.apps || []).map((x) => ({ ...x, on: !x.ja && !x.sistema }));
+        F.step = "revisao";
+      } catch (e) { F.erro = e.message; F.step = "entrada"; }
+      if (document.contains(dlg)) render();
+    }
+    async function adicionar() {
+      const esc_ = F.lidos.filter((x) => x.on).map(({ id, nome, pacote }) => ({ id, nome, pacote }));
+      try {
+        const r = await API.post("api/news/apps/adicionar", { apps: esc_ });
+        const n = r.adicionados || 0;
+        delete r.adicionados;
+        newsOv = r;
+        requestClose(entry, { force: true });
+        toast(n === 1 ? "1 app adicionado" : `${n} apps adicionados`);
+        appsDetAberto = true;
+        paintAppsDet(); renderNews();
+      } catch (e) { fail(e); }
+    }
+    dlg.addEventListener("click", (e) => {
+      const t = e.target;
+      if (t.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
+      const rm = t.closest("[data-af-rm]");
+      if (rm) { F.fotos.splice(+rm.dataset.afRm, 1); render(); return; }
+      const a = t.closest("[data-af-act]");
+      if (!a || a.disabled) return;
+      const act = a.dataset.afAct;
+      if (act === "fotos") pickFiles((files) => addFiles(files), { multiple: true });
+      else if (act === "ler") ler();
+      else if (act === "voltar") { F.step = "entrada"; render(); }
+      else if (act === "add") adicionar();
+    });
+    dlg.addEventListener("input", (e) => {
+      if (e.target.matches("[data-af-in]")) { F.texto = e.target.value; const b = $('[data-af-act="ler"]', dlg); if (b) b.disabled = !pode(); }
+    });
+    dlg.addEventListener("change", (e) => {
+      const c = e.target.closest("[data-af]");
+      if (c) { F.lidos[+c.dataset.af].on = c.checked; render(); }
+    });
+    render();
   }
   // a chave de um app: Acompanhar ou Deixar de fora (a mesma escolha da janela do app em Mais › Novidades)
   async function considerarApp(t) {
@@ -1958,13 +2053,13 @@
     <section class="panel" id="p-bens">
       <h2>${secIc("home")}Bens</h2>
       <p class="lead">Casa, terreno, carro: o que fica fora de casa.</p>
-      <ul class="opts"><li><div class="ot"><b id="bens-h">Usar bens</b><span>Desligar não apaga os bens.</span></div>
+      <ul class="opts"><li><div class="ot"><b id="bens-h">${oti("gem")}Usar bens</b><span>Desligar não apaga os bens.</span></div>
         <div class="oa">${switchHtml("bens-on", bensOn(), "bens-h")}</div></li></ul>
     </section>
     <section class="panel" id="p-zones">
       <h2>${secIc("pin")}Zonas</h2>
       <p class="lead">Partes de um cômodo, como Estante ou Rack da TV.</p>
-      <ul class="opts"><li><div class="ot"><b id="zones-h">Usar zonas</b><span>Desligar não apaga as zonas.</span></div>
+      <ul class="opts"><li><div class="ot"><b id="zones-h">${oti("grid")}Usar zonas</b><span>Desligar não apaga as zonas.</span></div>
         <div class="oa">${switchHtml("zones-on", zonesOn(), "zones-h")}</div></li></ul>
     </section>
     ${moreShortcut()}`;
@@ -1996,6 +2091,7 @@
   function viewCats() {
     return `
     <section class="panel" id="p-cats">
+      <h2>${secIc("tag")}Categorias</h2>
       <ul class="opts cats">
         <li><div class="ot"><b>${plural(CATS.length, "categoria", "categorias")}</b></div>
           <div class="oa"><button type="button" class="btn" data-act="cat-new">${ic("plus")}Nova categoria</button></div></li>
@@ -2017,10 +2113,10 @@
       cls: "modal narrow", label: id ? "Renomear categoria" : "Nova categoria",
       html: `<div class="dlg"><div class="dlg-h"><h2>${id ? "Renomear categoria" : "Nova categoria"}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-cn><div class="form">
-          <div class="field"><label for="cn-name">Nome</label><input id="cn-name" class="input" name="name" maxlength="60" value="${esc(old)}" placeholder="Ex.: Ferramentas" autocomplete="off"></div>
+          <div class="field"><label for="cn-name">Nome</label><textarea id="cn-name" class="input grow" rows="1" name="name" maxlength="60" placeholder="Ex.: Ferramentas" autocomplete="off">${esc(old)}</textarea></div>
           <div class="formerr" data-err hidden></div>
         </div></form>
-        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok>${id ? "Salvar" : "Criar categoria"}</button></div></div>`,
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok>${ic(id ? "check" : "plus")}${id ? "Salvar" : "Criar categoria"}</button></div></div>`,
     });
     const form = $("[data-cn]", entry.dlg), err = $("[data-err]", entry.dlg);
     setTimeout(() => { form.name.focus(); form.name.select(); }, 50);
@@ -2136,12 +2232,12 @@
     slot.innerHTML = `<ul class="opts">
       <li><div class="ot"><b><span class="status ${cls}"><i></i>${st.ready ? "Pronta para ler fotos" : "Não configurada"}</span></b><span>${esc(aiReasonText(st))}</span></div>
         <div class="oa"><button class="btn" data-act="ai-refresh">${ic("refresh")}Verificar de novo</button></div></li>
-      ${ents.length ? `<li><div class="ot"><b>IA para ler fotos</b><span>Padrão do Home Assistant usa a IA preferida definida lá.</span></div>
+      ${ents.length ? `<li><div class="ot"><b>${oti("camera")}IA para ler fotos</b><span>Padrão do Home Assistant usa a IA preferida definida lá.</span></div>
         <div class="oa"><select class="select" data-input="ai-entity" aria-label="IA para ler fotos">
           <option value="">Padrão do Home Assistant</option>
           ${ents.map((e) => `<option value="${esc(e.id)}"${e.id === st.selected ? " selected" : ""}${e.attachments ? "" : " disabled"}>${esc(e.name)}${e.attachments ? "" : " (não lê fotos)"}</option>`).join("")}
         </select></div></li>` : ""}
-      ${ents.length || agents.length ? `<li><div class="ot"><b>IA para buscar fotos na internet</b><span>Padrão do Home Assistant usa a IA preferida definida lá. Precisa da busca na web: na Anthropic, "Enable web search"; no Gemini, um assistente de conversa com "Enable Google Search tool".</span></div>
+      ${ents.length || agents.length ? `<li><div class="ot"><b>${oti("search")}IA para buscar fotos na internet</b><span>Padrão do Home Assistant usa a IA preferida definida lá. Precisa da busca na web: na Anthropic, "Enable web search"; no Gemini, um assistente de conversa com "Enable Google Search tool".</span></div>
         <div class="oa"><select class="select" data-input="ai-search" aria-label="IA para buscar fotos na internet">
           <option value="">Padrão do Home Assistant</option>
           ${ents.length ? `<optgroup label="Tarefas de IA">${ents.map((e) => opt(e, st.search)).join("")}</optgroup>` : ""}
@@ -2158,7 +2254,7 @@
       html: `<div class="dlg"><div class="dlg-h"><h2>Leitura por IA</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b"><p style="margin-top:0"><span class="status ${st.reason === "no_vision" ? "warn" : "bad"}"><i></i>${esc(aiReasonText(st))}</span></p>
         <p>Configure no Home Assistant:</p>${AI_STEPS}</div>
-        <div class="dlg-f"><a class="btn" href="#/config/integracoes" data-x>Abrir Integrações</a><button class="btn primary" data-x>Entendi</button></div></div>`,
+        <div class="dlg-f"><a class="btn" href="#/config/integracoes" data-x>${ic("gear")}Abrir Integrações</a><button class="btn primary" data-x>${ic("check")}Entendi</button></div></div>`,
     });
     entry.dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); });
     return false;
@@ -2232,7 +2328,7 @@
           <div class="cam-mid"><p class="cam-hint" data-cam-hint>Abrindo a câmera…</p></div>
           <div class="cam-bottom"><div class="cam-shots" data-cam-shots></div>
             <button type="button" class="cam-shutter" data-cam="shoot" aria-label="Fotografar" disabled><span></span></button>
-            ${max > 1 ? `<button type="button" class="cam-done" data-cam="done" disabled>Pronto</button>` : `<span></span>`}</div>
+            ${max > 1 ? `<button type="button" class="cam-done" data-cam="done" disabled>${ic("check", "sm")}Pronto</button>` : `<span></span>`}</div>
         </div>`,
         onClose: () => { stop(); shots.forEach((u) => URL.revokeObjectURL(u)); resolve(out); },
       });
@@ -2327,7 +2423,7 @@
         html: `<div class="dlg"><div class="dlg-h"><h2>Fotos de ${esc(r?.name || "cômodo")}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
           <div class="dlg-b">${photos.length ? `<div class="pick">${photos.map((p, k) => `<label><input type="checkbox" value="${esc(p.file)}" aria-label="${esc(p.label || `Foto ${k + 1}`)}"><img src="${esc(src(p.file))}" alt="" loading="lazy">${p.label ? `<span>${esc(p.label)}</span>` : ""}</label>`).join("")}</div>`
             : `<p class="muted" style="margin:0">Este cômodo ainda não tem outras fotos.</p>`}</div>
-          <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok disabled>Usar fotos</button></div></div>`,
+          <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok disabled>${ic("check")}Usar fotos</button></div></div>`,
         onClose: () => resolve(chosen),
       });
       const okBtn = $("[data-ok]", entry.dlg);
@@ -2372,8 +2468,8 @@
             <input id="wq" class="input" name="q" value="${esc(name)}" maxlength="200" autocomplete="off" enterkeyhint="search">
             <button type="submit" class="btn" data-go>${ic("search")}<span class="lbl">Buscar</span></button></form>
             <div data-slot="web" aria-live="polite"></div></div>
-          <div class="dlg-f"><span class="grow"></span><button type="button" class="btn ghost" data-x>Cancelar</button>
-            <button type="button" class="btn primary" data-ok disabled>Usar foto</button></div></div>`,
+          <div class="dlg-f"><span class="grow"></span><button type="button" class="btn ghost" data-x>${ic("close")}Cancelar</button>
+            <button type="button" class="btn primary" data-ok disabled>${ic("check")}Usar foto</button></div></div>`,
         onClose: () => { gen++; clearTimeout(timer); if (job) API.del(`api/web-photos/${job}`).catch(() => {}); resolve(got); },
       });
       const dlg = entry.dlg, form = $("[data-wq]", dlg), slot = $('[data-slot="web"]', dlg), ok = $("[data-ok]", dlg);
@@ -2422,7 +2518,7 @@
         return `<div class="wprod">
             ${withPhotos ? `<label class="check"><input type="checkbox" data-fill checked> Preencher também ${esc(list)}</label>` : `<p class="wprod-h">A IA achou estes dados do produto</p>`}
             <dl>${keys.map((k) => `<div><dt>${WEB_FIELDS[k]}</dt><dd>${esc(k === "cat" ? CAT[f[k]] : k === "value" ? money(f[k]) : f[k])}</dd></div>`).join("")}</dl>
-            <button type="button" class="btn sm" data-only>${withPhotos ? "Usar só os dados, sem foto" : "Usar estes dados"}</button></div>`;
+            <button type="button" class="btn sm" data-only>${ic("check", "sm")}${withPhotos ? "Usar só os dados, sem foto" : "Usar estes dados"}</button></div>`;
       }
       const wantsFill = () => { const c = $("[data-fill]", dlg); return !!product && (!c || c.checked); };
       async function use() {
@@ -2593,7 +2689,7 @@
       html: `<div class="dlg"><div class="dlg-h"><h2>Novidades</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b"><p class="news-of">${esc(it.name)}</p><div data-slot="news" aria-live="polite"></div></div>
         <div class="dlg-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Buscar de novo</button><span class="grow"></span>
-          <button type="button" class="btn primary" data-item>Ver item</button></div></div>`,
+          <button type="button" class="btn primary" data-item>${ic("external")}Ver item</button></div></div>`,
       onClose: () => { gen++; clearTimeout(timer); if (job) API.del(`api/news/${job}`).catch(() => {}); job = null; },
     });
     const dlg = entry.dlg, slot = $('[data-slot="news"]', dlg), again = $("[data-again]", dlg);
@@ -2646,7 +2742,7 @@
       html: `<div class="dlg"><div class="dlg-h"><h2>Novidades</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b"><p class="news-of">${esc(a.nome)}</p><div data-slot="news" aria-live="polite"></div></div>
         <div class="dlg-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Buscar de novo</button><span class="grow"></span>
-          <button type="button" class="btn" data-fora hidden>Deixar de fora</button><button type="button" class="btn primary" data-dentro hidden>Acompanhar</button></div></div>`,
+          <button type="button" class="btn" data-fora hidden>${ic("archive")}Deixar de fora</button><button type="button" class="btn primary" data-dentro hidden>${ic("plus")}Acompanhar</button></div></div>`,
       onClose: () => { gen++; clearTimeout(timer); if (job) API.del(`api/news/${job}`).catch(() => {}); job = null; },
     });
     const dlg = entry.dlg, slot = $('[data-slot="news"]', dlg), again = $("[data-again]", dlg), fora = $("[data-fora]", dlg), dentro = $("[data-dentro]", dlg);
@@ -2801,7 +2897,7 @@
             <p class="muted tn-app" data-tn-app hidden>${ic("info", "sm")}<span>Guardado no ResolvIA: a lista não aceita data.</span></p></div>
           <div class="formerr" data-err hidden></div>
         </div></form>
-        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok disabled>Criar tarefa</button></div></div>`,
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok disabled>${ic("plus")}Criar tarefa</button></div></div>`,
     });
     const form = $("[data-tn]", entry.dlg), err = $("[data-err]", entry.dlg), ok = $("[data-ok]", entry.dlg);
     // as listas como no Nova tarefa do ResolvIA: todas à vista, cada uma com a cor de lá; o prazo só numa lista que aceita
@@ -2944,7 +3040,7 @@
           ${zones ? `<div class="field"><label for="mv-zone">Zona</label><input id="mv-zone" class="input" name="zone" data-sug="mv-zones" value="${esc(it.zone || "")}" autocomplete="off"><datalist id="mv-zones">${zonesFor(it.room)}</datalist>
             <p class="help">Em outro cômodo, o item ganha um código novo.</p></div>` : ""}
         </div></form>
-        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok>${ic("move")}Mover</button></div></div>`,
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok>${ic("move")}Mover</button></div></div>`,
     });
     const form = $("[data-mv]", entry.dlg);
     if (zones) form.room.addEventListener("change", () => { $("#mv-zones", entry.dlg).innerHTML = zonesFor(form.room.value); if (form.room.value !== it.room) form.zone.value = ""; });
@@ -2990,7 +3086,7 @@
     const title = item ? `Editar ${what}` : dup ? `Duplicar ${what}` : `Novo ${what}`;
     const saveLbl = F.id ? "Salvar alterações" : `Salvar ${what}`;
     const otherCat = BENS_GROUPS.some(([k]) => k && k === F.cat) ? "outros" : F.cat || "outros"; // Outro guarda a categoria de um item que veio de um cômodo
-    const tipoBtns = () => BENS_GROUPS.map(([k, name]) => { const on = (k || "") === bensGroup(F); return `<button type="button" data-ed="tipo" data-v="${k}" aria-pressed="${on}">${{ imoveis: "Imóvel", veiculos: "Veículo" }[k] || "Outro"}</button>`; }).join("");
+    const tipoBtns = () => BENS_GROUPS.map(([k, name]) => { const on = (k || "") === bensGroup(F); return `<button type="button" data-ed="tipo" data-v="${k}" aria-pressed="${on}">${ic({ imoveis: "home", veiculos: "car" }[k] || "gem", "sm")}${{ imoveis: "Imóvel", veiculos: "Veículo" }[k] || "Outro"}</button>`; }).join("");
     const roomField = `<div class="field"><label for="f-room">Cômodo</label><select id="f-room" class="select" name="room">${roomOptions(F.room)}</select></div>`;
     const zoneField = `<div class="field"><label for="f-zone">Zona</label><input id="f-zone" class="input" name="zone" data-sug="f-zones" maxlength="120" autocomplete="off" value="${esc(F.zone)}" placeholder="Ex.: Estante, Bancada"><datalist id="f-zones"></datalist></div>`;
     const entry = openDialog({
@@ -3013,16 +3109,16 @@
               <div class="field"><label for="f-value">Valor total</label><div class="money"><input id="f-value" class="input" name="value" inputmode="decimal" value="${esc(F.value)}" placeholder="0"></div>
                 <p class="unit-hint" data-slot="unit"></p><p class="err" data-err="value" hidden></p></div>
             </div>
-            <details class="more-fields"${F.flag ? " open" : ""}><summary>${ic("chev", "sm")}Observação</summary>
+            <details class="more-fields"${F.flag ? " open" : ""}><summary>${ic("chev", "sm")}${oti("edit")}Observação</summary>
               <div class="form"><div class="field"><label for="f-flag" class="sr">Observação</label><textarea id="f-flag" class="input grow" rows="1" name="flag" maxlength="200" placeholder="Algo para lembrar sobre este item">${esc(F.flag)}</textarea></div></div></details>
             <div class="formerr" data-slot="formerr" hidden></div>
           </div>
         </form>
         <div class="dlg-f">
-          ${F.id ? "" : `<button type="button" class="btn" data-ed="again">Salvar e adicionar outro</button>`}
+          ${F.id ? "" : `<button type="button" class="btn" data-ed="again">${ic("plus")}Salvar e adicionar outro</button>`}
           <span class="grow"></span>
-          <button type="button" class="btn ghost hide-narrow" data-ed="cancel">Cancelar</button>
-          <button type="button" class="btn primary" data-ed="save">${saveLbl}</button>
+          <button type="button" class="btn ghost hide-narrow" data-ed="cancel">${ic("close")}Cancelar</button>
+          <button type="button" class="btn primary" data-ed="save">${ic("check")}${saveLbl}</button>
         </div></div>`,
       guard: async () => !F.dirty || confirmBox({ title: "Descartar o que foi preenchido?", ok: "Descartar", cancel: "Continuar editando", danger: true }),
     });
@@ -3040,7 +3136,7 @@
       const hasRoomPhotos = (D.roomById.get(F.room)?.photos || []).some((p) => !F.photos.includes(p.file));
       slot("photos").innerHTML = F.photos.map((f, i) => `<div class="ph"><img src="${esc(src(f))}" alt="Foto ${i + 1}">
           ${F.photoSrc[f] ? `<span class="web" title="Foto ilustrativa de ${esc(siteOf(F.photoSrc[f]))}">Internet</span>` : ""}
-          ${i === 0 ? `<span class="cover">Capa</span>` : `<button type="button" class="mkcover" data-ed="cover" data-i="${i}">Usar como capa</button>`}
+          ${i === 0 ? `<span class="cover">Capa</span>` : `<button type="button" class="mkcover" data-ed="cover" data-i="${i}">${ic("image", "sm")}Usar como capa</button>`}
           <button type="button" class="x" data-ed="rmphoto" data-i="${i}" aria-label="Remover foto ${i + 1}">${ic("close")}</button></div>`).join("")
         + Array.from({ length: F.uploading }, () => `<div class="ph loading"><span class="spin lg"></span></div>`).join("")
         + (CAMERA ? `<button type="button" class="add" data-ed="camera">${ic("camera")}Tirar foto</button>` : "")
@@ -3180,8 +3276,8 @@
         if (e.status === 409 && e.data && e.data.item) {
           const cur = e.data.item;
           showErr(`${esc(e.message)}<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button type="button" class="btn sm" data-ed="theirs">Carregar a versão atual</button>
-            <button type="button" class="btn sm" data-ed="mine">Salvar a minha mesmo assim</button></div>`);
+            <button type="button" class="btn sm" data-ed="theirs">${ic("refresh", "sm")}Carregar a versão atual</button>
+            <button type="button" class="btn sm" data-ed="mine">${ic("check", "sm")}Salvar a minha mesmo assim</button></div>`);
           entry.conflict = cur;
         } else showErr(esc(e.message));
       } finally { if (document.contains(dlg)) setBusy(false); }
@@ -3299,7 +3395,7 @@
     slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status ${v && v.ready ? "ok" : "bad"}"><i></i>${v && v.ready ? "Pronto para ouvir" : v ? "Sem fala para texto" : "Verificando…"}</span></b>
         <span>${v && v.ready ? `${using}${v.missing ? " A escolhida saiu do Home Assistant: usando o padrão." : ""}` : esc((v && v.reason) || "")}</span></div>
       <div class="oa"><button class="btn" data-act="voice-refresh">${ic("refresh")}Verificar de novo</button></div></li>
-      ${engines.length ? `<li><div class="ot"><b id="voice-stt-l">Fala para texto</b><span>Padrão do Home Assistant usa a do assistente de voz preferido.</span></div>
+      ${engines.length ? `<li><div class="ot"><b id="voice-stt-l">${oti("mic")}Fala para texto</b><span>Padrão do Home Assistant usa a do assistente de voz preferido.</span></div>
         <div class="oa"><select class="select" data-input="voice-stt" aria-labelledby="voice-stt-l">
           <option value="">Padrão do Home Assistant</option>
           ${engines.map((e) => `<option value="${esc(e.id)}"${e.id === sel ? " selected" : ""}>${esc(e.name)}</option>`).join("")}
@@ -3397,7 +3493,7 @@
     const entry = openDialog({
       cls: "sheet chat", label: "Conversar",
       html: `<div class="dlg"><div class="dlg-h"><h2>Conversar</h2>
-          <button type="button" class="btn ghost sm" data-new${CHAT.msgs.length ? "" : " hidden"}>Nova conversa</button>
+          <button type="button" class="btn ghost sm" data-new${CHAT.msgs.length ? "" : " hidden"}>${ic("plus", "sm")}Nova conversa</button>
           <button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b chat-b" data-slot="msgs" aria-live="polite"></div>
         <form class="chat-f" data-chat>
@@ -3412,7 +3508,7 @@
     const render = () => {
       box.innerHTML = CHAT.msgs.length ? CHAT.msgs.map((m) => `<div class="msg ${m.role === "user" ? "me" : m.error ? "ai err" : "ai"}">${m.role === "user" ? esc(m.text) : chatHtml(m.text)}${m.error ? `<button type="button" class="btn sm" data-retry>${ic("refresh", "sm")}Tentar de novo</button>` : ""}</div>`).join("")
           + (CHAT.busy ? `<div class="msg ai typing" aria-label="A IA está escrevendo"><i></i><i></i><i></i></div>` : "")
-        : `<div class="chat-empty"><div class="chat-ideas">${chatIdeas(sc).map((t) => `<button type="button" class="chip" data-idea>${esc(t)}</button>`).join("")}</div></div>`;
+        : `<div class="chat-empty"><div class="chat-ideas">${chatIdeas(sc).map((t) => `<button type="button" class="chip" data-idea>${ic("spark", "sm")}${esc(t)}</button>`).join("")}</div></div>`;
       $("[data-new]", dlg).hidden = !CHAT.msgs.length;
       box.scrollTop = box.scrollHeight;
     };
@@ -3511,11 +3607,11 @@
           </div>
           ${C.error ? `<div class="formerr" style="margin-top:14px">${esc(C.error)}</div>` : ""}
           <p class="voice-note">${useAi ? "" : "Sem IA, o app separa pelas vírgulas. "}Até 2 minutos.${PREVIEW ? " Na prévia, o microfone não grava: entra um exemplo." : ""}</p>`;
-        foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
+        foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="cancel">${ic("close")}Cancelar</button>
           <button type="button" class="btn primary" data-ct="done"${on ? "" : " disabled"}>${ic("check")}Pronto</button>`;
       } else if (C.step === "transcribing") {
         body.innerHTML = `<div class="ai-wait voice-wait"><span class="spin lg"></span><b>Transcrevendo…</b></div>`;
-        foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="stop">Cancelar</button>`;
+        foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="stop">${ic("close")}Cancelar</button>`;
       } else if (C.step === "photo" || C.step === "ready") {
         const hasRoomPhotos = (D.roomById.get(C.room)?.photos || []).length > 0;
         body.innerHTML = `<div class="form">
@@ -3535,13 +3631,13 @@
           </div>
           <div class="field"><label for="c-hint">Dica para a IA (opcional)</label><textarea id="c-hint" class="input grow" rows="1" data-ct-in="hint" maxlength="300" placeholder="Ex.: são taças de cristal; o vaso é de cerâmica" autocomplete="off">${esc(C.hint)}</textarea></div>
         </div>`;
-        foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
+        foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="cancel">${ic("close")}Cancelar</button>
           <button type="button" class="btn primary" data-ct="read"${C.file ? "" : " disabled"}>${ic("scan")}Digitalizar com IA</button>`;
       } else if (C.step === "reading") {
         body.innerHTML = C.voice ? `${heardBox()}<div class="ai-wait voice-wait"><span class="spin lg"></span><b>Separando os itens…</b></div>`
           : `<div class="cat-photo"><img src="${esc(src(C.file, "photos"))}" alt=""><div class="scan"></div></div>
           <div class="ai-wait"><b>Lendo a foto…</b><span>Pode levar até um minuto.</span></div>`;
-        foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="stop">${C.voice ? "Cancelar" : "Cancelar leitura"}</button>`;
+        foot.innerHTML = `<span class="grow"></span><button type="button" class="btn ghost" data-ct="stop">${ic("close")}${C.voice ? "Cancelar" : "Cancelar leitura"}</button>`;
       } else if (C.step === "error") {
         body.innerHTML = `${C.voice ? heardBox() : `<div class="cat-photo"><img src="${esc(src(C.file, "thumbs"))}" alt="" style="max-height:220px"></div>`}
           <div class="formerr" style="margin-top:14px">${esc(C.error)}</div>
@@ -3560,7 +3656,7 @@
           ${C.results.length ? `${zonesUse ? zl.map((rid, k) => `<datalist id="cr-zones-${k}">${zonesOf(rid).map((z) => `<option value="${esc(z)}">`).join("")}</datalist>`).join("") : ""}<ul class="found">${C.results.map((r, i) => `<li class="${r.on ? "" : "off"}">
             <input type="checkbox" class="fcheck" data-ri="${i}" data-rf="on"${r.on ? " checked" : ""} aria-label="Adicionar ${esc(r.name)}">
             <div class="fbody">
-              <div class="frow"><input class="input fname" data-ri="${i}" data-rf="name" value="${esc(r.name)}" aria-label="Nome">
+              <div class="frow"><textarea class="input grow fname" rows="1" data-ri="${i}" data-rf="name" aria-label="Nome" data-size="cat-nome">${esc(r.name)}</textarea>
                 <input class="input" data-ri="${i}" data-rf="qty" value="${esc(r.qty)}" aria-label="Quantidade">
                 <div class="money"><input class="input" data-ri="${i}" data-rf="value" value="${esc(moneyInput(r.value))}" inputmode="decimal" aria-label="Valor total"></div></div>
               <div class="frow2">${each ? `<select class="select${r.room ? "" : " need"}" data-ri="${i}" data-rf="room" aria-label="Cômodo">${roomOpts(r.room || "", r.room ? null : ["", "Qual cômodo?"])}</select>` : ""}
@@ -3572,7 +3668,7 @@
           ${!C.file || !house(all) || (D.roomById.get(all)?.photos || []).some((p) => p.file === C.file) ? "" : `<label class="check" style="margin-top:16px"><input type="checkbox" data-ct-in="keep"${C.keep ? " checked" : ""}> Guardar esta foto nas fotos de ${esc(roomName(all))}</label>`}`
           : `<p class="muted">${C.voice ? "Não achei itens no que você falou." : "Nenhum objeto encontrado. Tente uma foto mais próxima ou uma dica."}</p>`}`;
         foot.innerHTML = `<button type="button" class="btn" data-ct="back">${ic(C.voice ? "mic" : "back", "sm")}${C.voice ? "Falar de novo" : "Outra foto"}</button><span class="grow"></span>
-          <button type="button" class="btn ghost" data-ct="cancel">Cancelar</button>
+          <button type="button" class="btn ghost" data-ct="cancel">${ic("close")}Cancelar</button>
           <button type="button" class="btn primary" data-ct="add"${on ? "" : " disabled"}>${ic("plus")}${on > 1 ? `Adicionar ${on} itens` : on === 1 ? "Adicionar 1 item" : "Adicionar"}</button>`;
       }
     }
@@ -3827,12 +3923,12 @@
       cls: "modal narrow", label: "Novo cômodo",
       html: `<div class="dlg"><div class="dlg-h"><h2>Novo cômodo</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-rn><div class="form">
-          <div class="field"><label for="rn-name">Nome</label><input id="rn-name" class="input" name="name" maxlength="60" placeholder="Ex.: Garagem" autocomplete="off"></div>
+          <div class="field"><label for="rn-name">Nome</label><textarea id="rn-name" class="input grow" rows="1" name="name" maxlength="60" placeholder="Ex.: Garagem" autocomplete="off"></textarea></div>
           <div class="field"><label for="rn-code">Código</label><input id="rn-code" class="input" name="code" maxlength="4" style="text-transform:uppercase;max-width:140px" autocomplete="off">
             <p class="help">De 1 a 4 letras. Vira o começo do código dos itens, como GAR-001.</p></div>
           <div class="formerr" data-err hidden></div>
         </div></form>
-        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>Cancelar</button><button class="btn primary" data-ok>Criar cômodo</button></div></div>`,
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok>${ic("plus")}Criar cômodo</button></div></div>`,
     });
     const form = $("[data-rn]", entry.dlg);
     let touched = false;
@@ -3864,14 +3960,14 @@
       html: `<div class="dlg"><div class="dlg-h"><h2>Editar cômodo</h2><button class="btn ghost icon" data-re="cancel" aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b drop" data-re-form><div class="form">
           <div class="row2" style="grid-template-columns:1fr 120px">
-            <div class="field"><label for="re-name">Nome</label><input id="re-name" class="input" name="name" maxlength="60" value="${esc(R.name)}"></div>
+            <div class="field"><label for="re-name">Nome</label><textarea id="re-name" class="input grow" rows="1" name="name" maxlength="60">${esc(R.name)}</textarea></div>
             <div class="field"><label for="re-code">Código</label><input id="re-code" class="input" name="code" maxlength="4" value="${esc(R.code)}" style="text-transform:uppercase"></div>
           </div>
           <div class="field"><span class="lbl">Fotos do cômodo</span><div data-slot="rphotos"></div></div>
           <div class="formerr" data-err hidden></div>
         </div></form>
         <div class="dlg-f"><button type="button" class="btn danger" data-re="delete"${count ? ` title="Mova ou apague os ${count} itens antes"` : ""}>${ic("trash")}<span class="lbl">Apagar cômodo</span></button><span class="grow"></span>
-          <button type="button" class="btn ghost" data-re="cancel">Cancelar</button><button type="button" class="btn primary" data-re="save">Salvar</button></div></div>`,
+          <button type="button" class="btn ghost" data-re="cancel">${ic("close")}Cancelar</button><button type="button" class="btn primary" data-re="save">${ic("check")}Salvar</button></div></div>`,
       guard: async () => !R.dirty || confirmBox({ title: "Descartar as alterações?", ok: "Descartar", cancel: "Continuar editando", danger: true }),
     });
     const dlg = entry.dlg;
@@ -3879,8 +3975,8 @@
     const renderPhotos = () => {
       $('[data-slot="rphotos"]', dlg).innerHTML = `<ul class="opts">${R.photos.map((p, i) => `<li class="rph">
           <img src="${esc(src(p.file))}" alt="">
-          <input class="input" data-re-label="${i}" value="${esc(p.label || "")}" placeholder="Legenda" aria-label="Legenda da foto">
-          <button type="button" class="btn sm${R.cover === i ? " primary" : ""}" data-re="cover" data-i="${i}" aria-pressed="${R.cover === i}">${R.cover === i ? "Capa" : "Usar como capa"}</button>
+          <textarea class="input grow" rows="1" data-re-label="${i}" placeholder="Legenda" aria-label="Legenda da foto" data-size="legenda">${esc(p.label || "")}</textarea>
+          <button type="button" class="btn sm${R.cover === i ? " primary" : ""}" data-re="cover" data-i="${i}" aria-pressed="${R.cover === i}">${ic("image", "sm")}${R.cover === i ? "Capa" : "Usar como capa"}</button>
           <button type="button" class="btn sm icon" data-re="up" data-i="${i}" aria-label="Subir foto"${i === 0 ? " disabled" : ""}>${ic("up", "sm")}</button>
           <button type="button" class="btn sm icon" data-re="rm" data-i="${i}" aria-label="Apagar foto">${ic("trash", "sm")}</button></li>`).join("")}</ul>
         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
@@ -4072,7 +4168,7 @@
           <div class="prog" role="progressbar" aria-label="Progresso do envio" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
           <p class="muted" data-st style="margin:10px 0 0">Preparando o envio…</p>
           <p class="muted" style="margin:6px 0 0;font-size:14px">Deixe esta tela aberta até terminar.</p></div>
-        <div class="dlg-f"><span class="grow"></span><button type="button" class="btn ghost" data-x>Cancelar</button></div></div>`,
+        <div class="dlg-f"><span class="grow"></span><button type="button" class="btn ghost" data-x>${ic("close")}Cancelar</button></div></div>`,
       guard: async () => {
         if (done) return true;
         const ok = await confirmBox({
@@ -4294,6 +4390,7 @@
         API.post("api/news/notify-test", { who: "eu" }).then(() => toast("Aviso enviado para o seu celular."), fail).finally(() => { b.disabled = !!newsTestWhy(); });
         break;
       case "news-open": { const it = D.itemById.get(b.dataset.id); if (it) openNews(it); break; }
+      case "apps-ia": openAppsFinder(); break;
       case "app-open": { const a = ((newsOv && newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === b.dataset.id); if (a) openAppNews(a); break; }
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }
       case "ai-refresh": { const slot = $('#view [data-slot="ai-panel"]'); if (slot) { slot.innerHTML = `<p class="muted">Verificando…</p>`; renderAiPanel(slot, await aiStatus(true)); paintVoiceLead(); } break; }

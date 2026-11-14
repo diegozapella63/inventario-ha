@@ -3454,7 +3454,7 @@ def apps_collect(force: bool = False) -> dict:
                 _app_seen(d["apps"], pkg, when, _app_label(st.get("attributes")), s["pessoas"])
             d["lido"][eid] = agora.isoformat(timespec="seconds")
         if len(d["apps"]) > APPS_MAX:  # os usados há mais tempo saem primeiro
-            for k in sorted(d["apps"], key=lambda k: _ts(d["apps"][k].get("ultimo")))[:len(d["apps"]) - APPS_MAX]:
+            for k in sorted(d["apps"], key=lambda k: _ts(d["apps"][k].get("ultimo") or d["apps"][k].get("adicionado")))[:len(d["apps"]) - APPS_MAX]:
                 del d["apps"][k]
         d.update(lido_em=agora.isoformat(timespec="seconds"), sensores=len(sensors), celulares=sensors)
         write_json_atomic(APPS_FILE, d)
@@ -3513,7 +3513,7 @@ def ai_apps_triage(apps: list[tuple[str, str]]) -> dict:
 def app_news_prompt(nome: str, pacote: str) -> str:
     return "\n".join([
         "Você acompanha os aplicativos de celular de uma família no Brasil.",
-        f"Aplicativo: {nome} (Android, pacote {pacote})",
+        f"Aplicativo: {nome} (Android{'' if pacote.startswith(APP_IA) else f', pacote {pacote}'})",
         f"Hoje é {news_today().isoformat()}.",
         "",
         "Use a busca na web agora.",
@@ -3576,7 +3576,8 @@ def apps_overview(collect: bool = True) -> dict:
     for pkg, v in a["apps"].items():
         t = tri.get(pkg) if isinstance(tri.get(pkg), dict) else {}
         r = res.get(pkg) if isinstance(res.get(pkg), dict) else None
-        lista.append({"pacote": pkg, "nome": app_name(pkg, a["apps"], tri), "pessoas": v.get("pessoas") or [], "ultimo": v.get("ultimo"),
+        lista.append({"pacote": pkg, "nome": app_name(pkg, a["apps"], tri), "pessoas": v.get("pessoas") or [], "ultimo": v.get("ultimo") or None,
+                      **({"ia": True} if v.get("origem") == "ia" else {}),
                       "conferir": t.get("conferir") if "conferir" in t and not t.get("faltou") else None, "manual": bool(t.get("manual")),
                       "res": {"at": r.get("at"), "news": r.get("news")} if r else None})
     return {"sensores": a.get("sensores"), "lido_em": a.get("lido_em"), "lista": lista,
@@ -3648,6 +3649,153 @@ def app_news_job_start(body: dict) -> dict:
         WEB_JOBS[jid] = {"stage": "busy", "msg": "Procurando novidades…", "results": [], "news": None, "at": time.time(), "kind": "novidades"}
     threading.Thread(target=_app_news_job_run, args=(jid, pkg, app_name(pkg, apps, news_read()["apps_triagem"]), search_entity()), daemon=True).start()
     return {"id": jid}
+
+
+# Encontrar apps com IA (1.59.0): a pessoa manda prints da lista de apps do celular (ou cola os nomes); a IA lê os apps,
+# a tela mostra para escolher e os escolhidos entram em Apps detectados, acompanhados, como se o sensor tivesse visto
+APP_IA = "ia."  # o id do app achado pela IA sem o pacote: ia.<nome>
+APPS_LER_FOTOS = 6
+APPS_LER_MAX = 60
+MOCK_APPS_LIDOS = [{"nome": "Casa Conectada", "pacote": "com.exemplo.casaconectada"}, {"nome": "Banco Lua", "pacote": "com.exemplo.bancolua"},
+                   {"nome": "Mapa Fácil", "pacote": ""}, {"nome": "Configurações", "pacote": "com.android.settings", "sistema": True}]
+
+
+def apps_find_prompt(texto: str, fotos: int) -> str:
+    return "\n".join([
+        "Você ajuda a montar a lista dos aplicativos que uma família usa no celular (Android, no Brasil).",
+        ("Nas imagens anexadas (prints da lista de apps, da tela inicial, da Google Play ou das configurações do celular)"
+         + (" e no texto abaixo" if texto else "") if fotos else "No texto abaixo") + ", liste cada aplicativo que aparece.",
+        "- nome: como aparece na loja (ex.: \"Amazon Alexa\", não \"Alexa\" se a loja chama de outro jeito); sem repetir.",
+        "- pacote: o nome do pacote na Google Play (ex.: com.amazon.dee.app) só se tiver certeza; senão, vazio.",
+        "- sistema: true para as partes do sistema do celular (tela inicial, configurações, câmera, galeria, relógio, telefone, "
+        "mensagens do sistema, teclado, loja de apps); false para o resto.",
+        f"No máximo {APPS_LER_MAX} apps. Não invente: só o que está escrito.",
+        'Responda somente com um objeto JSON, sem texto antes ou depois: {"apps": [{"nome": "...", "pacote": "", "sistema": false}]}',
+    ] + (["", "Texto:", "<<<", texto, ">>>"] if texto else []))
+
+
+def _apps_lidos(parsed, existentes: dict) -> list[dict]:
+    """Os apps que a IA leu, limpos: o id é o pacote (quando ela deu um que parece de verdade) ou ia.<nome>; os que já estão
+    em Apps detectados (pelo pacote ou pelo nome) vêm marcados."""
+    lista = parsed.get("apps") if isinstance(parsed, dict) else parsed
+    nomes = {fold(v.get("nome") or ""): k for k, v in existentes.items() if v.get("nome")}
+    out, vistos = [], set()
+    for x in (lista if isinstance(lista, list) else [])[:APPS_LER_MAX * 2]:
+        if not isinstance(x, dict):
+            continue
+        nome = " ".join(str(x.get("nome") or "").split())[:60]
+        if not nome:
+            continue
+        pac = str(x.get("pacote") or "").strip()[:150]
+        pac = pac if PKG_RE.fullmatch(pac) and not pac.startswith(APP_IA) else ""
+        aid = pac or APP_IA + (re.sub(r"[^a-z0-9]+", "_", fold(nome)).strip("_") or "app")
+        if aid in vistos or fold(nome) in {fold(o["nome"]) for o in out}:
+            continue
+        vistos.add(aid)
+        ja = aid in existentes or fold(nome) in nomes
+        out.append({"id": aid, "nome": nome, "pacote": pac, "sistema": x.get("sistema") is True, "ja": ja})
+        if len(out) >= APPS_LER_MAX:
+            break
+    return out
+
+
+def apps_ler(body: dict) -> dict:
+    """Lê os prints (até 6, JPG ou PNG em base64) e o texto colado: os apps para a tela escolher."""
+    need_news_on()
+    need_apps_on()
+    need_ai_on()
+    texto = text(body.get("texto"), 4000, "texto")
+    fotos = body.get("fotos") if isinstance(body.get("fotos"), list) else []
+    if len(fotos) > APPS_LER_FOTOS:
+        raise ApiError(400, f"No máximo {APPS_LER_FOTOS} prints de cada vez.")
+    imgs = []
+    for f in fotos:
+        raw = str(f or "")
+        try:
+            dado = base64.b64decode(raw.split(",", 1)[1] if raw.startswith("data:") else raw, validate=True)
+        except (ValueError, TypeError):
+            raise ApiError(400, "Um dos prints não abriu. Use JPG ou PNG.") from None
+        tipo = "image/jpeg" if dado[:3] == b"\xff\xd8\xff" else "image/png" if dado[:8] == b"\x89PNG\r\n\x1a\n" else ""
+        if not tipo or len(dado) > 8 * 1024 * 1024:
+            raise ApiError(400, "Um dos prints não abriu. Use JPG ou PNG, até 8 MB.")
+        imgs.append((dado, tipo))
+    if not imgs and not texto:
+        raise ApiError(400, "Escolha os prints ou cole os nomes dos apps.")
+    prompt = apps_find_prompt(texto, len(imgs))
+    existentes = apps_read()["apps"]
+    if AI_MOCK:
+        with AiCall("apps", "ai_task.simulado", prompt, images=len(imgs)) as call:
+            time.sleep(0.6)
+            res = {"apps": MOCK_APPS_LIDOS}
+            call.answer(res)
+        return {"apps": _apps_lidos(res, existentes)}
+    tmp_dir = os.path.join(MEDIA_ROOT, AI_TMP_REL)
+    if imgs and not os.path.isdir(MEDIA_ROOT):
+        raise ApiError(500, "A pasta media não está disponível para o app.")
+    nomes = []
+    try:
+        if imgs:
+            os.makedirs(tmp_dir, exist_ok=True)
+        for dado, tipo in imgs:
+            n = f"{secrets.token_hex(8)}.{'jpg' if tipo == 'image/jpeg' else 'png'}"
+            with open(os.path.join(tmp_dir, n), "wb") as fh:
+                fh.write(dado)
+            nomes.append((n, tipo))
+        entity = photo_entity()
+        with AiCall("apps", entity, prompt, images=len(imgs)) as call:
+            payload = {"task_name": "InventarIA: encontrar apps", "instructions": prompt}
+            if nomes:
+                payload["attachments"] = [{"media_content_id": f"media-source://media_source/local/{AI_TMP_REL}/{n}", "media_content_type": t}
+                                          for n, t in nomes]
+            if entity:
+                payload["entity_id"] = entity
+            res = ha_request("POST", "/services/ai_task/generate_data?return_response", payload, timeout=240)
+            data = ((res or {}).get("service_response") or {}).get("data")
+            if data is None:
+                call.result = "formato"
+                raise ApiError(502, "A IA não devolveu resposta.")
+            call.answer(data)
+            try:
+                parsed = extract_json(data)
+            except ApiError:
+                call.result = "formato"
+                raise
+    finally:
+        for n, _ in nomes:
+            try:
+                os.unlink(os.path.join(tmp_dir, n))
+            except OSError:
+                pass
+    return {"apps": _apps_lidos(parsed, existentes)}
+
+
+def apps_adicionar(body: dict, user_id: str = "") -> dict:
+    """Os apps escolhidos entram em Apps detectados (de quem está na tela), acompanhados; os que já estavam ficam como estão."""
+    need_apps_on()
+    lista = body.get("apps") if isinstance(body.get("apps"), list) else []
+    lidos = _apps_lidos({"apps": lista}, {})
+    if not lidos:
+        raise ApiError(400, "Escolha os apps para adicionar.")
+    eu = my_person(user_id) if SUPERVISOR_TOKEN or AI_MOCK else None
+    pessoa = [eu["name"]] if eu and eu.get("name") else []
+    agora = now_iso()
+    novos = []
+    with APPS_LOCK:
+        d = apps_read()
+        nomes = {fold(v.get("nome") or ""): k for k, v in d["apps"].items()}
+        for x in lidos:
+            if x["id"] in d["apps"] or fold(x["nome"]) in nomes:
+                continue
+            d["apps"][x["id"]] = {"nome": x["nome"], "vezes": 0, "dias": 0, "dia": "", "primeiro": agora, "ultimo": "",
+                                  "pessoas": pessoa, "origem": "ia", "adicionado": agora}
+            novos.append(x)
+        write_json_atomic(APPS_FILE, d)
+    with NEWS_LOCK:
+        n = news_read()
+        for x in novos:
+            n["apps_triagem"][x["id"]] = {"conferir": True, "nome": x["nome"], "manual": True}
+        write_json_atomic(NEWS_FILE, n)
+    return {**news_overview(), "adicionados": len(novos)}
 
 
 def app_choice(body: dict) -> dict:
@@ -4508,6 +4656,14 @@ def r_news_app_choice(h, query):
     h.send_json(app_choice(h.read_body()))
 
 
+def r_news_apps_ler(h, query):
+    h.send_json(apps_ler(h.read_body()))
+
+
+def r_news_apps_add(h, query):
+    h.send_json(apps_adicionar(h.read_body(), h.headers.get("X-Remote-User-Id") or ""))
+
+
 def r_news_cancel(h, jid, query):
     job = WEB_JOBS.get(jid)
     if job:
@@ -4982,6 +5138,8 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/news/all", r_news_all),
     ("POST", r"/api/news/app", r_news_app_start),
     ("PUT", r"/api/news/app", r_news_app_choice),
+    ("POST", r"/api/news/apps/ler", r_news_apps_ler),
+    ("POST", r"/api/news/apps/adicionar", r_news_apps_add),
     ("GET", r"/api/news/people", r_news_people),
     ("POST", r"/api/news/notify-test", r_news_notify_test),
     ("GET", r"/api/recursos", r_rec_get),

@@ -46,7 +46,7 @@ async def body(r, p):
     await pg.click('label.switch:has([data-input="deprec-on"])')
     await pg.locator(".toast", has_text="Valor de hoje ligado").wait_for(timeout=8000)
     r.check(r.data()["settings"]["deprec"] is True, "ligado fica gravado")
-    r.eq(" ".join((await pg.locator("#p-gerencia .ot span").text_content()).split()), "Ligado: os valores perdem, por ano, a taxa de cada categoria do GerencIA.",
+    r.eq(" ".join((await pg.locator("#p-gerencia .ot > span").text_content()).split()), "Ligado: os valores perdem, por ano, a taxa de cada categoria do GerencIA.",
          "ligado: diz o que faz")
     # o patrimônio de hoje: a conta do GerencIA
     hoje = date.today()

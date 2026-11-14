@@ -368,6 +368,23 @@
       if (body.acompanhar !== true) delete ST.news.apps[a[0]];
       return handle("GET", "api/news", {});
     }
+    // Encontrar apps com IA (1.59.0): na prévia, a "IA" acha sempre os mesmos apps
+    if (method === "POST" && path === "api/news/apps/ler") {
+      aiOff();
+      if (!(body.fotos || []).length && !String(body.texto || "").trim()) fail("Escolha os prints ou cole os nomes dos apps.");
+      const ja = new Set(APPS.map((x) => x[1]));
+      return { apps: [["com.exemplo.casaconectada", "Casa Conectada", false], ["com.exemplo.bancolua", "Banco Lua", false], ["", "Mapa Fácil", false], ["com.android.settings", "Configurações", true]]
+        .map(([pacote, nome, sistema]) => ({ id: pacote || "ia." + plain(nome).replace(/[^a-z0-9]+/g, "_"), nome, pacote, sistema, ja: ja.has(nome) })) };
+    }
+    if (method === "POST" && path === "api/news/apps/adicionar") {
+      let n = 0;
+      for (const x of body.apps || []) {
+        const id = x.pacote || x.id;
+        if (APPS.some((a) => a[0] === id || a[1] === x.nome)) continue;
+        APPS.push([id, x.nome, ["Ana"]]); ST.news.apps_triagem[id] = { conferir: true, manual: true }; n++;
+      }
+      return { ...handle("GET", "api/news", {}), adicionados: n };
+    }
     if (method === "POST" && path === "api/news/app") {
       aiOff();
       const a = APPS.find((x) => x[0] === body.pacote);

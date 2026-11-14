@@ -57,6 +57,27 @@ CHECK = """() => {
     const ox = Math.min(ra.right, rc.right) - Math.max(ra.left, rc.left), oy = Math.min(ra.bottom, rc.bottom) - Math.max(ra.top, rc.top);
     if (ox > 2 && oy > 2) bad.push('botões um sobre o outro: ' + (a.textContent.trim() || a.getAttribute('aria-label')).slice(0, 20) + ' / ' + (c.textContent.trim() || c.getAttribute('aria-label')).slice(0, 20));
   }
+  // 1.59.0 (padrão da família): toda seção com o cabeçalho com ícone; toda linha com título com ícone; todo botão com texto
+  // com ícone; sem linha entre as linhas de opções nem no fim das listas
+  for (const sec of document.querySelectorAll('#view section.panel')) {
+    if (!sec.offsetParent) continue;
+    const h = sec.querySelector(':scope > h2');
+    if (!h || !h.querySelector('.sec-ic')) bad.push('seção sem o cabeçalho com ícone: ' + (sec.id || sec.className));
+  }
+  for (const b of document.querySelectorAll('.opts:not(.cats):not(.bk-lista):not(.versions) > li > .ot > b')) {
+    if (b.offsetParent && !b.querySelector('.ot-ic, .status')) bad.push('linha sem ícone: ' + b.textContent.trim().slice(0, 30));
+  }
+  for (const b of scope.querySelectorAll('.btn, button.chip, .toast button')) {
+    if (!b.offsetParent || !b.textContent.trim() || b.querySelector('svg, .spin')) continue;
+    bad.push('botão sem ícone: ' + b.textContent.trim().slice(0, 30));
+  }
+  for (const li of document.querySelectorAll('.opts:not(.cats):not(.bk-lista):not(.versions) > li')) {
+    if (li.offsetParent && parseFloat(getComputedStyle(li).borderBottomWidth) > 0) { bad.push('linha entre as opções: ' + li.textContent.trim().slice(0, 30)); break; }
+  }
+  for (const l of document.querySelectorAll('.opts, .nlist')) {
+    const last = l.lastElementChild, el = last && (last.querySelector(':scope > .nrow') || last);
+    if (el && el.offsetParent && parseFloat(getComputedStyle(el).borderBottomWidth) > 0) { bad.push('linha no fim da lista: ' + (l.className)); break; }
+  }
   return bad;
 }"""
 

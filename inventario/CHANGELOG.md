@@ -1,5 +1,13 @@
 # Mudanças
 
+## 1.59.0
+
+- **Encontrar apps com IA** (em Configurações › Opções › Apps detectados): mande prints da lista de apps do celular (ou cole os nomes), a IA lê e você marca quais entram. Eles ficam em Apps detectados, acompanhados, com "pela IA".
+- **Ver novidades** de cada app agora ocupa a largura toda, embaixo do nome e da chave, como os outros botões.
+- **Ícones em tudo**: cada seção tem o cabeçalho com ícone (agora também Conferir novidades, Limpar e Categorias), cada linha de opção tem um ícone antes do título (e os recolhidos também), e todo botão com texto tem ícone (Cancelar, Salvar, Aplicar…).
+- **Menos linhas**: sem a linha entre as opções de uma seção nem a do fim das listas.
+- Os nomes de cômodo e de categoria, a legenda das fotos e os nomes na conferência da IA aumentam puxando o canto, como os outros campos de texto.
+
 ## 1.58.0
 
 - **Novidades**: três botões, **Todas as novidades**, **Só equipamentos** e **Só apps** (com Apps do celular ligado; sem os apps, fica o Conferir novidades).
