@@ -1388,6 +1388,7 @@ textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh;
 .seg { min-height: var(--altura); align-items: stretch; }
 .seg button { height: auto; }
 .seg.themes button, .seg.tipo button { flex-direction: row; gap: 7px; min-height: 0; height: auto; padding: 0 6px; }
+.seg.tipo button { justify-content: center; text-align: center; }
 .seg.themes button .ic { width: 18px; height: 18px; flex: none; }
 @media (max-width: 380px) { .seg.themes button .ic { display: none; } }
 .found .input, .found .select { height: 38px; }
@@ -1413,3 +1414,19 @@ textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh;
 .sensor-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--muted); }
 .sensor-row:first-child { border-top: 0; }
 .sensor-row code { font-size: 13px; padding: 1px 6px; border-radius: 6px; background: var(--bg); color: var(--text); overflow-wrap: anywhere; font-family: ui-monospace, monospace; }
+
+/* 1.61.2: numa janela, os campos de escolhas fecham e abrem pelo título (a seta no fim); fechado, só o título */
+.field.dobravel > .lbl { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+.field.dobravel > .lbl::after { content: ""; flex: none; width: 18px; height: 18px; margin-left: auto; background: var(--muted); transition: transform .2s;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 18px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 18px no-repeat; }
+.field.dobravel.shut > .lbl::after { transform: rotate(-90deg); }
+.field.dobravel.shut > :not(.lbl) { display: none !important; }
+.field > label:has(> .ot-ic), .field > .lbl:has(> .ot-ic) { display: flex; align-items: center; gap: 8px; }
+.chip > .ic.sm + span { min-width: 0; }
+/* Salvar e adicionar outro e Salvar: lado a lado, do mesmo tamanho, no celular */
+@media (max-width: 480px) {
+  .dlg-f:has(> [data-ed="again"]) { display: grid; grid-template-columns: 1fr 1fr; }
+  .dlg-f:has(> [data-ed="again"]) > .grow, .dlg-f:has(> [data-ed="again"]) > .hide-narrow { display: none; }
+  .dlg-f:has(> [data-ed="again"]) > .btn { min-width: 0; white-space: normal; line-height: 1.15; text-align: center; justify-content: center; }
+}

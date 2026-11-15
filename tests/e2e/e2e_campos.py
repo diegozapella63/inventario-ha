@@ -61,6 +61,7 @@ async def body(r, p):
     await r.open(pg, "#/novidades", "#p-news")
     ids = await pg.evaluate("[...document.querySelectorAll('#view section.panel')].map(s => s.id)")
     r.eq(ids[-1], "p-news-clear", "Limpar novidades no fim da tela")
+    r.eq(ids[-2], "p-news", "1.61.2: Conferir novidades logo acima do Limpar, depois do que foi achado")
     conf = await pg.evaluate(LARG, '[data-act="news-all"]')
     r.check(conf and conf[0] > 300, f"Conferir novidades na largura do cartão ({conf})")
     r.check(await pg.evaluate(OVERFLOW), "nada passa da largura")

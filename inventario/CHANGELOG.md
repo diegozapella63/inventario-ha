@@ -1,5 +1,11 @@
 # Mudanças
 
+## 1.61.2
+
+- **Novidades**: **Conferir novidades** fica logo acima do **Limpar**, depois dos equipamentos e dos apps.
+- **Janelas**: cada campo com o ícone antes do título (Fotos, Nome, Detalhes, Tipo, Cômodo, Categoria, Quantidade, Valor…). As **Fotos** e, na **Nova tarefa**, a **Lista** e o **Prazo** fecham e abrem num toque no título; o aparelho lembra. Cada prazo ganhou o ícone.
+- **Novo item e Novo bem**: **Salvar e adicionar outro** e **Salvar** lado a lado, do mesmo tamanho, no celular. No **Tipo**, os textos ficam no meio.
+
 ## 1.61.1
 
 - **Sensores no Home Assistant** como no ResolvIA: a chave **Criar sensores** e, num quadro embaixo dela, cada sensor numa linha com o que mostra.

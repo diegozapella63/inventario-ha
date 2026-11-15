@@ -32,6 +32,13 @@ async def body(r, p):
     await pg.click('.rhead-actions [data-act="item-new"]')
     await pg.wait_for_selector("#f-name")
     r.eq(await pg.input_value("#f-room"), "escritorio", "dentro do cômodo, o item novo vai para ele")
+    # 1.61.2: cada título de campo com o ícone; Fotos fecha pelo título e abre de novo
+    r.check(await pg.evaluate("() => [...document.querySelectorAll('dialog .field > label:not(.sr), dialog .field > .lbl')].filter(l => l.textContent.trim()).every(l => l.querySelector('svg'))"), "os títulos dos campos com o ícone")
+    fotos = pg.locator("dialog .field.dobravel > .lbl", has_text="Fotos")
+    await fotos.click(); await pg.wait_for_timeout(150)
+    r.check(await fotos.get_attribute("aria-expanded") == "false" and not await pg.locator('[data-slot="photos"]').is_visible(), "Fotos fecha pelo título")
+    await fotos.click(); await pg.wait_for_timeout(150)
+    r.check(await pg.locator('[data-slot="photos"]').is_visible(), "e abre de novo")
     async with pg.expect_file_chooser() as fc:
         await pg.click('[data-ed="upload"]')
     await (await fc.value).set_files(foto)

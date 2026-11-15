@@ -343,11 +343,53 @@
 
   // ------------------------------------------------------------------ janelas (dialog) com botão voltar do celular
   const stack = [];
+  // 1.61.2 (padrão da família): numa janela, cada campo de escolhas (.field.dobravel) fecha e abre num toque no título,
+  // com a seta; fechado, só o título. O aparelho lembra os fechados (inv:campos), pelo título.
+  const camposFechados = () => new Set(LS.get("campos", []));
+  // e o título de cada campo com o ícone pelas palavras dele, quando não traz o seu (o padrão da família)
+  const ICONE_CAMPO = [[/^Fotos/, "image"], [/^Nome|^Tarefa|^Título/, "edit"], [/^Detalhes|^Observa/, "report"], [/^Tipo|^Categoria/, "grid"],
+    [/^Cômodo|^Onde/, "rooms"], [/^Zona/, "pin"], [/^Quantidade/, "layers"], [/^Valor|^Preço/, "wallet"], [/^Código/, "tag"], [/^Lista/, "checks"],
+    [/^Prazo|^Data|^Quando/, "calendar"], [/^Hor/, "clock"], [/^Cor/, "palette"], [/^Mensagem|^Texto/, "chat"], [/^Link|^Endereço|^Página/, "external"],
+    [/^Quem|^Pessoa/, "user"], [/^Ícone/, "spark"]];
+  const iconeCampo = (t) => (ICONE_CAMPO.find(([re]) => re.test(t)) || [0, "edit"])[1];
+  function iconesCampos(root) {
+    for (const l of root.querySelectorAll(".field > label:not(.sr):not(.switch):not(.chip), .field > .lbl")) {
+      if (l.querySelector("svg") || !l.textContent.trim()) continue;
+      l.insertAdjacentHTML("afterbegin", oti(iconeCampo(l.textContent.trim())));
+    }
+    // os campos de escolhas (as fotos, as listas, o prazo) fecham pelo título
+    for (const f of root.querySelectorAll(".field")) {
+      const l = f.querySelector(":scope > .lbl");
+      if (l && f.querySelector(":scope > .phs, :scope > .chips, :scope > [data-slot='rphotos']")) f.classList.add("dobravel");
+    }
+  }
+  function dobrarCampos(root) {
+    const shut = camposFechados();
+    for (const f of root.querySelectorAll(".field.dobravel")) {
+      const l = f.querySelector(":scope > .lbl, :scope > label");
+      if (!l) continue;
+      const k = l.textContent.trim();
+      f.classList.toggle("shut", shut.has(k));
+      l.setAttribute("role", "button");
+      l.tabIndex = 0;
+      l.setAttribute("aria-expanded", shut.has(k) ? "false" : "true");
+    }
+  }
+  function alternarCampo(l) {
+    const k = l.textContent.trim(), shut = camposFechados();
+    if (shut.has(k)) shut.delete(k); else shut.add(k);
+    LS.set("campos", [...shut]);
+    dobrarCampos(l.closest("dialog") || document);
+  }
   function openDialog({ cls = "modal", html, routed = false, guard = null, onClose = null, label = "" }) {
     const dlg = document.createElement("dialog");
     dlg.className = cls;
     if (label) dlg.setAttribute("aria-label", label);
     dlg.innerHTML = html;
+    iconesCampos(dlg);
+    dobrarCampos(dlg);
+    dlg.addEventListener("click", (e) => { const l = e.target.closest(".field.dobravel > .lbl"); if (l) alternarCampo(l); });
+    dlg.addEventListener("keydown", (e) => { const l = (e.key === "Enter" || e.key === " ") && e.target.closest(".field.dobravel > .lbl"); if (l) { e.preventDefault(); alternarCampo(l); } });
     document.body.append(dlg);
     const entry = { dlg, routed, guard, onClose, closing: false, awaitingPop: false };
     stack.push(entry);
@@ -1531,9 +1573,18 @@
       </ul>
     </section>`;
   }
-  // -- novidades de todos os equipamentos: a IA escolhe, nas categorias marcadas, o que faz sentido conferir
+  // -- novidades de todos os equipamentos: a IA escolhe, nas categorias marcadas, o que faz sentido conferir. A ordem
+  // (1.61.2): o que foi achado (Equipamentos, Apps do celular), depois Conferir novidades e, por último, Limpar
   function moreNews() {
     return `
+    <section class="panel" id="p-news-list">
+      <h2>${secIc("tag")}Equipamentos</h2>
+      <div data-slot="news-list"><p class="muted">Carregando…</p></div>
+    </section>
+    ${appsOn() ? `<section class="panel" id="p-news-apps">
+      <h2>${secIc("phone")}Apps do celular</h2>
+      <div data-slot="news-apps"><p class="muted">Carregando…</p></div>
+    </section>` : ""}
     <section class="panel" id="p-news">
       <h2>${secIc("spark")}Conferir novidades</h2>
       <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos eletrônicos${appsOn() ? " e dos apps do celular" : ""}.</p>
@@ -1543,14 +1594,6 @@
           : `<div class="oa"><button type="button" class="btn primary" data-act="news-all" data-so="">${ic("spark")}Conferir novidades</button></div>`}</li></ul>
       <div data-slot="news-job"></div>
     </section>
-    <section class="panel" id="p-news-list">
-      <h2>${secIc("tag")}Equipamentos</h2>
-      <div data-slot="news-list"><p class="muted">Carregando…</p></div>
-    </section>
-    ${appsOn() ? `<section class="panel" id="p-news-apps">
-      <h2>${secIc("phone")}Apps do celular</h2>
-      <div data-slot="news-apps"><p class="muted">Carregando…</p></div>
-    </section>` : ""}
     <section class="panel" id="p-news-clear">
       <h2>${secIc("trash")}Limpar</h2>
       <ul class="opts"><li><div class="ot"><b>${oti("trash")}Apagar o que foi achado</b><span>As novidades encontradas e as escolhas da IA.</span></div>
@@ -2934,6 +2977,7 @@
       .catch((e) => { if (TAREFAS.id === it.id) { TAREFAS.st = { erro: e.message }; paintTarefas(it); } });
   }
   const PRAZOS = [["", "Sem prazo"], [0, "Hoje"], [1, "Amanhã"], [7, "Em 7 dias"], [30, "Em 30 dias"], ["outra", "Outra data"]];
+  const PRAZO_IC = { "": "close", 0: "sun", 1: "clock", 7: "calendar", 30: "calendar" };
   const diaMais = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   // Outra data (1.49.1): o mês no visual do app (nunca a janela de data do celular), como no ResolvIA; o domingo primeiro
   const mesMais = (ym, n) => { const [y, m] = ym.split("-").map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
@@ -2955,11 +2999,11 @@
       html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("checks", `Nova tarefa`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-tn><div class="form">
           <p class="muted" style="margin:0">${esc(it.name)}</p>
-          <div class="field"><label for="tn-nome">Tarefa</label><textarea id="tn-nome" class="input grow" rows="1" name="tarefa" maxlength="255" placeholder="Ex.: Trocar o filtro" autocomplete="off"></textarea></div>
-          <div class="field"><span class="lbl" id="tn-l-lista">Lista</span>
+          <div class="field"><label for="tn-nome">${oti("edit")}Tarefa</label><textarea id="tn-nome" class="input grow" rows="1" name="tarefa" maxlength="255" placeholder="Ex.: Trocar o filtro" autocomplete="off"></textarea></div>
+          <div class="field dobravel"><span class="lbl" id="tn-l-lista">${oti("checks")}Lista</span>
             <div class="chips grid" role="radiogroup" aria-labelledby="tn-l-lista" data-slot="tn-listas"><p class="muted">Carregando…</p></div></div>
-          <div class="field" data-tn-prazo hidden><span class="lbl" id="tn-l-prazo">Prazo</span>
-            <div class="chips grid" role="radiogroup" aria-labelledby="tn-l-prazo">${PRAZOS.map(([v, t], k) => `<label class="chip"${v === "outra" ? " data-outra" : ""}><input type="radio" name="prazo" value="${v}"${k === 0 ? " checked" : ""}>${v === "outra" ? `${ic("calendar", "sm")}<span data-outra-l>${t}</span>` : t}</label>`).join("")}</div>
+          <div class="field dobravel" data-tn-prazo hidden><span class="lbl" id="tn-l-prazo">${oti("calendar")}Prazo</span>
+            <div class="chips grid" role="radiogroup" aria-labelledby="tn-l-prazo">${PRAZOS.map(([v, t], k) => `<label class="chip"${v === "outra" ? " data-outra" : ""}><input type="radio" name="prazo" value="${v}"${k === 0 ? " checked" : ""}>${v === "outra" ? `${ic("calendar", "sm")}<span data-outra-l>${t}</span>` : `${ic(PRAZO_IC[v] || "calendar", "sm")}<span>${t}</span>`}</label>`).join("")}</div>
             <div data-tn-cal hidden></div>
             <p class="muted tn-app" data-tn-app hidden>${ic("info", "sm")}<span>Guardado no ResolvIA: a lista não aceita data.</span></p></div>
           <div class="formerr" data-err hidden></div>
