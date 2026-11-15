@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.64.0
+
+- **Novidades › Limpar**: além de **Limpar novidades** (tudo), os botões **Só equipamentos** e **Só apps**, como no Conferir. Cada um pede confirmação e não mexe no outro; dos apps, o que você escolheu acompanhar ou deixar de fora continua.
+- **Limpar novidades** não traz mais as novidades de volta sozinho: o **Conferir sozinho** continua contando da última conferência, em vez de conferir tudo de novo logo depois de limpar. E uma busca que estava andando na hora de limpar não grava mais o que achou.
+
 ## 1.63.0
 
 - **Novidades**: **Apagar** as novidades de um equipamento, na janela dele (ao lado do **Buscar de novo**) e na ficha do item, com confirmação. Somem dele (e do mesmo equipamento nos outros cômodos) e não voltam nas próximas conferências; o que sair de novo aparece. Na lista, ele passa a dizer *Nada novo* e vai para o fim. **Limpar novidades** começa tudo do zero, inclusive as apagadas.

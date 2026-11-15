@@ -2859,13 +2859,14 @@ def ai_find_news(name: str, details: str, entity: str, prompt: str | None = None
 
 def _news_job_run(jid: str, name: str, details: str, entity: str, iid: str = ""):
     job = WEB_JOBS[jid]
+    gen = NEWS_GEN["itens"]
     try:
         found = ai_find_news(name, details, entity)
         if not job.get("cancelled"):
             ids = news_group_ids(iid) if iid else []
             found = news_mark(news_before(ids), found, fora=news_fora(ids)) if ids else found
             for g in ids:  # o mesmo equipamento nos outros cômodos ganha o mesmo resultado
-                news_save_result(g, found)
+                news_save_result(g, found, gen)
             job.update(stage="done", msg="", news=found)
     except ApiError as e:
         job.update(stage="error", msg=e.msg)
@@ -2895,6 +2896,8 @@ def news_job_start(body: dict) -> dict:
 # Novidades de todos: a IA escolhe, nas categorias marcadas, os itens em que faz sentido procurar novidades (uma
 # pergunta só, sem busca na web; fica guardado até o item mudar) e o app confere um por um, guardando cada resultado.
 NEWS_LOCK = threading.Lock()
+# 1.64.0: sobe a cada Limpar (dos equipamentos ou dos apps): uma busca que começou antes não grava depois de limpar
+NEWS_GEN = {"itens": 0, "apps": 0}
 NEWS_FRESH_DAYS = 7  # conferido há menos que isso fica para a próxima
 NEWS_CATS = ("eletronicos",)  # só Eletrônicos: móveis, panelas e roupas não têm novidades
 TRIAGE_CHUNK = 60
@@ -2965,15 +2968,29 @@ def news_of(iid: str) -> dict:
     return {"at": v.get("at"), "news": v["news"]}
 
 
-def news_clear() -> dict:
-    """Apaga as novidades guardadas, as escolhas da IA e a última conferência; para a conferência em andamento."""
+def news_clear(so: str = "") -> dict:
+    """Apaga as novidades guardadas e as escolhas da IA: de tudo (so ""), só dos equipamentos ("itens") ou só dos apps
+    ("apps", 1.64.0); para a conferência em andamento que mexe no que foi limpo, e o que uma busca começada antes achar
+    não é gravado (NEWS_GEN). O Conferir sozinho continua contando da última conferência (ultima_at), para não buscar
+    tudo de novo logo depois de limpar."""
+    if so not in ("", "itens", "apps"):
+        raise ApiError(400, "Escolha o que limpar: todas as novidades, só os equipamentos ou só os apps.")
     for jid, job in list(WEB_JOBS.items()):
-        if job.get("kind") == "lote":
+        if job.get("kind") == "lote" and (not so or (job.get("so") or "") in ("", so)):
             job.update(cancelled=True, cleared=True)
             WEB_JOBS.pop(jid, None)
-    with NEWS_LOCK:  # dos apps, fica o que a pessoa escolheu (Acompanhar e Deixar de fora): não é escolha da IA
-        manual = {k: v for k, v in news_read()["apps_triagem"].items() if isinstance(v, dict) and v.get("manual")}
-        write_json_atomic(NEWS_FILE, {"itens": {}, "triagem": {}, "apps": {}, "apps_triagem": manual})
+    with NEWS_LOCK:
+        d = news_read()
+        for k in ("itens", "apps") if not so else (so,):
+            NEWS_GEN[k] += 1
+        if so != "apps":
+            d.update(itens={}, triagem={}, apagadas={})
+        if so != "itens":  # dos apps, fica o que a pessoa escolheu (Acompanhar e Deixar de fora): não é escolha da IA
+            d.update(apps={}, apps_triagem={k: v for k, v in d["apps_triagem"].items() if isinstance(v, dict) and v.get("manual")})
+        if not so:
+            d["ultima_at"] = (d.get("ultima") or {}).get("at") or d.get("ultima_at")
+            d.pop("ultima", None)
+        write_json_atomic(NEWS_FILE, d)
     return news_overview()
 
 
@@ -3047,8 +3064,10 @@ def news_before(ids) -> dict | None:
     return max(vs, key=lambda v: str(v.get("at") or ""))["news"] if vs else None
 
 
-def news_save_result(iid: str, found: dict):
+def news_save_result(iid: str, found: dict, gen: int | None = None):
     with NEWS_LOCK:
+        if gen is not None and gen != NEWS_GEN["itens"]:
+            return  # limpou depois que a busca começou
         d = news_read()
         it = STORE.item(iid)
         d["itens"][iid] = {"at": now_iso(), "sig": item_sig(it) if it else "", "news": found}
@@ -3249,6 +3268,7 @@ def _news_batch_run(jid: str):
     done = found = errors = 0
     novos = []  # equipamentos com alguma novidade que não estava guardada (para o aviso)
     so = job.get("so") or ""  # 1.58.0: "itens" (Só equipamentos), "apps" (Só apps) ou "" (Todas as novidades)
+    gen = dict(NEWS_GEN)
     try:
         cats = news_cats()
         cands = [i for i in STORE.sorted_items() if i.get("cat") in cats] if so != "apps" else []
@@ -3345,12 +3365,12 @@ def _news_batch_run(jid: str):
                 if any(x.get("nova") for x in res["novidades"]):
                     novos.append(nome)
                 for m in alvo:
-                    news_save_result(m["id"], res)
+                    news_save_result(m["id"], res, gen["itens"])
             else:
                 res = news_mark((news_read()["apps"].get(alvo) or {}).get("news"), res)
                 if any(x.get("nova") for x in res["novidades"]):
                     novos_apps.append(nome)
-                app_news_save(alvo, res)
+                app_news_save(alvo, res, gen["apps"])
             done += 1
             found += 1 if res["novidades"] else 0
         summary = {"selecionados": len(groups) + len(sel_apps), "conferidos": done, "com_novidades": found,
@@ -3674,8 +3694,10 @@ def apps_triage_pending(job: dict | None = None):
         write_json_atomic(NEWS_FILE, d)
 
 
-def app_news_save(pkg: str, found: dict):
+def app_news_save(pkg: str, found: dict, gen: int | None = None):
     with NEWS_LOCK:
+        if gen is not None and gen != NEWS_GEN["apps"]:
+            return  # limpou depois que a busca começou
         d = news_read()
         d["apps"][pkg] = {"at": now_iso(), "news": found}
         write_json_atomic(NEWS_FILE, d)
@@ -3689,11 +3711,12 @@ def need_apps_on():
 
 def _app_news_job_run(jid: str, pkg: str, nome: str, entity: str):
     job = WEB_JOBS[jid]
+    gen = NEWS_GEN["apps"]
     try:
         found = ai_find_app_news(nome, pkg, entity)
         if not job.get("cancelled"):
             found = news_mark((news_read()["apps"].get(pkg) or {}).get("news"), found)
-            app_news_save(pkg, found)
+            app_news_save(pkg, found, gen)
             job.update(stage="done", msg="", news=found)
     except ApiError as e:
         job.update(stage="error", msg=e.msg)
@@ -4050,7 +4073,7 @@ def news_auto_due(now: float) -> bool:
         return False
     h, m = (int(x) for x in news_hora().split(":"))
     agora = datetime.fromtimestamp(now)
-    last = ts((d.get("ultima") or {}).get("at"))
+    last = ts((d.get("ultima") or {}).get("at") or d.get("ultima_at"))  # Limpar novidades guarda o ultima_at
     dia = (datetime.fromtimestamp(last).date() + timedelta(days=every)) if last else agora.date()
     return agora >= datetime(dia.year, dia.month, dia.day, h, m)
 
@@ -4677,7 +4700,7 @@ def r_news_overview(h, query):
 
 def r_news_clear(h, query):
     iid = (query.get("item") or [""])[0]  # 1.63.0: as de um equipamento só (Apagar, na janela dele)
-    h.send_json(news_dismiss(iid) if iid else news_clear())
+    h.send_json(news_dismiss(iid) if iid else news_clear((query.get("so") or [""])[0]))  # 1.64.0: so=itens ou so=apps
 
 
 def r_news_all(h, query):

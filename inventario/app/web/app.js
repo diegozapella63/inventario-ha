@@ -1597,7 +1597,9 @@
     <section class="panel" id="p-news-clear">
       <h2>${secIc("trash")}Limpar</h2>
       <ul class="opts"><li><div class="ot"><b>${oti("trash")}Apagar o que foi achado</b><span>As novidades encontradas e as escolhas da IA.</span></div>
-        <div class="oa"><button type="button" class="btn" data-act="news-clear">${ic("trash")}Limpar novidades</button></div></li></ul>
+        ${appsOn() ? `<div class="oa news-tres"><button type="button" class="btn" data-act="news-clear" data-so="">${ic("trash")}Limpar novidades</button>
+          <button type="button" class="btn" data-act="news-clear" data-so="itens">${ic("tag")}Só equipamentos</button><button type="button" class="btn" data-act="news-clear" data-so="apps">${ic("phone")}Só apps</button></div>`
+          : `<div class="oa"><button type="button" class="btn" data-act="news-clear" data-so="">${ic("trash")}Limpar novidades</button></div>`}</li></ul>
     </section>`;
   }
   let newsOv = null, newsJob = null, newsTimer = null, newsNums = null;
@@ -1730,16 +1732,19 @@
     await loadNews();
     if (st.stage === "error") renderNewsJob(st);
   }
-  async function clearNews() {
-    const ok = await confirmBox({ title: "Limpar as novidades?", body: "O inventário não muda.", ok: "Limpar", danger: true });
+  // 1.64.0: Limpar todas, só as dos equipamentos ou só as dos apps do celular
+  async function clearNews(so = "") {
+    const de = { itens: " dos equipamentos", apps: " dos apps" }[so] || "";
+    const ok = await confirmBox({ title: `Limpar as novidades${de}?`, body: so === "apps" ? "Os apps que você acompanha continuam." : "O inventário não muda.", ok: "Limpar", danger: true });
     if (!ok) return;
     try {
-      newsOv = await API.del("api/news");
-      newsJob = null;
-      clearTimeout(newsTimer);
+      newsOv = await API.del(so ? `api/news?so=${so}` : "api/news");
+      const corre = newsOv && newsOv.job;  // uma conferência que não mexe no que foi limpo continua
+      if (!corre) { newsJob = null; clearTimeout(newsTimer); }
       renderNews();
-      renderNewsJob(null);
-      toast("Novidades limpas.");
+      if (!corre) renderNewsJob(null);
+      paintAppsDet();
+      toast(`Novidades${de} limpas.`);
     } catch (e) { fail(e); }
   }
   async function cancelNewsAll() {
@@ -4526,7 +4531,7 @@
       case "versions": openVersions(); break;
       case "news-all": startNewsAll(b.dataset.so || ""); break;
       case "news-cancel": cancelNewsAll(); break;
-      case "news-clear": clearNews(); break;
+      case "news-clear": clearNews(b.dataset.so || ""); break;
       case "erase-all": eraseAll(); break;
       case "news-pessoa": toggleNewsPessoa(b.dataset.id); break;
       case "news-notify-test":

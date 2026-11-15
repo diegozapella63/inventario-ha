@@ -1,5 +1,6 @@
 """Novidades de todos os equipamentos (Mais > Novidades): só Eletrônicos, a escolha da IA, a conferência em lote e o que fica guardado."""
 import json
+from datetime import datetime
 import time
 import unittest
 from unittest import mock
@@ -337,6 +338,78 @@ class Limpar(UnitBase):
     def test_limpar_sem_nada_guardado(self):
         ov = server.news_clear()
         self.assertEqual(ov["itens"], {})
+
+    def guardar_app(self, pkg="com.exemplo.casa"):
+        server.app_news_save(pkg, server.news_clean(novidade()))
+        d = server.news_read()
+        d["apps_triagem"] = {pkg: {"conferir": True, "manual": True}, "com.exemplo.ia": {"conferir": True}}
+        server.write_json_atomic(server.NEWS_FILE, d)
+
+    def test_tudo_limpa_tambem_os_apps(self):
+        """1.64.0: Limpar novidades apaga as dos apps; o Acompanhar e o Deixar de fora da pessoa ficam."""
+        self.guardar(); self.guardar_app()
+        server.news_clear()
+        d = server.news_read()
+        self.assertEqual((d["itens"], d["apps"], d["apps_triagem"]), ({}, {}, {"com.exemplo.casa": {"conferir": True, "manual": True}}))
+
+    def test_so_equipamentos(self):
+        self.guardar(); self.guardar_app()
+        d0 = server.news_read()
+        d0["apagadas"] = {TV: ["x"]}
+        server.write_json_atomic(server.NEWS_FILE, d0)
+        server.news_clear("itens")
+        d = server.news_read()
+        self.assertEqual((d["itens"], d["triagem"], d["apagadas"]), ({}, {}, {}), "os equipamentos e o que foi apagado deles")
+        self.assertEqual(list(d["apps"]), ["com.exemplo.casa"], "os apps ficam")
+        self.assertEqual(len(d["apps_triagem"]), 2, "e a escolha da IA dos apps também")
+        self.assertEqual(d["ultima"]["at"], "2026-11-01T10:00:00-03:00", "a última conferência fica")
+
+    def test_so_apps(self):
+        self.guardar(); self.guardar_app()
+        server.news_clear("apps")
+        d = server.news_read()
+        self.assertEqual((d["apps"], list(d["apps_triagem"])), ({}, ["com.exemplo.casa"]), "dos apps, só a escolha da pessoa fica")
+        self.assertEqual(list(d["itens"]), [TV], "os equipamentos ficam")
+        self.assertEqual(list(d["triagem"]), [TV])
+
+    def test_so_um_lado_para_so_a_conferencia_que_mexe_nele(self):
+        jobs = {k: {"stage": "busy", "msg": "", "kind": "lote", "so": so, "at": time.time(), "results": []}
+                for k, so in (("a" * 16, ""), ("b" * 16, "itens"), ("c" * 16, "apps"))}
+        server.WEB_JOBS.update(jobs)
+        self.addCleanup(lambda: [server.WEB_JOBS.pop(k, None) for k in jobs])
+        server.news_clear("apps")
+        self.assertEqual([k for k in jobs if k in server.WEB_JOBS], ["b" * 16], "Só equipamentos continua")
+
+    def test_so_invalido(self):
+        with self.assertRaises(server.ApiError) as e:
+            server.news_clear("tudo")
+        self.assertEqual(e.exception.status, 400)
+
+    def test_uma_busca_comecada_antes_nao_grava_depois_de_limpar(self):
+        """1.64.0: a busca de um item ou de um app que estava andando quando a pessoa limpou não grava o que achou."""
+        g_it, g_ap = server.NEWS_GEN["itens"], server.NEWS_GEN["apps"]
+        server.news_clear("apps")
+        server.app_news_save("com.exemplo.casa", server.news_clean(novidade()), g_ap)
+        server.news_save_result(TV, server.news_clean(novidade()), g_it)
+        d = server.news_read()
+        self.assertEqual((d["apps"], list(d["itens"])), ({}, [TV]), "o app não grava; o item (outro lado) grava")
+        server.news_clear("itens")
+        server.news_save_result(TV, server.news_clean(novidade()), g_it)
+        self.assertEqual(server.news_read()["itens"], {})
+
+    def test_o_conferir_sozinho_conta_da_ultima_conferencia(self):
+        """1.64.0: depois de limpar, o Conferir sozinho não busca tudo de novo na hora: conta da última conferência."""
+        self.guardar()
+        server.news_clear()
+        d = server.news_read()
+        self.assertEqual((d.get("ultima"), d["ultima_at"]), (None, "2026-11-01T10:00:00-03:00"))
+        with mock.patch.object(server, "news_every", lambda: 7), mock.patch.object(server, "news_hora", lambda: "09:00"), \
+                mock.patch.object(server, "news_enabled", lambda: True), mock.patch.object(server, "ai_enabled", lambda: True):
+            antes = datetime(2026, 11, 8, 8, 0).timestamp()
+            depois = datetime(2026, 11, 8, 9, 30).timestamp()
+            self.assertEqual((server.news_auto_due(antes), server.news_auto_due(depois)), (False, True), "7 dias depois de 1/11, às 9:00")
+        server.news_clear()
+        self.assertEqual(server.news_read()["ultima_at"], "2026-11-01T10:00:00-03:00", "limpar de novo não perde a data")
 
 
 class Grupo(UnitBase):

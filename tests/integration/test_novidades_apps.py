@@ -77,6 +77,22 @@ class Apps(unittest.TestCase):
         self.erro("POST", "api/news/app", {"pacote": "com.nao.existe"}, 404, "App não encontrado.")
         self.erro("PUT", "api/news/app", {"pacote": CASA}, 400, "Diga se é para acompanhar o app.")
 
+    def conferir(self, pacote):
+        jid = self.app.ok("POST", "api/news/app", {"pacote": pacote})["id"]
+        t0 = time.time()
+        while (st := self.app.ok("GET", f"api/news/{jid}"))["stage"] == "busy" and time.time() - t0 < 10:
+            time.sleep(0.1)
+        self.assertEqual(st["stage"], "done", st)
+
+    def test_4_limpar_novidades_limpa_as_dos_apps(self):
+        """1.64.0: Limpar novidades apaga também as dos apps (o Acompanhar e o Deixar de fora da pessoa ficam)."""
+        self.ligar()
+        self.app.ok("GET", "api/news")
+        self.conferir(CASA)
+        ov = self.app.ok("DELETE", "api/news")
+        self.assertEqual({a["pacote"]: a["res"] for a in ov["apps"]["lista"]}, {CASA: None, MUSICA: None}, "na resposta")
+        self.assertEqual({a["pacote"]: a["res"] for a in self.app.ok("GET", "api/news")["apps"]["lista"]}, {CASA: None, MUSICA: None}, "e ao abrir de novo")
+
 
 if __name__ == "__main__":
     unittest.main()

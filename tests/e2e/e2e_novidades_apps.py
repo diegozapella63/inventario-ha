@@ -2,7 +2,8 @@
 em Mais › Novidades (sem o Home Assistant, os apps de exemplo de um celular de teste), conferir todos com os apps, a janela
 de um app (o guardado, sem chamar a IA), Deixar de fora (sai das Novidades e vai para Inativos, nas Opções) e Acompanhar
 (volta e busca); 1.58.0: Todas as novidades, Só equipamentos e Só apps; Apps detectados como sub-opção, com Ver novidades e
-os desligados em Inativos (n); no celular de 320 px e no computador, no escuro e no claro."""
+os desligados em Inativos (n); no celular de 320 px e no computador, no escuro e no claro. 1.64.0: Limpar novidades,
+Só equipamentos e Só apps."""
 import os
 
 from e2e_lib import OVERFLOW, TEXTS, helpers, main
@@ -216,6 +217,36 @@ async def body(r, p):
     await r.open(pg, "#/novidades", "#p-news-apps")
     await pg.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)
     r.check("Mercadinho" not in [x[0] for x in await pg.evaluate(APPS)], "nas Novidades, o desconsiderado sai da lista")
+
+    # 1.64.0: Limpar: Limpar novidades na largura toda, Só equipamentos e Só apps lado a lado embaixo
+    bl = await pg.evaluate("""[...document.querySelectorAll('#p-news-clear .oa .btn')].map(b => { const q = b.getBoundingClientRect();
+      return [b.textContent.trim(), Math.round(q.width), Math.round(q.top), !!b.querySelector('svg')]; })""")
+    r.check([x[0] for x in bl] == ["Limpar novidades", "Só equipamentos", "Só apps"] and all(x[3] for x in bl) and bl[1][1] == bl[2][1]
+            and bl[1][2] == bl[2][2] > bl[0][2] and bl[0][1] > bl[1][1] * 1.8, f"Limpar: o de tudo na largura toda, Só equipamentos e Só apps lado a lado ({bl})")
+    await r.shot(pg, "limpar")
+    eq_antes = r.api("GET", "api/news")["itens"]
+    antes = [x for x in await pg.evaluate(APPS) if "não conferido" not in x[1]]
+    r.check(antes and eq_antes, f"há apps e equipamentos com novidades antes de limpar ({antes[:2]})")
+    # Só apps: os apps sem novidades, os equipamentos como estavam
+    await pg.click('#p-news-clear [data-act="news-clear"][data-so="apps"]')
+    await pg.wait_for_selector("dialog.modal.narrow [data-r]", timeout=4000)
+    r.eq((await pg.text_content("dialog.modal.narrow h2")).strip(), "Limpar as novidades dos apps?", "a confirmação diz o quê")
+    await pg.click('dialog.modal.narrow [data-r="1"]')
+    await pg.locator(".toast", has_text="Novidades dos apps limpas").wait_for(timeout=5000)
+    await pg.wait_for_timeout(300)
+    depois = await pg.evaluate(APPS)
+    r.check(all("Ainda não conferido" in x[1] and x[2] == [] for x in depois), f"Só apps: nenhum app com novidades ({depois[:3]})")
+    r.eq(r.api("GET", "api/news")["itens"], eq_antes, "e os equipamentos ficam")
+    await pg.reload()
+    await pg.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)
+    r.check(all("Ainda não conferido" in x[1] for x in await pg.evaluate(APPS)), "e continuam limpas ao abrir de novo")
+    # Só equipamentos: os equipamentos sem novidades
+    await pg.click('#p-news-clear [data-act="news-clear"][data-so="itens"]')
+    await pg.wait_for_selector("dialog.modal.narrow [data-r]", timeout=4000)
+    r.eq((await pg.text_content("dialog.modal.narrow h2")).strip(), "Limpar as novidades dos equipamentos?", "a confirmação dos equipamentos")
+    await pg.click('dialog.modal.narrow [data-r="1"]')
+    await pg.locator(".toast", has_text="Novidades dos equipamentos limpas").wait_for(timeout=5000)
+    r.eq(r.api("GET", "api/news")["itens"], {}, "Só equipamentos: limpos")
 
     # desligada de novo: some da tela, e a API recusa
     r.api("PUT", "api/settings", {"news_apps": False})
