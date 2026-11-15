@@ -1,5 +1,12 @@
 # Mudanças
 
+## 1.69.0
+
+- **Conversar › Clipe**: manda junto uma foto ou um PDF: **Tirar foto**, **Escolher fotos** (a galeria) ou **Escolher arquivo**. A IA olha o arquivo para responder ("o que diz esta etiqueta?").
+- **Conversar › Perguntas prontas**: as ideias de pergunta viram suas. **Editar perguntas** tira (✕) e acrescenta as que você quiser; **Padrão** volta às de cada tela. Ficam guardadas no aparelho.
+- **Conversar**: o botão ✨ ao lado da caixa abre as perguntas prontas a qualquer momento, não só na conversa vazia.
+- **Conversar**: o microfone e o Enviar dividem o mesmo botão, como no WhatsApp: com a caixa vazia, o microfone; escrevendo, o Enviar.
+
 ## 1.68.0
 
 - **Novidades vistas**: abrir as novidades de um equipamento ou de um app (a janela ou a ficha) mostra o **Nova** desta vez e depois deixa de marcar como nova: na lista, ele passa a dizer *3 novidades* e vai para baixo dos que ainda têm novas.

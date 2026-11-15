@@ -55,12 +55,68 @@ async def body(r, p):
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "conversa")
 
+    # 1.69.0: o botão redondo da direita: vazio, o microfone; com texto, o Enviar
+    r.eq(await pg.locator("dialog.chat .chat-in [data-mic]").count(), 1, "caixa vazia: o microfone")
+    r.eq(await pg.locator('dialog.chat .chat-in button[type="submit"]').count(), 0, "sem o Enviar ao lado")
+    await pg.fill("dialog.chat textarea", "oi")
+    r.eq(await pg.locator('dialog.chat .chat-in button[type="submit"]').count(), 1, "escrevendo: o Enviar no lugar do microfone")
+    await pg.fill("dialog.chat textarea", "")
+    r.eq(await pg.locator("dialog.chat .chat-in [data-mic]").count(), 1, "apagou: o microfone de novo")
+
+    # 1.69.0: as perguntas prontas a qualquer momento (✨), editáveis e guardadas no aparelho
+    q = pg.locator("dialog.chat [data-quick]")
+    r.check(await q.is_visible(), "com a conversa andando, o ✨ ao lado da caixa")
+    await q.click()
+    r.eq(await q.get_attribute("aria-expanded"), "true", "o ✨ abre as perguntas")
+    ideas2 = await pg.evaluate("[...document.querySelectorAll('dialog.chat .chat-quick .chip')].map(c => c.textContent)")
+    r.eq(ideas2, ideas, "as mesmas da conversa vazia")
+    await pg.click("dialog.chat .chat-quick [data-ed-open]")
+    await pg.click("dialog.chat [data-ed-rm] >> nth=0")
+    await pg.fill("dialog.chat [data-ed-in]", "Quanto vale a cozinha?")
+    await pg.click("dialog.chat [data-ed-add]")
+    r.eq(await pg.input_value("dialog.chat [data-ed-in]"), "", "Adicionar limpa a caixa")
+    w = await pg.evaluate("[...document.querySelectorAll('dialog.chat .chat-ed-acts .btn')].map(b => Math.round(b.getBoundingClientRect().width))")
+    r.check(len(set(w)) == 1, f"Padrão e Pronto do mesmo tamanho ({w})")
+    r.check(await pg.evaluate(OVERFLOW), "editar: sem rolagem para o lado")
+    await r.shot(pg, "perguntas")
+    await pg.click("dialog.chat [data-ed-ok]")
+    novas = ideas[1:] + ["Quanto vale a cozinha?"]
+    r.eq(await pg.evaluate("[...document.querySelectorAll('dialog.chat .chat-quick .chip')].map(c => c.textContent)"), novas, "Pronto: as perguntas novas")
+    r.eq(await pg.evaluate("JSON.parse(localStorage.getItem('inv.perguntas'))"), novas, "guardadas no aparelho")
+    await q.click()
+    r.eq(await pg.locator("dialog.chat .chat-quick").count(), 0, "o mesmo botão fecha")
+
+    # 1.69.0: o clipe: Tirar foto, Escolher fotos e Escolher arquivo; a foto vai junto com a pergunta
+    await pg.click("dialog.chat [data-clip]")
+    ops = await pg.evaluate("[...document.querySelectorAll('dialog.chat .chat-op')].map(b => b.textContent.trim())")
+    r.eq(ops, ["Tirar foto", "Escolher fotos", "Escolher arquivo"], "o menu do clipe")
+    r.eq(await pg.locator("dialog.chat .chat-op svg").count(), 3, "cada opção com o seu ícone")
+    await r.shot(pg, "clipe")
+    async with pg.expect_file_chooser() as fc:
+        await pg.click('dialog.chat [data-op="fotos"]')
+    chooser = await fc.value
+    r.check(chooser.is_multiple(), "a galeria deixa escolher várias")
+    png = bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000" "1f15c4890000000d49444154789c6360f8cfc0f01f0005000201" "5a8a3b4b0000000049454e44ae426082")
+    await chooser.set_files(files=[{"name": "etiqueta.png", "mimeType": "image/png", "buffer": png}])
+    await pg.wait_for_selector("dialog.chat .chat-prev")
+    r.eq((await pg.text_content("dialog.chat .chat-prev > span:not(.chat-pdf)")).strip(), "etiqueta.png", "a foto escolhida, antes de mandar")
+    r.eq(await pg.locator('dialog.chat .chat-in button[type="submit"]').count(), 1, "com arquivo: o Enviar")
+    await pg.fill("dialog.chat textarea", "o que diz?")
+    ha.ai_reply = lambda kind, payload: (asked.append(payload.get("instructions", "")), f"Diz 220 V. ({len(payload.get('attachments') or [])} arquivo)")[1]
+    await pg.press("dialog.chat textarea", "Enter")
+    await pg.wait_for_function("document.querySelectorAll('dialog.chat .msg.ai:not(.typing)').length === 3", timeout=15000)
+    r.eq(await pg.evaluate("[...document.querySelectorAll('dialog.chat .msg.me .msg-arq')].map(x => x.textContent.trim())"), ["etiqueta.png"], "o nome do arquivo na pergunta")
+    r.check("Diz 220 V. (1 arquivo)" in (await pg.evaluate(MSGS))[-1][1], "a foto foi junto para a IA")
+    r.check("Pessoa: [mandou etiqueta.png] o que diz?" in asked[-1], "a IA sabe que a pessoa mandou um arquivo")
+    r.eq(await pg.locator("dialog.chat .chat-prev").count(), 0, "depois de mandar, a caixa limpa")
+    ha.ai_reply = reply
+
     # fechar e abrir de novo: a conversa continua; Nova conversa limpa
     await pg.click("dialog.chat [data-x]")
     await pg.wait_for_timeout(300)
     await pg.click(".chat-top")
     await pg.wait_for_selector("dialog.chat .msg")
-    r.eq(len(await pg.evaluate(MSGS)), 4, "abrir de novo: a conversa continua")
+    r.eq(len(await pg.evaluate(MSGS)), 6, "abrir de novo: a conversa continua")
     await pg.click("[data-new]")
     r.eq(await pg.locator("dialog.chat .msg").count(), 0, "Nova conversa limpa")
     await pg.click("dialog.chat [data-x]")
@@ -71,6 +127,7 @@ async def body(r, p):
     await pg.click('dialog.sheet [data-act="chat"]')
     await pg.wait_for_selector("dialog.chat .chat-ideas")
     r.eq((await pg.text_content(".chat-ctx")).strip(), "Sobre Smart TV 55 polegadas", "da ficha, a conversa é sobre o item")
+    r.eq(await pg.evaluate("[...document.querySelectorAll('dialog.chat .chat-ideas .chip')].map(c => c.textContent)"), novas, "editadas, valem em todas as telas")
     await pg.fill("dialog.chat textarea", "vale pôr no seguro?")
     await pg.click('dialog.chat button[type="submit"]')
     await pg.wait_for_selector("dialog.chat .msg.ai:not(.typing)", timeout=15000)

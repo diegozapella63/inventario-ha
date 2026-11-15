@@ -166,7 +166,9 @@ Em Mais e em Configurações, um toque no cabeçalho de uma seção fecha ou abr
 O balão ao lado do microfone, no alto da tela (e na ficha do item), abre uma conversa com a IA. Pergunte sobre o que está na tela ("qual o item mais caro daqui?", "vale pôr no seguro?") ou sobre qualquer outro assunto. A IA recebe o resumo da casa e o que está na tela: o item, o cômodo com os itens, a busca ou as novidades. Ela responde, mas não muda o inventário.
 
 - Responde a IA de buscar fotos na internet (Mais > Configurações > Integrações); sem ela, a de ler fotos. Um assistente de conversa com a Pesquisa Google ligada responde também o que é de fora da casa.
-- Com o microfone da conversa, dá para falar a pergunta.
+- Com o microfone da conversa (o botão redondo da direita, com a caixa vazia; escrevendo, ele vira o Enviar), dá para falar a pergunta.
+- O **clipe**, à esquerda da caixa, manda junto uma foto ou um PDF: **Tirar foto**, **Escolher fotos** (a galeria, até 4) ou **Escolher arquivo** (uma foto ou um PDF, como o manual ou a nota fiscal). Com arquivo, responde a IA de ler fotos. Na conversa fica só o nome do arquivo.
+- **Perguntas prontas**: na conversa vazia aparecem algumas perguntas da tela para tocar; o botão ✨ ao lado da caixa abre as mesmas a qualquer momento. Em **Editar perguntas**, o ✕ tira uma pergunta e **Adicionar** põe outra (aí valem em todas as telas); **Padrão** volta às de cada tela. Ficam guardadas no aparelho.
 - A conversa fica até fechar o app; **Nova conversa** começa outra. Cada pergunta conta em Uso da IA.
 
 ## Seus dados

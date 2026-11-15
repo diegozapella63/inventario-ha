@@ -1,5 +1,7 @@
 """Conversar: o chat com a IA (as instruções, os dados da tela que vão junto, a conversa, a IA usada e as falhas)."""
+import base64
 import json
+import os
 import unittest
 from unittest import mock
 
@@ -206,6 +208,47 @@ class Pergunta(UnitBase):
         ha = self.fake_ha()
         ha.ai_reply = lambda kind, payload: "y" * 9000
         self.assertEqual(len(server.ai_chat({"messages": msgs("oi")}, None)["reply"]), 6000)
+
+    def test_com_foto_vai_junto_para_a_ia_de_fotos(self):
+        """1.69.0: Tirar foto, Escolher fotos ou Escolher arquivo: o arquivo vai junto, pela IA de ler fotos, e some depois."""
+        ha = self.fake_ha()
+        vistos = []
+        def responder(kind, payload):
+            for a in payload.get("attachments") or []:
+                rel = a["media_content_id"].split("media-source://media_source/local/", 1)[1]
+                vistos.append((a["media_content_type"], os.path.isfile(os.path.join(server.MEDIA_ROOT, rel))))
+            return "É uma TV de 55 polegadas."
+        ha.ai_reply = responder
+        self.store.settings["ai_entity"] = "ai_task.google_ai_task"
+        self.store.settings["ai_search"] = "conversation.google_generative_ai"
+        jpg = "data:image/jpeg;base64," + base64.b64encode(b"\xff\xd8\xff\xe0" + b"\1" * 60).decode()
+        pdf = base64.b64encode(b"%PDF-1.4 manual").decode()
+        m = msgs("o que é isto?")
+        res = server.ai_chat({"messages": m, "anexos": [{"nome": "tv.jpg", "b64": jpg}]}, None)
+        self.assertEqual(res["reply"], "É uma TV de 55 polegadas.")
+        body = ha.calls("POST", "/core/api/services/ai_task")[-1]["body"]
+        self.assertEqual(body["entity_id"], "ai_task.google_ai_task", "com arquivo, a IA de ler fotos")
+        self.assertEqual(vistos, [("image/jpeg", True)], "o arquivo existe enquanto a IA lê")
+        self.assertIn("Pessoa: [mandou tv.jpg] o que é isto?", body["instructions"])
+        self.assertIn("mandou 1 arquivo (foto ou PDF)", body["instructions"])
+        self.assertEqual(os.listdir(os.path.join(server.MEDIA_ROOT, server.AI_TMP_REL)), [], "e some depois")
+        # sem texto vale (só o PDF); a próxima pergunta vai sem o arquivo
+        server.ai_chat({"messages": [{"role": "user", "text": "", "anexos": ["manual.pdf"]}], "anexos": [{"nome": "manual.pdf", "b64": pdf}]}, None)
+        self.assertEqual(vistos[-1], ("application/pdf", True), "um PDF também, sem texto")
+        n = len(ha.calls("POST", "/core/api/services/ai_task"))
+        ha.conversation_reply = lambda payload: "Um ano."
+        res = server.ai_chat({"messages": m + [{"role": "assistant", "text": "É uma TV."}, {"role": "user", "text": "e a garantia?"}]}, None)
+        self.assertEqual((res["reply"], len(ha.calls("POST", "/core/api/services/ai_task"))), ("Um ano.", n), "sem arquivo, a IA da conversa de sempre")
+
+    def test_arquivos_que_nao_servem(self):
+        with mock.patch.object(server, "AI_MOCK", True), mock.patch.object(server.time, "sleep"):
+            jpg = base64.b64encode(b"\xff\xd8\xff\xe0" + b"\1" * 60).decode()
+            self.assertApiError(400, server.ai_chat, {"messages": msgs("oi"), "anexos": [{"b64": base64.b64encode(b"texto").decode()}]}, None, msg_part="não abriu")
+            self.assertApiError(400, server.ai_chat, {"messages": msgs("oi"), "anexos": [{"b64": jpg}] * 5}, None, msg_part="No máximo 4")
+            self.assertApiError(400, server.ai_chat, {"messages": msgs("oi"), "anexos": [{"b64": jpg}, {"b64": base64.b64encode(b"%PDF-1").decode()}]}, None, msg_part="um PDF por vez")
+            res = server.ai_chat({"messages": msgs("oi"), "anexos": [{"b64": jpg}]}, None)
+            self.assertEqual(res["reply"], server.MOCK_CHAT_ARQ)
+        self.assertEqual(server.usage_summary()["recent"][0]["images"], 1, "o uso conta o arquivo")
 
     def test_nao_muda_o_inventario(self):
         ha = self.fake_ha()

@@ -490,6 +490,7 @@
       aiOff();
       await wait(900);
       const last = [...(body.messages || [])].reverse().find((m) => m.role === "user");
+      if ((body.anexos || []).length) return { reply: `Exemplo da prévia: no Home Assistant, a IA olha ${body.anexos.length > 1 ? `os ${body.anexos.length} arquivos` : "o arquivo"} e responde de verdade.`, entity: "ai_task.exemplo" };
       return { reply: `Exemplo da prévia: no Home Assistant, a IA responde de verdade, com os dados desta tela.\n- Você perguntou: “${String(last ? last.text : "").slice(0, 120)}”`, entity: "ai_task.exemplo" };
     }
     // Recursos (1.54.0): o que o equipamento tem, ditos pela IA (aqui, um exemplo)

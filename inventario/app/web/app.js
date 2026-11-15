@@ -3796,10 +3796,26 @@
     return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(https?:\/\/[^\s<]+[^\s<.,;:)!?])/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
       .split(/\n/).map((l) => (/^\s*[-*•]\s+/.test(l) ? `<span class="li">${l.replace(/^\s*[-*•]\s+/, "")}</span>` : l)).join("<br>").replace(/<br>(<span class="li">)/g, "$1").replace(/(<\/span>)<br>/g, "$1");
   }
+  // 1.69.0: Perguntas prontas: as da tela até a pessoa editar (Editar perguntas, guardadas no aparelho em inv.perguntas);
+  // na conversa vazia ficam à vista, e o ✨ ao lado da caixa abre as mesmas a qualquer momento
+  const PERG_KEY = "inv.perguntas";
+  function chatQuestions(sc) {
+    try {
+      const v = JSON.parse(localStorage.getItem(PERG_KEY) || "null");
+      if (Array.isArray(v)) return v.filter((x) => typeof x === "string" && x.trim());
+    } catch { /* sem o armazenamento do aparelho: as da tela */ }
+    return chatIdeas(sc);
+  }
+  function saveQuestions(list) {
+    try { if (list == null) localStorage.removeItem(PERG_KEY); else localStorage.setItem(PERG_KEY, JSON.stringify(list)); } catch { /* modo privado */ }
+  }
+  const CHAT_MAX_ARQ = 4;
   function openChat() {
     if (!aiOn()) return;
     const sc = chatScreen();
     let rec = null;
+    // a parte de baixo: o menu do clipe, as perguntas prontas (ou a edição delas) e os arquivos escolhidos
+    const U = { menu: false, quick: false, ed: null, files: [] };
     const entry = openDialog({
       cls: "modal chat", label: "Conversar",
       html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("chat", `Conversar`)}</h2>
@@ -3808,65 +3824,162 @@
         <div class="dlg-b chat-b" data-slot="msgs" aria-live="polite"></div>
         <form class="chat-f" data-chat>
           ${chatAbout(sc) ? `<p class="chat-ctx">Sobre ${esc(chatAbout(sc))}</p>` : ""}
-          <div class="chat-in"><textarea class="input" name="t" rows="1" data-size="off" maxlength="2000" placeholder="Pergunte o que quiser" aria-label="Mensagem" enterkeyhint="send"></textarea>
-            ${voiceReady() ? `<button type="button" class="btn icon" data-mic aria-label="Falar a pergunta">${ic("mic")}</button>` : ""}
-            <button type="submit" class="btn primary icon" aria-label="Enviar">${ic("send")}</button></div>
+          <div class="chat-extra" data-slot="extra"></div>
+          <div class="chat-in"><button type="button" class="btn icon chat-clip" data-clip aria-label="Anexar" title="Anexar" aria-expanded="false">${ic("clip")}</button>
+            <textarea class="input" name="t" rows="1" data-size="off" maxlength="2000" placeholder="Pergunte o que quiser" aria-label="Mensagem" enterkeyhint="send"></textarea>
+            <button type="button" class="btn icon chat-q" data-quick aria-label="Perguntas prontas" title="Perguntas prontas" aria-expanded="false" hidden>${ic("spark")}</button>
+            <span data-slot="pri"></span></div>
         </form></div>`,
       onClose: () => { if (rec) { rec.cancel(); rec = null; } },
     });
-    const dlg = entry.dlg, box = $('[data-slot="msgs"]', dlg), form = $("[data-chat]", dlg), ta = form.t, mic = $("[data-mic]", dlg);
+    const dlg = entry.dlg, box = $('[data-slot="msgs"]', dlg), form = $("[data-chat]", dlg), ta = form.t, extra = $('[data-slot="extra"]', dlg);
+    const quickBlock = () => {
+      const ed = U.ed;
+      if (ed) return `<div class="chat-ed"><p class="chat-ed-h">${ic("edit", "sm")}Perguntas prontas</p>
+          ${ed.list.map((q, i) => `<div class="chat-ed-row"><span>${esc(q)}</span><button type="button" class="btn ghost icon" data-ed-rm="${i}" aria-label="Tirar “${esc(q)}”" title="Tirar">${ic("close", "sm")}</button></div>`).join("")}
+          <div class="chat-ed-new"><input class="input" data-ed-in maxlength="120" placeholder="Nova pergunta" aria-label="Nova pergunta" enterkeyhint="done" value="${esc(ed.draft || "")}">
+            <button type="button" class="btn" data-ed-add>${ic("plus")}Adicionar</button></div>
+          <div class="chat-ed-acts"><button type="button" class="btn" data-ed-def>${ic("refresh")}Padrão</button><button type="button" class="btn primary" data-ed-ok>${ic("check")}Pronto</button></div></div>`;
+      const qs = chatQuestions(sc);
+      return `${qs.length ? `<div class="chat-ideas">${qs.map((t) => `<button type="button" class="chip" data-idea>${ic("spark", "sm")}${esc(t)}</button>`).join("")}</div>` : ""}
+        <button type="button" class="btn ghost sm chat-ed-open" data-ed-open>${ic("edit", "sm")}Editar perguntas</button>`;
+    };
+    // o botão redondo da direita: com a caixa vazia, o microfone (ouvindo, o visto); com texto ou arquivo, o Enviar
+    const priHtml = () => (voiceReady() && (rec || (!ta.value.trim() && !U.files.length))
+      ? `<button type="button" class="btn icon${rec ? " on" : ""}" data-mic aria-label="${rec ? "Pronto: enviar o que falei" : "Falar a pergunta"}">${ic(rec ? "check" : "mic")}</button>`
+      : `<button type="submit" class="btn primary icon" aria-label="Enviar">${ic("send")}</button>`);
+    const pri = () => { const slot = $('[data-slot="pri"]', dlg), html = priHtml(); if (slot.innerHTML.trim() !== html) slot.innerHTML = html; };
+    const drawExtra = () => {
+      const open = CHAT.msgs.length && (U.quick || U.ed);
+      extra.innerHTML = (open ? `<div class="chat-quick">${quickBlock()}</div>` : "")
+        + (U.menu ? `<div class="chat-menu" role="menu">
+            <button type="button" class="chat-op" role="menuitem" data-op="camera">${ic("camera")}Tirar foto</button>
+            <button type="button" class="chat-op" role="menuitem" data-op="fotos">${ic("image")}Escolher fotos</button>
+            <button type="button" class="chat-op" role="menuitem" data-op="arquivo">${ic("file")}Escolher arquivo</button></div>` : "")
+        + (U.files.length ? `<div class="chat-prevs">${U.files.map((f, i) => `<div class="chat-prev">${f.pdf ? `<span class="chat-pdf">${ic("file")}</span>` : `<img src="${f.b64}" alt="">`}<span>${esc(f.nome)}</span><button type="button" class="btn ghost icon" data-file-rm="${i}" aria-label="Tirar ${esc(f.nome)}">${ic("close", "sm")}</button></div>`).join("")}</div>` : "");
+      const q = $("[data-quick]", dlg), clip = $("[data-clip]", dlg);
+      q.hidden = !CHAT.msgs.length; q.classList.toggle("on", !!open); q.setAttribute("aria-expanded", open ? "true" : "false");
+      clip.classList.toggle("on", U.menu); clip.setAttribute("aria-expanded", U.menu ? "true" : "false");
+      pri();
+    };
     const render = () => {
-      box.innerHTML = CHAT.msgs.length ? CHAT.msgs.map((m) => `<div class="msg ${m.role === "user" ? "me" : m.error ? "ai err" : "ai"}">${m.role === "user" ? esc(m.text) : chatHtml(m.text)}${m.error ? `<button type="button" class="btn sm" data-retry>${ic("refresh", "sm")}Tentar de novo</button>` : ""}</div>`).join("")
+      box.innerHTML = CHAT.msgs.length ? CHAT.msgs.map((m) => `<div class="msg ${m.role === "user" ? "me" : m.error ? "ai err" : "ai"}">${(m.anexos || []).map((n) => `<span class="msg-arq">${ic("file", "sm")}${esc(n)}</span>`).join("")}${m.role === "user" ? esc(m.text) : chatHtml(m.text)}${m.error ? `<button type="button" class="btn sm" data-retry>${ic("refresh", "sm")}Tentar de novo</button>` : ""}</div>`).join("")
           + (CHAT.busy ? `<div class="msg ai typing" aria-label="A IA está escrevendo"><i></i><i></i><i></i></div>` : "")
-        : `<div class="chat-empty"><div class="chat-ideas">${chatIdeas(sc).map((t) => `<button type="button" class="chip" data-idea>${ic("spark", "sm")}${esc(t)}</button>`).join("")}</div></div>`;
+        : `<div class="chat-empty">${quickBlock()}</div>`;
       $("[data-new]", dlg).hidden = !CHAT.msgs.length;
+      drawExtra();
       box.scrollTop = box.scrollHeight;
     };
     const grow = () => { ta.style.height = "auto"; ta.style.height = `${Math.min(140, ta.scrollHeight + 2)}px`; };
-    async function ask() {
+    async function ask(files = []) {
       CHAT.busy = true; render();
       try {
-        const res = await API.post("api/chat", { messages: CHAT.msgs.filter((m) => !m.error).slice(-12).map(({ role, text }) => ({ role, text })), screen: sc });
+        const body = { messages: CHAT.msgs.filter((m) => !m.error).slice(-12).map(({ role, text, anexos }) => (anexos ? { role, text, anexos } : { role, text })), screen: sc };
+        if (files.length) body.anexos = files.map((f) => ({ nome: f.nome, b64: f.b64 }));
+        const res = await API.post("api/chat", body);
         CHAT.msgs.push({ role: "assistant", text: res.reply || "" });
-      } catch (e) { CHAT.msgs.push({ role: "assistant", text: e.message, error: true }); }
+      } catch (e) {
+        CHAT.msgs.push({ role: "assistant", text: e.message, error: true });
+        if (files.length && !U.files.length) U.files = files; // o arquivo volta, para mandar de novo
+      }
       CHAT.busy = false;
       if (document.contains(dlg)) { render(); ta.focus(); }
     }
     function send(text) {
-      const t = String(text || "").trim();
-      if (!t || CHAT.busy) return;
+      const t = String(text || "").trim(), files = U.files;
+      if ((!t && !files.length) || CHAT.busy) return;
       CHAT.msgs = CHAT.msgs.filter((m) => !m.error);
-      CHAT.msgs.push({ role: "user", text: t });
+      CHAT.msgs.push(files.length ? { role: "user", text: t, anexos: files.map((f) => f.nome) } : { role: "user", text: t });
+      Object.assign(U, { files: [], menu: false, quick: false, ed: null });
       ta.value = ""; grow();
-      ask();
+      ask(files);
     }
+    async function addFiles(list) {
+      for (const f of list) {
+        if (U.files.length >= CHAT_MAX_ARQ) { toast(`Até ${CHAT_MAX_ARQ} arquivos por mensagem.`); break; }
+        const pdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name || "");
+        try {
+          if (pdf) {
+            if (f.size > 15 * 1024 * 1024) throw new Error("Arquivo grande demais (até 15 MB).");
+            U.files = [{ nome: f.name || "arquivo.pdf", pdf: true, b64: "data:application/pdf;base64," + await b64(f) }]; // um PDF vai sozinho
+            continue;
+          }
+          if (!imageFiles([f]).length) throw new Error("Escolha uma foto ou um PDF.");
+          let img, url;
+          try {
+            try { img = await createImageBitmap(f, { imageOrientation: "from-image" }); } catch { url = URL.createObjectURL(f); img = await loadImg(url); }
+            if (U.files.some((x) => x.pdf)) U.files = [];
+            U.files.push({ nome: f.name || `Foto ${U.files.length + 1}.jpg`, pdf: false, b64: "data:image/jpeg;base64," + await b64(await toJpeg(img, 1600, 0.85)) });
+          } finally { if (url) URL.revokeObjectURL(url); if (img && img.close) img.close(); }
+        } catch (e) { fail(e); }
+      }
+      if (document.contains(dlg)) drawExtra();
+    }
+    function chooseFile(accept, multiple) {
+      const inp = document.createElement("input");
+      inp.type = "file"; inp.accept = accept; inp.multiple = multiple && MULTI_PICK; inp.hidden = true;
+      inp.addEventListener("change", () => { const fs = [...(inp.files || [])]; inp.remove(); if (fs.length) addFiles(fs); });
+      document.body.appendChild(inp); inp.click();
+    }
+    function addQuestion() {
+      const ed = U.ed, t = ed && (ed.draft || "").trim();
+      if (!t) return;
+      ed.list.push(t); ed.draft = "";
+      redraw(); const inp = $("[data-ed-in]", dlg); if (inp) inp.focus();
+    }
+    const redraw = () => (CHAT.msgs.length ? drawExtra() : render());
     async function dictate() {
       if (rec) { // segunda vez: para, transcreve e manda
         const r = rec; rec = null;
         const pcm = r.stop();
-        mic.classList.remove("on"); mic.innerHTML = ic("mic");
+        pri();
         if (pcm.length < VOICE_RATE * 0.4) { toast("Não ouvi nada. Toque no microfone e fale."); return; }
-        mic.disabled = true;
+        const mic = $("[data-mic]", dlg); if (mic) mic.disabled = true;
         try { const res = await API.raw("POST", "api/voice", pcm); send(res.text || ""); }
         catch (e) { fail(e); }
-        finally { mic.disabled = false; }
+        finally { const m = $("[data-mic]", dlg); if (m) m.disabled = false; }
         return;
       }
       const r = new (window.INV_RECORDER || Recorder)(() => {});
       try { await r.start(); } catch (err) { r.cancel(); toast(micError(err), { error: true }); return; }
       rec = r;
-      mic.classList.add("on"); mic.innerHTML = ic("check"); mic.setAttribute("aria-label", "Pronto: enviar o que falei");
+      pri();
     }
     form.addEventListener("submit", (e) => { e.preventDefault(); send(ta.value); });
-    ta.addEventListener("input", grow);
+    ta.addEventListener("input", () => { grow(); pri(); });
     ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(ta.value); } });
+    dlg.addEventListener("input", (e) => { if (e.target.matches("[data-ed-in]") && U.ed) U.ed.draft = e.target.value; });
+    dlg.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing && e.target.matches("[data-ed-in]")) { e.preventDefault(); addQuestion(); } });
     dlg.addEventListener("click", (e) => {
-      if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
-      if (e.target.closest("[data-new]")) { CHAT.msgs = []; render(); ta.focus(); return; }
-      const idea = e.target.closest("[data-idea]");
+      const t = e.target;
+      if (t.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
+      if (t.closest("[data-new]")) { CHAT.msgs = []; Object.assign(U, { quick: false, menu: false }); render(); ta.focus(); return; }
+      const idea = t.closest("[data-idea]");
       if (idea) { send(idea.textContent); return; }
-      if (e.target.closest("[data-retry]")) { CHAT.msgs = CHAT.msgs.filter((m) => !m.error); render(); ask(); return; }
-      if (e.target.closest("[data-mic]")) dictate();
+      if (t.closest("[data-retry]")) { CHAT.msgs = CHAT.msgs.filter((m) => !m.error); const fs = U.files; U.files = []; render(); ask(fs); return; }
+      if (t.closest("[data-mic]")) { dictate(); return; }
+      if (t.closest("[data-quick]")) { Object.assign(U, { quick: !(U.quick || U.ed), ed: null, menu: false }); drawExtra(); return; }
+      if (t.closest("[data-clip]")) { U.menu = !U.menu; if (U.menu) U.quick = false; drawExtra(); return; }
+      const op = t.closest("[data-op]");
+      if (op) {
+        U.menu = false; drawExtra();
+        if (op.dataset.op === "camera") camera(addFiles, { max: CHAT_MAX_ARQ, title: "Tirar foto" });
+        else if (op.dataset.op === "fotos") chooseFile("image/*", true);
+        else chooseFile("image/*,application/pdf", false);
+        return;
+      }
+      const rm = t.closest("[data-file-rm]");
+      if (rm) { U.files.splice(Number(rm.dataset.fileRm), 1); drawExtra(); return; }
+      if (t.closest("[data-ed-open]")) { Object.assign(U, { ed: { list: chatQuestions(sc).slice(), draft: "" }, menu: false }); redraw(); return; }
+      const edrm = t.closest("[data-ed-rm]");
+      if (edrm && U.ed) { U.ed.list.splice(Number(edrm.dataset.edRm), 1); redraw(); return; }
+      if (t.closest("[data-ed-add]")) { addQuestion(); return; }
+      if (t.closest("[data-ed-def]")) { saveQuestions(null); U.ed = { list: chatIdeas(sc).slice(), draft: "" }; redraw(); return; }
+      if (t.closest("[data-ed-ok]") && U.ed) {
+        const d = (U.ed.draft || "").trim(), list = U.ed.list.concat(d ? [d] : []);
+        saveQuestions(list.join("\n") === chatIdeas(sc).join("\n") ? null : list); // as da tela: seguem a tela
+        U.ed = null; redraw();
+      }
     });
     render();
     if (!COARSE) setTimeout(() => ta.focus(), 60);

@@ -4242,6 +4242,31 @@ def news_batch_start(auto: bool = False, so: str = "") -> dict:
 CHAT_TURNS = 12
 CHAT_MAX_CHARS = 2000
 MOCK_CHAT = "Exemplo da IA simulada: no Home Assistant, a IA responde de verdade, com os dados desta tela."
+MOCK_CHAT_ARQ = "Exemplo da IA simulada: li o arquivo. No Home Assistant, a IA responde de verdade sobre a foto ou o PDF."
+CHAT_ANEXOS_MAX = 4  # 1.69.0: Tirar foto, Escolher fotos, Escolher arquivo (até 4 fotos ou um PDF por mensagem)
+
+
+def chat_anexos(body: dict) -> list:
+    """Os arquivos da última mensagem: [(bytes, tipo, nome)], fotos (JPG, PNG, WebP) ou um PDF, até 15 MB cada."""
+    lista = body.get("anexos") if isinstance(body.get("anexos"), list) else []
+    if len(lista) > CHAT_ANEXOS_MAX:
+        raise ApiError(400, f"No máximo {CHAT_ANEXOS_MAX} arquivos de cada vez.")
+    out = []
+    for a in lista:
+        raw = str((a or {}).get("b64") or "") if isinstance(a, dict) else ""
+        try:
+            dado = base64.b64decode(raw.split(",", 1)[1] if raw.startswith("data:") else raw, validate=True)
+        except (ValueError, TypeError):
+            dado = b""
+        tipo = ("image/jpeg" if dado[:3] == b"\xff\xd8\xff" else "image/png" if dado[:8] == b"\x89PNG\r\n\x1a\n"
+                else "image/webp" if dado[:4] == b"RIFF" and dado[8:12] == b"WEBP" else "application/pdf" if dado[:5] == b"%PDF-" else "")
+        if not tipo or len(dado) > 15 * 1024 * 1024:
+            raise ApiError(400, "Um dos arquivos não abriu. Use uma foto (JPG ou PNG) ou um PDF, até 15 MB.")
+        nome = " ".join(str(a.get("nome") or "").split())[:80] or ("arquivo.pdf" if tipo == "application/pdf" else "foto.jpg")
+        out.append((dado, tipo, nome))
+    if len(out) > 1 and any(t == "application/pdf" for _, t, _ in out):
+        raise ApiError(400, "Envie um PDF por vez.")
+    return out
 
 
 def _money(v) -> str:
@@ -4317,11 +4342,12 @@ def chat_context(screen: dict) -> str:
     return "\n".join(lines)
 
 
-def chat_prompt(messages: list[dict], screen: dict, user: str | None) -> str:
+def chat_prompt(messages: list[dict], screen: dict, user: str | None, anexos: int = 0) -> str:
     conv = []
     for m in messages[-CHAT_TURNS:]:
         who = "Pessoa" if m["role"] == "user" else "Assistente"
-        conv.append(f"{who}: {m['text']}")
+        arqs = f"[mandou {', '.join(m['anexos'])}] " if m.get("anexos") else ""
+        conv.append(f"{who}: {arqs}{m['text']}".rstrip())
     return "\n".join([
         f"Você é o assistente do InventarIA, o app de inventário da casa{f' de {user}' if user else ''}, dentro do Home Assistant.",
         "Responda em português do Brasil, curto e direto, em texto simples (no máximo uma lista curta).",
@@ -4334,8 +4360,37 @@ def chat_prompt(messages: list[dict], screen: dict, user: str | None) -> str:
         "Conversa até agora:",
         *conv,
         "",
+        *([f"Com a última mensagem, a Pessoa mandou {'1 arquivo' if anexos == 1 else f'{anexos} arquivos'} (foto ou PDF), que vão junto: "
+           "olhe o que está neles (um item, uma nota fiscal, um manual, uma etiqueta) para responder.", ""] if anexos else []),
         "Responda à última mensagem da Pessoa. Só o texto da resposta.",
     ])
+
+
+def chat_com_arquivos(prompt: str, entity: str, anexos: list):
+    """A conversa com os arquivos junto: vão pela pasta media do Home Assistant e são apagados depois."""
+    if not os.path.isdir(MEDIA_ROOT):
+        raise ApiError(500, "A pasta media não está disponível para o app.")
+    tmp_dir = os.path.join(MEDIA_ROOT, AI_TMP_REL)
+    os.makedirs(tmp_dir, exist_ok=True)
+    nomes = []
+    try:
+        for dado, tipo, _ in anexos:
+            n = f"{secrets.token_hex(8)}.{ {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'}.get(tipo, 'pdf') }"
+            with open(os.path.join(tmp_dir, n), "wb") as fh:
+                fh.write(dado)
+            nomes.append((n, tipo))
+        payload = {"task_name": "InventarIA: conversa", "instructions": prompt,
+                   "attachments": [{"media_content_id": f"media-source://media_source/local/{AI_TMP_REL}/{n}", "media_content_type": t} for n, t in nomes]}
+        if entity:
+            payload["entity_id"] = entity
+        res = ha_request("POST", "/services/ai_task/generate_data?return_response", payload, timeout=180)
+        return ((res or {}).get("service_response") or {}).get("data")
+    finally:
+        for n, _ in nomes:
+            try:
+                os.unlink(os.path.join(tmp_dir, n))
+            except OSError:
+                pass
 
 
 def chat_entity() -> str:
@@ -4353,21 +4408,26 @@ def ai_chat(body: dict, user: str | None) -> dict:
         if not isinstance(m, dict) or m.get("role") not in ("user", "assistant"):
             raise ApiError(400, "Conversa inválida.")
         t = " ".join(str(m.get("text") or "").split()) if m["role"] == "user" else str(m.get("text") or "").strip()
-        if not t:
+        arqs = [" ".join(str(x).split())[:80] for x in (m.get("anexos") or []) if str(x).strip()][:CHAT_ANEXOS_MAX] if m["role"] == "user" and isinstance(m.get("anexos"), list) else []
+        if not t and not arqs:
             continue
-        msgs.append({"role": m["role"], "text": t[:CHAT_MAX_CHARS]})
+        msgs.append({"role": m["role"], "text": t[:CHAT_MAX_CHARS], **({"anexos": arqs} if arqs else {})})
+    anexos = chat_anexos(body)
     if not msgs or msgs[-1]["role"] != "user":
         raise ApiError(400, "Escreva uma mensagem.")
+    if anexos:
+        msgs[-1]["anexos"] = [n for _, _, n in anexos]
     if not SUPERVISOR_TOKEN and not AI_MOCK:
         raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
-    prompt = chat_prompt(msgs, body.get("screen") or {}, user)
-    entity = chat_entity()
-    with AiCall("chat", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
+    prompt = chat_prompt(msgs, body.get("screen") or {}, user, len(anexos))
+    # com arquivo, a IA de ler fotos (a da conversa pode não aceitar anexos)
+    entity = photo_entity() if anexos else chat_entity()
+    with AiCall("chat", "ai_task.simulado" if AI_MOCK else entity, prompt, images=len(anexos)) as call:
         if AI_MOCK:
             time.sleep(0.4)
-            reply = MOCK_CHAT
+            reply = MOCK_CHAT_ARQ if anexos else MOCK_CHAT
         else:
-            res = ai_call_text("InventarIA: conversa", prompt, entity, timeout=120)
+            res = chat_com_arquivos(prompt, entity, anexos) if anexos else ai_call_text("InventarIA: conversa", prompt, entity, timeout=120)
             if isinstance(res, dict):  # tarefa de IA às vezes devolve um objeto
                 res = res.get("text") or res.get("resposta") or json.dumps(res, ensure_ascii=False)
             reply = str(res or "").strip()
