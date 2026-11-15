@@ -1588,16 +1588,14 @@
     ${aiOn() ? `<section class="panel" id="p-news-rec">
       <h2>${secIc("sliders")}Eletrônicos</h2>
       <div data-slot="rec-list"><p class="muted">Carregando…</p></div>
-      <button type="button" class="btn block" data-act="rec-all">${ic("spark")}Buscar todos os recursos</button>
-      <div data-slot="rec-job"></div>
     </section>` : ""}
     <section class="panel" id="p-news">
       <h2>${secIc("spark")}Conferir novidades</h2>
       <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos eletrônicos${appsOn() ? " e dos apps do celular" : ""}.</p>
-      <ul class="opts"><li><div class="ot"><b>${oti("checks")}Todos de uma vez</b><span>${appsOn() ? "A IA escolhe os eletrônicos e os apps que vale conferir." : "A IA escolhe, entre os eletrônicos, os que vale conferir."}</span></div>
-        ${appsOn() ? `<div class="oa news-tres"><button type="button" class="btn primary" data-act="news-all" data-so="">${ic("spark")}Todas as novidades</button>
-          <button type="button" class="btn" data-act="news-all" data-so="itens">${ic("tag")}Só equipamentos</button><button type="button" class="btn" data-act="news-all" data-so="apps">${ic("phone")}Só apps</button></div>`
-          : `<div class="oa"><button type="button" class="btn primary" data-act="news-all" data-so="">${ic("spark")}Conferir novidades</button></div>`}</li></ul>
+      <ul class="opts"><li><div class="ot"><b>${oti("checks")}Todos de uma vez</b><span>${appsOn() ? "A IA escolhe os eletrônicos e os apps que vale conferir, e busca os recursos que faltam." : "A IA escolhe, entre os eletrônicos, os que vale conferir, e busca os recursos que faltam."}</span></div>
+        <div class="oa news-tres"><button type="button" class="btn primary" data-act="news-all" data-so="">${ic("spark")}Todas as novidades</button>
+          <button type="button" class="btn" data-act="news-all" data-so="itens">${ic("tag")}Só equipamentos</button>${appsOn() ? `<button type="button" class="btn" data-act="news-all" data-so="apps">${ic("phone")}Só apps</button>` : ""}
+          <button type="button" class="btn" data-act="news-all" data-so="recursos">${ic("sliders")}Só eletrônicos</button></div></li></ul>
       <div data-slot="news-job"></div>
     </section>
     <section class="panel" id="p-news-clear">
@@ -1619,6 +1617,22 @@
   const newsRecall = (r) => ((r && r.news && r.news.novidades) || []).some((x) => x.tipo === "recall");
   // 1.62.0: as novidades que não estavam na conferência anterior (o servidor marca nova), para achar o que mudou
   const newsNew = (r) => ((r && r.news && r.news.novidades) || []).filter((x) => x.nova).length;
+  // 1.68.0: abriu as novidades (a janela ou a ficha): o que era novo foi visto e deixa de ser novo na lista. A tela que
+  // está aberta continua mostrando o Nova desta vez.
+  const semNova = (r) => (r && r.news ? { ...r, news: { ...r.news, novidades: (r.news.novidades || []).map(({ nova, ...x }) => x) } } : r);
+  function seenNews(alvo, r) {
+    if (!newsNew(r)) return;
+    API.post("api/news/visto", alvo).catch(() => {});
+    if (!newsOv) return;
+    if (alvo.item) {
+      const g = (newsOv.grupos || {})[alvo.item];
+      for (const [id, v] of Object.entries(newsOv.itens || {})) if (id === alvo.item || (g && (newsOv.grupos || {})[id] === g)) newsOv.itens[id] = semNova(v);
+    } else {
+      const a = ((newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === alvo.pacote);
+      if (a) a.res = semNova(a.res);
+    }
+    renderNews();
+  }
   const newsSt = (r) => {
     const n = newsCount(r), k = newsNew(r);
     return !r ? "Ainda não conferido" : `${k ? `${plural(k, "nova", "novas")} de ${int(n)}` : n ? plural(n, "novidade", "novidades") : "Nada novo"} · ${whenShort(r.at)}`;
@@ -1716,7 +1730,9 @@
     const u = newsOv && newsOv.ultima, c = newsNums;
     js.innerHTML = u ? `<p class="muted njob">Conferido ${esc(whenShort(u.at))}: ${c && c.conferidos ? `${int(c.com)} de ${int(c.conferidos)} com novidades novas` : "nada para conferir agora"}.</p>` : "";
   }
+  let newsSo = "";
   async function startNewsAll(so = "") {
+    newsSo = so;
     try { const r = await API.post("api/news/all", { so }); newsJob = r.id; renderNewsJob({ stage: "busy", msg: "Começando…" }); pollNewsAll(); }
     catch (e) { fail(e); }
   }
@@ -1734,19 +1750,20 @@
     API.del(`api/news/${newsJob}`).catch(() => {});
     newsJob = null;
     const sm = st.summary || {};
-    if (st.stage === "done") toast(sm.conferidos ? `Conferidos ${int(sm.conferidos)}: ${int(sm.novos || 0)} com novidades novas.` : "Tudo conferido nos últimos 7 dias.");
+    const rec = sm.recursos ? ` Recursos de ${plural(sm.recursos, "eletrônico", "eletrônicos")}.` : "";
+    if (st.stage === "done") toast(sm.conferidos ? `Conferidos ${int(sm.conferidos)}: ${int(sm.novos || 0)} com novidades novas.${rec}` : rec ? rec.trim() : newsSo === "recursos" ? "Todos os eletrônicos já têm os recursos." : "Tudo conferido nos últimos 7 dias.");
+    loadRecAll();
     await loadNews();
     if (st.stage === "error") renderNewsJob(st);
   }
-  // -- Novidades › Eletrônicos (1.65.0): os recursos de cada eletrônico (o mesmo em vários cômodos numa linha só), e
-  // Buscar todos os recursos busca os que ainda não têm; um toque abre os recursos, como na ficha
-  let recOv = null, recJob = null, recTimer = null;
+  // -- Novidades › Eletrônicos (1.65.0): os recursos de cada eletrônico (o mesmo em vários cômodos numa linha só); um
+  // toque abre os recursos, como na ficha. Conferir novidades › Só eletrônicos (1.68.0) busca os que ainda não têm
+  let recOv = null;
   async function loadRecAll() {
     if (!aiOn()) return;
     try { recOv = await API.get("api/recursos/todos"); }
     catch (e) { const sl = $('#view [data-slot="rec-list"]'); if (sl) sl.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
     renderRecAll();
-    if (recOv.job && !recJob) { recJob = recOv.job.id; pollRecAll(); }
   }
   function recGroups() {
     const res = (recOv && recOv.itens) || {}, grp = (recOv && recOv.grupos) || {}, by = new Map();
@@ -1773,55 +1790,6 @@
         <span class="nb"><b>${esc(it.name)}</b><span class="nm">${esc(where)} · ${esc(st)}</span></span>
         ${r ? `<span class="pill">${int(r.n)}</span>` : ""}${ic("chev", "sm")}</button></li>`;
     }).join("")}</ul>` : `<p class="muted">Nenhum item em Eletrônicos.</p>`;
-    const b = $('#view [data-act="rec-all"]');
-    if (b) b.hidden = !gs.length;
-    if (!recJob) renderRecJob(null);
-  }
-  function renderRecJob(st) {
-    const js = $('#view [data-slot="rec-job"]');
-    if (!js) return;
-    const b = $('#view [data-act="rec-all"]');
-    if (b) b.disabled = !!(st && st.stage === "busy");
-    if (st && st.stage === "busy") {
-      const p = st.progress || {}, pct = p.total ? Math.round((p.feitos / p.total) * 100) : 0;
-      js.innerHTML = `<div class="njob" aria-live="polite"><p><span class="spin"></span><span>${esc(st.msg || "Buscando…")}</span></p>
-        <div class="prog" role="progressbar" aria-label="Progresso" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>
-        <button type="button" class="btn sm" data-act="rec-cancel">${ic("close", "sm")}Parar</button></div>`;
-      return;
-    }
-    js.innerHTML = st && st.stage === "error" ? `<p class="formerr njob">${esc(st.msg)}</p>` : "";
-  }
-  async function startRecAll() {
-    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return; }
-    try { recJob = (await API.post("api/recursos/todos", {})).id; renderRecJob({ stage: "busy", msg: "Começando…" }); pollRecAll(); }
-    catch (e) { fail(e); }
-  }
-  async function pollRecAll() {
-    clearTimeout(recTimer);
-    if (!recJob) return;
-    let st;
-    try { st = await API.get(`api/recursos/${recJob}`); }
-    catch (e) { recJob = null; renderRecJob({ stage: "error", msg: e.message }); return; }
-    if (st.stage === "busy") {
-      renderRecJob(st);
-      if ($('#view [data-slot="rec-job"]')) recTimer = setTimeout(pollRecAll, 1500); else recJob = null; // saiu da tela: segue no servidor
-      return;
-    }
-    API.del(`api/recursos/${recJob}`).catch(() => {});
-    recJob = null;
-    const sm = st.summary || {};
-    if (st.stage === "done") toast(sm.total ? `Recursos de ${plural(sm.buscados || 0, "eletrônico", "eletrônicos")}${sm.erros ? ` (${int(sm.erros)} sem resposta)` : ""}.` : "Todos os eletrônicos já têm os recursos.");
-    await loadRecAll();
-    if (st.stage === "error") renderRecJob(st);
-  }
-  async function cancelRecAll() {
-    if (!recJob) return;
-    const j = recJob;
-    recJob = null;
-    clearTimeout(recTimer);
-    await API.del(`api/recursos/${j}`).catch(() => {});
-    toast("Busca parada. Os recursos já achados ficaram salvos.");
-    loadRecAll();
   }
   // a janela dos recursos de um eletrônico: o guardado, sem chamar a IA; sem nada guardado, busca
   function openRec(it) {
@@ -2174,7 +2142,8 @@
         <span class="nm">${esc([joinE(a.pessoas || []), a.ultimo ? `usado ${whenShort(a.ultimo)}` : a.ia ? "pela IA" : "", quando(a)].filter(Boolean).join(" · "))}</span></div>
         <label class="switch"><input type="checkbox" role="switch" data-input="app-considerar" data-pkg="${esc(a.pacote)}" aria-labelledby="${id}"${on(a) ? " checked" : ""}><span class="track" aria-hidden="true"></span></label>
         <div class="app-det-b"><button type="button" class="btn" data-act="app-open" data-id="${esc(a.pacote)}" aria-label="Ver novidades de ${esc(a.nome)}">${ic("spark", "sm")}Ver novidades</button>
-          <button type="button" class="btn" data-act="app-rename" data-id="${esc(a.pacote)}" aria-label="Renomear ${esc(a.nome)}">${ic("edit", "sm")}Renomear</button></div></li>`;
+          <button type="button" class="btn icon" data-act="app-rename" data-id="${esc(a.pacote)}" aria-label="Renomear ${esc(a.nome)}" title="Renomear">${ic("edit")}</button>
+          <button type="button" class="btn icon" data-act="app-del" data-id="${esc(a.pacote)}" aria-label="Apagar ${esc(a.nome)}" title="Apagar">${ic("trash")}</button></div></li>`;
     };
     const ativos = L.filter(on), inativos = L.filter((a) => !on(a));
     const busca = appsDetBusca.trim(), bate = (a) => appBate(a, busca);
@@ -2211,6 +2180,16 @@
     };
     form.addEventListener("submit", (e) => { e.preventDefault(); go(); });
     entry.dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); if (e.target.closest("[data-ok]")) go(); });
+  }
+  // 1.68.0: Apagar um app de Apps detectados (com o que foi achado dele); volta se for usado de novo no celular
+  async function removeApp(a) {
+    const ok = await confirmBox({ title: `Apagar ${a.nome}?`, body: "Sai da lista. Volta se for usado de novo no celular.", ok: "Apagar", danger: true });
+    if (!ok) return;
+    try {
+      newsOv = await API.del(`api/news/app?pacote=${encodeURIComponent(a.pacote)}`);
+      paintAppsDet(); filtraAppsDet(); renderNews();
+      toast(`${a.nome} apagado`);
+    } catch (e) { fail(e); }
   }
   // Encontrar apps com IA (1.59.0): prints da lista de apps do celular ou os nomes colados; a IA lê, a pessoa marca quais
   // entram em Apps detectados (acompanhados). Só com a IA ligada.
@@ -2957,7 +2936,10 @@
   function paintItemNews() {
     const slot = sheet && sheet.itemId === INEWS.id && $('[data-slot="item-news"]', sheet.dlg);
     const it = INEWS.id && D.itemById.get(INEWS.id);
-    if (slot && it) slot.innerHTML = itemNewsHtml(it);
+    if (slot && it) {
+      slot.innerHTML = itemNewsHtml(it);
+      if (INEWS.st && INEWS.st.r && newsNew(INEWS.st.r)) { seenNews({ item: it.id }, INEWS.st.r); INEWS.st = { ...INEWS.st, r: semNova(INEWS.st.r), visto: true }; }
+    }
   }
   function stopItemNews() { INEWS.gen++; clearTimeout(INEWS.timer); }
   function loadItemNews(it) {
@@ -3012,7 +2994,7 @@
     const dlg = entry.dlg, slot = $('[data-slot="news"]', dlg), again = $("[data-again]", dlg), apagar = $("[data-apagar]", dlg);
     const show = (html, done, n = 0) => { slot.innerHTML = html; again.hidden = !done; apagar.hidden = !(done && n); };
     const error = (m) => show(`<p class="formerr">${esc(m)}</p>`, true);
-    const render = (r) => show(newsListHtml(r, it), true, newsCount(r));
+    const render = (r) => { show(newsListHtml(r, it), true, newsCount(r)); seenNews({ item: it.id }, r); };
     async function poll(my) {
       let st;
       try { st = await API.get(`api/news/${job}`); }
@@ -3066,7 +3048,7 @@
     const dlg = entry.dlg, slot = $('[data-slot="news"]', dlg), again = $("[data-again]", dlg), fora = $("[data-fora]", dlg), dentro = $("[data-dentro]", dlg);
     const show = (html, done) => { slot.innerHTML = html; again.hidden = !done; fora.hidden = !done; dentro.hidden = true; };
     const error = (m) => show(`<p class="formerr">${esc(m)}</p>`, true);
-    const render = (r) => show(newsListHtml(r, { name: a.nome }), true);
+    const render = (r) => { show(newsListHtml(r, { name: a.nome }), true); seenNews({ pacote: a.pacote }, r); };
     const update = (fn) => { // o app na lista das Novidades, sem ler tudo de novo
       const L = (newsOv && newsOv.apps && newsOv.apps.lista) || [];
       const k = L.findIndex((x) => x.pacote === a.pacote);
@@ -4720,9 +4702,8 @@
         break;
       case "news-open": { const it = D.itemById.get(b.dataset.id); if (it) openNews(it); break; }
       case "rec-open": { const it = D.itemById.get(b.dataset.id); if (it) openRec(it); break; }
-      case "rec-all": startRecAll(); break;
-      case "rec-cancel": cancelRecAll(); break;
       case "apps-ia": openAppsFinder(); break;
+      case "app-del": { const a = ((newsOv && newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === b.dataset.id); if (a) removeApp(a); break; }
       case "app-rename": { const a = ((newsOv && newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === b.dataset.id); if (a) openAppName(a); break; }
       case "app-open": { const a = ((newsOv && newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === b.dataset.id); if (a) openAppNews(a); break; }
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }

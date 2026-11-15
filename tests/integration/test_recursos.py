@@ -17,6 +17,16 @@ def esperar(app, jid, timeout=8):
     raise AssertionError("a busca dos recursos não terminou")
 
 
+def esperar_lote(app, jid, timeout=20):
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        st = app.ok("GET", f"api/news/{jid}")
+        if st["stage"] != "busy":
+            return st
+        time.sleep(0.15)
+    raise AssertionError("a conferência não terminou")
+
+
 class Recursos(ServerCase):
     def test_recursos_de_um_eletronico_guardados_ate_o_item_mudar(self):
         app = self.fresh(mock_ai=True)
@@ -34,8 +44,9 @@ class Recursos(ServerCase):
         self.assertEqual(app.ok("GET", "api/recursos?item=sal-007"), {})
 
     def test_os_de_todos_os_eletronicos(self):
-        """1.65.0: GET api/recursos/todos lista os eletrônicos e quantos recursos cada um tem; POST busca os que faltam (o
-        mesmo equipamento em vários cômodos numa busca só, guardada em todos); de novo, nada a buscar."""
+        """1.65.0: GET api/recursos/todos lista os eletrônicos e quantos recursos cada um tem; 1.68.0: Conferir novidades ›
+        Só eletrônicos (so=recursos) busca os que faltam (o mesmo equipamento em vários cômodos numa busca só, guardada em
+        todos), sem contar como conferência das novidades; de novo, nada a buscar."""
         app = self.fresh(mock_ai=True)
         els = {i["id"] for i in app.data()["items"] if i["cat"] == "eletronicos"}
         tv = next(i for i in app.data()["items"] if i["id"] == "sal-007")
@@ -43,20 +54,22 @@ class Recursos(ServerCase):
         esperar(app, app.ok("POST", "api/recursos", {"item": "sal-007"})["id"])
         ov = app.ok("GET", "api/recursos/todos")
         self.assertEqual(set(ov["itens"]), els | {outro}, "só os eletrônicos")
-        self.assertEqual((ov["itens"]["sal-007"]["n"], ov["itens"][outro], ov["job"]), (3, None, None))
+        self.assertEqual((ov["itens"]["sal-007"]["n"], ov["itens"][outro]), (3, None))
         self.assertEqual(ov["grupos"][outro], ov["grupos"]["sal-007"], "o mesmo equipamento em dois cômodos")
-        st = esperar(app, app.ok("POST", "api/recursos/todos", {})["id"], timeout=20)
+        st = esperar_lote(app, app.ok("POST", "api/news/all", {"so": "recursos"})["id"])
         self.assertEqual(st["stage"], "done", st)
         grupos = {ov["grupos"][i] for i in els | {outro}}
-        self.assertEqual(st["summary"], {"buscados": len(grupos) - 1, "erros": 0, "total": len(grupos) - 1}, "a TV já tinha: o outro cômodo ganha o mesmo, sem buscar")
+        self.assertEqual((st["summary"]["recursos"], st["summary"]["recursos_total"], st["summary"]["conferidos"]), (len(grupos) - 1, len(grupos) - 1, 0),
+                         "a TV já tinha: o outro cômodo ganha o mesmo, sem buscar; nenhuma novidade conferida")
         ov = app.ok("GET", "api/recursos/todos")
         self.assertTrue(all(v and v["n"] for v in ov["itens"].values()), ov["itens"])
         self.assertEqual(app.ok("GET", f"api/recursos?item={outro}")["recursos"], app.ok("GET", "api/recursos?item=sal-007")["recursos"])
-        st = esperar(app, app.ok("POST", "api/recursos/todos", {})["id"])
-        self.assertEqual(st["summary"], {"buscados": 0, "erros": 0, "total": 0}, "de novo: nada a buscar")
+        self.assertIsNone(app.ok("GET", "api/news")["ultima"], "não conta como conferência das novidades")
+        st = esperar_lote(app, app.ok("POST", "api/news/all", {"so": "recursos"})["id"])
+        self.assertEqual(st["summary"]["recursos_total"], 0, "de novo: nada a buscar")
+        self.assertEqual(app.request("POST", "api/news/all", {"so": "tudo"})[0], 400)
         app.ok("PUT", "api/settings", {"ai": False})
         self.assertEqual(app.request("GET", "api/recursos/todos")[0], 409, "IA desligada: recusa")
-        self.assertEqual(app.request("POST", "api/recursos/todos", {})[0], 409)
 
     def test_so_nas_categorias_dos_recursos_e_com_a_ia(self):
         app = self.fresh(mock_ai=True)

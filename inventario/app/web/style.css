@@ -868,18 +868,21 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .app-det-t { display: grid; gap: 2px; min-width: 0; justify-items: start; }
 .app-det-t b { font-weight: 500; overflow-wrap: anywhere; } /* nada cortado: o nome e o porquê quebram a linha */
 .app-det-t .nm { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
-/* 1.66.0: Ver novidades e Renomear lado a lado, na largura toda (no computador, 2 × 200 px à direita) */
-.app-det > .app-det-b { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.app-det > .app-det-b > .btn { width: 100%; min-width: 0; justify-content: center; white-space: normal; line-height: 1.15; text-align: center; padding-left: 8px; padding-right: 8px; }
-@media (min-width: 1000px) { .app-det > .app-det-b { width: 408px; justify-self: end; } }
+/* 1.68.0: Ver novidades na largura que sobra, Renomear e Apagar só com o ícone ao lado (no computador, 280 px à direita) */
+.app-det > .app-det-b { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
+.app-det > .app-det-b > .btn { min-width: 0; justify-content: center; white-space: normal; line-height: 1.15; text-align: center; }
+.app-det > .app-det-b > .btn:first-child { padding-left: 10px; padding-right: 10px; gap: 6px; }
+.app-det > .app-det-b > .btn.icon { width: var(--altura); height: var(--altura); padding: 0; }
+.app-det > .app-det-b > .btn[data-act="app-del"] { color: var(--danger); }
+@media (min-width: 1000px) { .app-det > .app-det-b { width: 388px; justify-self: end; } }
+@media (max-width: 360px) { .app-det > .app-det-b > .btn.icon { width: 44px; } } /* 320 px: o Ver novidades cabe sem cortar */
 .apps-inativos { margin-top: 4px; border-top: 1px solid var(--line); }
 .apps-inativos .app-det-l { margin-top: 2px; }
 /* Conferir (1.58.0): Todas as novidades na largura toda e, embaixo, Só equipamentos e Só apps dividindo a linha */
-/* Conferir e (1.64.0) Limpar: o de tudo na largura toda, Só equipamentos e Só apps lado a lado embaixo */
-:is(#p-news, #p-news-clear) .opts .oa.news-tres { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; flex: 1 1 100%; }
+/* Conferir e (1.64.0) Limpar: 1.68.0, um botão por linha, na largura do cartão (no computador, 280 px à direita) */
+:is(#p-news, #p-news-clear) .opts .oa.news-tres { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; flex: 1 1 100%; }
 :is(#p-news, #p-news-clear) .opts .oa.news-tres > .btn { width: auto; max-width: none; min-width: 0; justify-content: center; }
-:is(#p-news, #p-news-clear) .opts .oa.news-tres > .btn:first-child { grid-column: 1 / -1; }
-@media (min-width: 1000px) { :is(#p-news, #p-news-clear) .opts .oa.news-tres { flex: none; width: 400px; } }
+@media (min-width: 1000px) { :is(#p-news, #p-news-clear) .opts .oa.news-tres { flex: none; width: 280px; } }
 .inews { margin-top: 18px; }
 .inews-h { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 17px; font-weight: 700; }
 .inews-h .ic { color: var(--tag-text); }
@@ -898,9 +901,6 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .rec-list b { font-weight: 600; }
 .rec-list span { color: var(--muted); font-size: 14.5px; line-height: 1.4; }
 .rec-src { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
-/* 1.65.0: Novidades › Eletrônicos: Buscar todos os recursos embaixo da lista, na largura do cartão (no computador, 280 px à direita) */
-#p-news-rec > [data-act="rec-all"] { margin-top: 14px; min-height: var(--altura); }
-@media (min-width: 1000px) { #p-news-rec > [data-act="rec-all"] { width: 280px; margin-left: auto; display: flex; } }
 .itasks > [data-slot] > .muted { margin: 8px 0 0; }
 .inews > .muted { margin: 8px 0 0; } /* Recursos e Novidades ainda não procurados: o que vem ali */
 .tlist { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }

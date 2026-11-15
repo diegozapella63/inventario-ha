@@ -1,7 +1,8 @@
 """1.54.0: Recursos. Na ficha de um eletrônico, de uma utilidade ou de um veículo, a seção Recursos (1.55.0: com título e
 ícone, como Tarefas no ResolvIA e Novidades) e o botão Ver recursos (na largura toda, como o Buscar novidades e o Nova tarefa) pede à IA o que o equipamento tem; a lista fica na ficha, com a fonte e Ver de novo. Um móvel
 não tem o botão; com a IA desligada, some. Em Mais › Categorias, Utilidades e Veículos ficam fixas, como Eletrônicos.
-1.65.0: Novidades › Eletrônicos, os recursos de todos os eletrônicos: a lista, Buscar todos os recursos e a janela de um."""
+1.65.0: Novidades › Eletrônicos, os recursos de todos os eletrônicos: a lista e a janela de um; 1.68.0: Conferir novidades ›
+Só eletrônicos busca os que faltam."""
 import e2e_lib
 from e2e_lib import OVERFLOW, main
 
@@ -62,15 +63,19 @@ async def body(r, p):
     tv = next(x for x in rows if x[0].startswith("Smart TV"))
     r.check(" · 3 recursos · hoje" in tv[1] and tv[2] == ["3"] and rows[0] == tv, f"a TV, já vista na ficha, com 3 recursos, no alto ({tv})")
     r.check(len(rows) > 1 and all(x[1].endswith("Ainda não buscado") and x[2] == [] for x in rows[1:]), f"os outros ainda não buscados, embaixo ({rows[1:3]})")
-    bw = await pg.evaluate("() => { const b = document.querySelector('#p-news-rec [data-act=\"rec-all\"]'), s = b.parentElement, cs = getComputedStyle(s); return [Math.round(b.getBoundingClientRect().width), Math.round(s.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)), Math.round(b.getBoundingClientRect().height), !!b.querySelector('svg')]; }")
-    r.check(abs(bw[0] - bw[1]) <= 2 and bw[2] == 50 and bw[3], f"Buscar todos os recursos na largura do cartão, com o ícone ({bw})")
+    r.eq(await pg.locator('#p-news-rec .btn').count(), 0, "1.68.0: sem botão na seção: a busca fica em Conferir novidades")
     await r.shot(pg, "eletronicos")
-    await pg.click('#p-news-rec [data-act="rec-all"]')
+    # Conferir novidades › Só eletrônicos (1.68.0): os recursos dos que ainda não têm; o Conferido das novidades fica
+    corpos = []
+    pg.on("request", lambda q: corpos.append(q.post_data) if q.url.endswith("/api/news/all") else None)
+    await pg.click('#p-news [data-act="news-all"][data-so="recursos"]')
     await pg.locator(".toast", has_text="Recursos de").wait_for(timeout=20000)
     await pg.wait_for_timeout(400)
+    r.eq(corpos, ['{"so":"recursos"}'], "pede só os recursos")
     rows = await pg.evaluate(ROWS)
-    r.check(all(" recursos · hoje" in x[1] and x[2] == ["3"] for x in rows), f"Buscar todos: cada eletrônico com os recursos ({rows[:2]})")
-    await pg.click('#p-news-rec [data-act="rec-all"]')
+    r.check(all(" recursos · hoje" in x[1] and x[2] == ["3"] for x in rows), f"Só eletrônicos: cada eletrônico com os recursos ({rows[:2]})")
+    r.eq(r.api("GET", "api/news")["ultima"], None, "e não conta como conferência das novidades")
+    await pg.click('#p-news [data-act="news-all"][data-so="recursos"]')
     await pg.locator(".toast", has_text="Todos os eletrônicos já têm os recursos").wait_for(timeout=10000)
     r.check(True, "de novo: nada a buscar")
     # um toque abre os recursos, guardados, com Ver de novo e Ver item

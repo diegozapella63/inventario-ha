@@ -1,5 +1,11 @@
 # Mudanças
 
+## 1.68.0
+
+- **Novidades vistas**: abrir as novidades de um equipamento ou de um app (a janela ou a ficha) mostra o **Nova** desta vez e depois deixa de marcar como nova: na lista, ele passa a dizer *3 novidades* e vai para baixo dos que ainda têm novas.
+- **Conferir novidades › Só eletrônicos**: busca os recursos dos eletrônicos que ainda não têm (saiu o botão da seção Eletrônicos). **Todas as novidades** busca os recursos que faltam também; o Conferir sozinho, não. Os botões do Conferir e do Limpar ficam um por linha.
+- **Apps detectados**: cada app ganha **Apagar** (com confirmação): sai da lista com o que foi achado dele; volta se for usado de novo no celular. **Renomear** e **Apagar** ficam só com o ícone, ao lado do **Ver novidades**, que não corta mais no celular.
+
 ## 1.67.0
 
 - **Apps detectados**: com mais de 6 apps, o campo **Buscar app** acha um app pelo nome ou pelo pacote, sem ligar para acentos. Se o app estiver em **Inativos**, a lista abre; sem nenhum, diz que não achou.

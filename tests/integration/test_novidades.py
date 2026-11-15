@@ -197,6 +197,19 @@ class Todos(ServerCase):
         app.ok("PUT", "api/settings", {"ai": False})
         self.assertEqual(app.request("GET", "api/news?item=sal-007")[0], 409, "IA desligada: recusa")
 
+    def test_abrir_as_novidades_deixa_de_ser_nova(self):
+        """1.68.0: abriu a janela ou a ficha (POST api/news/visto): as novas deixam de ser novas, no item e no mesmo
+        equipamento dos outros cômodos; de novo, nada a mudar."""
+        app = self.fresh(mock_ai=True)
+        outro = app.ok("POST", "api/items", {"room": "quarto", "name": "Smart TV 55 polegadas", "cat": "eletronicos", "value": 10})["item"]["id"]
+        esperar(app, app.ok("POST", "api/news", {"item": "sal-007"})["id"])
+        self.assertTrue(all(n.get("nova") for n in app.ok("GET", f"api/news?item={outro}")["news"]["novidades"]))
+        self.assertEqual(app.ok("POST", "api/news/visto", {"item": "sal-007"}), {"vistas": 6}, "3 em cada cômodo")
+        for i in ("sal-007", outro):
+            self.assertFalse(any(n.get("nova") for n in app.ok("GET", f"api/news?item={i}")["news"]["novidades"]), i)
+        self.assertEqual(app.ok("POST", "api/news/visto", {"item": "sal-007"}), {"vistas": 0})
+        self.assertEqual(app.request("POST", "api/news/visto", {})[0], 400)
+
     def test_apagar_as_novidades_de_um_equipamento(self):
         """1.63.0: DELETE api/news?item= apaga as achadas do equipamento (e dos outros cômodos com o mesmo); elas não voltam
         ao buscar de novo, e Limpar novidades começa do zero."""

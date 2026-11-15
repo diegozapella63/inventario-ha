@@ -62,7 +62,9 @@ async def body(r, p):
 
     # abrir um da lista: o que já foi conferido, sem chamar a IA
     sent = []
-    pg.on("request", lambda q: sent.append(q.url) if q.method == "POST" and "/api/news" in q.url else None)
+    pg.on("request", lambda q: sent.append(q.url) if q.method == "POST" and "/api/news" in q.url and not q.url.endswith("/api/news/visto") else None)
+    vistos = []
+    pg.on("request", lambda q: vistos.append(q.post_data) if q.url.endswith("/api/news/visto") else None)
     await pg.locator(".nrow", has_text="Smart TV 55 polegadas").first.click()
     await pg.wait_for_selector("dialog.modal .news li", timeout=4000)
     r.eq(sent, [], "abrir um item mostra o resultado guardado, sem chamar a IA")
@@ -76,6 +78,10 @@ async def body(r, p):
     await pg.wait_for_selector("dialog.sheet", state="detached", timeout=4000)
     await pg.wait_for_timeout(300)
     r.check(pg.url.endswith("#/novidades") and await pg.locator("#p-news-list .nrow").count() > 0, "o Voltar volta para as Novidades")
+    # 1.68.0: abriu, viu: deixa de ser nova na lista
+    tvr = next(x for x in await pg.evaluate(ROWS) if x[0] == "Smart TV 55 polegadas")
+    r.check(vistos and " · 3 novidades · hoje" in tvr[1] and await pg.locator(".nrow", has_text="Smart TV 55 polegadas").locator(".pill.nova").count() == 0,
+            f"aberta, a TV deixa de ser nova na lista ({tvr}, {vistos[:1]})")
 
     # os deixados de fora: no fim da lista, recolhidos, com o nome e a contagem (o padrão dos apps); abrem num toque
     pos = await pg.evaluate("""(() => { const d = document.querySelector('#p-news-list .news-out'); return d ? [d.open, d === d.parentElement.lastElementChild,
@@ -94,7 +100,7 @@ async def body(r, p):
     r.eq(await pg.locator(".news-out .nrow", has_text=nome).count(), 0, "conferido, sai dos deixados de fora")
     if pos[2] > 1:
         r.check(await pg.locator(".news-out[open]").count() == 1, "e a seção continua aberta, para conferir o próximo")
-    r.check("3 novas de 3" in await pg.locator("#p-news-list > div > .nlist .nrow", has_text=nome).first.text_content(), "e entra na lista, com o resultado")
+    r.check(" · 3 novidades · hoje" in await pg.locator("#p-news-list > div > .nlist .nrow", has_text=nome).first.text_content(), "e entra na lista, com o resultado (já vista)")
 
     # de novo na mesma semana: nada a conferir
     await pg.click('[data-act="news-all"]')
@@ -137,7 +143,7 @@ async def body(r, p):
     # 1.49.1: o resumo conta os de agora (antes ficava o número do dia da conferência)
     k = await pg.evaluate("[...document.querySelectorAll('#p-news-list .nrow')].filter(b => !b.closest('.news-out')).length")
     foot = (await pg.text_content('[data-slot="news-job"]')).strip()
-    r.check(f"{k} de {k} com novidades novas" in foot and k == k_antes - 1, f"o resumo sem o que saiu ({foot}, {k}, antes {k_antes})")
+    r.check(f"{k - 2} de {k} com novidades novas" in foot and k == k_antes - 1, f"o resumo sem o que saiu, e sem as duas já vistas ({foot}, {k}, antes {k_antes})")
 
     # 1.62.0: conferido de novo sem nada que não estava antes: as mesmas 3, nenhuma nova; vai para depois dos que têm novas
     tv = next(i["id"] for i in r.data()["items"] if i["name"] == "Smart TV 55 polegadas")
@@ -155,7 +161,7 @@ async def body(r, p):
     r.eq(rows[-1][0], "Smart TV 55 polegadas", "e vai para o fim, depois dos que têm novidades novas")
     await r.shot(pg, "lista-com-novas")
     foot = (await pg.text_content('[data-slot="news-job"]')).strip()
-    r.check(f"{k - 1} de {k} com novidades novas" in foot, f"o resumo conta só os com novas ({foot})")
+    r.check(f"{k - 2} de {k} com novidades novas" in foot, f"o resumo conta só os com novas ({foot})")
     await pg.locator(".nrow", has_text="Smart TV 55 polegadas").first.click()
     await pg.wait_for_selector("dialog.modal .news li", timeout=4000)
     r.eq(await pg.locator("dialog.modal .news .pill.nova").count(), 0, "na janela, nenhuma marcada Nova")

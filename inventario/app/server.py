@@ -3057,6 +3057,26 @@ def news_dismiss(iid: str) -> dict:
     return news_of(iid)
 
 
+def news_seen(body: dict) -> dict:
+    """1.68.0: as novidades de um equipamento (e dos outros cômodos com o mesmo) ou de um app foram vistas (a pessoa abriu
+    a janela ou a ficha): deixam de ser novas na lista. Devolve quantas eram novas."""
+    need_news_on()
+    iid, pkg = str(body.get("item") or ""), str(body.get("pacote") or "")
+    if not iid and not pkg:
+        raise ApiError(400, "Diga o item ou o app.")
+    n = 0
+    with NEWS_LOCK:
+        d = news_read()
+        alvos = [d["itens"].get(i) for i in news_group_ids(iid)] if iid else [d["apps"].get(pkg)]
+        for v in alvos:
+            for x in ((v or {}).get("news") or {}).get("novidades") or [] if isinstance(v, dict) else []:
+                if x.pop("nova", None):
+                    n += 1
+        if n:
+            write_json_atomic(NEWS_FILE, d)
+    return {"vistas": n}
+
+
 def news_before(ids) -> dict | None:
     """A conferência guardada mais recente entre esses itens (o mesmo equipamento em vários cômodos)."""
     its = news_read()["itens"]
@@ -3201,87 +3221,40 @@ def rec_job_start(body: dict) -> dict:
     return {"id": jid}
 
 
-# ---------- Novidades › Eletrônicos (1.65.0): os recursos de todos os eletrônicos de uma vez. Busca só os que ainda não
-# têm (ou que mudaram depois); o mesmo equipamento em vários cômodos é uma busca só, guardada em todos.
+# ---------- Novidades › Eletrônicos (1.65.0): os recursos de todos os eletrônicos. Conferir novidades › Só eletrônicos
+# (1.68.0, na conferência das novidades) busca os que ainda não têm (ou que mudaram depois); o mesmo equipamento em
+# vários cômodos é uma busca só, guardada em todos.
 REC_LOTE_CAT = "eletronicos"
 
 
 def rec_overview() -> dict:
-    """Os eletrônicos e os recursos guardados de cada um ({id: {n, at}}), e a busca de todos em andamento."""
+    """Os eletrônicos e os recursos guardados de cada um ({id: {n, at}}), e o grupo de cada um."""
     need_ai_on()
     itens = {}
     for it in STORE.data["items"]:
         if it.get("cat") == REC_LOTE_CAT:
             r = rec_of(it["id"])
             itens[it["id"]] = {"n": len(r.get("recursos") or []), "at": r.get("at")} if r else None
-    job = next((dict(id=j, stage=v["stage"], msg=v["msg"], progress=v.get("progress"))
-                for j, v in WEB_JOBS.items() if v.get("kind") == "recursos-lote" and v["stage"] == "busy"), None)
-    return {"itens": itens, "grupos": {i: news_group_key(STORE.item(i)) for i in itens}, "job": job}
+    return {"itens": itens, "grupos": {i: news_group_key(STORE.item(i)) for i in itens}}
 
 
-def _rec_batch_run(jid: str):
-    job = WEB_JOBS[jid]
-    done = errors = 0
-    try:
-        groups = {}
-        for it in STORE.sorted_items():
-            if it.get("cat") == REC_LOTE_CAT:
-                groups.setdefault(news_group_key(it), []).append(it)
-        todo = []
-        for ms in groups.values():
-            tem = next((r for r in (rec_of(m["id"]) for m in ms) if r), None)
-            if not tem:
-                todo.append(ms)
-                continue
-            for m in ms:  # o mesmo equipamento noutro cômodo já tem: ganha o mesmo, sem perguntar à IA de novo
-                if not rec_of(m["id"]):
-                    rec_save(m["id"], {k: tem[k] for k in ("recursos", "fonte", "site")})
-        entity = search_entity()
-        for n, ms in enumerate(todo):
-            if job.get("cancelled"):
-                break
-            need_ai_on()
-            it = min(ms, key=lambda m: (len(m["name"]), m["name"]))
-            job["progress"] = {"feitos": n, "total": len(todo), "atual": it["name"]}
-            job["msg"] = f"Buscando {n + 1} de {len(todo)}: {it['name']}"
-            try:
-                found = ai_find_rec(it["name"], " ".join(str(it.get("details") or "").split())[:300], entity)
-            except ApiError as e:
-                if is_quota(e.msg) or e.status == 409:
-                    raise  # a cota acabou ou a IA foi desligada: os próximos também não vão
-                errors += 1
-                continue
-            if job.get("cancelled"):
-                break
-            for m in ms:
-                if not rec_of(m["id"]):
-                    rec_save(m["id"], found)
-            done += 1
-        job.update(stage="done", msg="", summary={"buscados": done, "erros": errors, "total": len(todo)},
-                   progress={"feitos": done, "total": len(todo), "atual": ""})
-    except ApiError as e:
-        job.update(stage="error", msg=e.msg + (f" Os recursos já achados ({done}) ficaram salvos." if done else ""),
-                   summary={"buscados": done, "erros": errors})
-    except Exception:  # noqa: BLE001
-        log.exception("recursos de todos")
-        job.update(stage="error", msg="Não deu para buscar agora. Tente de novo em instantes.")
-
-
-def rec_batch_start() -> dict:
-    need_ai_on()
-    if not SUPERVISOR_TOKEN and not AI_MOCK:
-        raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
-    with WEB_LOCK:
-        for j, v in WEB_JOBS.items():
-            if v.get("kind") == "recursos-lote" and v["stage"] == "busy" and not v.get("cancelled"):
-                return {"id": j}  # já tem uma busca andando: acompanha a mesma
-    web_jobs_cleanup()
-    jid = secrets.token_hex(8)
-    with WEB_LOCK:
-        WEB_JOBS[jid] = {"stage": "busy", "msg": "Começando…", "results": [], "at": time.time(), "kind": "recursos-lote",
-                         "progress": {"feitos": 0, "total": 0, "atual": ""}}
-    threading.Thread(target=_rec_batch_run, args=(jid,), daemon=True).start()
-    return {"id": jid}
+def rec_pending() -> list[list[dict]]:
+    """Os eletrônicos que ainda não têm os recursos, por grupo (o mesmo equipamento em vários cômodos é uma busca só). Um
+    grupo em que algum já tem: os outros ganham os mesmos, sem perguntar à IA de novo."""
+    groups = {}
+    for it in STORE.sorted_items():
+        if it.get("cat") == REC_LOTE_CAT:
+            groups.setdefault(news_group_key(it), []).append(it)
+    todo = []
+    for ms in groups.values():
+        tem = next((r for r in (rec_of(m["id"]) for m in ms) if r), None)
+        if not tem:
+            todo.append(ms)
+            continue
+        for m in ms:
+            if not rec_of(m["id"]):
+                rec_save(m["id"], {k: tem[k] for k in ("recursos", "fonte", "site")})
+    return todo
 
 
 def news_overview() -> dict:
@@ -3351,10 +3324,13 @@ def _news_batch_run(jid: str):
     done = found = errors = 0
     novos = []  # equipamentos com alguma novidade que não estava guardada (para o aviso)
     so = job.get("so") or ""  # 1.58.0: "itens" (Só equipamentos), "apps" (Só apps) ou "" (Todas as novidades)
+    # 1.68.0: "recursos" (Só eletrônicos): os recursos dos eletrônicos que ainda não têm; Todas as novidades (não a sozinha)
+    # busca os recursos também, depois das novidades
     gen = dict(NEWS_GEN)
+    rec_done = 0
     try:
         cats = news_cats()
-        cands = [i for i in STORE.sorted_items() if i.get("cat") in cats] if so != "apps" else []
+        cands = [i for i in STORE.sorted_items() if i.get("cat") in cats] if so in ("", "itens") else []
         d = news_read()
         todo_tri = [i for i in cands if (d["triagem"].get(i["id"]) or {}).get("sig") != item_sig(i)]
         if todo_tri:
@@ -3400,7 +3376,7 @@ def _news_batch_run(jid: str):
         # os apps do celular (com a opção ligada): lê o histórico dos sensores, a IA escolhe os que ainda não viu e entram
         # na mesma conferência, depois dos equipamentos, com o mesmo intervalo
         sel_apps, apps_todo, apps = [], [], {}
-        if apps_enabled() and so != "itens":
+        if apps_enabled() and so in ("", "apps"):
             job["msg"] = "Lendo os apps dos celulares…"
             try:
                 apps_collect(force=True)
@@ -3414,16 +3390,17 @@ def _news_batch_run(jid: str):
             sel_apps = apps_selected(d, apps)
             app_at = lambda p: _ts((d["apps"].get(p) or {}).get("at"))  # noqa: E731
             apps_todo = sorted((p for p in sel_apps if app_at(p) < fresh), key=app_at)
-        total = len(todo) + len(apps_todo)
+        rec_todo = rec_pending() if so == "recursos" or (so == "" and not job.get("auto")) else []
+        total = len(todo) + len(apps_todo) + len(rec_todo)
         job["progress"] = {"feitos": 0, "total": total, "atual": ""}
         entity = search_entity()
         novos_apps = []
-        fila = [("item", ms) for ms in todo] + [("app", p) for p in apps_todo]
+        fila = [("item", ms) for ms in todo] + [("app", p) for p in apps_todo] + [("rec", ms) for ms in rec_todo]
         for n, (tipo, alvo) in enumerate(fila):
             if job.get("cancelled"):
                 break
             need_ai_on()
-            if tipo == "item":
+            if tipo != "app":
                 it = min(alvo, key=lambda m: (len(m["name"]), m["name"]))  # o nome mais curto: "Lâmpada", não "Lâmpadas"
                 nome = it["name"]
             else:
@@ -3433,6 +3410,8 @@ def _news_batch_run(jid: str):
             try:
                 if tipo == "item":
                     res = ai_find_news(it["name"], " ".join(str(it.get("details") or "").split())[:300], entity)
+                elif tipo == "rec":
+                    res = ai_find_rec(it["name"], " ".join(str(it.get("details") or "").split())[:300], entity)
                 else:
                     res = ai_find_app_news(nome, alvo, entity)
             except ApiError as e:
@@ -3442,6 +3421,14 @@ def _news_batch_run(jid: str):
                 continue
             if job.get("cleared"):  # Limpar novidades no meio: nada mais é gravado
                 return
+            if tipo == "rec":
+                if job.get("cancelled"):
+                    break
+                for m in alvo:
+                    if not rec_of(m["id"]):
+                        rec_save(m["id"], res)
+                rec_done += 1
+                continue
             if tipo == "item":
                 ids = [m["id"] for m in alvo]
                 res = news_mark(news_before(ids), res, fora=news_fora(ids))
@@ -3457,13 +3444,15 @@ def _news_batch_run(jid: str):
             done += 1
             found += 1 if res["novidades"] else 0
         summary = {"selecionados": len(groups) + len(sel_apps), "conferidos": done, "com_novidades": found,
-                   "em_dia": len(groups) - len(todo) + len(sel_apps) - len(apps_todo), "erros": errors, "novos": len(novos) + len(novos_apps)}
+                   "em_dia": len(groups) - len(todo) + len(sel_apps) - len(apps_todo), "erros": errors, "novos": len(novos) + len(novos_apps),
+                   "recursos": rec_done, "recursos_total": len(rec_todo)}
         if job.get("cleared"):
             return
-        with NEWS_LOCK:
-            d = news_read()
-            d["ultima"] = {"at": now_iso(), **summary}
-            write_json_atomic(NEWS_FILE, d)
+        if so != "recursos":  # Só eletrônicos não é uma conferência das novidades: o Conferido de antes fica
+            with NEWS_LOCK:
+                d = news_read()
+                d["ultima"] = {"at": now_iso(), **summary}
+                write_json_atomic(NEWS_FILE, d)
         job.update(stage="done", msg="", summary=summary, progress={"feitos": done, "total": total, "atual": ""})
         if job.get("auto") and (novos or novos_apps) and news_aviso() and news_para():
             try:
@@ -3472,9 +3461,9 @@ def _news_batch_run(jid: str):
                 log.warning("aviso das novidades: %s", e.msg)
     except ApiError as e:
         msg = e.msg
-        if done:
-            msg += f" O que já foi conferido ({done}) ficou salvo."
-        job.update(stage="error", msg=msg, summary={"conferidos": done, "com_novidades": found})
+        if done + rec_done:
+            msg += f" O que já foi conferido ({done + rec_done}) ficou salvo."
+        job.update(stage="error", msg=msg, summary={"conferidos": done, "com_novidades": found, "recursos": rec_done})
     except Exception:  # noqa: BLE001
         log.exception("novidades de todos")
         job.update(stage="error", msg="Não deu para conferir agora. Tente de novo em instantes.")
@@ -3510,7 +3499,7 @@ def apps_read() -> dict:
     d = read_json_ok(APPS_FILE, {}) or {}
     if not isinstance(d, dict):
         d = {}
-    for k in ("apps", "lido"):
+    for k in ("apps", "lido", "apagados"):  # apagados (1.68.0): {pacote: quando} os que a pessoa apagou da lista
         if not isinstance(d.get(k), dict):
             d[k] = {}
     return d
@@ -3621,6 +3610,10 @@ def apps_collect(force: bool = False) -> dict:
                 when = str(st.get("last_changed") or st.get("last_updated") or "")
                 if not PKG_RE.fullmatch(pkg) or _ts(when) <= _ts(desde):  # o primeiro é o de antes da leitura: já contado
                     continue
+                if pkg in d["apagados"]:  # apagado da lista: volta só se for usado depois de apagar
+                    if _ts(when) <= _ts(d["apagados"][pkg]):
+                        continue
+                    del d["apagados"][pkg]
                 _app_seen(d["apps"], pkg, when, _app_label(st.get("attributes")), s["pessoas"])
             d["lido"][eid] = agora.isoformat(timespec="seconds")
         if len(d["apps"]) > APPS_MAX:  # os usados há mais tempo saem primeiro
@@ -3729,6 +3722,27 @@ def app_name(pkg: str, apps: dict | None = None, tri: dict | None = None, nomes:
     t = (tri or {}).get(pkg) or {}
     a = (apps or {}).get(pkg) or {}
     return str((nomes or {}).get(pkg) or "") or t.get("nome") or a.get("nome") or pkg.rsplit(".", 1)[-1]
+
+
+def app_remove(pkg: str) -> dict:
+    """1.68.0: Apagar um app de Apps detectados, com o que foi achado dele, a escolha e o nome dado. Volta se for usado de
+    novo no celular depois de apagar (o sensor) ou adicionado de novo (Encontrar apps com IA)."""
+    need_apps_on()
+    with APPS_LOCK:
+        d = apps_read()
+        if pkg not in d["apps"]:
+            raise ApiError(404, "App não encontrado.")
+        del d["apps"][pkg]
+        d["apagados"][pkg] = now_iso()
+        for k in sorted(d["apagados"], key=lambda k: str(d["apagados"][k]))[:max(0, len(d["apagados"]) - APPS_MAX)]:
+            del d["apagados"][k]  # os mais antigos saem (no máximo APPS_MAX lembrados)
+        write_json_atomic(APPS_FILE, d)
+    with NEWS_LOCK:
+        n = news_read()
+        for k in ("apps", "apps_triagem", "apps_nomes"):
+            n[k].pop(pkg, None)
+        write_json_atomic(NEWS_FILE, n)
+    return news_overview()
 
 
 def app_rename(body: dict) -> dict:
@@ -3981,6 +3995,7 @@ def apps_adicionar(body: dict, user_id: str = "") -> dict:
         for x in lidos:
             if x["id"] in d["apps"] or fold(x["nome"]) in nomes:
                 continue
+            d["apagados"].pop(x["id"], None)  # adicionado de novo pela pessoa
             d["apps"][x["id"]] = {"nome": x["nome"], "vezes": 0, "dias": 0, "dia": "", "primeiro": agora, "ultimo": "",
                                   "pessoas": pessoa, "origem": "ia", "adicionado": agora}
             novos.append(x)
@@ -4201,8 +4216,8 @@ def news_auto_loop():
 def news_batch_start(auto: bool = False, so: str = "") -> dict:
     """A conferência de todos (so ""), só dos equipamentos ("itens") ou só dos apps do celular ("apps")."""
     need_news_on()
-    if so not in ("", "itens", "apps"):
-        raise ApiError(400, "Escolha o que conferir: todas as novidades, só os equipamentos ou só os apps.")
+    if so not in ("", "itens", "apps", "recursos"):
+        raise ApiError(400, "Escolha o que conferir: todas as novidades, só os equipamentos, só os apps ou só os eletrônicos.")
     if so == "apps" and not apps_enabled():
         raise ApiError(409, "Ligue Apps do celular em Mais > Configurações > Opções.")
     if not SUPERVISOR_TOKEN and not AI_MOCK:
@@ -4848,12 +4863,19 @@ def r_rec_all_get(h, query):
     h.send_json(rec_overview())
 
 
-def r_rec_all_start(h, query):
-    h.send_json(rec_batch_start(), 202)
+
 
 
 def r_news_app_start(h, query):
     h.send_json(app_news_job_start(h.read_body()), 202)
+
+
+def r_news_seen(h, query):
+    h.send_json(news_seen(h.read_body()))
+
+
+def r_news_app_remove(h, query):
+    h.send_json(app_remove((query.get("pacote") or [""])[0]))
 
 
 def r_news_app_rename(h, query):
@@ -5347,13 +5369,14 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/news/app", r_news_app_start),
     ("PUT", r"/api/news/app", r_news_app_choice),
     ("PUT", r"/api/news/app/nome", r_news_app_rename),  # 1.66.0: Renomear
+    ("DELETE", r"/api/news/app", r_news_app_remove),  # 1.68.0: Apagar um app
+    ("POST", r"/api/news/visto", r_news_seen),  # 1.68.0: abriu as novidades: deixam de ser novas
     ("POST", r"/api/news/apps/ler", r_news_apps_ler),
     ("POST", r"/api/news/apps/adicionar", r_news_apps_add),
     ("GET", r"/api/news/people", r_news_people),
     ("POST", r"/api/news/notify-test", r_news_notify_test),
     ("GET", r"/api/recursos", r_rec_get),
     ("GET", r"/api/recursos/todos", r_rec_all_get),  # 1.65.0: Novidades › Eletrônicos
-    ("POST", r"/api/recursos/todos", r_rec_all_start),
     ("POST", r"/api/recursos", r_rec_start),
     ("GET", r"/api/recursos/([a-f0-9]{16})", r_rec_status),
     ("DELETE", r"/api/recursos/([a-f0-9]{16})", r_news_cancel),

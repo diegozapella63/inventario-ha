@@ -3,8 +3,9 @@ em Mais › Novidades (sem o Home Assistant, os apps de exemplo de um celular de
 de um app (o guardado, sem chamar a IA), Deixar de fora (sai das Novidades e vai para Inativos, nas Opções) e Acompanhar
 (volta e busca); 1.58.0: Todas as novidades, Só equipamentos e Só apps; Apps detectados como sub-opção, com Ver novidades e
 os desligados em Inativos (n); no celular de 320 px e no computador, no escuro e no claro. 1.64.0: Limpar novidades,
-Só equipamentos e Só apps. 1.66.0: Renomear um app. 1.67.0: Buscar app."""
+Só equipamentos e Só apps. 1.66.0: Renomear um app. 1.67.0: Buscar app. 1.68.0: Apagar um app; Só eletrônicos; um botão por linha."""
 import os
+import re
 
 from e2e_lib import OVERFLOW, TEXTS, helpers, main
 
@@ -51,14 +52,16 @@ async def body(r, p):
       const a = o.querySelector('.ot').getBoundingClientRect(), b = d.getBoundingClientRect();
       return [Math.round(b.left - a.left), getComputedStyle(o).borderBottomStyle, getComputedStyle(d).borderTopStyle, getComputedStyle(d).borderRadius]; })()""")
     r.check(sub[0] >= 12 and sub[1] == "none" and sub[2] == "solid" and sub[3] != "0px", f"Apps detectados recuado num quadro, logo abaixo de Apps do celular ({sub})")
-    # o Ver novidades: um botão como os outros dos apps (no lugar da lupa), embaixo do nome e da chave; 1.66.0: com o
-    # Renomear ao lado, os dois do mesmo tamanho, na largura toda da linha
+    # o Ver novidades: um botão como os outros dos apps (no lugar da lupa), embaixo do nome e da chave; 1.68.0: com o
+    # Renomear e o Apagar só com o ícone ao lado, na largura toda da linha
     bts = await pg.evaluate(f"""[...document.querySelectorAll("{det} .app-det-b")].map(b => {{ const li = b.closest('li').getBoundingClientRect(), r = b.getBoundingClientRect();
-      const bs = [...b.querySelectorAll('.btn')].map(x => x.getBoundingClientRect());
-      return [[...b.querySelectorAll('.btn')].map(x => x.textContent.trim()), Math.round(bs[0].height), Math.round(li.width - r.width), r.top > b.closest('li').querySelector('.switch').getBoundingClientRect().bottom - 1,
-        Math.round(bs[0].width) === Math.round(bs[1].width) && Math.round(bs[0].top) === Math.round(bs[1].top)]; }})""")
-    r.check(all(x[0] == ["Ver novidades", "Renomear"] for x in bts), f"cada app com Ver novidades e Renomear ({bts[0][0]})")
-    r.check(all(x[1] >= 44 and x[2] <= 1 and x[3] and x[4] for x in bts), f"lado a lado, do mesmo tamanho, na largura toda, embaixo do nome e da chave ({bts[0]})")
+      const bs = [...b.querySelectorAll('.btn')], q = bs.map(x => x.getBoundingClientRect());
+      return [bs.map(x => x.textContent.trim() || x.getAttribute('aria-label').split(' ')[0]), Math.round(q[0].height), Math.round(li.width - r.width),
+        r.top > b.closest('li').querySelector('.switch').getBoundingClientRect().bottom - 1, q.every(x => Math.round(x.top) === Math.round(q[0].top)),
+        Math.round(q[1].width), Math.round(q[2].width), bs[0].scrollWidth <= bs[0].clientWidth + 1]; }})""")
+    r.check(all(x[0] == ["Ver novidades", "Renomear", "Apagar"] for x in bts), f"cada app com Ver novidades, Renomear e Apagar ({bts[0][0]})")
+    r.check(all(x[1] == 50 and x[2] <= 1 and x[3] and x[4] and x[5] == x[6] == 50 and x[7] for x in bts),
+            f"numa linha, na largura toda, embaixo do nome e da chave; Renomear e Apagar quadrados, só com o ícone ({bts[0]})")
     r.eq(await pg.locator(f"{det} .app-det .ic use[href='#i-search']").count(), 0, "sem a lupa")
     chaves = f"{det} [data-input='app-considerar']"
     r.eq(await pg.evaluate(f"[...document.querySelectorAll(\"{chaves}\")].map(i => i.checked)"), [True] * 5, "1.57.0: cada um com a sua chave, ligada de início")
@@ -75,7 +78,7 @@ async def body(r, p):
     r.eq(((await pg.text_content("dialog.modal .dlg-h h2")).strip(), await pg.input_value("dialog.modal #an-name")), ("Renomear app", "Música Já"), "a janela, com o nome de agora")
     await pg.fill("dialog.modal #an-name", "Música Já Premium")
     await pg.click("dialog.modal [data-ok]")
-    await pg.locator(".toast", has_text="Renomeado: Música Já Premium").wait_for(timeout=4000)
+    await pg.locator(".toast", has_text="Renomeado: Música Já Premium").last.wait_for(timeout=4000)
     r.check("Música Já Premium" in await pg.evaluate(TEXTS, f"{det} .app-det b"), "o nome novo na lista")
     musica = next(a for a in r.api("GET", "api/news")["apps"]["lista"] if a["pacote"] == "com.exemplo.musicaja")
     r.eq((musica["nome"], musica.get("renomeado")), ("Música Já Premium", True), "fica gravado")
@@ -83,7 +86,7 @@ async def body(r, p):
     await pg.wait_for_selector("dialog.modal #an-name", timeout=4000)
     await pg.fill("dialog.modal #an-name", "")
     await pg.click("dialog.modal [data-ok]")
-    await pg.locator(".toast", has_text="Renomeado: Música Já").wait_for(timeout=4000)
+    await pg.locator(".toast", has_text=re.compile(r"Renomeado: Música Já$")).last.wait_for(timeout=4000)
     r.eq(next(a for a in r.api("GET", "api/news")["apps"]["lista"] if a["pacote"] == "com.exemplo.musicaja")["nome"], "Música Já", "vazio: volta ao nome de antes")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "opcoes")
@@ -101,18 +104,19 @@ async def body(r, p):
     sl = await pg.text_content('[data-slot="news-apps"]')
     r.check("Música Já" in sl and "4 apps novos entram na próxima conferência." in sl, f"o buscado sozinho já está na lista; os outros, na próxima ({sl.strip()[:80]})")
 
-    # 1.58.0: Todas as novidades na largura toda; Só equipamentos e Só apps embaixo, dividindo a linha
-    bts = await pg.evaluate("""[...document.querySelectorAll('#p-news [data-act="news-all"]')].map(b => [b.textContent.trim(), b.dataset.so, Math.round(b.getBoundingClientRect().width), Math.round(b.getBoundingClientRect().top)])""")
-    r.eq([(x[0], x[1]) for x in bts], [("Todas as novidades", ""), ("Só equipamentos", "itens"), ("Só apps", "apps")], "os três botões")
-    r.check(bts[1][3] == bts[2][3] > bts[0][3] and abs(bts[1][2] - bts[2][2]) <= 1 and bts[0][2] > bts[1][2] * 1.8, f"Todas em cima, os outros dois lado a lado do mesmo tamanho ({bts})")
+    # 1.58.0: Todas as novidades, Só equipamentos e Só apps; 1.68.0: e Só eletrônicos (os recursos), um botão por linha
+    bts = await pg.evaluate("""[...document.querySelectorAll('#p-news [data-act="news-all"]')].map(b => [b.textContent.trim(), b.dataset.so, Math.round(b.getBoundingClientRect().width), Math.round(b.getBoundingClientRect().top), !!b.querySelector('svg')])""")
+    r.eq([(x[0], x[1]) for x in bts], [("Todas as novidades", ""), ("Só equipamentos", "itens"), ("Só apps", "apps"), ("Só eletrônicos", "recursos")], "os quatro botões")
+    r.check(len({x[2] for x in bts}) == 1 and all(bts[i][3] < bts[i + 1][3] for i in range(3)) and all(x[4] for x in bts), f"um por linha, do mesmo tamanho, com o ícone ({bts})")
     # conferir todos: os equipamentos e os apps
     await pg.click('[data-act="news-all"][data-so=""]')
     await pg.locator(".toast", has_text="Conferidos").wait_for(timeout=60000)
     await pg.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)
     rows = await pg.evaluate(APPS)
     r.eq([x[0] for x in rows], ["Casa Conectada", "Mercadinho", "Música Já"], "os apps que a IA escolheu, em ordem")
-    r.check(all(x[1].startswith("Pessoa de Teste · 2 novas de 2 · hoje") for x in rows), f"de quem é o celular, quantas novidades novas e quando ({rows[0][1]})")
-    r.check(all(x[2] == ["2"] for x in rows) and await pg.locator("#p-news-apps .nrow .pill.nova").count() == len(rows), "quantas novas ao lado, na cor do app (1.62.0: a primeira vez, tudo novo)")
+    r.check(all(x[1].startswith("Pessoa de Teste · 2 novas de 2 · hoje") for x in rows if x[0] != "Música Já"), f"de quem é o celular, quantas novidades novas e quando ({rows[0][1]})")
+    r.check(next(x for x in rows if x[0] == "Música Já")[1].startswith("Pessoa de Teste · 2 novidades · hoje"), "1.68.0: o Música Já, aberto antes, já foi visto")
+    r.check(all(x[2] == ["2"] for x in rows) and await pg.locator("#p-news-apps .nrow .pill.nova").count() == len(rows) - 1, "quantas novas ao lado, na cor do app (1.62.0: a primeira vez, tudo novo; o visto, sem a cor)")
     r.eq(await pg.locator("#p-news-apps .news-out").count(), 0, "1.58.0: sem os deixados de fora aqui (ficam nas Opções, em Inativos)")
     foot = await pg.text_content('[data-slot="news-job"]')
     r.check("com novidades" in foot, f"o resumo conta os apps também ({foot.strip()})")
@@ -121,7 +125,7 @@ async def body(r, p):
 
     # a janela de um app: o que já foi conferido, sem chamar a IA
     sent = []
-    pg.on("request", lambda q: sent.append(q.url) if q.method in ("POST", "PUT") and "/api/news" in q.url else None)
+    pg.on("request", lambda q: sent.append(q.url) if q.method in ("POST", "PUT") and "/api/news" in q.url and not q.url.endswith("/api/news/visto") else None)
     await pg.locator("#p-news-apps .nrow", has_text="Casa Conectada").click()
     await pg.wait_for_selector("dialog.modal .news li", timeout=4000)
     r.eq(sent, [], "abre o guardado, sem chamar a IA")
@@ -178,7 +182,7 @@ async def body(r, p):
     await pg2.wait_for_selector(det, timeout=8000)
     await pg2.click(f"{det} summary")
     cort = await pg2.evaluate(f"""[...document.querySelectorAll("{det} .app-det-b .btn")].filter(b => b.scrollWidth > b.clientWidth + 1 || b.getBoundingClientRect().height > 60).map(b => b.textContent.trim())""")
-    r.eq(cort, [], "320 px: Ver novidades e Renomear sem cortar o texto")
+    r.eq(cort, [], "320 px: Ver novidades sem cortar o texto")
     ctx3, pg3 = await r.page(b, "pc", "dark")
     await r.open(pg3, "#/novidades", "#p-news-apps")
     await pg3.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)
@@ -255,16 +259,24 @@ async def body(r, p):
     await r.shot(pg, "buscar-app")
     await pg.fill(busca, "")
     r.check(len(await pg.evaluate(VIS)) >= 7 and await pg.locator(f"{det} .apps-nada").is_hidden(), "vazio: todos de novo")
+    # 1.68.0: Apagar um app: pede confirmação, sai da lista (e do que foi achado)
+    await pg.click(f"{det} [data-act='app-del'][data-id='ia.mapa_facil']")
+    await pg.wait_for_selector("dialog.modal.narrow [data-r]", timeout=4000)
+    r.eq((await pg.text_content("dialog.modal.narrow h2")).strip(), "Apagar Mapa Fácil?", "pede confirmação")
+    await pg.click('dialog.modal.narrow [data-r="1"]')
+    await pg.locator(".toast", has_text="Mapa Fácil apagado").wait_for(timeout=4000)
+    r.check("Mapa Fácil" not in await pg.evaluate(TEXTS, f"{det} .app-det b"), "sai de Apps detectados")
+    r.check(all(a["pacote"] != "ia.mapa_facil" for a in r.api("GET", "api/news")["apps"]["lista"]), "e do servidor")
 
     await r.open(pg, "#/novidades", "#p-news-apps")
     await pg.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)
     r.check("Mercadinho" not in [x[0] for x in await pg.evaluate(APPS)], "nas Novidades, o desconsiderado sai da lista")
 
-    # 1.64.0: Limpar: Limpar novidades na largura toda, Só equipamentos e Só apps lado a lado embaixo
+    # 1.64.0: Limpar: Limpar novidades, Só equipamentos e Só apps; 1.68.0: um por linha, do mesmo tamanho
     bl = await pg.evaluate("""[...document.querySelectorAll('#p-news-clear .oa .btn')].map(b => { const q = b.getBoundingClientRect();
       return [b.textContent.trim(), Math.round(q.width), Math.round(q.top), !!b.querySelector('svg')]; })""")
-    r.check([x[0] for x in bl] == ["Limpar novidades", "Só equipamentos", "Só apps"] and all(x[3] for x in bl) and bl[1][1] == bl[2][1]
-            and bl[1][2] == bl[2][2] > bl[0][2] and bl[0][1] > bl[1][1] * 1.8, f"Limpar: o de tudo na largura toda, Só equipamentos e Só apps lado a lado ({bl})")
+    r.check([x[0] for x in bl] == ["Limpar novidades", "Só equipamentos", "Só apps"] and all(x[3] for x in bl) and len({x[1] for x in bl}) == 1
+            and bl[0][2] < bl[1][2] < bl[2][2], f"Limpar: um por linha, do mesmo tamanho ({bl})")
     await r.shot(pg, "limpar")
     eq_antes = r.api("GET", "api/news")["itens"]
     antes = [x for x in await pg.evaluate(APPS) if "não conferido" not in x[1]]

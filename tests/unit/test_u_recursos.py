@@ -1,6 +1,5 @@
 """1.54.0: Recursos. O pedido à IA (o produto, os detalhes, a página indicada), a limpeza do que ela responde (nomes
 curtos sem repetir, no máximo 12, a fonte só com http) e as respostas fora do formato ou sem nada."""
-import threading
 import time
 import unittest
 from unittest import mock
@@ -43,31 +42,19 @@ class Limpeza(UnitBase):
 
 
 class Todos(UnitBase):
-    """1.65.0: Buscar todos os recursos: um que a IA não achou conta como erro e os outros seguem; a cota acabou para."""
-    def rodar(self, fake):
-        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S, "ai_find_rec", fake):
-            jid = S.rec_batch_start()["id"]
+    """1.68.0: Conferir novidades › Só eletrônicos (so=recursos): um que a IA não achou conta como erro e os outros seguem;
+    a cota acabou para; Parar não grava o que estava sendo buscado; Todas as novidades (não a sozinha) busca também."""
+    REC = {"produto": "X", "recursos": [{"nome": "Wi-Fi", "detalhe": ""}], "fonte": "", "site": ""}
+
+    def rodar(self, fake, so="recursos", auto=False):
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S, "ai_find_rec", fake), \
+                mock.patch.object(S, "ai_find_news", lambda *a: S.news_clean({"novidades": []})), mock.patch.object(S.time, "sleep", lambda s: None):
+            jid = S.news_batch_start(so=so, auto=auto)["id"]
             job = S.WEB_JOBS[jid]
             t0 = time.time()
             while job["stage"] == "busy" and time.time() - t0 < 10:
                 time.sleep(0.02)
             return job
-
-    def test_uma_busca_andando_acompanha_a_mesma(self):
-        solta = threading.Event()
-
-        def fake(name, details, entity):
-            solta.wait(5)
-            return {"produto": name, "recursos": [{"nome": "Wi-Fi", "detalhe": ""}], "fonte": "", "site": ""}
-        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S, "ai_find_rec", fake):
-            jid = S.rec_batch_start()["id"]
-            self.assertEqual(S.rec_batch_start()["id"], jid)
-            ov = S.rec_overview()
-            self.assertEqual(ov["job"]["id"], jid, "e a lista diz que está andando")
-            solta.set()
-            t0 = time.time()
-            while S.WEB_JOBS[jid]["stage"] == "busy" and time.time() - t0 < 10:
-                time.sleep(0.02)
 
     def test_um_erro_nao_para_os_outros(self):
         calls = []
@@ -76,11 +63,12 @@ class Todos(UnitBase):
             calls.append(name)
             if len(calls) == 1:
                 raise S.ApiError(502, "A IA não achou os recursos deste item.")
-            return {"produto": name, "recursos": [{"nome": "Wi-Fi", "detalhe": ""}], "fonte": "", "site": ""}
+            return self.REC
         job = self.rodar(fake)
         self.assertEqual(job["stage"], "done", job)
-        self.assertEqual((job["summary"]["erros"], job["summary"]["buscados"]), (1, len(calls) - 1))
+        self.assertEqual((job["summary"]["erros"], job["summary"]["recursos"]), (1, len(calls) - 1))
         self.assertGreater(len(calls), 1)
+        self.assertIsNone(S.news_read().get("ultima"), "Só eletrônicos não é uma conferência das novidades")
 
     def test_a_cota_acabou_para(self):
         calls = []
@@ -89,25 +77,31 @@ class Todos(UnitBase):
             calls.append(name)
             if len(calls) == 2:
                 raise S.ApiError(429, "A cota da IA acabou por hoje.")
-            return {"produto": name, "recursos": [{"nome": "Wi-Fi", "detalhe": ""}], "fonte": "", "site": ""}
+            return self.REC
         job = self.rodar(fake)
         self.assertEqual((job["stage"], len(calls)), ("error", 2))
-        self.assertIn("Os recursos já achados (1) ficaram salvos.", job["msg"])
+        self.assertIn("O que já foi conferido (1) ficou salvo.", job["msg"])
 
     def test_parar(self):
         def fake(name, details, entity):
             for j in S.WEB_JOBS.values():
-                if j.get("kind") == "recursos-lote":
+                if j.get("kind") == "lote":
                     j["cancelled"] = True
-            return {"produto": name, "recursos": [{"nome": "Wi-Fi", "detalhe": ""}], "fonte": "", "site": ""}
+            return self.REC
         job = self.rodar(fake)
-        self.assertEqual((job["stage"], job["summary"]["buscados"]), ("done", 0), "parou: o que estava sendo buscado não grava")
+        self.assertEqual(job["summary"]["recursos"], 0, "parou: o que estava sendo buscado não grava")
 
-    def test_um_erro_inesperado(self):
+    def test_todas_busca_os_recursos_a_sozinha_nao(self):
+        calls = []
+
         def fake(name, details, entity):
-            raise ValueError("x")
-        job = self.rodar(fake)
-        self.assertEqual((job["stage"], job["msg"]), ("error", "Não deu para buscar agora. Tente de novo em instantes."))
+            calls.append(name)
+            return self.REC
+        job = self.rodar(fake, so="", auto=True)
+        self.assertEqual((job["stage"], calls), ("done", []), "o Conferir sozinho não busca os recursos")
+        job = self.rodar(fake, so="")
+        self.assertEqual(job["stage"], "done", job)
+        self.assertTrue(calls and job["summary"]["recursos"] == len(calls), "Todas as novidades busca os recursos que faltam")
 
 
 if __name__ == "__main__":

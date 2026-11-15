@@ -84,6 +84,24 @@ class Apps(unittest.TestCase):
             time.sleep(0.1)
         self.assertEqual(st["stage"], "done", st)
 
+    def test_6_abrir_um_app_deixa_de_ser_nova(self):
+        self.ligar()
+        self.app.ok("GET", "api/news")
+        self.conferir(MUSICA)
+        res = lambda: next(a for a in self.app.ok("GET", "api/news")["apps"]["lista"] if a["pacote"] == MUSICA)["res"]  # noqa: E731
+        self.assertTrue(any(n.get("nova") for n in res()["news"]["novidades"]))
+        self.assertGreater(self.app.ok("POST", "api/news/visto", {"pacote": MUSICA})["vistas"], 0)
+        self.assertFalse(any(n.get("nova") for n in res()["news"]["novidades"]))
+
+    def test_7_apagar_um_app(self):
+        """1.68.0: sai de Apps detectados com o que foi achado."""
+        self.ligar()
+        self.app.ok("GET", "api/news")
+        self.conferir(MUSICA)
+        ov = self.app.ok("DELETE", f"api/news/app?pacote={MUSICA}")
+        self.assertNotIn(MUSICA, [a["pacote"] for a in ov["apps"]["lista"]])
+        self.erro("DELETE", f"api/news/app?pacote={MUSICA}", None, 404, "App não encontrado.")
+
     def test_5_renomear_um_app(self):
         """1.66.0: o nome que a pessoa dá vale na lista e na busca; vazio volta ao de antes; fica depois de Limpar."""
         self.ligar()

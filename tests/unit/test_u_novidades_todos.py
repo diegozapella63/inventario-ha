@@ -252,7 +252,7 @@ class Lote(UnitBase):
             job = next(j for j in server.WEB_JOBS.values() if j.get("kind") == "lote")
             seen.append(dict(job["progress"]))
             return novidade()
-        with mock.patch.object(server, "ai_find_news", fake):
+        with mock.patch.object(server, "ai_find_news", fake), mock.patch.object(server, "rec_pending", lambda: []):  # (1.68.0: só as novidades)
             self.run_batch()
         self.assertEqual(seen[0]["feitos"], 0)
         self.assertEqual(seen[1]["feitos"], 1)

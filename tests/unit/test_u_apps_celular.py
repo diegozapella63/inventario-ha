@@ -83,6 +83,29 @@ class Coleta(ComHA):
         self.assertEqual(d["apps"][CASA]["vezes"], 2, "o estado de antes da leitura (o primeiro do histórico) não conta de novo")
         self.assertEqual(d["apps"][MERCADO]["vezes"], 1)
 
+    def test_apagar_um_app_volta_so_se_for_usado_depois(self):
+        """1.68.0: apagado da lista, sai com o que foi achado, a escolha e o nome dado; o uso de antes não traz de volta,
+        um uso depois de apagar traz (como novo); adicionado de novo pela pessoa, volta também."""
+        server.apps_collect(force=True)
+        n = server.news_read()
+        n["apps"][CASA] = {"at": quando(hours=1), "news": {"novidades": []}}
+        n["apps_triagem"][CASA] = {"conferir": True}
+        n["apps_nomes"][CASA] = "Casa Esperta"
+        server.write_json_atomic(server.NEWS_FILE, n)
+        with mock.patch.object(server, "need_apps_on", lambda: None), mock.patch.object(server, "news_overview", lambda: {}):
+            server.app_remove(CASA)
+            with self.assertRaises(server.ApiError) as e:
+                server.app_remove(CASA)
+            self.assertEqual(e.exception.status, 404)
+        n = server.news_read()
+        self.assertEqual((CASA in n["apps"], CASA in n["apps_triagem"], CASA in n["apps_nomes"]), (False, False, False))
+        d = server.apps_collect(force=True)
+        self.assertNotIn(CASA, d["apps"], "o uso de antes não traz de volta")
+        self.assertIn(CASA, d["apagados"])
+        self.ha.history[SENSOR].append(estado(CASA, quando(seconds=-30), "Casa Conectada"))
+        d = server.apps_collect(force=True)
+        self.assertEqual((CASA in d["apps"], CASA in d["apagados"]), (True, False), "usado depois de apagar: volta")
+
     def test_le_o_historico_de_novo_so_depois_de_10_minutos(self):
         server.apps_collect()
         server.apps_collect()
