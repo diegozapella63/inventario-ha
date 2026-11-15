@@ -3048,7 +3048,21 @@
     const dlg = entry.dlg, slot = $('[data-slot="news"]', dlg), again = $("[data-again]", dlg), fora = $("[data-fora]", dlg), dentro = $("[data-dentro]", dlg);
     const show = (html, done) => { slot.innerHTML = html; again.hidden = !done; fora.hidden = !done; dentro.hidden = true; };
     const error = (m) => show(`<p class="formerr">${esc(m)}</p>`, true);
-    const render = (r) => { show(newsListHtml(r, { name: a.nome }), true); seenNews({ pacote: a.pacote }, r); };
+    // 1.70.0: Apagar as novidades do app (como as de um equipamento): não voltam nas próximas conferências
+    const render = (r) => {
+      show(newsListHtml(r, { name: a.nome }) + (newsCount(r) ? `<div class="app-news-del"><button type="button" class="btn block" data-apagar-app>${ic("trash")}Apagar</button></div>` : ""), true);
+      seenNews({ pacote: a.pacote }, r);
+    };
+    async function dismissApp() {
+      const ok = await confirmBox({ title: "Apagar as novidades?", body: "Elas não voltam nas próximas conferências.", ok: "Apagar", danger: true });
+      if (!ok) return;
+      try {
+        const r = await API.del(`api/news?pacote=${encodeURIComponent(a.pacote)}`);
+        update((x) => ({ ...x, res: r }));
+        if (document.contains(dlg)) render(r);
+        toast("Novidades apagadas.");
+      } catch (e) { fail(e); }
+    }
     const update = (fn) => { // o app na lista das Novidades, sem ler tudo de novo
       const L = (newsOv && newsOv.apps && newsOv.apps.lista) || [];
       const k = L.findIndex((x) => x.pacote === a.pacote);
@@ -3091,6 +3105,7 @@
     dlg.addEventListener("click", (e) => {
       if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
       if (e.target.closest("[data-again]")) start();
+      if (e.target.closest("[data-apagar-app]")) dismissApp();
       if (e.target.closest("[data-fora]")) choose(false);
       if (e.target.closest("[data-dentro]")) choose(true);
     });

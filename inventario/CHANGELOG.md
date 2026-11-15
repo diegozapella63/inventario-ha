@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.70.0
+
+- **Novidades › Apps do celular**: **Apagar**, na janela das novidades de um app, apaga o que foi achado dele, como já dava nos equipamentos. Elas não voltam nas próximas conferências; o que sair de novo aparece.
+- Muitos pedidos ao mesmo tempo (as fotos de um cômodo carregando, vários celulares abertos) não derrubam mais a conexão com o app.
+
 ## 1.69.0
 
 - **Conversar › Clipe**: manda junto uma foto ou um PDF: **Tirar foto**, **Escolher fotos** (a galeria) ou **Escolher arquivo**. A IA olha o arquivo para responder ("o que diz esta etiqueta?").

@@ -2947,7 +2947,7 @@ def news_read() -> dict:
     d = read_json_ok(NEWS_FILE, {}) or {}
     if not isinstance(d, dict):
         d = {}
-    for k in ("itens", "triagem", "apps", "apps_triagem", "apagadas", "apps_nomes"):  # apps_nomes (1.66.0): o nome que a pessoa deu  # apps: as novidades de cada app do celular; apps_triagem: a escolha
+    for k in ("itens", "triagem", "apps", "apps_triagem", "apagadas", "apps_nomes", "apps_apagadas"):  # apps_apagadas (1.70.0): por app  # apps_nomes (1.66.0): o nome que a pessoa deu  # apps: as novidades de cada app do celular; apps_triagem: a escolha
         # apagadas (1.63.0): por item, as novidades que a pessoa apagou (a fonte e o título), que não voltam
         if not isinstance(d.get(k), dict):
             d[k] = {}
@@ -2986,7 +2986,7 @@ def news_clear(so: str = "") -> dict:
         if so != "apps":
             d.update(itens={}, triagem={}, apagadas={})
         if so != "itens":  # dos apps, fica o que a pessoa escolheu (Acompanhar e Deixar de fora): não é escolha da IA
-            d.update(apps={}, apps_triagem={k: v for k, v in d["apps_triagem"].items() if isinstance(v, dict) and v.get("manual")})
+            d.update(apps={}, apps_apagadas={}, apps_triagem={k: v for k, v in d["apps_triagem"].items() if isinstance(v, dict) and v.get("manual")})
         if not so:
             d["ultima_at"] = (d.get("ultima") or {}).get("at") or d.get("ultima_at")
             d.pop("ultima", None)
@@ -3034,6 +3034,30 @@ def news_fora(ids) -> set[str]:
 
 
 NEWS_APAGADAS_MAX = 60  # por item, as últimas apagadas (a IA traz só as 3 mais recentes)
+
+
+def app_news_fora(pkg: str) -> set[str]:
+    """1.70.0: as novidades apagadas de um app, que não voltam nas próximas conferências."""
+    return {k for k in (news_read()["apps_apagadas"].get(pkg) or []) if isinstance(k, str)}
+
+
+def app_news_dismiss(pkg: str) -> dict:
+    """1.70.0: apaga as novidades achadas de um app (como as de um equipamento, 1.63.0): não voltam nas próximas
+    conferências; o que sair de novo aparece. Devolve o que a janela mostra ({at, news}, com novidades vazias)."""
+    need_news_on()
+    need_apps_on()
+    with NEWS_LOCK:
+        d = news_read()
+        v = d["apps"].get(pkg)
+        if not isinstance(v, dict) or not isinstance(v.get("news"), dict):
+            raise ApiError(404, "Este app não tem novidades.")
+        ks = [k for k in (d["apps_apagadas"].get(pkg) or []) if isinstance(k, str)]
+        for n in v["news"].get("novidades") or []:
+            ks += [k for k in news_keys(n) if k not in ks]
+        d["apps_apagadas"][pkg] = ks[-NEWS_APAGADAS_MAX:]
+        v["news"] = {**v["news"], "novidades": [], "apagadas": len(v["news"].get("novidades") or []) + int(v["news"].get("apagadas") or 0)}
+        write_json_atomic(NEWS_FILE, d)
+    return {"at": v.get("at"), "news": v["news"]}
 
 
 def news_dismiss(iid: str) -> dict:
@@ -3437,7 +3461,7 @@ def _news_batch_run(jid: str):
                 for m in alvo:
                     news_save_result(m["id"], res, gen["itens"])
             else:
-                res = news_mark((news_read()["apps"].get(alvo) or {}).get("news"), res)
+                res = news_mark((news_read()["apps"].get(alvo) or {}).get("news"), res, fora=app_news_fora(alvo))
                 if any(x.get("nova") for x in res["novidades"]):
                     novos_apps.append(nome)
                 app_news_save(alvo, res, gen["apps"])
@@ -3832,7 +3856,7 @@ def _app_news_job_run(jid: str, pkg: str, nome: str, entity: str):
     try:
         found = ai_find_app_news(nome, pkg, entity)
         if not job.get("cancelled"):
-            found = news_mark((news_read()["apps"].get(pkg) or {}).get("news"), found)
+            found = news_mark((news_read()["apps"].get(pkg) or {}).get("news"), found, fora=app_news_fora(pkg))
             app_news_save(pkg, found, gen)
             job.update(stage="done", msg="", news=found)
     except ApiError as e:
@@ -4879,6 +4903,9 @@ def r_news_overview(h, query):
 
 def r_news_clear(h, query):
     iid = (query.get("item") or [""])[0]  # 1.63.0: as de um equipamento só (Apagar, na janela dele)
+    pkg = (query.get("pacote") or [""])[0]  # 1.70.0: as de um app só
+    if pkg:
+        return h.send_json(app_news_dismiss(pkg))
     h.send_json(news_dismiss(iid) if iid else news_clear((query.get("so") or [""])[0]))  # 1.64.0: so=itens ou so=apps
 
 
@@ -5461,6 +5488,13 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
 ]]
 
 
+class Servidor(ThreadingHTTPServer):
+    """A fila de 5 conexões do padrão recusava pedidos quando chegavam muitos juntos (as miniaturas de um cômodo, vários
+    aparelhos ao mesmo tempo): a conexão caía antes de ser atendida."""
+    daemon_threads = True
+    request_queue_size = 128
+
+
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     STORE.load()
@@ -5469,8 +5503,7 @@ def main():
     threading.Thread(target=usage_sensor_loop, daemon=True).start()
     threading.Thread(target=news_auto_loop, daemon=True).start()
     threading.Thread(target=conexao_loop, daemon=True).start()
-    srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    srv.daemon_threads = True
+    srv = Servidor(("0.0.0.0", PORT), Handler)
     log.info("InventarIA %s ouvindo na porta %d%s", VERSION, PORT, " (modo dev)" if DEV else "")
     try:
         srv.serve_forever()

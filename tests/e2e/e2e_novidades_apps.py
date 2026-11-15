@@ -146,6 +146,21 @@ async def body(r, p):
     await pg.click('[data-act="news-all"][data-so="apps"]')
     await pg.locator(".toast", has_text="Conferid").wait_for(timeout=30000)
     r.eq(corpos, ['{"so":"apps"}'], "Só apps pede só os apps")
+    await pg.click("#p-news-apps [data-act='app-open'][data-id='com.exemplo.mercadinho']")
+    await pg.wait_for_selector("dialog.modal .news li", timeout=10000)
+    # 1.70.0: Apagar as novidades do app, como as de um equipamento: pede confirmação, somem e não voltam ao buscar de novo
+    r.check(await pg.locator("dialog.modal [data-apagar-app]").is_visible(), "1.70.0: Apagar, embaixo das novidades do app")
+    await r.shot(pg, "app-apagar")
+    await pg.click("dialog.modal [data-apagar-app]")
+    await pg.click("dialog.modal.narrow [data-r='1']")
+    await pg.locator(".toast", has_text="Novidades apagadas.").last.wait_for(timeout=4000)
+    r.eq(await pg.locator("dialog.modal .news li").count(), 0, "as novidades do app somem")
+    merc = next(a for a in r.api("GET", "api/news")["apps"]["lista"] if a["pacote"] == "com.exemplo.mercadinho")
+    r.eq((merc["res"]["news"]["novidades"], merc["res"]["news"]["apagadas"] > 0), ([], True), "gravado no servidor")
+    await pg.click("dialog.modal [data-again]")
+    await pg.wait_for_function("!document.querySelector('dialog.modal .wbusy')", timeout=15000)
+    r.eq(await pg.locator("dialog.modal .news li").count(), 0, "buscar de novo: as apagadas não voltam")
+    await pg.click("dialog.modal [data-x]")
 
     # Acompanhar: nas Opções, em Inativos, o Ver novidades do app deixado de fora; volta e busca
     await r.open(pg, "#/config/opcoes", "#p-news-opts")

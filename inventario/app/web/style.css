@@ -913,6 +913,7 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 /* 1.63.0: Buscar de novo e Apagar lado a lado, do mesmo tamanho */
 .inews-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
 .inews-acts > .btn { width: 100%; min-width: 0; justify-content: center; }
+.app-news-del { margin-top: 14px; }  /* 1.70.0: Apagar as novidades de um app */
 .inews > .formerr { margin: 10px 0 0; }
 .inews .wbusy { padding: 8px 4px; }
 /* tarefas no ResolvIA, na ficha do item */

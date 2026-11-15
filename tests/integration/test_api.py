@@ -260,7 +260,11 @@ class Robustez(ServerCase):
         erros = []
 
         def cria(n):
-            st, _, out = self.app.post("api/items", {"room": "lavanderia", "name": f"Pregador {n}"})
+            try:
+                st, _, out = self.app.post("api/items", {"room": "lavanderia", "name": f"Pregador {n}"})
+            except OSError as e:  # a conexão recusada (a fila do servidor cheia) também conta como erro
+                erros.append(repr(e))
+                return
             if st != 201:
                 erros.append(out)
 

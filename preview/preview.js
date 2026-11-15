@@ -351,7 +351,7 @@
           j.recs = (j.recs || 0) + 1;
           continue;
         }
-        const news = it.app ? markNews((ST.news.apps[it.app] || {}).news, exampleAppNews(it.name)) : markNews((ST.news.itens[it.id] || {}).news, exampleNews(it.name), (ST.news.apagadas || {})[it.id]);
+        const news = it.app ? markNews((ST.news.apps[it.app] || {}).news, exampleAppNews(it.name), (ST.news.apps_apagadas || {})[it.app]) : markNews((ST.news.itens[it.id] || {}).news, exampleNews(it.name), (ST.news.apagadas || {})[it.id]);
         if (news.novidades.some((x) => x.nova)) j.novos = (j.novos || 0) + 1;
         if (it.app) ST.news.apps[it.app] = { at: new Date().toISOString(), news };
         else for (const x of sameGroup(it)) ST.news.itens[x.id] = { at: new Date().toISOString(), news };
@@ -391,6 +391,15 @@
         v.news = { ...v.news, novidades: [], apagadas: v.news.novidades.length + (v.news.apagadas || 0) };
       }
       return ST.news.itens[it.id] || {};
+    }
+    if (method === "DELETE" && path.startsWith("api/news?pacote=")) { // 1.70.0: Apagar as de um app
+      const pkg = decodeURIComponent(path.slice("api/news?pacote=".length));
+      const v = ST.news.apps[pkg];
+      if (!v || !v.news) fail("Este app não tem novidades.", 404);
+      ST.news.apps_apagadas = ST.news.apps_apagadas || {};
+      ST.news.apps_apagadas[pkg] = [...(ST.news.apps_apagadas[pkg] || []), ...v.news.novidades.flatMap((n) => [n.fonte, plain(n.titulo)])];
+      v.news = { ...v.news, novidades: [], apagadas: v.news.novidades.length + (v.news.apagadas || 0) };
+      return v;
     }
     if (method === "DELETE" && path === "api/news") {
       for (const [id, j] of ST.jobs) if (j.lote) { j.done = true; ST.jobs.delete(id); }
@@ -536,7 +545,7 @@
       if (!j) fail("Esta busca terminou. Busque de novo.", 404);
       aiOff();
       if (Date.now() - j.at < 1600) return { stage: "busy", msg: "Procurando novidades…" };
-      if (j.app) { const news = markNews((ST.news.apps[j.app] || {}).news, exampleAppNews(j.name)); ST.news.apps[j.app] = { at: new Date().toISOString(), news }; return { stage: "done", msg: "", example: true, news }; }
+      if (j.app) { const news = markNews((ST.news.apps[j.app] || {}).news, exampleAppNews(j.name), (ST.news.apps_apagadas || {})[j.app]); ST.news.apps[j.app] = { at: new Date().toISOString(), news }; return { stage: "done", msg: "", example: true, news }; }
       const news = markNews((ST.news.itens[j.item] || {}).news, exampleNews(j.name), (ST.news.apagadas || {})[j.item]);
       const it = d.items.find((i) => i.id === j.item);
       for (const x of it ? sameGroup(it) : [{ id: j.item }]) ST.news.itens[x.id] = { at: new Date().toISOString(), news };

@@ -102,6 +102,25 @@ class Apps(unittest.TestCase):
         self.assertNotIn(MUSICA, [a["pacote"] for a in ov["apps"]["lista"]])
         self.erro("DELETE", f"api/news/app?pacote={MUSICA}", None, 404, "App não encontrado.")
 
+    def test_8_apagar_as_novidades_de_um_app(self):
+        """1.70.0: DELETE api/news?pacote= apaga as novidades achadas do app (como as de um equipamento); elas não voltam ao
+        buscar de novo, e Limpar só apps começa do zero."""
+        self.ligar()
+        self.app.ok("GET", "api/news")
+        self.conferir(CASA)
+        n = len(next(a for a in self.app.ok("GET", "api/news")["apps"]["lista"] if a["pacote"] == CASA)["res"]["news"]["novidades"])
+        self.assertGreater(n, 0)
+        r = self.app.ok("DELETE", f"api/news?pacote={CASA}")
+        self.assertEqual((r["news"]["novidades"], r["news"]["apagadas"]), ([], n))
+        casa = lambda: next(a for a in self.app.ok("GET", "api/news")["apps"]["lista"] if a["pacote"] == CASA)  # noqa: E731
+        self.assertEqual(casa()["res"]["news"]["novidades"], [], "a lista também")
+        self.conferir(CASA)
+        self.assertEqual((casa()["res"]["news"]["novidades"], casa()["res"]["news"]["apagadas"]), ([], n), "buscar de novo: não voltam")
+        self.erro("DELETE", f"api/news?pacote={MUSICA}", None, 404, "Este app não tem novidades.")
+        self.app.ok("DELETE", "api/news?so=apps")
+        self.conferir(CASA)
+        self.assertEqual(len(casa()["res"]["news"]["novidades"]), n, "Limpar só apps começa do zero: voltam")
+
     def test_5_renomear_um_app(self):
         """1.66.0: o nome que a pessoa dá vale na lista e na busca; vazio volta ao de antes; fica depois de Limpar."""
         self.ligar()
