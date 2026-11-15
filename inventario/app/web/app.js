@@ -838,7 +838,7 @@
       box?.focus({ preventScroll: true });
     }
     if (base.name === "data") loadDataPanels();
-    if (base.name === "news") loadNews();
+    if (base.name === "news") { loadNews(); loadRecAll(); }
     if (base.name === "charts") drawArea();
     if (navigated && slideFrom) { // a tela nova entra pelo lado para onde o dedo foi
       const dir = slideFrom;
@@ -1585,6 +1585,12 @@
       <h2>${secIc("phone")}Apps do celular</h2>
       <div data-slot="news-apps"><p class="muted">Carregando…</p></div>
     </section>` : ""}
+    ${aiOn() ? `<section class="panel" id="p-news-rec">
+      <h2>${secIc("sliders")}Eletrônicos</h2>
+      <div data-slot="rec-list"><p class="muted">Carregando…</p></div>
+      <button type="button" class="btn block" data-act="rec-all">${ic("spark")}Buscar todos os recursos</button>
+      <div data-slot="rec-job"></div>
+    </section>` : ""}
     <section class="panel" id="p-news">
       <h2>${secIc("spark")}Conferir novidades</h2>
       <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos eletrônicos${appsOn() ? " e dos apps do celular" : ""}.</p>
@@ -1731,6 +1737,133 @@
     if (st.stage === "done") toast(sm.conferidos ? `Conferidos ${int(sm.conferidos)}: ${int(sm.novos || 0)} com novidades novas.` : "Tudo conferido nos últimos 7 dias.");
     await loadNews();
     if (st.stage === "error") renderNewsJob(st);
+  }
+  // -- Novidades › Eletrônicos (1.65.0): os recursos de cada eletrônico (o mesmo em vários cômodos numa linha só), e
+  // Buscar todos os recursos busca os que ainda não têm; um toque abre os recursos, como na ficha
+  let recOv = null, recJob = null, recTimer = null;
+  async function loadRecAll() {
+    if (!aiOn()) return;
+    try { recOv = await API.get("api/recursos/todos"); }
+    catch (e) { const sl = $('#view [data-slot="rec-list"]'); if (sl) sl.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+    renderRecAll();
+    if (recOv.job && !recJob) { recJob = recOv.job.id; pollRecAll(); }
+  }
+  function recGroups() {
+    const res = (recOv && recOv.itens) || {}, grp = (recOv && recOv.grupos) || {}, by = new Map();
+    for (const it of D.items.filter((x) => x.id in res)) {
+      const k = grp[it.id] || it.id;
+      if (!by.has(k)) by.set(k, []);
+      by.get(k).push(it);
+    }
+    return [...by.values()].map((items) => {
+      const it = [...items].sort((a, b) => a.name.length - b.name.length || a.name.localeCompare(b.name, "pt-BR"))[0];
+      const r = items.map((x) => res[x.id]).filter(Boolean).sort((a, b) => String(b.at).localeCompare(String(a.at)))[0] || null;
+      return { it, r, items, open: items.find((x) => r && res[x.id] === r) || it };
+    });
+  }
+  function renderRecAll() {
+    const sl = $('#view [data-slot="rec-list"]');
+    if (!sl || !recOv) return;
+    const gs = recGroups().sort((a, b) => Number(!a.r) - Number(!b.r) || a.it.name.localeCompare(b.it.name, "pt-BR"));
+    sl.innerHTML = gs.length ? `<ul class="nlist">${gs.map(({ r, items, it, open }) => {
+      const rooms = [...new Set(items.map((x) => x.room))];
+      const where = rooms.length > 1 ? plural(rooms.length, "cômodo", "cômodos") : (D.roomById.get(rooms[0])?.name || "");
+      const st = r ? `${plural(r.n, "recurso", "recursos")} · ${whenShort(r.at)}` : "Ainda não buscado";
+      return `<li><button type="button" class="nrow" data-act="rec-open" data-id="${esc(open.id)}">
+        <span class="nb"><b>${esc(it.name)}</b><span class="nm">${esc(where)} · ${esc(st)}</span></span>
+        ${r ? `<span class="pill">${int(r.n)}</span>` : ""}${ic("chev", "sm")}</button></li>`;
+    }).join("")}</ul>` : `<p class="muted">Nenhum item em Eletrônicos.</p>`;
+    const b = $('#view [data-act="rec-all"]');
+    if (b) b.hidden = !gs.length;
+    if (!recJob) renderRecJob(null);
+  }
+  function renderRecJob(st) {
+    const js = $('#view [data-slot="rec-job"]');
+    if (!js) return;
+    const b = $('#view [data-act="rec-all"]');
+    if (b) b.disabled = !!(st && st.stage === "busy");
+    if (st && st.stage === "busy") {
+      const p = st.progress || {}, pct = p.total ? Math.round((p.feitos / p.total) * 100) : 0;
+      js.innerHTML = `<div class="njob" aria-live="polite"><p><span class="spin"></span><span>${esc(st.msg || "Buscando…")}</span></p>
+        <div class="prog" role="progressbar" aria-label="Progresso" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>
+        <button type="button" class="btn sm" data-act="rec-cancel">${ic("close", "sm")}Parar</button></div>`;
+      return;
+    }
+    js.innerHTML = st && st.stage === "error" ? `<p class="formerr njob">${esc(st.msg)}</p>` : "";
+  }
+  async function startRecAll() {
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return; }
+    try { recJob = (await API.post("api/recursos/todos", {})).id; renderRecJob({ stage: "busy", msg: "Começando…" }); pollRecAll(); }
+    catch (e) { fail(e); }
+  }
+  async function pollRecAll() {
+    clearTimeout(recTimer);
+    if (!recJob) return;
+    let st;
+    try { st = await API.get(`api/recursos/${recJob}`); }
+    catch (e) { recJob = null; renderRecJob({ stage: "error", msg: e.message }); return; }
+    if (st.stage === "busy") {
+      renderRecJob(st);
+      if ($('#view [data-slot="rec-job"]')) recTimer = setTimeout(pollRecAll, 1500); else recJob = null; // saiu da tela: segue no servidor
+      return;
+    }
+    API.del(`api/recursos/${recJob}`).catch(() => {});
+    recJob = null;
+    const sm = st.summary || {};
+    if (st.stage === "done") toast(sm.total ? `Recursos de ${plural(sm.buscados || 0, "eletrônico", "eletrônicos")}${sm.erros ? ` (${int(sm.erros)} sem resposta)` : ""}.` : "Todos os eletrônicos já têm os recursos.");
+    await loadRecAll();
+    if (st.stage === "error") renderRecJob(st);
+  }
+  async function cancelRecAll() {
+    if (!recJob) return;
+    const j = recJob;
+    recJob = null;
+    clearTimeout(recTimer);
+    await API.del(`api/recursos/${j}`).catch(() => {});
+    toast("Busca parada. Os recursos já achados ficaram salvos.");
+    loadRecAll();
+  }
+  // a janela dos recursos de um eletrônico: o guardado, sem chamar a IA; sem nada guardado, busca
+  function openRec(it) {
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return; }
+    let job = null, timer = null, gen = 0;
+    const entry = openDialog({
+      cls: "modal", label: "Recursos",
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("sliders", "Recursos")}</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <div class="dlg-b"><p class="news-of">${esc(it.name)}</p><div data-slot="rec" aria-live="polite"></div></div>
+        <div class="dlg-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Ver de novo</button><span class="grow"></span>
+          <button type="button" class="btn primary" data-item>${ic("external")}Ver item</button></div></div>`,
+      onClose: () => { gen++; clearTimeout(timer); if (job) API.del(`api/recursos/${job}`).catch(() => {}); job = null; },
+    });
+    const dlg = entry.dlg, slot = $('[data-slot="rec"]', dlg), again = $("[data-again]", dlg);
+    const show = (html, done) => { slot.innerHTML = html; again.hidden = !done; };
+    const render = (r) => show(`<ul class="rec-list">${(r.recursos || []).map((x) => `<li><b>${esc(x.nome)}</b>${x.detalhe ? `<span>${esc(x.detalhe)}</span>` : ""}</li>`).join("")}</ul>
+      ${r.fonte ? `<p class="rec-src">Fonte: <a href="${esc(r.fonte)}" target="_blank" rel="noopener">${esc(r.site || r.fonte)}</a></p>` : ""}`, true);
+    async function poll(my) {
+      let st;
+      try { st = await API.get(`api/recursos/${job}`); }
+      catch (e) { if (my === gen) show(`<p class="formerr">${esc(e.message)}</p>`, true); return; }
+      if (my !== gen) return;
+      if (st.stage === "busy") { timer = setTimeout(() => poll(my), 1200); return; }
+      API.del(`api/recursos/${job}`).catch(() => {});
+      job = null;
+      if (st.stage === "error") { show(`<p class="formerr">${esc(st.msg)}</p>`, true); return; }
+      render(st.rec || {});
+      loadRecAll();
+    }
+    async function start() {
+      const my = ++gen;
+      show(`<div class="wbusy"><span class="spin"></span><p><b>Procurando os recursos…</b><span>Pode levar até um minuto.</span></p></div>`, false);
+      try { job = (await API.post("api/recursos", { item: it.id })).id; }
+      catch (e) { if (my === gen) show(`<p class="formerr">${esc(e.message)}</p>`, true); return; }
+      poll(my);
+    }
+    dlg.addEventListener("click", (e) => {
+      if (e.target.closest("[data-again]")) start();
+      if (e.target.closest("[data-item]")) { finalizeThen(entry, () => nav(`#/i/${encodeURIComponent(it.id)}`)); return; } // a ficha; o Voltar volta para as Novidades
+    });
+    const my0 = gen;
+    API.get(`api/recursos?item=${encodeURIComponent(it.id)}`).then((r) => { if (my0 === gen) { if (r && r.recursos && r.recursos.length) render(r); else start(); } }).catch(() => { if (my0 === gen) start(); });
   }
   // 1.64.0: Limpar todas, só as dos equipamentos ou só as dos apps do celular
   async function clearNews(so = "") {
@@ -4539,6 +4672,9 @@
         API.post("api/news/notify-test", { who: "eu" }).then(() => toast("Aviso enviado para o seu celular."), fail).finally(() => { b.disabled = !!newsTestWhy(); });
         break;
       case "news-open": { const it = D.itemById.get(b.dataset.id); if (it) openNews(it); break; }
+      case "rec-open": { const it = D.itemById.get(b.dataset.id); if (it) openRec(it); break; }
+      case "rec-all": startRecAll(); break;
+      case "rec-cancel": cancelRecAll(); break;
       case "apps-ia": openAppsFinder(); break;
       case "app-open": { const a = ((newsOv && newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === b.dataset.id); if (a) openAppNews(a); break; }
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }

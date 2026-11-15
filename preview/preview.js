@@ -457,6 +457,21 @@
       aiOff();
       return (ST.rec || {})[decodeURIComponent(path.slice("api/recursos?item=".length))] || {};
     }
+    // Novidades › Eletrônicos (1.65.0): os recursos de todos os eletrônicos; a busca de todos completa os que faltam
+    const recDe = (id) => { const r = (ST.rec || {})[id]; return r ? { n: r.recursos.length, at: r.at } : null; };
+    if (method === "GET" && path === "api/recursos/todos") {
+      aiOff();
+      const els = d.items.filter((i) => i.cat === "eletronicos");
+      const job = [...ST.jobs.entries()].find(([, j]) => j.recAll && Date.now() - j.at < 1500);
+      return { itens: Object.fromEntries(els.map((i) => [i.id, recDe(i.id)])), grupos: Object.fromEntries(els.map((i) => [i.id, groupKey(i)])),
+        job: job ? { id: job[0], stage: "busy", msg: "Buscando…", progress: { feitos: 0, total: 1, atual: "" } } : null };
+    }
+    if (method === "POST" && path === "api/recursos/todos") {
+      aiOff();
+      const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");
+      ST.jobs.set(id, { at: Date.now(), recAll: true });
+      return { id };
+    }
     if (method === "POST" && path === "api/recursos") {
       aiOff();
       const it = d.items.find((i) => i.id === body.item);
@@ -469,6 +484,13 @@
       const j = ST.jobs.get(m[1]);
       if (method === "DELETE") { ST.jobs.delete(m[1]); return { ok: true }; }
       if (!j) fail("Esta busca terminou. Veja de novo.", 404);
+      if (j.recAll) {
+        const falta = d.items.filter((i) => i.cat === "eletronicos" && !(ST.rec || {})[i.id]);
+        if (Date.now() - j.at < 1500) return { stage: "busy", msg: `Buscando 1 de ${falta.length}…`, progress: { feitos: 0, total: falta.length, atual: "" } };
+        const at = new Date().toISOString();
+        for (const i of falta) ST.rec = { ...(ST.rec || {}), [i.id]: { recursos: [{ nome: "Wi-Fi", detalhe: "Exemplo da prévia: no Home Assistant, a IA diz os recursos deste modelo." }, { nome: "Timer", detalhe: "Programa a hora de ligar e desligar." }], fonte: "", at } };
+        return { stage: "done", msg: "", summary: { buscados: falta.length, erros: 0, total: falta.length } };
+      }
       if (Date.now() - j.at < 1200) return { stage: "busy", msg: "Procurando os recursos…" };
       const rec = { recursos: [{ nome: "Wi-Fi", detalhe: "Exemplo da prévia: no Home Assistant, a IA diz os recursos deste modelo." }, { nome: "Timer", detalhe: "Programa a hora de ligar e desligar." }], fonte: "", at: new Date().toISOString() };
       ST.rec = { ...(ST.rec || {}), [j.item]: rec };

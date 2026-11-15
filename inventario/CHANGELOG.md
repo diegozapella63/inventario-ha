@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.65.0
+
+- **Novidades › Eletrônicos**: uma seção nova, depois de Apps do celular, com todos os eletrônicos e quantos recursos cada um tem (*3 recursos · hoje*, ou *Ainda não buscado*). **Buscar todos os recursos** busca de uma vez os que ainda não têm, com o andamento e **Parar**; o mesmo equipamento em vários cômodos é uma linha e uma busca só. Um toque abre os recursos, com **Ver de novo** e **Ver item**.
+
 ## 1.64.0
 
 - **Novidades › Limpar**: além de **Limpar novidades** (tudo), os botões **Só equipamentos** e **Só apps**, como no Conferir. Cada um pede confirmação e não mexe no outro; dos apps, o que você escolheu acompanhar ou deixar de fora continua.

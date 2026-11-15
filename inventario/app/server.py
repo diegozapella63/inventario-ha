@@ -3201,6 +3201,89 @@ def rec_job_start(body: dict) -> dict:
     return {"id": jid}
 
 
+# ---------- Novidades › Eletrônicos (1.65.0): os recursos de todos os eletrônicos de uma vez. Busca só os que ainda não
+# têm (ou que mudaram depois); o mesmo equipamento em vários cômodos é uma busca só, guardada em todos.
+REC_LOTE_CAT = "eletronicos"
+
+
+def rec_overview() -> dict:
+    """Os eletrônicos e os recursos guardados de cada um ({id: {n, at}}), e a busca de todos em andamento."""
+    need_ai_on()
+    itens = {}
+    for it in STORE.data["items"]:
+        if it.get("cat") == REC_LOTE_CAT:
+            r = rec_of(it["id"])
+            itens[it["id"]] = {"n": len(r.get("recursos") or []), "at": r.get("at")} if r else None
+    job = next((dict(id=j, stage=v["stage"], msg=v["msg"], progress=v.get("progress"))
+                for j, v in WEB_JOBS.items() if v.get("kind") == "recursos-lote" and v["stage"] == "busy"), None)
+    return {"itens": itens, "grupos": {i: news_group_key(STORE.item(i)) for i in itens}, "job": job}
+
+
+def _rec_batch_run(jid: str):
+    job = WEB_JOBS[jid]
+    done = errors = 0
+    try:
+        groups = {}
+        for it in STORE.sorted_items():
+            if it.get("cat") == REC_LOTE_CAT:
+                groups.setdefault(news_group_key(it), []).append(it)
+        todo = []
+        for ms in groups.values():
+            tem = next((r for r in (rec_of(m["id"]) for m in ms) if r), None)
+            if not tem:
+                todo.append(ms)
+                continue
+            for m in ms:  # o mesmo equipamento noutro cômodo já tem: ganha o mesmo, sem perguntar à IA de novo
+                if not rec_of(m["id"]):
+                    rec_save(m["id"], {k: tem[k] for k in ("recursos", "fonte", "site")})
+        entity = search_entity()
+        for n, ms in enumerate(todo):
+            if job.get("cancelled"):
+                break
+            need_ai_on()
+            it = min(ms, key=lambda m: (len(m["name"]), m["name"]))
+            job["progress"] = {"feitos": n, "total": len(todo), "atual": it["name"]}
+            job["msg"] = f"Buscando {n + 1} de {len(todo)}: {it['name']}"
+            try:
+                found = ai_find_rec(it["name"], " ".join(str(it.get("details") or "").split())[:300], entity)
+            except ApiError as e:
+                if is_quota(e.msg) or e.status == 409:
+                    raise  # a cota acabou ou a IA foi desligada: os próximos também não vão
+                errors += 1
+                continue
+            if job.get("cancelled"):
+                break
+            for m in ms:
+                if not rec_of(m["id"]):
+                    rec_save(m["id"], found)
+            done += 1
+        job.update(stage="done", msg="", summary={"buscados": done, "erros": errors, "total": len(todo)},
+                   progress={"feitos": done, "total": len(todo), "atual": ""})
+    except ApiError as e:
+        job.update(stage="error", msg=e.msg + (f" Os recursos já achados ({done}) ficaram salvos." if done else ""),
+                   summary={"buscados": done, "erros": errors})
+    except Exception:  # noqa: BLE001
+        log.exception("recursos de todos")
+        job.update(stage="error", msg="Não deu para buscar agora. Tente de novo em instantes.")
+
+
+def rec_batch_start() -> dict:
+    need_ai_on()
+    if not SUPERVISOR_TOKEN and not AI_MOCK:
+        raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
+    with WEB_LOCK:
+        for j, v in WEB_JOBS.items():
+            if v.get("kind") == "recursos-lote" and v["stage"] == "busy" and not v.get("cancelled"):
+                return {"id": j}  # já tem uma busca andando: acompanha a mesma
+    web_jobs_cleanup()
+    jid = secrets.token_hex(8)
+    with WEB_LOCK:
+        WEB_JOBS[jid] = {"stage": "busy", "msg": "Começando…", "results": [], "at": time.time(), "kind": "recursos-lote",
+                         "progress": {"feitos": 0, "total": 0, "atual": ""}}
+    threading.Thread(target=_rec_batch_run, args=(jid,), daemon=True).start()
+    return {"id": jid}
+
+
 def news_overview() -> dict:
     """O que a aba Novidades mostra: as categorias, quem a IA escolheu, o que já foi conferido e a conferência em andamento."""
     d = news_read()
@@ -4737,7 +4820,15 @@ def r_rec_start(h, query):
 
 def r_rec_status(h, jid, query):
     job = web_job(jid)
-    h.send_json({"stage": job["stage"], "msg": job["msg"], "rec": job.get("rec")})
+    h.send_json({"stage": job["stage"], "msg": job["msg"], "rec": job.get("rec"), "progress": job.get("progress"), "summary": job.get("summary")})
+
+
+def r_rec_all_get(h, query):
+    h.send_json(rec_overview())
+
+
+def r_rec_all_start(h, query):
+    h.send_json(rec_batch_start(), 202)
 
 
 def r_news_app_start(h, query):
@@ -5235,6 +5326,8 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/news/people", r_news_people),
     ("POST", r"/api/news/notify-test", r_news_notify_test),
     ("GET", r"/api/recursos", r_rec_get),
+    ("GET", r"/api/recursos/todos", r_rec_all_get),  # 1.65.0: Novidades › Eletrônicos
+    ("POST", r"/api/recursos/todos", r_rec_all_start),
     ("POST", r"/api/recursos", r_rec_start),
     ("GET", r"/api/recursos/([a-f0-9]{16})", r_rec_status),
     ("DELETE", r"/api/recursos/([a-f0-9]{16})", r_news_cancel),

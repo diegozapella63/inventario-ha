@@ -1,5 +1,6 @@
 """1.54.0: Recursos. A IA diz o que um equipamento tem (funções, modos, conexões), só em Eletrônicos, Utilidades e Veículos
-e só com a IA ligada; o resultado fica guardado até o item mudar (nome ou detalhes) e conta no Uso da IA."""
+e só com a IA ligada; o resultado fica guardado até o item mudar (nome ou detalhes) e conta no Uso da IA. 1.65.0: os de
+todos os eletrônicos de uma vez (Novidades › Eletrônicos)."""
 import time
 import unittest
 
@@ -31,6 +32,31 @@ class Recursos(ServerCase):
         it = next(i for i in app.data()["items"] if i["id"] == "sal-007")
         app.ok("PUT", "api/items/sal-007", {**it, "name": it["name"] + " (outro modelo)"})
         self.assertEqual(app.ok("GET", "api/recursos?item=sal-007"), {})
+
+    def test_os_de_todos_os_eletronicos(self):
+        """1.65.0: GET api/recursos/todos lista os eletrônicos e quantos recursos cada um tem; POST busca os que faltam (o
+        mesmo equipamento em vários cômodos numa busca só, guardada em todos); de novo, nada a buscar."""
+        app = self.fresh(mock_ai=True)
+        els = {i["id"] for i in app.data()["items"] if i["cat"] == "eletronicos"}
+        tv = next(i for i in app.data()["items"] if i["id"] == "sal-007")
+        outro = app.ok("POST", "api/items", {"room": "quarto", "name": tv["name"], "cat": "eletronicos", "value": 10})["item"]["id"]
+        esperar(app, app.ok("POST", "api/recursos", {"item": "sal-007"})["id"])
+        ov = app.ok("GET", "api/recursos/todos")
+        self.assertEqual(set(ov["itens"]), els | {outro}, "só os eletrônicos")
+        self.assertEqual((ov["itens"]["sal-007"]["n"], ov["itens"][outro], ov["job"]), (3, None, None))
+        self.assertEqual(ov["grupos"][outro], ov["grupos"]["sal-007"], "o mesmo equipamento em dois cômodos")
+        st = esperar(app, app.ok("POST", "api/recursos/todos", {})["id"], timeout=20)
+        self.assertEqual(st["stage"], "done", st)
+        grupos = {ov["grupos"][i] for i in els | {outro}}
+        self.assertEqual(st["summary"], {"buscados": len(grupos) - 1, "erros": 0, "total": len(grupos) - 1}, "a TV já tinha: o outro cômodo ganha o mesmo, sem buscar")
+        ov = app.ok("GET", "api/recursos/todos")
+        self.assertTrue(all(v and v["n"] for v in ov["itens"].values()), ov["itens"])
+        self.assertEqual(app.ok("GET", f"api/recursos?item={outro}")["recursos"], app.ok("GET", "api/recursos?item=sal-007")["recursos"])
+        st = esperar(app, app.ok("POST", "api/recursos/todos", {})["id"])
+        self.assertEqual(st["summary"], {"buscados": 0, "erros": 0, "total": 0}, "de novo: nada a buscar")
+        app.ok("PUT", "api/settings", {"ai": False})
+        self.assertEqual(app.request("GET", "api/recursos/todos")[0], 409, "IA desligada: recusa")
+        self.assertEqual(app.request("POST", "api/recursos/todos", {})[0], 409)
 
     def test_so_nas_categorias_dos_recursos_e_com_a_ia(self):
         app = self.fresh(mock_ai=True)

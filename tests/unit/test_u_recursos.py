@@ -1,5 +1,6 @@
 """1.54.0: Recursos. O pedido à IA (o produto, os detalhes, a página indicada), a limpeza do que ela responde (nomes
 curtos sem repetir, no máximo 12, a fonte só com http) e as respostas fora do formato ou sem nada."""
+import time
 import unittest
 from unittest import mock
 
@@ -38,6 +39,59 @@ class Limpeza(UnitBase):
             self.assertIn("marca e o modelo", e.exception.msg)
         with mock.patch.object(S, "AI_MOCK", False), mock.patch.object(S, "ai_call_text", return_value={"recursos": [{"nome": "Timer"}]}):
             self.assertEqual(S.ai_find_rec("TV", "", "ai_task.x")["recursos"], [{"nome": "Timer", "detalhe": ""}])
+
+
+class Todos(UnitBase):
+    """1.65.0: Buscar todos os recursos: um que a IA não achou conta como erro e os outros seguem; a cota acabou para."""
+    def rodar(self, fake):
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S, "ai_find_rec", fake):
+            jid = S.rec_batch_start()["id"]
+            self.assertEqual(S.rec_batch_start()["id"], jid, "uma busca andando: acompanha a mesma")
+            job = S.WEB_JOBS[jid]
+            t0 = time.time()
+            while job["stage"] == "busy" and time.time() - t0 < 10:
+                time.sleep(0.02)
+            return job
+
+    def test_um_erro_nao_para_os_outros(self):
+        calls = []
+
+        def fake(name, details, entity):
+            calls.append(name)
+            if len(calls) == 1:
+                raise S.ApiError(502, "A IA não achou os recursos deste item.")
+            return {"produto": name, "recursos": [{"nome": "Wi-Fi", "detalhe": ""}], "fonte": "", "site": ""}
+        job = self.rodar(fake)
+        self.assertEqual(job["stage"], "done", job)
+        self.assertEqual((job["summary"]["erros"], job["summary"]["buscados"]), (1, len(calls) - 1))
+        self.assertGreater(len(calls), 1)
+
+    def test_a_cota_acabou_para(self):
+        calls = []
+
+        def fake(name, details, entity):
+            calls.append(name)
+            if len(calls) == 2:
+                raise S.ApiError(429, "A cota da IA acabou por hoje.")
+            return {"produto": name, "recursos": [{"nome": "Wi-Fi", "detalhe": ""}], "fonte": "", "site": ""}
+        job = self.rodar(fake)
+        self.assertEqual((job["stage"], len(calls)), ("error", 2))
+        self.assertIn("Os recursos já achados (1) ficaram salvos.", job["msg"])
+
+    def test_parar(self):
+        def fake(name, details, entity):
+            for j in S.WEB_JOBS.values():
+                if j.get("kind") == "recursos-lote":
+                    j["cancelled"] = True
+            return {"produto": name, "recursos": [{"nome": "Wi-Fi", "detalhe": ""}], "fonte": "", "site": ""}
+        job = self.rodar(fake)
+        self.assertEqual((job["stage"], job["summary"]["buscados"]), ("done", 0), "parou: o que estava sendo buscado não grava")
+
+    def test_um_erro_inesperado(self):
+        def fake(name, details, entity):
+            raise ValueError("x")
+        job = self.rodar(fake)
+        self.assertEqual((job["stage"], job["msg"]), ("error", "Não deu para buscar agora. Tente de novo em instantes."))
 
 
 if __name__ == "__main__":

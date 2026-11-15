@@ -891,6 +891,9 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .rec-list b { font-weight: 600; }
 .rec-list span { color: var(--muted); font-size: 14.5px; line-height: 1.4; }
 .rec-src { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+/* 1.65.0: Novidades › Eletrônicos: Buscar todos os recursos embaixo da lista, na largura do cartão (no computador, 280 px à direita) */
+#p-news-rec > [data-act="rec-all"] { margin-top: 14px; min-height: var(--altura); }
+@media (min-width: 1000px) { #p-news-rec > [data-act="rec-all"] { width: 280px; margin-left: auto; display: flex; } }
 .itasks > [data-slot] > .muted { margin: 8px 0 0; }
 .inews > .muted { margin: 8px 0 0; } /* Recursos e Novidades ainda não procurados: o que vem ali */
 .tlist { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
