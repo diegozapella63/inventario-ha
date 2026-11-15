@@ -3,7 +3,7 @@ em Mais › Novidades (sem o Home Assistant, os apps de exemplo de um celular de
 de um app (o guardado, sem chamar a IA), Deixar de fora (sai das Novidades e vai para Inativos, nas Opções) e Acompanhar
 (volta e busca); 1.58.0: Todas as novidades, Só equipamentos e Só apps; Apps detectados como sub-opção, com Ver novidades e
 os desligados em Inativos (n); no celular de 320 px e no computador, no escuro e no claro. 1.64.0: Limpar novidades,
-Só equipamentos e Só apps."""
+Só equipamentos e Só apps. 1.66.0: Renomear um app."""
 import os
 
 from e2e_lib import OVERFLOW, TEXTS, helpers, main
@@ -51,11 +51,14 @@ async def body(r, p):
       const a = o.querySelector('.ot').getBoundingClientRect(), b = d.getBoundingClientRect();
       return [Math.round(b.left - a.left), getComputedStyle(o).borderBottomStyle, getComputedStyle(d).borderTopStyle, getComputedStyle(d).borderRadius]; })()""")
     r.check(sub[0] >= 12 and sub[1] == "none" and sub[2] == "solid" and sub[3] != "0px", f"Apps detectados recuado num quadro, logo abaixo de Apps do celular ({sub})")
-    # o Ver novidades: um botão como os outros dos apps (no lugar da lupa); 1.58.1: na largura toda da linha, embaixo
+    # o Ver novidades: um botão como os outros dos apps (no lugar da lupa), embaixo do nome e da chave; 1.66.0: com o
+    # Renomear ao lado, os dois do mesmo tamanho, na largura toda da linha
     bts = await pg.evaluate(f"""[...document.querySelectorAll("{det} .app-det-b")].map(b => {{ const li = b.closest('li').getBoundingClientRect(), r = b.getBoundingClientRect();
-      return [b.textContent.trim(), b.classList.contains('btn'), Math.round(r.height), Math.round(li.width - r.width), r.top > b.closest('li').querySelector('.switch').getBoundingClientRect().bottom - 1]; }})""")
-    r.eq({x[0] for x in bts}, {"Ver novidades"}, "cada app com o Ver novidades")
-    r.check(all(x[1] and x[2] >= 44 and x[3] <= 1 and x[4] for x in bts), f"um botão do app, na largura toda, embaixo do nome e da chave ({bts[0]})")
+      const bs = [...b.querySelectorAll('.btn')].map(x => x.getBoundingClientRect());
+      return [[...b.querySelectorAll('.btn')].map(x => x.textContent.trim()), Math.round(bs[0].height), Math.round(li.width - r.width), r.top > b.closest('li').querySelector('.switch').getBoundingClientRect().bottom - 1,
+        Math.round(bs[0].width) === Math.round(bs[1].width) && Math.round(bs[0].top) === Math.round(bs[1].top)]; }})""")
+    r.check(all(x[0] == ["Ver novidades", "Renomear"] for x in bts), f"cada app com Ver novidades e Renomear ({bts[0][0]})")
+    r.check(all(x[1] >= 44 and x[2] <= 1 and x[3] and x[4] for x in bts), f"lado a lado, do mesmo tamanho, na largura toda, embaixo do nome e da chave ({bts[0]})")
     r.eq(await pg.locator(f"{det} .app-det .ic use[href='#i-search']").count(), 0, "sem a lupa")
     chaves = f"{det} [data-input='app-considerar']"
     r.eq(await pg.evaluate(f"[...document.querySelectorAll(\"{chaves}\")].map(i => i.checked)"), [True] * 5, "1.57.0: cada um com a sua chave, ligada de início")
@@ -66,6 +69,22 @@ async def body(r, p):
     await pg.click("dialog.modal [data-x]")
     musica = await pg.text_content(f"{det} li:has([data-id='com.exemplo.musicaja']) .nm")
     r.check("novo" not in musica, f"depois de buscar, não é mais novo ({musica.strip()})")
+    # 1.66.0: Renomear: o nome novo vale na lista e nas Novidades; vazio volta ao de antes
+    await pg.click(f"{det} [data-act='app-rename'][data-id='com.exemplo.musicaja']")
+    await pg.wait_for_selector("dialog.modal #an-name", timeout=4000)
+    r.eq(((await pg.text_content("dialog.modal .dlg-h h2")).strip(), await pg.input_value("dialog.modal #an-name")), ("Renomear app", "Música Já"), "a janela, com o nome de agora")
+    await pg.fill("dialog.modal #an-name", "Música Já Premium")
+    await pg.click("dialog.modal [data-ok]")
+    await pg.locator(".toast", has_text="Renomeado: Música Já Premium").wait_for(timeout=4000)
+    r.check("Música Já Premium" in await pg.evaluate(TEXTS, f"{det} .app-det b"), "o nome novo na lista")
+    musica = next(a for a in r.api("GET", "api/news")["apps"]["lista"] if a["pacote"] == "com.exemplo.musicaja")
+    r.eq((musica["nome"], musica.get("renomeado")), ("Música Já Premium", True), "fica gravado")
+    await pg.click(f"{det} [data-act='app-rename'][data-id='com.exemplo.musicaja']")
+    await pg.wait_for_selector("dialog.modal #an-name", timeout=4000)
+    await pg.fill("dialog.modal #an-name", "")
+    await pg.click("dialog.modal [data-ok]")
+    await pg.locator(".toast", has_text="Renomeado: Música Já").wait_for(timeout=4000)
+    r.eq(next(a for a in r.api("GET", "api/news")["apps"]["lista"] if a["pacote"] == "com.exemplo.musicaja")["nome"], "Música Já", "vazio: volta ao nome de antes")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "opcoes")
     await pg.click('label.switch:has([data-input="news-auto"])')  # mexer em outra opção não fecha a lista
@@ -155,6 +174,11 @@ async def body(r, p):
     await pg2.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)
     r.check(await pg2.evaluate(OVERFLOW), "320 px: sem rolagem para o lado")
     await r.shot(pg2, "320-claro", full_page=True)
+    await r.open(pg2, "#/config/opcoes", "#p-news-opts")
+    await pg2.wait_for_selector(det, timeout=8000)
+    await pg2.click(f"{det} summary")
+    cort = await pg2.evaluate(f"""[...document.querySelectorAll("{det} .app-det-b .btn")].filter(b => b.scrollWidth > b.clientWidth + 1 || b.getBoundingClientRect().height > 60).map(b => b.textContent.trim())""")
+    r.eq(cort, [], "320 px: Ver novidades e Renomear sem cortar o texto")
     ctx3, pg3 = await r.page(b, "pc", "dark")
     await r.open(pg3, "#/novidades", "#p-news-apps")
     await pg3.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)

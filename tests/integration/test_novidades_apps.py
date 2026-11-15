@@ -84,6 +84,21 @@ class Apps(unittest.TestCase):
             time.sleep(0.1)
         self.assertEqual(st["stage"], "done", st)
 
+    def test_5_renomear_um_app(self):
+        """1.66.0: o nome que a pessoa dá vale na lista e na busca; vazio volta ao de antes; fica depois de Limpar."""
+        self.ligar()
+        self.app.ok("GET", "api/news")
+        ov = self.app.ok("PUT", "api/news/app/nome", {"pacote": CASA, "nome": "  Casa   Esperta "})
+        casa = next(a for a in ov["apps"]["lista"] if a["pacote"] == CASA)
+        self.assertEqual((casa["nome"], casa["renomeado"]), ("Casa Esperta", True))
+        self.app.ok("DELETE", "api/news")
+        self.assertEqual(next(a for a in self.app.ok("GET", "api/news")["apps"]["lista"] if a["pacote"] == CASA)["nome"], "Casa Esperta", "fica depois de Limpar")
+        ov = self.app.ok("PUT", "api/news/app/nome", {"pacote": CASA, "nome": ""})
+        casa = next(a for a in ov["apps"]["lista"] if a["pacote"] == CASA)
+        self.assertEqual((casa["nome"], "renomeado" in casa), ("Casa Conectada", False), "vazio: o nome de antes")
+        self.erro("PUT", "api/news/app/nome", {"pacote": "com.nao.existe", "nome": "X"}, 404, "App não encontrado.")
+        self.erro("PUT", "api/news/app/nome", {"pacote": CASA, "nome": "x" * 61}, 400, "Use um nome de até 60 letras.")
+
     def test_4_limpar_novidades_limpa_as_dos_apps(self):
         """1.64.0: Limpar novidades apaga também as dos apps (o Acompanhar e o Deixar de fora da pessoa ficam)."""
         self.ligar()

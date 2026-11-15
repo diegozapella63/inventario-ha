@@ -2947,7 +2947,7 @@ def news_read() -> dict:
     d = read_json_ok(NEWS_FILE, {}) or {}
     if not isinstance(d, dict):
         d = {}
-    for k in ("itens", "triagem", "apps", "apps_triagem", "apagadas"):  # apps: as novidades de cada app do celular; apps_triagem: a escolha
+    for k in ("itens", "triagem", "apps", "apps_triagem", "apagadas", "apps_nomes"):  # apps_nomes (1.66.0): o nome que a pessoa deu  # apps: as novidades de cada app do celular; apps_triagem: a escolha
         # apagadas (1.63.0): por item, as novidades que a pessoa apagou (a fonte e o título), que não voltam
         if not isinstance(d.get(k), dict):
             d[k] = {}
@@ -3427,7 +3427,7 @@ def _news_batch_run(jid: str):
                 it = min(alvo, key=lambda m: (len(m["name"]), m["name"]))  # o nome mais curto: "Lâmpada", não "Lâmpadas"
                 nome = it["name"]
             else:
-                nome = app_name(alvo, apps, tri_a)
+                nome = app_name(alvo, apps, tri_a, d["apps_nomes"])
             job["progress"] = {"feitos": n, "total": total, "atual": nome}
             job["msg"] = f"Conferindo {n + 1} de {total}: {nome}"
             try:
@@ -3724,11 +3724,31 @@ def celular_nome(s: dict) -> str:
     return re.sub(r"_(last_used_app|ultimo_app_usado|ultimo_aplicativo_usado)$", "", e[7:]).replace("_", " ") or "um celular"
 
 
-def app_name(pkg: str, apps: dict | None = None, tri: dict | None = None) -> str:
-    """O nome do app: o que a IA deu, o que o sensor mandou ou, sem nenhum, o fim do pacote."""
+def app_name(pkg: str, apps: dict | None = None, tri: dict | None = None, nomes: dict | None = None) -> str:
+    """O nome do app: o que a pessoa deu (Renomear, 1.66.0), o que a IA deu, o que o sensor mandou ou o fim do pacote."""
     t = (tri or {}).get(pkg) or {}
     a = (apps or {}).get(pkg) or {}
-    return t.get("nome") or a.get("nome") or pkg.rsplit(".", 1)[-1]
+    return str((nomes or {}).get(pkg) or "") or t.get("nome") or a.get("nome") or pkg.rsplit(".", 1)[-1]
+
+
+def app_rename(body: dict) -> dict:
+    """1.66.0: Renomear um app (o nome vale na tela, nas buscas da IA e nos avisos); vazio volta ao nome de antes. Fica
+    mesmo depois de Limpar novidades."""
+    need_apps_on()
+    pkg = str(body.get("pacote") or "")
+    if pkg not in apps_read()["apps"]:
+        raise ApiError(404, "App não encontrado.")
+    nome = " ".join(str(body.get("nome") or "").split())
+    if len(nome) > 60:
+        raise ApiError(400, "Use um nome de até 60 letras.")
+    with NEWS_LOCK:
+        d = news_read()
+        if nome:
+            d["apps_nomes"][pkg] = nome
+        else:
+            d["apps_nomes"].pop(pkg, None)
+        write_json_atomic(NEWS_FILE, d)
+    return news_overview()
 
 
 def apps_overview(collect: bool = True) -> dict:
@@ -3746,7 +3766,7 @@ def apps_overview(collect: bool = True) -> dict:
     for pkg, v in a["apps"].items():
         t = tri.get(pkg) if isinstance(tri.get(pkg), dict) else {}
         r = res.get(pkg) if isinstance(res.get(pkg), dict) else None
-        lista.append({"pacote": pkg, "nome": app_name(pkg, a["apps"], tri), "pessoas": v.get("pessoas") or [], "ultimo": v.get("ultimo") or None,
+        lista.append({"pacote": pkg, "nome": app_name(pkg, a["apps"], tri, d["apps_nomes"]), **({"renomeado": True} if d["apps_nomes"].get(pkg) else {}), "pessoas": v.get("pessoas") or [], "ultimo": v.get("ultimo") or None,
                       **({"ia": True} if v.get("origem") == "ia" else {}),
                       "conferir": t.get("conferir") if "conferir" in t and not t.get("faltou") else None, "manual": bool(t.get("manual")),
                       "res": {"at": r.get("at"), "news": r.get("news")} if r else None})
@@ -3821,7 +3841,8 @@ def app_news_job_start(body: dict) -> dict:
     jid = secrets.token_hex(8)
     with WEB_LOCK:
         WEB_JOBS[jid] = {"stage": "busy", "msg": "Procurando novidades…", "results": [], "news": None, "at": time.time(), "kind": "novidades"}
-    threading.Thread(target=_app_news_job_run, args=(jid, pkg, app_name(pkg, apps, news_read()["apps_triagem"]), search_entity()), daemon=True).start()
+    d = news_read()
+    threading.Thread(target=_app_news_job_run, args=(jid, pkg, app_name(pkg, apps, d["apps_triagem"], d["apps_nomes"]), search_entity()), daemon=True).start()
     return {"id": jid}
 
 
@@ -4835,6 +4856,10 @@ def r_news_app_start(h, query):
     h.send_json(app_news_job_start(h.read_body()), 202)
 
 
+def r_news_app_rename(h, query):
+    h.send_json(app_rename(h.read_body()))
+
+
 def r_news_app_choice(h, query):
     h.send_json(app_choice(h.read_body()))
 
@@ -5321,6 +5346,7 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/news/all", r_news_all),
     ("POST", r"/api/news/app", r_news_app_start),
     ("PUT", r"/api/news/app", r_news_app_choice),
+    ("PUT", r"/api/news/app/nome", r_news_app_rename),  # 1.66.0: Renomear
     ("POST", r"/api/news/apps/ler", r_news_apps_ler),
     ("POST", r"/api/news/apps/adicionar", r_news_apps_add),
     ("GET", r"/api/news/people", r_news_people),

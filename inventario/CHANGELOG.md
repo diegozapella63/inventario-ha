@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.66.0
+
+- **Apps detectados** (Configurações › Opções): cada app ganha **Renomear**, ao lado do **Ver novidades**. O nome novo vale na lista, nas Novidades e na busca da IA (um nome mais claro ajuda a achar as novidades certas); apagar o nome volta ao de antes. Continua depois de **Limpar novidades**.
+
 ## 1.65.0
 
 - **Novidades › Eletrônicos**: uma seção nova, depois de Apps do celular, com todos os eletrônicos e quantos recursos cada um tem (*3 recursos · hoje*, ou *Ainda não buscado*). **Buscar todos os recursos** busca de uma vez os que ainda não têm, com o andamento e **Parar**; o mesmo equipamento em vários cômodos é uma linha e uma busca só. Um toque abre os recursos, com **Ver de novo** e **Ver item**.

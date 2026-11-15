@@ -1,5 +1,6 @@
 """1.54.0: Recursos. O pedido à IA (o produto, os detalhes, a página indicada), a limpeza do que ela responde (nomes
 curtos sem repetir, no máximo 12, a fonte só com http) e as respostas fora do formato ou sem nada."""
+import threading
 import time
 import unittest
 from unittest import mock
@@ -46,12 +47,27 @@ class Todos(UnitBase):
     def rodar(self, fake):
         with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S, "ai_find_rec", fake):
             jid = S.rec_batch_start()["id"]
-            self.assertEqual(S.rec_batch_start()["id"], jid, "uma busca andando: acompanha a mesma")
             job = S.WEB_JOBS[jid]
             t0 = time.time()
             while job["stage"] == "busy" and time.time() - t0 < 10:
                 time.sleep(0.02)
             return job
+
+    def test_uma_busca_andando_acompanha_a_mesma(self):
+        solta = threading.Event()
+
+        def fake(name, details, entity):
+            solta.wait(5)
+            return {"produto": name, "recursos": [{"nome": "Wi-Fi", "detalhe": ""}], "fonte": "", "site": ""}
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S, "ai_find_rec", fake):
+            jid = S.rec_batch_start()["id"]
+            self.assertEqual(S.rec_batch_start()["id"], jid)
+            ov = S.rec_overview()
+            self.assertEqual(ov["job"]["id"], jid, "e a lista diz que está andando")
+            solta.set()
+            t0 = time.time()
+            while S.WEB_JOBS[jid]["stage"] == "busy" and time.time() - t0 < 10:
+                time.sleep(0.02)
 
     def test_um_erro_nao_para_os_outros(self):
         calls = []

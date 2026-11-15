@@ -863,8 +863,10 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .app-det-t { display: grid; gap: 2px; min-width: 0; justify-items: start; }
 .app-det-t b { font-weight: 500; overflow-wrap: anywhere; } /* nada cortado: o nome e o porquê quebram a linha */
 .app-det-t .nm { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
-.app-det > .app-det-b { grid-column: 1 / -1; width: 100%; justify-content: center; } /* 1.58.1: na largura toda, como os outros */
-@media (min-width: 1000px) { .app-det > .app-det-b { width: 280px; justify-self: end; } }
+/* 1.66.0: Ver novidades e Renomear lado a lado, na largura toda (no computador, 2 × 200 px à direita) */
+.app-det > .app-det-b { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.app-det > .app-det-b > .btn { width: 100%; min-width: 0; justify-content: center; white-space: normal; line-height: 1.15; text-align: center; padding-left: 8px; padding-right: 8px; }
+@media (min-width: 1000px) { .app-det > .app-det-b { width: 408px; justify-self: end; } }
 .apps-inativos { margin-top: 4px; border-top: 1px solid var(--line); }
 .apps-inativos .app-det-l { margin-top: 2px; }
 /* Conferir (1.58.0): Todas as novidades na largura toda e, embaixo, Só equipamentos e Só apps dividindo a linha */

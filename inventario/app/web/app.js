@@ -2156,7 +2156,8 @@
       return `<li class="app-det"><div class="app-det-t"><b id="${id}">${esc(a.nome)}</b>
         <span class="nm">${esc([joinE(a.pessoas || []), a.ultimo ? `usado ${whenShort(a.ultimo)}` : a.ia ? "pela IA" : "", quando(a)].filter(Boolean).join(" · "))}</span></div>
         <label class="switch"><input type="checkbox" role="switch" data-input="app-considerar" data-pkg="${esc(a.pacote)}" aria-labelledby="${id}"${on(a) ? " checked" : ""}><span class="track" aria-hidden="true"></span></label>
-        <button type="button" class="btn app-det-b" data-act="app-open" data-id="${esc(a.pacote)}" aria-label="Ver novidades de ${esc(a.nome)}">${ic("spark", "sm")}Ver novidades</button></li>`;
+        <div class="app-det-b"><button type="button" class="btn" data-act="app-open" data-id="${esc(a.pacote)}" aria-label="Ver novidades de ${esc(a.nome)}">${ic("spark", "sm")}Ver novidades</button>
+          <button type="button" class="btn" data-act="app-rename" data-id="${esc(a.pacote)}" aria-label="Renomear ${esc(a.nome)}">${ic("edit", "sm")}Renomear</button></div></li>`;
     };
     const ativos = L.filter(on), inativos = L.filter((a) => !on(a));
     return `<details class="news-out apps-det"${appsDetAberto ? " open" : ""}><summary>${ic("chev", "sm")}${oti("phone")}Apps detectados (${int(L.length)})</summary>
@@ -2164,6 +2165,31 @@
       ${ativos.length ? `<ul class="app-det-l">${ativos.map(row).join("")}</ul>` : ""}
       ${inativos.length ? `<details class="news-out apps-inativos"${appsInatAberto ? " open" : ""}><summary>${ic("chev", "sm")}${oti("archive")}Inativos (${int(inativos.length)})</summary>
         <ul class="app-det-l">${inativos.map(row).join("")}</ul></details>` : ""}</details>`;
+  }
+  // 1.66.0: Renomear um app de Apps detectados (vale na tela, nas buscas da IA e nos avisos); vazio volta ao nome de antes
+  function openAppName(a) {
+    const entry = openDialog({
+      cls: "modal narrow", label: "Renomear app",
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("edit", "Renomear app")}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <form class="dlg-b" data-an><div class="form">
+          <div class="field"><label for="an-name">Nome</label><textarea id="an-name" class="input grow" rows="1" name="nome" maxlength="60" placeholder="${esc(a.nome)}" autocomplete="off">${esc(a.nome)}</textarea></div>
+          <div class="formerr" data-err hidden></div>
+        </div></form>
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok>${ic("check")}Salvar</button></div></div>`,
+    });
+    const form = $("[data-an]", entry.dlg), err = $("[data-err]", entry.dlg);
+    setTimeout(() => { form.nome.focus(); form.nome.select(); }, 50);
+    const go = async () => {
+      const nome = form.nome.value.trim();
+      if (nome === a.nome) { requestClose(entry, { force: true }); return; }
+      try {
+        newsOv = await API.put("api/news/app/nome", { pacote: a.pacote, nome });
+        const novo = ((newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === a.pacote);
+        finalizeThen(entry, () => { paintAppsDet(); renderNews(); toast(`Renomeado: ${novo ? novo.nome : nome}`); });
+      } catch (e) { err.hidden = false; err.textContent = e.message; }
+    };
+    form.addEventListener("submit", (e) => { e.preventDefault(); go(); });
+    entry.dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); if (e.target.closest("[data-ok]")) go(); });
   }
   // Encontrar apps com IA (1.59.0): prints da lista de apps do celular ou os nomes colados; a IA lê, a pessoa marca quais
   // entram em Apps detectados (acompanhados). Só com a IA ligada.
@@ -4676,6 +4702,7 @@
       case "rec-all": startRecAll(); break;
       case "rec-cancel": cancelRecAll(); break;
       case "apps-ia": openAppsFinder(); break;
+      case "app-rename": { const a = ((newsOv && newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === b.dataset.id); if (a) openAppName(a); break; }
       case "app-open": { const a = ((newsOv && newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === b.dataset.id); if (a) openAppNews(a); break; }
       case "import-file": { const inp = $("#pick-import"); inp.multiple = MULTI_PICK; inp.click(); break; }
       case "ai-refresh": { const slot = $('#view [data-slot="ai-panel"]'); if (slot) { slot.innerHTML = `<p class="muted">Verificando…</p>`; renderAiPanel(slot, await aiStatus(true)); paintVoiceLead(); } break; }
