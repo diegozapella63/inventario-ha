@@ -1743,12 +1743,13 @@
     </section>
     <section class="panel" id="p-sensors">
       <h2>${secIc("gauge")}Sensores no Home Assistant</h2>
-      <ul class="opts"><li><div class="ot"><b id="sensors-h">${oti("gauge")}Criar os sensores</b><span>${sensorsOn()
-        ? '<span class="codepath">sensor.inventaria_ia_hoje</span>, com as chamadas de IA de hoje' + (newsOn()
-          ? ', e <span class="codepath">binary_sensor.inventaria_recall</span>, ligado com um recall nas Novidades.' : ".")
-        : newsOn() ? "As chamadas de IA de hoje e os recalls das Novidades, para painéis e automações."
-        : "As chamadas de IA de hoje, para painéis e automações."}</span></div>
-        <div class="oa">${switchHtml("sensors-on", sensorsOn(), "sensors-h")}</div></li></ul>
+      <p class="lead">Para usar em painéis e automações do Home Assistant.</p>
+      <ul class="opts"><li${sensorsOn() ? ' class="tem-sub"' : ""}><div class="ot"><b id="sensors-h">${oti("gauge")}Criar sensores</b><span>${sensorsOn() ? "Ligado." : "Desligado: nenhum sensor no Home Assistant."}</span></div>
+        <div class="oa">${switchHtml("sensors-on", sensorsOn(), "sensors-h")}</div></li>
+        ${sensorsOn() ? `<li class="sub"><div class="sub-box sensor-list">${[
+          ["sensor.inventaria_ia_hoje", "chamadas de IA hoje, com erros, cota e tokens estimados"],
+          ...(newsOn() ? [["binary_sensor.inventaria_recall", "ligado com um recall nas Novidades"]] : []),
+        ].map(([e, o]) => `<div class="sensor-row"><code>${e}</code><span>${o}</span></div>`).join("")}</div></li>` : ""}</ul>
     </section>` : ""}
 `;
   }

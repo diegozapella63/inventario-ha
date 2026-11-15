@@ -1407,3 +1407,9 @@ textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh;
 /* 1.59.0: todo botão com texto tem ícone (padrão da família): os que não são .btn também alinham o ícone */
 .toast button, .phs .ph .mkcover, .cam-done, button.chip, [data-ed="tipo"] { display: inline-flex; align-items: center; gap: 6px; }
 .phs .ph .mkcover .ic { width: 13px; height: 13px; }
+
+/* Sensores no Home Assistant (1.61.1, como no ResolvIA): Criar sensores e, num quadro embaixo, cada sensor numa linha */
+.sub-box.sensor-list { padding: 4px 14px; display: grid; }
+.sensor-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--muted); }
+.sensor-row:first-child { border-top: 0; }
+.sensor-row code { font-size: 13px; padding: 1px 6px; border-radius: 6px; background: var(--bg); color: var(--text); overflow-wrap: anywhere; font-family: ui-monospace, monospace; }

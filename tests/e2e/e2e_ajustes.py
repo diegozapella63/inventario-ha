@@ -98,6 +98,9 @@ async def body(r, p):
     rc = ha.state(RECALL)
     r.check(rc is not None and rc["state"] == "off" and rc["attributes"]["quantidade"] == 0, f"binary_sensor.inventaria_recall criado, desligado sem recall ({rc and rc['state']})")
     r.check("binary_sensor.inventaria_recall" in await pg.text_content("#p-sensors"), "o cartão diz o sensor do recall")
+    # 1.61.1: como no ResolvIA, cada sensor numa linha, no quadro embaixo de Criar sensores
+    linhas = await pg.locator("#p-sensors li.sub .sub-box.sensor-list .sensor-row code").all_inner_texts()
+    r.eq(linhas, ["sensor.inventaria_ia_hoje", "binary_sensor.inventaria_recall"], "os sensores no quadro embaixo da chave")
     await pg.click('label.switch:has([data-input="sensors-on"])')
     await pg.locator(".toast", has_text="Sensores desligados").wait_for(timeout=8000)
     for _ in range(30):

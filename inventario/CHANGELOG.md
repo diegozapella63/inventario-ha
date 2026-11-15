@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.61.1
+
+- **Sensores no Home Assistant** como no ResolvIA: a chave **Criar sensores** e, num quadro embaixo dela, cada sensor numa linha com o que mostra.
+
 ## 1.61.0
 
 - **Contrair e expandir as seções**: em Mais e em Configurações, um toque no cabeçalho de uma seção fecha ou abre (a seta no canto mostra). O aparelho lembra as que ficaram fechadas para a próxima vez.
