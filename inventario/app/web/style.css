@@ -876,6 +876,9 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .inews-h { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 17px; font-weight: 700; }
 .inews-h .ic { color: var(--tag-text); }
 .inews > .btn { margin-top: 14px; width: 100%; } /* Novidades, Buscar de novo e Nova tarefa: do mesmo tamanho */
+/* 1.63.0: Buscar de novo e Apagar lado a lado, do mesmo tamanho */
+.inews-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.inews-acts > .btn { width: 100%; min-width: 0; justify-content: center; }
 .inews > .formerr { margin: 10px 0 0; }
 .inews .wbusy { padding: 8px 4px; }
 /* tarefas no ResolvIA, na ficha do item */
@@ -1433,4 +1436,9 @@ textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh;
   .dlg-f:has(> [data-ed="again"]) { display: grid; grid-template-columns: 1fr 1fr; }
   .dlg-f:has(> [data-ed="again"]) > .grow, .dlg-f:has(> [data-ed="again"]) > .hide-narrow { display: none; }
   .dlg-f:has(> [data-ed="again"]) > .btn { min-width: 0; white-space: normal; line-height: 1.15; text-align: center; justify-content: center; }
+  /* 1.63.0: a janela das Novidades de um equipamento: Buscar de novo e Apagar lado a lado, Ver item embaixo, na largura toda */
+  .dlg-f.news-f:has(> [data-apagar]:not([hidden])) { display: grid; grid-template-columns: 1fr 1fr; }
+  .dlg-f.news-f:has(> [data-apagar]:not([hidden])) > .grow { display: none; }
+  .dlg-f.news-f:has(> [data-apagar]:not([hidden])) > [data-item] { grid-column: 1 / -1; }
+  .dlg-f.news-f:has(> [data-apagar]:not([hidden])) > .btn { min-width: 0; justify-content: center; }
 }

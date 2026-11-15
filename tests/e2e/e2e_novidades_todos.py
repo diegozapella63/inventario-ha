@@ -166,8 +166,41 @@ async def body(r, p):
     await pg.wait_for_selector("dialog.modal .news li", timeout=4000)
     r.eq(await pg.locator("dialog.modal .news .pill.nova", has_text="Nova").count(), 3, f"e num com novas, cada uma marcada Nova ({outro})")
     await r.shot(pg, "novas-do-item")
+    # 1.63.0: Apagar as novidades do equipamento: Buscar de novo e Apagar lado a lado, Ver item embaixo; pede confirmação
+    f = await pg.evaluate("""[...document.querySelectorAll('dialog.modal .dlg-f .btn')].filter(b => !b.hidden).map(b => { const q = b.getBoundingClientRect();
+      return [b.textContent.trim(), Math.round(q.width), Math.round(q.top)]; })""")
+    r.check([x[0] for x in f] == ["Buscar de novo", "Apagar", "Ver item"] and f[0][1] == f[1][1] and f[0][2] == f[1][2] and f[2][2] > f[0][2] and f[2][1] > f[0][1] * 1.8,
+            f"Buscar de novo e Apagar lado a lado, do mesmo tamanho; Ver item embaixo, na largura toda ({f})")
+    await pg.click("dialog.modal [data-apagar]")
+    await pg.wait_for_selector("dialog.modal.narrow [data-r]", timeout=4000)
+    r.eq((await pg.text_content("dialog.modal.narrow h2")).strip(), "Apagar as novidades?", "pede confirmação")
+    await pg.click('dialog.modal.narrow [data-r="1"]')
+    await pg.locator(".toast", has_text="Novidades apagadas").wait_for(timeout=5000)
+    await pg.wait_for_timeout(300)
+    r.check("Nada novo além do que você apagou" in await pg.text_content("dialog.modal [data-slot=news]") and await pg.locator("dialog.modal [data-apagar]").is_hidden(),
+            "a janela fica sem as novidades, sem o Apagar")
     await pg.click("dialog.modal .dlg-h [data-x]")
     await pg.wait_for_timeout(400)
+    rows = await pg.evaluate(ROWS)
+    linha = next(x for x in rows if x[0] == outro)
+    r.check(" · Nada novo · hoje" in linha[1] and linha[2] == [] and rows[-1][0] == outro, f"na lista: Nada novo, sem o número, no fim ({linha}, {rows[-1][0]})")
+    r.eq(r.api("GET", f"api/news?item={next(i['id'] for i in r.data()['items'] if i['name'] == outro)}")["news"]["apagadas"], 3, "e o servidor guarda quantas foram apagadas")
+    # e pela ficha do item: Buscar de novo e Apagar lado a lado
+    await r.open(pg, f"#/i/{tv}", "dialog.sheet h1")
+    await pg.wait_for_selector('dialog.sheet [data-act="item-news-del"]', timeout=6000)
+    b2 = await pg.evaluate("""[...document.querySelectorAll('dialog.sheet .inews-acts .btn')].map(b => { const q = b.getBoundingClientRect(); return [b.textContent.trim(), Math.round(q.width), Math.round(q.top)]; })""")
+    r.check([x[0] for x in b2] == ["Buscar de novo", "Apagar"] and b2[0][1:] == b2[1][1:], f"na ficha, Buscar de novo e Apagar lado a lado, do mesmo tamanho ({b2})")
+    await r.shot(pg, "ficha-apagar")
+    await pg.click('dialog.sheet [data-act="item-news-del"]')
+    await pg.wait_for_selector("dialog.modal.narrow [data-r]", timeout=4000)
+    await pg.click('dialog.modal.narrow [data-r="1"]')
+    await pg.locator(".toast", has_text="Novidades apagadas").wait_for(timeout=5000)
+    await pg.wait_for_timeout(300)
+    r.check("Nada novo além do que você apagou" in await pg.text_content('dialog.sheet [data-slot="item-news"]') and await pg.locator('dialog.sheet [data-act="item-news-del"]').count() == 0,
+            "na ficha também: sem as novidades, só o Buscar de novo")
+    await pg.go_back()
+    await pg.wait_for_selector("dialog.sheet", state="detached", timeout=4000)
+    await r.open(pg, "#/novidades", "#p-news-list .nlist")
 
     # Limpar novidades, com confirmação
     await pg.wait_for_selector("#p-news-list .nlist .nrow", timeout=8000)

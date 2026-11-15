@@ -2682,7 +2682,7 @@
         <div class="news-meta">${x.nova ? `<span class="pill nova">Nova</span>` : ""}<span class="pill${x.tipo === "recall" ? " warn" : ""}">${esc(NEWS_KIND[x.tipo] || "Novidade")}</span>${x.boato ? `<span class="pill">Boato</span>` : ""}${x.data ? `<span class="news-date">${esc(newsDate(x.data))}</span>` : ""}</div>
         <b>${esc(x.titulo)}</b>${x.resumo ? `<p>${esc(x.resumo)}</p>` : ""}
         <a href="${esc(x.fonte)}" target="_blank" rel="noopener noreferrer">${esc(x.site || siteOf(x.fonte))}</a></li>`).join("")}</ul>`
-      : `<p class="muted news-none">Nada novo nos últimos 12 meses.</p>`}
+      : `<p class="muted news-none">${r.news && r.news.apagadas ? "Nada novo além do que você apagou." : "Nada novo nos últimos 12 meses."}</p>`}
       <p class="muted news-foot">${r.example ? "Exemplo simulado da prévia. " : ""}Buscado ${esc(whenShort(r.at))}${prod && norm(prod) !== norm(it.name) ? `, como ${esc(prod)}` : ""}.</p>`;
   }
   // na ficha: o que já foi conferido aparece direto; Novidades (ou Buscar de novo) procura ali mesmo. A busca segue no
@@ -2753,7 +2753,21 @@
     const head = `<h3 class="inews-h">${ic("spark")}Novidades</h3>`;
     if (!st) return `${head}<p class="muted">Atualizações, recalls e modelos novos.</p>${btn("search", "Buscar novidades")}`;
     if (st.busy) return `${head}<div class="wbusy"><span class="spin"></span><p><b>Procurando novidades…</b><span>Pode levar até um minuto.</span></p></div>`;
-    return `${head}${st.error ? `<p class="formerr">${esc(st.error)}</p>` : newsListHtml(st.r, it)}${btn("refresh", "Buscar de novo")}`;
+    const del = !st.error && newsCount(st.r) ? `<button type="button" class="btn" data-act="item-news-del" data-id="${esc(it.id)}">${ic("trash")}Apagar</button>` : "";
+    return `${head}${st.error ? `<p class="formerr">${esc(st.error)}</p>` : newsListHtml(st.r, it)}${del ? `<div class="inews-acts">${btn("refresh", "Buscar de novo")}${del}</div>` : btn("refresh", "Buscar de novo")}`;
+  }
+  // 1.63.0: Apagar as novidades de um equipamento (na ficha e na janela das Novidades): somem dele e dos outros cômodos
+  // com o mesmo, e não voltam nas próximas conferências; o que sair de novo aparece
+  async function dismissNews(it) {
+    const ok = await confirmBox({ title: "Apagar as novidades?", body: "Elas não voltam nas próximas conferências.", ok: "Apagar", danger: true });
+    if (!ok) return null;
+    try {
+      const r = await API.del(`api/news?item=${encodeURIComponent(it.id)}`);
+      if (newsOv) { try { newsOv = await API.get("api/news"); } catch { /* fica a lista de antes */ } renderNews(); }
+      if (INEWS.id === it.id) { INEWS.st = r && r.news ? { r } : null; paintItemNews(); }
+      toast("Novidades apagadas.");
+      return r;
+    } catch (e) { fail(e); return null; }
   }
   function paintItemNews() {
     const slot = sheet && sheet.itemId === INEWS.id && $('[data-slot="item-news"]', sheet.dlg);
@@ -2805,14 +2819,15 @@
       cls: "modal", label: "Novidades",
       html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("spark", `Novidades`)}</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b"><p class="news-of">${esc(it.name)}</p><div data-slot="news" aria-live="polite"></div></div>
-        <div class="dlg-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Buscar de novo</button><span class="grow"></span>
+        <div class="dlg-f news-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Buscar de novo</button>
+          <button type="button" class="btn" data-apagar hidden>${ic("trash")}Apagar</button><span class="grow"></span>
           <button type="button" class="btn primary" data-item>${ic("external")}Ver item</button></div></div>`,
       onClose: () => { gen++; clearTimeout(timer); if (job) API.del(`api/news/${job}`).catch(() => {}); job = null; },
     });
-    const dlg = entry.dlg, slot = $('[data-slot="news"]', dlg), again = $("[data-again]", dlg);
-    const show = (html, done) => { slot.innerHTML = html; again.hidden = !done; };
+    const dlg = entry.dlg, slot = $('[data-slot="news"]', dlg), again = $("[data-again]", dlg), apagar = $("[data-apagar]", dlg);
+    const show = (html, done, n = 0) => { slot.innerHTML = html; again.hidden = !done; apagar.hidden = !(done && n); };
     const error = (m) => show(`<p class="formerr">${esc(m)}</p>`, true);
-    const render = (r) => show(newsListHtml(r, it), true);
+    const render = (r) => show(newsListHtml(r, it), true, newsCount(r));
     async function poll(my) {
       let st;
       try { st = await API.get(`api/news/${job}`); }
@@ -2842,6 +2857,7 @@
       if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
       if (e.target.closest("[data-item]")) { finalizeThen(entry, () => nav(`#/i/${encodeURIComponent(it.id)}`)); return; } // a ficha do item; o Voltar volta para as Novidades
       if (e.target.closest("[data-again]")) start();
+      if (e.target.closest("[data-apagar]")) dismissNews(it).then((r) => { if (r) render(r); });
     });
     const my0 = gen;
     // o que já foi conferido fica guardado no servidor: abre na hora, sem chamar a IA
@@ -4485,6 +4501,7 @@
       case "item-edit": if (item) openEditor({ item }); break;
       case "web-photo": if (item) addWebPhoto(item); break;
       case "item-news": if (item) searchItemNews(item); break;
+      case "item-news-del": if (item) dismissNews(item); break;
       case "item-rec": if (item) searchItemRec(item); break;
       case "item-dup": if (item) openEditor({ dup: item }); break;
       case "tarefa-nova": if (item) openTarefaNova(item); break;

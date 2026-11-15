@@ -2863,7 +2863,7 @@ def _news_job_run(jid: str, name: str, details: str, entity: str, iid: str = "")
         found = ai_find_news(name, details, entity)
         if not job.get("cancelled"):
             ids = news_group_ids(iid) if iid else []
-            found = news_mark(news_before(ids), found) if ids else found
+            found = news_mark(news_before(ids), found, fora=news_fora(ids)) if ids else found
             for g in ids:  # o mesmo equipamento nos outros cômodos ganha o mesmo resultado
                 news_save_result(g, found)
             job.update(stage="done", msg="", news=found)
@@ -2944,7 +2944,8 @@ def news_read() -> dict:
     d = read_json_ok(NEWS_FILE, {}) or {}
     if not isinstance(d, dict):
         d = {}
-    for k in ("itens", "triagem", "apps", "apps_triagem"):  # apps: as novidades de cada app do celular; apps_triagem: a escolha
+    for k in ("itens", "triagem", "apps", "apps_triagem", "apagadas"):  # apps: as novidades de cada app do celular; apps_triagem: a escolha
+        # apagadas (1.63.0): por item, as novidades que a pessoa apagou (a fonte e o título), que não voltam
         if not isinstance(d.get(k), dict):
             d[k] = {}
     for v in [*d["itens"].values(), *d["apps"].values()]:  # guardadas antes do limite: ficam só as mais recentes
@@ -2976,17 +2977,26 @@ def news_clear() -> dict:
     return news_overview()
 
 
-def news_mark(before, found: dict, at: str = "") -> dict:
+def news_keys(n: dict) -> list[str]:
+    """Como uma novidade é reconhecida de uma conferência para outra: pela fonte ou pelo título."""
+    return [k for k in (str(n.get("fonte") or ""), fold(str(n.get("titulo") or ""))) if k]
+
+
+def news_mark(before, found: dict, at: str = "", fora=()) -> dict:
     """1.62.0: cada novidade guarda desde quando aparece (desde); as que não estavam na conferência anterior (pela fonte
     ou pelo título) ganham nova: true, para a lista mostrar quais equipamentos tiveram algo novo desde a última consulta.
-    Uma que já estava fica com o desde de antes e sem o nova (guardada antes da 1.62.0, sem o desde)."""
+    Uma que já estava fica com o desde de antes e sem o nova (guardada antes da 1.62.0, sem o desde). 1.63.0: as que a
+    pessoa apagou (fora: as chaves de news_keys) não entram; apagadas diz quantas ficaram de fora desta vez."""
     at = at or now_iso()
+    fora = set(fora)
+    todas = (found or {}).get("novidades") or []
+    found = {**(found or {}), "novidades": [n for n in todas if not fora.intersection(news_keys(n))]}
+    found["apagadas"] = len(todas) - len(found["novidades"])
     prev = {}
     for n in ((before or {}).get("novidades") or []) if isinstance(before, dict) else []:
         if isinstance(n, dict):
-            for k in (str(n.get("fonte") or ""), fold(str(n.get("titulo") or ""))):
-                if k:
-                    prev.setdefault(k, n)
+            for k in news_keys(n):
+                prev.setdefault(k, n)
     out = []
     for n in (found or {}).get("novidades") or []:
         old = prev.get(str(n.get("fonte") or "")) or prev.get(fold(str(n.get("titulo") or "")))
@@ -2998,6 +3008,36 @@ def news_mark(before, found: dict, at: str = "") -> dict:
             m.update(desde=at, nova=True)
         out.append(m)
     return {**(found or {}), "novidades": out}
+
+
+def news_fora(ids) -> set[str]:
+    """As novidades apagadas (1.63.0) de qualquer um desses itens (o mesmo equipamento em vários cômodos)."""
+    ap = news_read()["apagadas"]
+    return {k for i in ids for k in (ap.get(i) or []) if isinstance(k, str)}
+
+
+NEWS_APAGADAS_MAX = 60  # por item, as últimas apagadas (a IA traz só as 3 mais recentes)
+
+
+def news_dismiss(iid: str) -> dict:
+    """1.63.0: apaga as novidades achadas de um equipamento (e dos outros cômodos com o mesmo), e elas não voltam nas
+    próximas conferências; o que sair de novo aparece. Devolve o que a ficha mostra ({at, news}, com novidades vazias)."""
+    need_news_on()
+    if not STORE.item(iid):
+        raise ApiError(404, "Item não encontrado.")
+    with NEWS_LOCK:
+        d = news_read()
+        for i in news_group_ids(iid):
+            v = d["itens"].get(i)
+            if not isinstance(v, dict) or not isinstance(v.get("news"), dict):
+                continue
+            ks = [k for k in (d["apagadas"].get(i) or []) if isinstance(k, str)]
+            for n in v["news"].get("novidades") or []:
+                ks += [k for k in news_keys(n) if k not in ks]
+            d["apagadas"][i] = ks[-NEWS_APAGADAS_MAX:]
+            v["news"] = {**v["news"], "novidades": [], "apagadas": len(v["news"].get("novidades") or []) + int(v["news"].get("apagadas") or 0)}
+        write_json_atomic(NEWS_FILE, d)
+    return news_of(iid)
 
 
 def news_before(ids) -> dict | None:
@@ -3300,7 +3340,8 @@ def _news_batch_run(jid: str):
             if job.get("cleared"):  # Limpar novidades no meio: nada mais é gravado
                 return
             if tipo == "item":
-                res = news_mark(news_before([m["id"] for m in alvo]), res)
+                ids = [m["id"] for m in alvo]
+                res = news_mark(news_before(ids), res, fora=news_fora(ids))
                 if any(x.get("nova") for x in res["novidades"]):
                     novos.append(nome)
                 for m in alvo:
@@ -4635,7 +4676,8 @@ def r_news_overview(h, query):
 
 
 def r_news_clear(h, query):
-    h.send_json(news_clear())
+    iid = (query.get("item") or [""])[0]  # 1.63.0: as de um equipamento só (Apagar, na janela dele)
+    h.send_json(news_dismiss(iid) if iid else news_clear())
 
 
 def r_news_all(h, query):

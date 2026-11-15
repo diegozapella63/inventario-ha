@@ -130,6 +130,13 @@ class NovasEntradas(UnitBase):
     def test_nada_achado(self):
         self.assertEqual(server.news_mark({"novidades": [self.A]}, {"novidades": []})["novidades"], [])
 
+    def test_as_apagadas_nao_entram(self):
+        """1.63.0: as que a pessoa apagou (pela fonte ou pelo título) ficam de fora, e apagadas diz quantas."""
+        r = server.news_mark(None, {"novidades": [self.A, self.B]}, fora=[server.fold("ATUALIZAÇÃO 2.1")])
+        self.assertEqual(([n["titulo"] for n in r["novidades"]], r["apagadas"]), (["Modelo 2027"], 1))
+        r = server.news_mark(None, {"novidades": [self.A, self.B]}, fora=["https://fab.exemplo/b"])
+        self.assertEqual(([n["titulo"] for n in r["novidades"]], r["apagadas"]), (["Atualização 2.1"], 1))
+
 
 class Aviso(UnitBase):
     def test_texto(self):

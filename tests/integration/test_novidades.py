@@ -197,6 +197,26 @@ class Todos(ServerCase):
         app.ok("PUT", "api/settings", {"ai": False})
         self.assertEqual(app.request("GET", "api/news?item=sal-007")[0], 409, "IA desligada: recusa")
 
+    def test_apagar_as_novidades_de_um_equipamento(self):
+        """1.63.0: DELETE api/news?item= apaga as achadas do equipamento (e dos outros cômodos com o mesmo); elas não voltam
+        ao buscar de novo, e Limpar novidades começa do zero."""
+        app = self.fresh(mock_ai=True)
+        outro = app.ok("POST", "api/items", {"room": "quarto", "name": "Smart TV 55 polegadas", "cat": "eletronicos", "value": 10})["item"]["id"]
+        esperar(app, app.ok("POST", "api/news", {"item": "sal-007"})["id"])
+        self.assertEqual(len(app.ok("GET", f"api/news?item={outro}")["news"]["novidades"]), 3, "o mesmo equipamento no quarto")
+        r = app.ok("DELETE", "api/news?item=sal-007")
+        self.assertEqual((r["news"]["novidades"], r["news"]["apagadas"]), ([], 3))
+        self.assertEqual(app.ok("GET", f"api/news?item={outro}")["news"]["novidades"], [], "e no outro cômodo também")
+        self.assertEqual(app.ok("GET", "api/news")["itens"]["sal-007"]["news"]["novidades"], [])
+        st = esperar(app, app.ok("POST", "api/news", {"item": outro})["id"])
+        self.assertEqual((st["news"]["novidades"], st["news"]["apagadas"]), ([], 3), "buscar de novo: as apagadas não voltam")
+        self.assertEqual(app.request("DELETE", "api/news?item=nao-existe")[0], 404)
+        app.ok("DELETE", "api/news")
+        st = esperar(app, app.ok("POST", "api/news", {"item": "sal-007"})["id"])
+        self.assertEqual(len(st["news"]["novidades"]), 3, "Limpar novidades começa do zero: voltam")
+        app.ok("PUT", "api/settings", {"ai": False})
+        self.assertEqual(app.request("DELETE", "api/news?item=sal-007")[0], 409, "IA desligada: recusa")
+
     def test_padrao_so_eletronicos(self):
         app = self.fresh(mock_ai=True)
         self.assertEqual(app.ok("GET", "api/news")["cats"], ["eletronicos"])
