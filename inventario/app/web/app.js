@@ -2140,7 +2140,24 @@
   }
   // Opções › Novidades (1.56.1): logo abaixo de Apps do celular, os apps que o sensor achou, recolhidos em Apps detectados (n),
   // com os celulares que têm o sensor ligado e, de cada app, de quem, quando foi usado e se é acompanhado; sem app, o que fazer
-  let appsDetAberto = false, appsInatAberto = false;
+  let appsDetAberto = false, appsInatAberto = false, appsDetBusca = "";
+  // 1.67.0: Buscar app, pelo nome ou pelo pacote, sem acento; mostra só os que batem (e abre Inativos se um estiver lá)
+  const appBate = (a, q) => !q.trim() || norm(`${a.nome} ${a.pacote}`).includes(norm(q.trim()));
+  function filtraAppsDet() {
+    const box = $('#view .apps-det');
+    if (!box) return;
+    const q = appsDetBusca;
+    let n = 0;
+    for (const li of $$(".app-det", box)) { const ok = !q.trim() || norm(li.dataset.busca || "").includes(norm(q.trim())); li.hidden = !ok; n += ok ? 1 : 0; }
+    const inat = $(".apps-inativos", box);
+    if (inat) {
+      const vis = $$(".app-det:not([hidden])", inat).length;
+      inat.hidden = !!q.trim() && !vis;
+      if (q.trim() && vis) inat.open = true;
+    }
+    const nada = $(".apps-nada", box);
+    if (nada) { nada.hidden = !q.trim() || n > 0; nada.textContent = `Nenhum app com “${q.trim()}”.`; }
+  }
   function appsDetHtml() {
     const A = newsOv && newsOv.apps;
     if (!A) return `<p class="help">Procurando os apps dos celulares…</p>`;
@@ -2153,17 +2170,21 @@
     const row = (a) => {
       const id = "app-det-" + a.pacote.replace(/[^a-z0-9]/gi, "-");
       // 1.58.1: o Ver novidades na largura toda, embaixo do nome e da chave (como os outros botões dos apps)
-      return `<li class="app-det"><div class="app-det-t"><b id="${id}">${esc(a.nome)}</b>
+      return `<li class="app-det" data-busca="${esc(`${a.nome} ${a.pacote}`)}"${appBate(a, appsDetBusca) ? "" : " hidden"}><div class="app-det-t"><b id="${id}">${esc(a.nome)}</b>
         <span class="nm">${esc([joinE(a.pessoas || []), a.ultimo ? `usado ${whenShort(a.ultimo)}` : a.ia ? "pela IA" : "", quando(a)].filter(Boolean).join(" · "))}</span></div>
         <label class="switch"><input type="checkbox" role="switch" data-input="app-considerar" data-pkg="${esc(a.pacote)}" aria-labelledby="${id}"${on(a) ? " checked" : ""}><span class="track" aria-hidden="true"></span></label>
         <div class="app-det-b"><button type="button" class="btn" data-act="app-open" data-id="${esc(a.pacote)}" aria-label="Ver novidades de ${esc(a.nome)}">${ic("spark", "sm")}Ver novidades</button>
           <button type="button" class="btn" data-act="app-rename" data-id="${esc(a.pacote)}" aria-label="Renomear ${esc(a.nome)}">${ic("edit", "sm")}Renomear</button></div></li>`;
     };
     const ativos = L.filter(on), inativos = L.filter((a) => !on(a));
+    const busca = appsDetBusca.trim(), bate = (a) => appBate(a, busca);
     return `<details class="news-out apps-det"${appsDetAberto ? " open" : ""}><summary>${ic("chev", "sm")}${oti("phone")}Apps detectados (${int(L.length)})</summary>
       ${(A.celulares || []).length ? `<p class="help">Com o sensor: ${esc(joinE(A.celulares))}.</p>` : ""}${encontrarBtn()}
+      ${L.length > 6 ? `<div class="filterbar apps-busca"><label class="search">${ic("search")}<span class="sr">Buscar app</span>
+        <input class="input" type="search" data-input="apps-busca" placeholder="Buscar app" value="${esc(appsDetBusca)}" autocomplete="off" enterkeyhint="search"></label></div>
+        <p class="muted apps-nada"${appsDetBusca.trim() && !L.some((a) => appBate(a, appsDetBusca)) ? "" : " hidden"}>Nenhum app com “${esc(appsDetBusca.trim())}”.</p>` : ""}
       ${ativos.length ? `<ul class="app-det-l">${ativos.map(row).join("")}</ul>` : ""}
-      ${inativos.length ? `<details class="news-out apps-inativos"${appsInatAberto ? " open" : ""}><summary>${ic("chev", "sm")}${oti("archive")}Inativos (${int(inativos.length)})</summary>
+      ${inativos.length ? `<details class="news-out apps-inativos"${appsInatAberto || (busca && inativos.some(bate)) ? " open" : ""}${busca && !inativos.some(bate) ? " hidden" : ""}><summary>${ic("chev", "sm")}${oti("archive")}Inativos (${int(inativos.length)})</summary>
         <ul class="app-det-l">${inativos.map(row).join("")}</ul></details>` : ""}</details>`;
   }
   // 1.66.0: Renomear um app de Apps detectados (vale na tela, nas buscas da IA e nos avisos); vazio volta ao nome de antes
@@ -4745,6 +4766,7 @@
     if (!k) return;
     if (k === "search-q") { onSearchInput(t.value); const c = $('#view [data-act="search-clear"]'); if (c) c.hidden = !t.value; }
     else if (k === "room-filter") onRoomFilter(t.dataset.room, t.value);
+    else if (k === "apps-busca") { appsDetBusca = t.value; filtraAppsDet(); }
     else if (k === "home-q" && t.value.trim()) {
       focusSearch = true;
       nav(hashOf({ name: "search", q: { q: t.value } }));

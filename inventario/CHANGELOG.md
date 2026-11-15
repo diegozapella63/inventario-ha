@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.67.0
+
+- **Apps detectados**: com mais de 6 apps, o campo **Buscar app** acha um app pelo nome ou pelo pacote, sem ligar para acentos. Se o app estiver em **Inativos**, a lista abre; sem nenhum, diz que não achou.
+
 ## 1.66.0
 
 - **Apps detectados** (Configurações › Opções): cada app ganha **Renomear**, ao lado do **Ver novidades**. O nome novo vale na lista, nas Novidades e na busca da IA (um nome mais claro ajuda a achar as novidades certas); apagar o nome volta ao de antes. Continua depois de **Limpar novidades**.

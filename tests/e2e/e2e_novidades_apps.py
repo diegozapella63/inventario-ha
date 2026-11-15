@@ -3,7 +3,7 @@ em Mais › Novidades (sem o Home Assistant, os apps de exemplo de um celular de
 de um app (o guardado, sem chamar a IA), Deixar de fora (sai das Novidades e vai para Inativos, nas Opções) e Acompanhar
 (volta e busca); 1.58.0: Todas as novidades, Só equipamentos e Só apps; Apps detectados como sub-opção, com Ver novidades e
 os desligados em Inativos (n); no celular de 320 px e no computador, no escuro e no claro. 1.64.0: Limpar novidades,
-Só equipamentos e Só apps. 1.66.0: Renomear um app."""
+Só equipamentos e Só apps. 1.66.0: Renomear um app. 1.67.0: Buscar app."""
 import os
 
 from e2e_lib import OVERFLOW, TEXTS, helpers, main
@@ -237,6 +237,24 @@ async def body(r, p):
     r.check("Banco Lua" in nomes and "Mapa Fácil" in nomes, f"entram em Apps detectados, ligados ({nomes})")
     r.check("pela IA" in await pg.text_content(f"{det} li:has([data-id='ia.mapa_facil']) .nm"), "com pela IA")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
+    # 1.67.0: Buscar app (com mais de 6 apps): pelo nome ou pelo pacote, sem acento; um que está em Inativos abre a lista
+    busca = f"{det} [data-input='apps-busca']"
+    VIS = f"""[...document.querySelectorAll("{det} .app-det")].filter(l => !l.hidden && l.offsetParent).map(l => l.querySelector('b').textContent)"""
+    r.check(await pg.locator(busca).is_visible(), "Buscar app aparece")
+    hb = await pg.evaluate(f"""(() => {{ const i = document.querySelector("{busca}"); return [Math.round(i.getBoundingClientRect().height), !!i.closest('label').querySelector('svg')]; }})()""")
+    r.eq(hb, [50, True], "da altura dos outros campos, com a lupa")
+    await pg.fill(busca, "MAPA facil")
+    r.eq(await pg.evaluate(VIS), ["Mapa Fácil"], "pelo nome, sem acento nem maiúsculas")
+    await pg.fill(busca, "launcher")
+    r.eq(await pg.evaluate(VIS), ["Tela inicial"], "pelo pacote")
+    await pg.fill(busca, "mercad")
+    r.check(await pg.evaluate(VIS) == ["Mercadinho"] and await pg.eval_on_selector(inat, "d => d.open"), "um de Inativos: a lista abre")
+    await pg.fill(busca, "xyz")
+    r.check(await pg.evaluate(VIS) == [] and await pg.locator(f"{det} .apps-nada").is_visible()
+            and "Nenhum app com “xyz”." in await pg.text_content(f"{det} .apps-nada"), "nada: diz que não achou")
+    await r.shot(pg, "buscar-app")
+    await pg.fill(busca, "")
+    r.check(len(await pg.evaluate(VIS)) >= 7 and await pg.locator(f"{det} .apps-nada").is_hidden(), "vazio: todos de novo")
 
     await r.open(pg, "#/novidades", "#p-news-apps")
     await pg.wait_for_selector("#p-news-apps .nlist .nrow", timeout=8000)

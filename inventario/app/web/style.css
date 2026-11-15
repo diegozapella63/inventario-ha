@@ -639,6 +639,11 @@ div.croom:hover { background: none; }
 .filterbar .search { position: relative; flex: 1; max-width: 360px; }
 .filterbar .search .ic { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); }
 .filterbar .search .input { padding-left: 40px; height: 40px; }
+/* 1.67.0: Apps detectados › Buscar app, na largura do quadro, da altura dos outros campos */
+.filterbar.apps-busca { margin: 12px 0 6px; }
+.filterbar.apps-busca .search { max-width: none; }
+.filterbar.apps-busca .search .input { height: var(--altura); width: 100%; }
+.apps-nada { margin: 8px 0 0; }
 
 .zone { margin-top: 30px; }
 .zone-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 6px 8px; }
