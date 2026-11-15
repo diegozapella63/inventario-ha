@@ -102,21 +102,33 @@ class Pessoas(UnitBase):
 
 
 class NovasEntradas(UnitBase):
+    """1.62.0: news_mark marca nova o que não estava na conferência anterior (pela fonte ou pelo título) e guarda o desde."""
     A = {"titulo": "Atualização 2.1", "fonte": "https://fab.exemplo/a"}
     B = {"titulo": "Modelo 2027", "fonte": "https://fab.exemplo/b"}
+    novas = staticmethod(lambda r: [n["titulo"] for n in r["novidades"] if n.get("nova")])
 
     def test_sem_busca_anterior_tudo_e_novo(self):
-        self.assertEqual(server.news_new_entries(None, {"novidades": [self.A, self.B]}), [self.A, self.B])
+        r = server.news_mark(None, {"produto": "X", "novidades": [self.A, self.B]}, at="2026-11-14T21:00:00-03:00")
+        self.assertEqual(self.novas(r), ["Atualização 2.1", "Modelo 2027"])
+        self.assertEqual({n["desde"] for n in r["novidades"]}, {"2026-11-14T21:00:00-03:00"})
+        self.assertEqual(r["produto"], "X")
 
-    def test_a_mesma_fonte_nao_e_nova(self):
-        self.assertEqual(server.news_new_entries({"novidades": [self.A]}, {"novidades": [self.A, self.B]}), [self.B])
+    def test_a_mesma_fonte_nao_e_nova_e_fica_com_o_desde_de_antes(self):
+        antes = server.news_mark(None, {"novidades": [self.A]}, at="2026-11-01T10:00:00-03:00")
+        r = server.news_mark(antes, {"novidades": [self.A, self.B]}, at="2026-11-14T21:00:00-03:00")
+        self.assertEqual(self.novas(r), ["Modelo 2027"])
+        self.assertEqual([n["desde"] for n in r["novidades"]], ["2026-11-01T10:00:00-03:00", "2026-11-14T21:00:00-03:00"])
+        de_novo = server.news_mark(r, {"novidades": [self.A, self.B]})
+        self.assertEqual(self.novas(de_novo), [], "conferido de novo sem nada novo: nenhuma nova")
 
     def test_o_mesmo_titulo_com_outra_fonte_nao_e_novo(self):
         antes = {"novidades": [{"titulo": "ATUALIZAÇÃO 2.1", "fonte": "https://outro.exemplo/x"}]}
-        self.assertEqual(server.news_new_entries(antes, {"novidades": [self.A]}), [])
+        r = server.news_mark(antes, {"novidades": [self.A]})
+        self.assertEqual(self.novas(r), [])
+        self.assertNotIn("desde", r["novidades"][0], "guardada antes da 1.62.0: sem o desde")
 
     def test_nada_achado(self):
-        self.assertEqual(server.news_new_entries({"novidades": [self.A]}, {"novidades": []}), [])
+        self.assertEqual(server.news_mark({"novidades": [self.A]}, {"novidades": []})["novidades"], [])
 
 
 class Aviso(UnitBase):

@@ -2862,7 +2862,9 @@ def _news_job_run(jid: str, name: str, details: str, entity: str, iid: str = "")
     try:
         found = ai_find_news(name, details, entity)
         if not job.get("cancelled"):
-            for g in news_group_ids(iid) if iid else []:  # o mesmo equipamento nos outros cômodos ganha o mesmo resultado
+            ids = news_group_ids(iid) if iid else []
+            found = news_mark(news_before(ids), found) if ids else found
+            for g in ids:  # o mesmo equipamento nos outros cômodos ganha o mesmo resultado
                 news_save_result(g, found)
             job.update(stage="done", msg="", news=found)
     except ApiError as e:
@@ -2972,6 +2974,37 @@ def news_clear() -> dict:
         manual = {k: v for k, v in news_read()["apps_triagem"].items() if isinstance(v, dict) and v.get("manual")}
         write_json_atomic(NEWS_FILE, {"itens": {}, "triagem": {}, "apps": {}, "apps_triagem": manual})
     return news_overview()
+
+
+def news_mark(before, found: dict, at: str = "") -> dict:
+    """1.62.0: cada novidade guarda desde quando aparece (desde); as que não estavam na conferência anterior (pela fonte
+    ou pelo título) ganham nova: true, para a lista mostrar quais equipamentos tiveram algo novo desde a última consulta.
+    Uma que já estava fica com o desde de antes e sem o nova (guardada antes da 1.62.0, sem o desde)."""
+    at = at or now_iso()
+    prev = {}
+    for n in ((before or {}).get("novidades") or []) if isinstance(before, dict) else []:
+        if isinstance(n, dict):
+            for k in (str(n.get("fonte") or ""), fold(str(n.get("titulo") or ""))):
+                if k:
+                    prev.setdefault(k, n)
+    out = []
+    for n in (found or {}).get("novidades") or []:
+        old = prev.get(str(n.get("fonte") or "")) or prev.get(fold(str(n.get("titulo") or "")))
+        m = {k: v for k, v in n.items() if k not in ("nova", "desde")}
+        if old:
+            if old.get("desde"):
+                m["desde"] = old["desde"]
+        else:
+            m.update(desde=at, nova=True)
+        out.append(m)
+    return {**(found or {}), "novidades": out}
+
+
+def news_before(ids) -> dict | None:
+    """A conferência guardada mais recente entre esses itens (o mesmo equipamento em vários cômodos)."""
+    its = news_read()["itens"]
+    vs = [its[i] for i in ids if isinstance(its.get(i), dict) and isinstance(its[i].get("news"), dict)]
+    return max(vs, key=lambda v: str(v.get("at") or ""))["news"] if vs else None
 
 
 def news_save_result(iid: str, found: dict):
@@ -3267,12 +3300,14 @@ def _news_batch_run(jid: str):
             if job.get("cleared"):  # Limpar novidades no meio: nada mais é gravado
                 return
             if tipo == "item":
-                if news_new_entries((news_read()["itens"].get(it["id"]) or {}).get("news"), res):
+                res = news_mark(news_before([m["id"] for m in alvo]), res)
+                if any(x.get("nova") for x in res["novidades"]):
                     novos.append(nome)
                 for m in alvo:
                     news_save_result(m["id"], res)
             else:
-                if news_new_entries((news_read()["apps"].get(alvo) or {}).get("news"), res):
+                res = news_mark((news_read()["apps"].get(alvo) or {}).get("news"), res)
+                if any(x.get("nova") for x in res["novidades"]):
                     novos_apps.append(nome)
                 app_news_save(alvo, res)
             done += 1
@@ -3299,15 +3334,6 @@ def _news_batch_run(jid: str):
     except Exception:  # noqa: BLE001
         log.exception("novidades de todos")
         job.update(stage="error", msg="Não deu para conferir agora. Tente de novo em instantes.")
-
-
-def news_new_entries(before, after) -> list[dict]:
-    """As novidades de agora que não estavam na busca anterior (pela fonte ou pelo título)."""
-    seen = set()
-    for n in ((before or {}).get("novidades") or []) if isinstance(before, dict) else []:
-        if isinstance(n, dict):
-            seen.add(str(n.get("fonte") or "")); seen.add(fold(str(n.get("titulo") or "")))
-    return [n for n in (after or {}).get("novidades") or [] if n.get("fonte") not in seen and fold(n.get("titulo") or "") not in seen]
 
 
 # ---------- Apps do celular (1.56.0): as novidades dos apps que a casa usa, pelo sensor Último app usado do app Home
@@ -3625,6 +3651,7 @@ def _app_news_job_run(jid: str, pkg: str, nome: str, entity: str):
     try:
         found = ai_find_app_news(nome, pkg, entity)
         if not job.get("cancelled"):
+            found = news_mark((news_read()["apps"].get(pkg) or {}).get("news"), found)
             app_news_save(pkg, found)
             job.update(stage="done", msg="", news=found)
     except ApiError as e:

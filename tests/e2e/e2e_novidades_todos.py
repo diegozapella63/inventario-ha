@@ -1,5 +1,6 @@
 """Novidades (no menu Mais): só Eletrônicos, sem escolher categorias; conferir todos (a IA escolhe, entre os eletrônicos, o que vale conferir),
-progresso e Parar, a lista com recall primeiro, abrir um item, os deixados de fora (no fim, recolhidos, com a contagem; abertos, ficam
+progresso e Parar, a lista com recall primeiro, as novidades novas (1.62.0: o que não estava na conferência anterior, na cor do
+app e antes das já vistas), abrir um item, os deixados de fora (no fim, recolhidos, com a contagem; abertos, ficam
 abertos enquanto a tela está aberta), item de outra categoria fora da lista,
 Limpar novidades com confirmação e a aba some com a IA desligada."""
 from e2e_lib import OVERFLOW, main
@@ -38,14 +39,17 @@ async def body(r, p):
     r.check("Smart TV 55 polegadas" in nomes and "Notebook 14 polegadas" in nomes, f"a IA escolheu os aparelhos ({len(nomes)})")
     r.check(not any(n in nomes for n in ("Geladeira frost free inox", "Fruteira de madeira", "Sofá de 3 lugares cinza-azulado")),
             "só eletrônicos: sem geladeira, fruteira nem sofá")
-    r.check(all("novidades" in x[1] and "hoje" in x[1] for x in rows), "cada um com quantas novidades e quando")
+    r.check(all(x[1].endswith(("3 novas de 3 · hoje " + x[1][-5:])) for x in rows), f"a primeira vez, tudo novo: quantas novas e quando ({rows[0][1]})")
     lx = [x for x in rows if "LX10" in x[0]]
     r.eq([x[0] for x in lx], ["Lâmpada inteligente Wi-Fi LX10"], "o mesmo equipamento em dois cômodos é uma linha só, com o nome no singular")
     r.check(lx and lx[0][1].startswith("2 cômodos · "), f"e diz em quantos cômodos está ({lx[0][1] if lx else ''})")
     r.eq(r.api("GET", "api/ai/usage")["today"]["kinds"].get("novidades"), len(rows), "uma busca por equipamento, não por item")
     lx_ids = [i["id"] for i in r.data()["items"] if "LX10" in i["name"]]
     r.check(all(r.api("GET", f"api/news?item={i}").get("news") for i in lx_ids), "e o resultado vale para os dois itens")
-    r.check(all(x[2] == ["3"] for x in rows), f"o número de novidades ao lado ({rows[0][2]})")
+    r.check(all(x[2] == ["3"] for x in rows) and await pg.locator("#p-news-list > div > .nlist .nrow .pill.nova").count() == len(rows), f"quantas novas ao lado, na cor do app ({rows[0][2]})")
+    r.eq(await pg.evaluate("[...document.querySelectorAll('#p-news-list .nrow .nm')].filter(e => e.scrollWidth > e.clientWidth + 1 && !e.closest('.news-out')).map(e => e.textContent)"), [], "o quando inteiro, sem cortar")
+    cor = await pg.evaluate("(() => { const d = document.createElement('i'); d.style.color = 'var(--a)'; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return [getComputedStyle(document.querySelector('.nrow .pill.nova')).borderTopColor, c]; })()")
+    r.eq(cor[0], cor[1], "as novas na cor do app")
     fora = await pg.text_content(".news-out summary")
     r.check(fora.startswith("Deixados de fora pela IA ("), f"os que a IA deixou de fora ficam recolhidos ({fora.strip()})")
     foot = await pg.text_content('[data-slot="news-job"]')
@@ -90,7 +94,7 @@ async def body(r, p):
     r.eq(await pg.locator(".news-out .nrow", has_text=nome).count(), 0, "conferido, sai dos deixados de fora")
     if pos[2] > 1:
         r.check(await pg.locator(".news-out[open]").count() == 1, "e a seção continua aberta, para conferir o próximo")
-    r.check("novidades" in await pg.locator("#p-news-list > div > .nlist .nrow", has_text=nome).first.text_content(), "e entra na lista, com o resultado")
+    r.check("3 novas de 3" in await pg.locator("#p-news-list > div > .nlist .nrow", has_text=nome).first.text_content(), "e entra na lista, com o resultado")
 
     # de novo na mesma semana: nada a conferir
     await pg.click('[data-act="news-all"]')
@@ -133,7 +137,37 @@ async def body(r, p):
     # 1.49.1: o resumo conta os de agora (antes ficava o número do dia da conferência)
     k = await pg.evaluate("[...document.querySelectorAll('#p-news-list .nrow')].filter(b => !b.closest('.news-out')).length")
     foot = (await pg.text_content('[data-slot="news-job"]')).strip()
-    r.check(f"{k} de {k} com novidades" in foot and k == k_antes - 1, f"o resumo sem o que saiu ({foot}, {k}, antes {k_antes})")
+    r.check(f"{k} de {k} com novidades novas" in foot and k == k_antes - 1, f"o resumo sem o que saiu ({foot}, {k}, antes {k_antes})")
+
+    # 1.62.0: conferido de novo sem nada que não estava antes: as mesmas 3, nenhuma nova; vai para depois dos que têm novas
+    tv = next(i["id"] for i in r.data()["items"] if i["name"] == "Smart TV 55 polegadas")
+    jid = r.api("POST", "api/news", {"item": tv})["id"]
+    for _ in range(40):
+        st_ = r.api("GET", f"api/news/{jid}")
+        if st_["stage"] != "busy":
+            break
+        await pg.wait_for_timeout(250)
+    r.eq([x.get("nova", False) for x in st_["news"]["novidades"]], [False, False, False], "buscar de novo: as que já estavam não são novas")
+    await r.open(pg, "#/novidades", "#p-news-list .nlist")
+    rows = await pg.evaluate(ROWS)
+    linha = next(x for x in rows if x[0] == "Smart TV 55 polegadas")
+    r.check(linha[1].startswith("Sala de estar · 3 novidades · hoje") and linha[2] == ["3"] and await pg.locator(".nrow", has_text="Smart TV 55 polegadas").locator(".pill.nova").count() == 0, f"sem nada novo: 3 novidades, o número sem a cor ({linha})")
+    r.eq(rows[-1][0], "Smart TV 55 polegadas", "e vai para o fim, depois dos que têm novidades novas")
+    await r.shot(pg, "lista-com-novas")
+    foot = (await pg.text_content('[data-slot="news-job"]')).strip()
+    r.check(f"{k - 1} de {k} com novidades novas" in foot, f"o resumo conta só os com novas ({foot})")
+    await pg.locator(".nrow", has_text="Smart TV 55 polegadas").first.click()
+    await pg.wait_for_selector("dialog.modal .news li", timeout=4000)
+    r.eq(await pg.locator("dialog.modal .news .pill.nova").count(), 0, "na janela, nenhuma marcada Nova")
+    await pg.click("dialog.modal .dlg-h [data-x]")
+    await pg.wait_for_timeout(400)
+    outro = rows[0][0]
+    await pg.locator(".nrow", has_text=outro).first.click()
+    await pg.wait_for_selector("dialog.modal .news li", timeout=4000)
+    r.eq(await pg.locator("dialog.modal .news .pill.nova", has_text="Nova").count(), 3, f"e num com novas, cada uma marcada Nova ({outro})")
+    await r.shot(pg, "novas-do-item")
+    await pg.click("dialog.modal .dlg-h [data-x]")
+    await pg.wait_for_timeout(400)
 
     # Limpar novidades, com confirmação
     await pg.wait_for_selector("#p-news-list .nlist .nrow", timeout=8000)

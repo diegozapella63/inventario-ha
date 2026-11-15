@@ -40,12 +40,13 @@ async def body(r, p):
     await pg.wait_for_selector("dialog.sheet .news li", timeout=10000)
     r.eq((await pg.text_content('dialog.sheet [data-slot="item-news"] .inews-h')).strip(), "Novidades", "as novidades aparecem na ficha, com título")
     rows = await pg.evaluate("""[...document.querySelectorAll('dialog.sheet .news li')].map(li => ({
-        tipo: [...li.querySelectorAll('.pill')].map(p => p.textContent), data: li.querySelector('.news-date')?.textContent || '',
+        tipo: [...li.querySelectorAll('.pill:not(.nova)')].map(p => p.textContent), nova: li.querySelectorAll('.pill.nova').length, data: li.querySelector('.news-date')?.textContent || '',
         titulo: li.querySelector('b').textContent, site: li.querySelector('a').textContent, href: li.querySelector('a').href,
         alvo: li.querySelector('a').target }))""")
     r.eq([x["titulo"] for x in rows], ["Modelo novo da mesma linha", "Atualização de software melhora o Wi-Fi", "Troca da fonte de alimentação em um lote"],
          "só as 3 mais recentes, das mais novas para as mais antigas")
     r.eq(rows[1]["tipo"], ["Atualização"], "o tipo de cada uma")
+    r.eq([x["nova"] for x in rows], [1, 1, 1], "1.62.0: a primeira busca, cada uma marcada Nova")
     r.eq(rows[1]["data"], "12 set. 2026", "data por extenso, curta")
     r.eq(rows[2]["data"], "jul. 2026", "só mês e ano quando é o que se sabe")
     r.eq(rows[0]["tipo"], ["Modelo novo", "Boato"], "boato vem marcado")

@@ -188,6 +188,11 @@ class Todos(ServerCase):
         r = app.ok("GET", "api/news?item=sal-007")
         self.assertTrue(r["at"])
         self.assertEqual(len(r["news"]["novidades"]), 3)
+        self.assertTrue(all(n["nova"] and n["desde"] for n in r["news"]["novidades"]), "a primeira conferência: tudo é novo, com o desde")
+        st = esperar(app, app.ok("POST", "api/news", {"item": "sal-007"})["id"])
+        self.assertFalse(any(n.get("nova") for n in st["news"]["novidades"]), "1.62.0: buscar de novo sem nada novo: nenhuma nova")
+        self.assertEqual([n["desde"] for n in app.ok("GET", "api/news?item=sal-007")["news"]["novidades"]],
+                         [n["desde"] for n in r["news"]["novidades"]], "e o desde fica o da primeira vez")
         self.assertEqual(app.ok("GET", "api/news?item=nao-existe"), {})
         app.ok("PUT", "api/settings", {"ai": False})
         self.assertEqual(app.request("GET", "api/news?item=sal-007")[0], 409, "IA desligada: recusa")

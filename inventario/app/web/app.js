@@ -1609,16 +1609,26 @@
   }
   const newsCount = (r) => ((r && r.news && r.news.novidades) || []).length;
   const newsRecall = (r) => ((r && r.news && r.news.novidades) || []).some((x) => x.tipo === "recall");
+  // 1.62.0: as novidades que não estavam na conferência anterior (o servidor marca nova), para achar o que mudou
+  const newsNew = (r) => ((r && r.news && r.news.novidades) || []).filter((x) => x.nova).length;
+  const newsSt = (r) => {
+    const n = newsCount(r), k = newsNew(r);
+    return !r ? "Ainda não conferido" : `${k ? `${plural(k, "nova", "novas")} de ${int(n)}` : n ? plural(n, "novidade", "novidades") : "Nada novo"} · ${whenShort(r.at)}`;
+  };
+  const newsPill = (r) => {
+    const n = newsCount(r), k = newsNew(r);
+    return newsRecall(r) ? `<span class="pill warn">Recall</span>` : k ? `<span class="pill nova" title="${plural(k, "nova", "novas")}">${int(k)}</span>` : n ? `<span class="pill">${int(n)}</span>` : "";
+  };
+  // a ordem: recall, com novidades novas, com novidades (já vistas), ainda não conferido, nada novo
+  const newsRank = (r) => (newsRecall(r) ? 0 : newsNew(r) ? 1 : newsCount(r) ? 2 : !r ? 3 : 4);
   // uma linha por equipamento: o mesmo em vários cômodos (ou no plural) fica junto, com o nome mais curto
   function newsRow(g) {
     const { it, r, items, open } = g;
     const rooms = [...new Set(items.map((x) => x.room))];
     const where = rooms.length > 1 ? plural(rooms.length, "cômodo", "cômodos") : (D.roomById.get(rooms[0])?.name || "");
-    const n = newsCount(r);
-    const st = !r ? "Ainda não conferido" : `${n ? plural(n, "novidade", "novidades") : "Nada novo"} · ${whenShort(r.at)}`;
-    return `<li><button type="button" class="nrow" data-act="news-open" data-id="${esc(open.id)}">
-        <span class="nb"><b>${esc(it.name)}</b><span class="nm">${esc(where)} · ${esc(st)}</span></span>
-        ${newsRecall(r) ? `<span class="pill warn">Recall</span>` : n ? `<span class="pill">${int(n)}</span>` : ""}${ic("chev", "sm")}</button></li>`;
+    return `<li><button type="button" class="nrow${newsNew(r) ? " tem-nova" : ""}" data-act="news-open" data-id="${esc(open.id)}">
+        <span class="nb"><b>${esc(it.name)}</b><span class="nm">${esc(where)} · ${esc(newsSt(r))}</span></span>
+        ${newsPill(r)}${ic("chev", "sm")}</button></li>`;
   }
   function newsGroups(list, ov) {
     const res = ov.itens || {}, grp = ov.grupos || {}, by = new Map();
@@ -1638,16 +1648,15 @@
     const ls = $('#view [data-slot="news-list"]');
     if (!ov || !ls) return;
     const res = ov.itens || {}, tri = ov.triagem || {};
-    const rank = (g) => (newsRecall(g.r) ? 0 : newsCount(g.r) ? 1 : !g.r ? 2 : 3);
-    const sortG = (a, b) => rank(a) - rank(b) || newsCount(b.r) - newsCount(a.r) || a.it.name.localeCompare(b.it.name, "pt-BR");
+    const sortG = (a, b) => newsRank(a.r) - newsRank(b.r) || newsNew(b.r) - newsNew(a.r) || newsCount(b.r) - newsCount(a.r) || a.it.name.localeCompare(b.it.name, "pt-BR");
     // na lista: os que a IA escolheu e os já conferidos (um deixado de fora conferido sai de lá); embaixo, os deixados de fora
     const chosen = newsGroups(D.items.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || res[it.id])), ov).sort(sortG);
     const vistos = chosen.filter((g) => g.r);
-    newsNums = { conferidos: vistos.length, com: vistos.filter((g) => newsCount(g.r) > 0).length };
+    newsNums = { conferidos: vistos.length, com: vistos.filter((g) => newsNew(g.r) > 0).length };
     const out = newsGroups(D.items.filter((it) => tri[it.id] === false && !res[it.id] && ov.cats.includes(it.cat)), ov).sort(sortG);
     const appsVistos = ((ov.apps && ov.apps.lista) || []).filter((a) => a.res);
     newsNums.conferidos += appsVistos.length;
-    newsNums.com += appsVistos.filter((a) => newsCount(a.res) > 0).length;
+    newsNums.com += appsVistos.filter((a) => newsNew(a.res) > 0).length;
     renderNewsApps();
     // os deixados de fora no fim, recolhidos (o padrão dos apps para o que fica de fora): abertos, ficam abertos
     // enquanto a tela está aberta (conferir um por um não fecha a lista); ao voltar à tela, recolhidos de novo
@@ -1662,18 +1671,16 @@
   const APPS_SEM_SENSOR = "Ligue o sensor Último app usado no app Home Assistant de cada celular: Configurações › Aplicativo complementar › Gerenciar sensores.";
   const APPS_NENHUM = "Nenhum app ainda: abra no celular os apps que quer acompanhar.";
   function appRow(a) {
-    const r = a.res, n = newsCount(r);
-    const st = !r ? "Ainda não conferido" : `${n ? plural(n, "novidade", "novidades") : "Nada novo"} · ${whenShort(r.at)}`;
-    return `<li><button type="button" class="nrow" data-act="app-open" data-id="${esc(a.pacote)}">
-        <span class="nb"><b>${esc(a.nome)}</b><span class="nm">${esc([joinE(a.pessoas || []), st].filter(Boolean).join(" · "))}</span></span>
-        ${n ? `<span class="pill">${int(n)}</span>` : ""}${ic("chev", "sm")}</button></li>`;
+    const r = a.res;
+    return `<li><button type="button" class="nrow${newsNew(r) ? " tem-nova" : ""}" data-act="app-open" data-id="${esc(a.pacote)}">
+        <span class="nb"><b>${esc(a.nome)}</b><span class="nm">${esc([joinE(a.pessoas || []), newsSt(r)].filter(Boolean).join(" · "))}</span></span>
+        ${newsPill(r)}${ic("chev", "sm")}</button></li>`;
   }
   function renderNewsApps() {
     const sl = $('#view [data-slot="news-apps"]'), A = newsOv && newsOv.apps;
     if (!sl || !A) return;
     const L = A.lista || [];
-    const rank = (a) => (newsCount(a.res) ? 0 : !a.res ? 1 : 2);
-    const sortA = (x, y) => rank(x) - rank(y) || newsCount(y.res) - newsCount(x.res) || x.nome.localeCompare(y.nome, "pt-BR");
+    const sortA = (x, y) => newsRank(x.res) - newsRank(y.res) || newsNew(y.res) - newsNew(x.res) || newsCount(y.res) - newsCount(x.res) || x.nome.localeCompare(y.nome, "pt-BR");
     const chosen = L.filter((a) => a.conferir === true || a.res).sort(sortA);
     const novos = L.filter((a) => a.conferir == null && !a.res).length;
     if (!L.length) {
@@ -1699,7 +1706,7 @@
     // os números de agora (1.49.1): os equipamentos que estão na lista e já foram conferidos; um item apagado (ou que
     // saiu de Eletrônicos) depois de conferir não conta mais
     const u = newsOv && newsOv.ultima, c = newsNums;
-    js.innerHTML = u ? `<p class="muted njob">Conferido ${esc(whenShort(u.at))}: ${c && c.conferidos ? `${int(c.com)} de ${int(c.conferidos)} com novidades` : "nada para conferir agora"}.</p>` : "";
+    js.innerHTML = u ? `<p class="muted njob">Conferido ${esc(whenShort(u.at))}: ${c && c.conferidos ? `${int(c.com)} de ${int(c.conferidos)} com novidades novas` : "nada para conferir agora"}.</p>` : "";
   }
   async function startNewsAll(so = "") {
     try { const r = await API.post("api/news/all", { so }); newsJob = r.id; renderNewsJob({ stage: "busy", msg: "Começando…" }); pollNewsAll(); }
@@ -1719,7 +1726,7 @@
     API.del(`api/news/${newsJob}`).catch(() => {});
     newsJob = null;
     const sm = st.summary || {};
-    if (st.stage === "done") toast(sm.conferidos ? `Conferidos ${int(sm.conferidos)}: ${int(sm.com_novidades || 0)} com novidades.` : "Tudo conferido nos últimos 7 dias.");
+    if (st.stage === "done") toast(sm.conferidos ? `Conferidos ${int(sm.conferidos)}: ${int(sm.novos || 0)} com novidades novas.` : "Tudo conferido nos últimos 7 dias.");
     await loadNews();
     if (st.stage === "error") renderNewsJob(st);
   }
@@ -2672,7 +2679,7 @@
   function newsListHtml(r, it) {
     const list = (r.news && r.news.novidades) || [], prod = (r.news && r.news.produto) || "";
     return `${list.length ? `<ul class="news">${list.map((x) => `<li>
-        <div class="news-meta"><span class="pill${x.tipo === "recall" ? " warn" : ""}">${esc(NEWS_KIND[x.tipo] || "Novidade")}</span>${x.boato ? `<span class="pill">Boato</span>` : ""}${x.data ? `<span class="news-date">${esc(newsDate(x.data))}</span>` : ""}</div>
+        <div class="news-meta">${x.nova ? `<span class="pill nova">Nova</span>` : ""}<span class="pill${x.tipo === "recall" ? " warn" : ""}">${esc(NEWS_KIND[x.tipo] || "Novidade")}</span>${x.boato ? `<span class="pill">Boato</span>` : ""}${x.data ? `<span class="news-date">${esc(newsDate(x.data))}</span>` : ""}</div>
         <b>${esc(x.titulo)}</b>${x.resumo ? `<p>${esc(x.resumo)}</p>` : ""}
         <a href="${esc(x.fonte)}" target="_blank" rel="noopener noreferrer">${esc(x.site || siteOf(x.fonte))}</a></li>`).join("")}</ul>`
       : `<p class="muted news-none">Nada novo nos últimos 12 meses.</p>`}

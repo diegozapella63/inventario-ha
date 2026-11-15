@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.62.0
+
+- **Novidades**: dá para ver o que mudou desde a última consulta. Cada conferência compara com a anterior: o que não estava lá vem marcado **Nova** na janela do item, e na lista o equipamento diz *2 novas de 3*, com o número na cor do app, e sobe para o alto (logo depois de um recall). Os que só têm o que você já viu dizem *3 novidades*, com o número sem cor, e ficam embaixo. O resumo da conferência conta só os com novidades novas, como o aviso no celular. As marcações começam na próxima conferência de cada item; vale também para os apps do celular.
+- **Configurações › Integrações** no celular estreito: a escolha da IA aparece inteira (*Padrão do Home Assistant*).
+
 ## 1.61.2
 
 - **Novidades**: **Conferir novidades** fica logo acima do **Limpar**, depois dos equipamentos e dos apps.
