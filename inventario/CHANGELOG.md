@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.71.0
+
+- **Apps do celular**: um app só por nome. Quando o mesmo app aparece com dois pacotes (o que a IA achou num print e o que o celular usa de verdade, por exemplo), os dois viram um. Fica o que o celular usa, levando o nome dado, a escolha e as novidades do outro, e o repetido não volta. **Encontrar apps com IA** também não adiciona um app com o nome de um que já está na lista.
+- **Mais › Novidades › Apps do celular**: com mais de 6 apps, ganhou a busca (**Buscar app**), como em Apps detectados.
+
 ## 1.70.0
 
 - **Novidades › Apps do celular**: **Apagar**, na janela das novidades de um app, apaga o que foi achado dele, como já dava nos equipamentos. Elas não voltam nas próximas conferências; o que sair de novo aparece.

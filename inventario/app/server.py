@@ -3407,6 +3407,7 @@ def _news_batch_run(jid: str):
             except ApiError as e:
                 log.info("apps do celular: %s", e.msg)
             apps_triage_pending(job)
+            apps_dedupe()  # 1.71.0: com os nomes da IA, dois pacotes do mesmo app viram um (uma busca só)
             if job.get("cleared"):
                 return
             apps, d = apps_read()["apps"], news_read()
@@ -3634,6 +3635,7 @@ def apps_collect(force: bool = False) -> dict:
                 when = str(st.get("last_changed") or st.get("last_updated") or "")
                 if not PKG_RE.fullmatch(pkg) or _ts(when) <= _ts(desde):  # o primeiro é o de antes da leitura: já contado
                     continue
+                pkg = (d.get("iguais") or {}).get(pkg, pkg)  # 1.71.0: o mesmo app com outro pacote conta no que ficou
                 if pkg in d["apagados"]:  # apagado da lista: volta só se for usado depois de apagar
                     if _ts(when) <= _ts(d["apagados"][pkg]):
                         continue
@@ -3789,6 +3791,55 @@ def app_rename(body: dict) -> dict:
     return news_overview()
 
 
+def apps_dedupe() -> bool:
+    """1.71.0: um app só por nome. Dois pacotes com o mesmo nome (o que a IA achou num print e o que o celular usa de
+    verdade, ou duas versões do mesmo app) viram um: fica o visto no celular e, entre eles, o usado por último; ele leva os
+    usos, as pessoas, o nome dado, a escolha e as novidades do outro. O pacote que saiu fica em `iguais`, e um uso dele
+    depois conta no que ficou (não volta repetido)."""
+    n = news_read()
+    with APPS_LOCK:
+        a = apps_read()
+        grupos = {}
+        for pkg in a["apps"]:
+            grupos.setdefault(fold(app_name(pkg, a["apps"], n["apps_triagem"], n["apps_nomes"])), []).append(pkg)
+        trocas = {}
+        for pkgs in grupos.values():
+            if len(pkgs) < 2:
+                continue
+            pkgs.sort(key=lambda p: (a["apps"][p].get("origem") != "ia", _ts(a["apps"][p].get("ultimo") or a["apps"][p].get("adicionado"))), reverse=True)
+            fica, *sai = pkgs
+            f = a["apps"][fica]
+            for p in sai:
+                v = a["apps"].pop(p)
+                f["vezes"] = int(f.get("vezes") or 0) + int(v.get("vezes") or 0)
+                f["dias"] = max(int(f.get("dias") or 0), int(v.get("dias") or 0))
+                if _ts(v.get("ultimo")) > _ts(f.get("ultimo")):
+                    f["ultimo"] = v["ultimo"]
+                if v.get("primeiro") and (not f.get("primeiro") or _ts(v["primeiro"]) < _ts(f["primeiro"])):
+                    f["primeiro"] = v["primeiro"]
+                f["pessoas"] = list(dict.fromkeys([*(f.get("pessoas") or []), *(v.get("pessoas") or [])]))
+                trocas[p] = fica
+        if not trocas:
+            return False
+        a.setdefault("iguais", {}).update(trocas)
+        write_json_atomic(APPS_FILE, a)
+    with NEWS_LOCK:
+        n = news_read()
+        for p, fica in trocas.items():
+            for k in ("apps", "apps_triagem", "apps_nomes", "apps_apagadas"):
+                if p not in n.get(k, {}):
+                    continue
+                v = n[k].pop(p)
+                atual = n[k].get(fica)
+                melhor = (atual is None
+                          or (k == "apps_triagem" and isinstance(v, dict) and v.get("manual") and not (atual or {}).get("manual"))
+                          or (k == "apps" and _ts((v or {}).get("at")) > _ts((atual or {}).get("at"))))
+                if melhor:
+                    n[k][fica] = v
+        write_json_atomic(NEWS_FILE, n)
+    return True
+
+
 def apps_overview(collect: bool = True) -> dict:
     """Os apps para a tela das Novidades: [{pacote, nome, pessoas, ultimo, conferir (da IA ou da pessoa; None se ainda não
     viu), manual, res}], e quantos sensores achou na última leitura."""
@@ -3797,6 +3848,7 @@ def apps_overview(collect: bool = True) -> dict:
             apps_collect()
         except ApiError as e:
             log.info("apps do celular: %s", e.msg)
+    apps_dedupe()
     a = apps_read()
     d = news_read()
     tri, res = d["apps_triagem"], d["apps"]
@@ -4015,7 +4067,9 @@ def apps_adicionar(body: dict, user_id: str = "") -> dict:
     novos = []
     with APPS_LOCK:
         d = apps_read()
-        nomes = {fold(v.get("nome") or ""): k for k, v in d["apps"].items()}
+        # 1.71.0: o mesmo nome em qualquer lugar (o que a pessoa deu, o da IA ou o do celular) é o mesmo app
+        nt = news_read()
+        nomes = {fold(app_name(k, d["apps"], nt["apps_triagem"], nt["apps_nomes"])): k for k in d["apps"]}
         for x in lidos:
             if x["id"] in d["apps"] or fold(x["nome"]) in nomes:
                 continue

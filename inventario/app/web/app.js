@@ -1692,9 +1692,20 @@
   // entram na próxima conferência; embaixo, recolhidos, os deixados de fora (pela IA ou pela pessoa)
   const APPS_SEM_SENSOR = "Ligue o sensor Último app usado no app Home Assistant de cada celular: Configurações › Aplicativo complementar › Gerenciar sensores.";
   const APPS_NENHUM = "Nenhum app ainda: abra no celular os apps que quer acompanhar.";
+  // 1.71.0: Buscar app também na lista das Novidades (com mais de 6), pelo nome ou pelo pacote, sem acento
+  let newsAppsBusca = "";
+  function filtraNewsApps() {
+    const box = $('#view [data-slot="news-apps"]');
+    if (!box) return;
+    const q = newsAppsBusca.trim();
+    let n = 0;
+    for (const li of $$(".nlist > li[data-busca]", box)) { const ok = !q || norm(li.dataset.busca || "").includes(norm(q)); li.hidden = !ok; n += ok ? 1 : 0; }
+    const nada = $(".news-apps-nada", box);
+    if (nada) { nada.hidden = !q || n > 0; nada.textContent = `Nenhum app com “${q}”.`; }
+  }
   function appRow(a) {
     const r = a.res;
-    return `<li><button type="button" class="nrow${newsNew(r) ? " tem-nova" : ""}" data-act="app-open" data-id="${esc(a.pacote)}">
+    return `<li data-busca="${esc(`${a.nome} ${a.pacote}`)}"${appBate(a, newsAppsBusca) ? "" : " hidden"}><button type="button" class="nrow${newsNew(r) ? " tem-nova" : ""}" data-act="app-open" data-id="${esc(a.pacote)}">
         <span class="nb"><b>${esc(a.nome)}</b><span class="nm">${esc([joinE(a.pessoas || []), newsSt(r)].filter(Boolean).join(" · "))}</span></span>
         ${newsPill(r)}${ic("chev", "sm")}</button></li>`;
   }
@@ -1709,9 +1720,14 @@
       sl.innerHTML = `<p class="muted">${A.sensores ? APPS_NENHUM : APPS_SEM_SENSOR}</p>`;
       return;
     }
-    sl.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map(appRow).join("")}</ul>` : ""}
+    const busca = chosen.length > 6 ? `<div class="filterbar apps-busca"><label class="search">${ic("search")}<span class="sr">Buscar app</span>
+        <input class="input" type="search" data-input="news-apps-busca" placeholder="Buscar app" value="${esc(newsAppsBusca)}" autocomplete="off" enterkeyhint="search"></label></div>
+        <p class="muted news-apps-nada"${newsAppsBusca.trim() && !chosen.some((a) => appBate(a, newsAppsBusca)) ? "" : " hidden"}>Nenhum app com “${esc(newsAppsBusca.trim())}”.</p>` : "";
+    const ativo = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.input === "news-apps-busca";
+    sl.innerHTML = `${busca}${chosen.length ? `<ul class="nlist">${chosen.map(appRow).join("")}</ul>` : ""}
       ${novos ? `<p class="muted">${chosen.length ? `${plural(novos, "app novo entra", "apps novos entram")} na próxima conferência.` : "Toque em Todas as novidades ou Só apps: a IA escolhe os apps."}</p>` : ""}
       ${!chosen.length && !novos ? `<p class="muted">Nenhum app acompanhado. Ligue os apps em Configurações › Opções › Apps detectados.</p>` : ""}`;
+    if (ativo) { const i = $('[data-input="news-apps-busca"]', sl); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
   }
   function renderNewsJob(st) {
     const js = $('#view [data-slot="news-job"]');
@@ -4876,6 +4892,7 @@
     if (k === "search-q") { onSearchInput(t.value); const c = $('#view [data-act="search-clear"]'); if (c) c.hidden = !t.value; }
     else if (k === "room-filter") onRoomFilter(t.dataset.room, t.value);
     else if (k === "apps-busca") { appsDetBusca = t.value; filtraAppsDet(); }
+    else if (k === "news-apps-busca") { newsAppsBusca = t.value; filtraNewsApps(); }
     else if (k === "home-q" && t.value.trim()) {
       focusSearch = true;
       nav(hashOf({ name: "search", q: { q: t.value } }));

@@ -106,6 +106,39 @@ class Coleta(ComHA):
         d = server.apps_collect(force=True)
         self.assertEqual((CASA in d["apps"], CASA in d["apagados"]), (True, False), "usado depois de apagar: volta")
 
+    def test_um_app_so_por_nome(self):
+        """1.71.0: o app que a IA achou num print (outro pacote) e o que o celular usa, com o mesmo nome, viram um só: fica o
+        visto no celular, com o nome dado, a escolha e as novidades do outro; um uso do outro pacote depois conta nele."""
+        IA = "com.palpite.casaconectada"
+        server.apps_collect(force=True)
+        a = server.apps_read()
+        a["apps"][IA] = {"nome": "Casa Conectada", "vezes": 0, "dias": 0, "dia": "", "primeiro": quando(days=5), "ultimo": "",
+                         "pessoas": ["Beto"], "origem": "ia", "adicionado": quando(days=5)}
+        server.write_json_atomic(server.APPS_FILE, a)
+        n = server.news_read()
+        n["apps_triagem"][IA] = {"conferir": True, "nome": "Casa Conectada", "manual": True}
+        n["apps_triagem"][CASA] = {"conferir": False, "nome": "casa conectada"}
+        n["apps"][IA] = {"at": quando(hours=1), "news": {"novidades": []}}
+        n["apps_nomes"][IA] = "Casa Conectada"
+        server.write_json_atomic(server.NEWS_FILE, n)
+        with mock.patch.object(server, "apps_collect", lambda force=False: server.apps_read()):
+            lista = server.apps_overview()["lista"]
+        self.assertEqual(sorted(x["pacote"] for x in lista), [CASA, MUSICA], "um só, o do celular")
+        casa = next(x for x in lista if x["pacote"] == CASA)
+        self.assertEqual((casa["nome"], casa["conferir"], casa["pessoas"], bool(casa["res"])), ("Casa Conectada", True, ["Ana", "Beto"], True))
+        n = server.news_read()
+        self.assertEqual([IA in n[k] for k in ("apps", "apps_triagem", "apps_nomes")], [False, False, False])
+        self.assertEqual(server.apps_read()["iguais"], {IA: CASA})
+        self.assertFalse(server.apps_dedupe(), "nada mais a juntar")
+        self.ha.history[SENSOR].append(estado(IA, quando(seconds=-30), "Casa Conectada"))
+        d = server.apps_collect(force=True)
+        self.assertNotIn(IA, d["apps"], "um uso do outro pacote não traz o repetido de volta")
+        self.assertEqual(d["apps"][CASA]["vezes"], 3)
+        # adicionado de novo pela IA com o nome de um que já está (qualquer nome: o dado, o da IA ou o do celular): não entra
+        with mock.patch.object(server, "need_apps_on", lambda: None), mock.patch.object(server, "news_overview", lambda: {}):
+            r = server.apps_adicionar({"apps": [{"id": "com.outro.palpite", "nome": "casa conectada"}, {"id": "com.exemplo.novo", "nome": "Novo"}]})
+        self.assertEqual(r["adicionados"], 1)
+
     def test_le_o_historico_de_novo_so_depois_de_10_minutos(self):
         server.apps_collect()
         server.apps_collect()
