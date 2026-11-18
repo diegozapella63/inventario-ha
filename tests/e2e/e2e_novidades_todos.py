@@ -60,6 +60,24 @@ async def body(r, p):
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "depois", full_page=True)
 
+    # 1.73.0: Buscar equipamento (com mais de 6), como o Buscar app: pelo nome, pelo código ou pelo cômodo, sem acento
+    busca = '[data-busca-de="news-list"]'
+    total = await pg.locator("#p-news-list .nlist > li").count()
+    r.check(total > 6 and await pg.locator(busca).is_visible(), f"com mais de 6, a busca ({total})")
+    r.eq(await pg.get_attribute(busca, "placeholder"), "Buscar equipamento", "o nome da busca")
+    await pg.fill(busca, "lampada")
+    vis = await pg.evaluate("[...document.querySelectorAll('#p-news-list .nlist > li:not([hidden]) .nb b')].map(b => b.textContent)")
+    r.eq(vis, ["Lâmpada inteligente Wi-Fi LX10"], "pelo nome, sem acento")
+    await pg.fill(busca, "radio")
+    r.check(await pg.locator(".news-out").evaluate("d => d.open") and await pg.locator(".news-out .nlist > li:not([hidden])").count() == 1,
+            "um deixado de fora que bate abre a lista dele")
+    await pg.fill(busca, "zzz")
+    r.check(await pg.locator("#p-news-list .news-nada").is_visible() and "Nenhum equipamento com" in await pg.text_content("#p-news-list .news-nada"), "nada: o aviso")
+    await r.shot(pg, "busca-equipamento")
+    await pg.fill(busca, "")
+    r.eq(await pg.locator("#p-news-list .nlist > li[hidden]").count(), 0, "vazio: todos de novo")
+    await pg.evaluate("document.querySelector('.news-out').open = false")
+
     # abrir um da lista: o que já foi conferido, sem chamar a IA
     sent = []
     pg.on("request", lambda q: sent.append(q.url) if q.method == "POST" and "/api/news" in q.url and not q.url.endswith("/api/news/visto") else None)

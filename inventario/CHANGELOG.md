@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.73.0
+
+- **Mais › Novidades**: **Equipamentos** e **Eletrônicos** ganharam a busca no alto, como a dos apps (com mais de 6): **Buscar equipamento** e **Buscar eletrônico** filtram pelo nome, pelo código ou pelo cômodo, sem acento. Um deixado de fora pela IA que bate abre a lista dele.
+
 ## 1.72.0
 
 - **Integrações › IA** (antes "IA do Home Assistant"): agora há uma IA para cada uso, como nos outros apps. **Para conversar** (a Conversa e o Falar), **Para ler fotos e PDFs** (ler fotos, catalogar e a Conversa com uma foto ou um PDF) e **Para pesquisar na internet** (as fotos da internet e as novidades). A de fotos e a de pesquisar começam **Igual à de conversar**. Assim uma IA mais barata conversa e uma mais caprichada lê as fotos e pesquisa.

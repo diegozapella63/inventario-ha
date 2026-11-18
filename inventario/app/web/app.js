@@ -1644,11 +1644,42 @@
   // a ordem: recall, com novidades novas, com novidades (já vistas), ainda não conferido, nada novo
   const newsRank = (r) => (newsRecall(r) ? 0 : newsNew(r) ? 1 : newsCount(r) ? 2 : !r ? 3 : 4);
   // uma linha por equipamento: o mesmo em vários cômodos (ou no plural) fica junto, com o nome mais curto
+  // 1.73.0: Buscar também em Equipamentos e Eletrônicos (com mais de 6), como nos Apps do celular: pelo nome, pelo
+  // código ou pelo cômodo, sem acento; um deixado de fora que bate abre a lista dele
+  const NEWS_BUSCA = { "news-list": ["Buscar equipamento", "Nenhum equipamento com"], "rec-list": ["Buscar eletrônico", "Nenhum eletrônico com"] };
+  const newsBusca = { "news-list": "", "rec-list": "" };
+  const buscaDe = (items) => esc(items.map((x) => `${x.name} ${tagOf(x)} ${D.roomById.get(x.room)?.name || ""}`).join(" "));
+  function buscaHtml(slot, n) {
+    if (n <= 6) return "";
+    const ph = NEWS_BUSCA[slot][0];
+    return `<div class="filterbar apps-busca"><label class="search">${ic("search")}<span class="sr">${ph}</span>
+        <input class="input" type="search" data-input="news-busca" data-busca-de="${slot}" placeholder="${ph}" value="${esc(newsBusca[slot])}" autocomplete="off" enterkeyhint="search"></label></div>
+      <p class="muted news-nada" hidden></p>`;
+  }
+  function filtraBusca(slot) {
+    const box = $(`#view [data-slot="${slot}"]`);
+    if (!box) return;
+    const q = newsBusca[slot].trim();
+    let n = 0;
+    for (const li of $$(".nlist > li[data-busca]", box)) { const ok = !q || norm(li.dataset.busca || "").includes(norm(q)); li.hidden = !ok; n += ok ? 1 : 0; }
+    const out = $(".news-out", box);
+    if (out && q && $$(".nlist > li[data-busca]:not([hidden])", out).length) out.open = true;
+    const nada = $(".news-nada", box);
+    if (nada) { nada.hidden = !q || n > 0; nada.textContent = `${NEWS_BUSCA[slot][1]} “${q}”.`; }
+  }
+  // depois de desenhar de novo (a lista se atualiza sozinha), a busca continua valendo e o teclado não fecha
+  function depoisDaBusca(slot, ativo) {
+    filtraBusca(slot);
+    if (!ativo) return;
+    const i = $(`#view [data-busca-de="${slot}"]`);
+    if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+  }
+  const buscando = (slot) => !!(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.buscaDe === slot);
   function newsRow(g) {
     const { it, r, items, open } = g;
     const rooms = [...new Set(items.map((x) => x.room))];
     const where = rooms.length > 1 ? plural(rooms.length, "cômodo", "cômodos") : (D.roomById.get(rooms[0])?.name || "");
-    return `<li><button type="button" class="nrow${newsNew(r) ? " tem-nova" : ""}" data-act="news-open" data-id="${esc(open.id)}">
+    return `<li data-busca="${buscaDe(items)}"><button type="button" class="nrow${newsNew(r) ? " tem-nova" : ""}" data-act="news-open" data-id="${esc(open.id)}">
         <span class="nb"><b>${esc(it.name)}</b><span class="nm">${esc(where)} · ${esc(newsSt(r))}</span></span>
         ${newsPill(r)}${ic("chev", "sm")}</button></li>`;
   }
@@ -1682,10 +1713,11 @@
     renderNewsApps();
     // os deixados de fora no fim, recolhidos (o padrão dos apps para o que fica de fora): abertos, ficam abertos
     // enquanto a tela está aberta (conferir um por um não fecha a lista); ao voltar à tela, recolhidos de novo
-    const wasOpen = !!$(".news-out[open]", ls);
-    ls.innerHTML = `${chosen.length ? `<ul class="nlist">${chosen.map(newsRow).join("")}</ul>`
+    const wasOpen = !!$(".news-out[open]", ls), ativo = buscando("news-list");
+    ls.innerHTML = `${buscaHtml("news-list", chosen.length + out.length)}${chosen.length ? `<ul class="nlist">${chosen.map(newsRow).join("")}</ul>`
         : `<p class="muted">${ov.pendentes ? "Toque em Conferir novidades: a IA escolhe os equipamentos." : "Nenhum item em Eletrônicos."}</p>`}
       ${out.length ? `<details class="news-out"${wasOpen ? " open" : ""}><summary>${ic("chev", "sm")}${oti("archive")}Deixados de fora pela IA (${int(out.length)})</summary><ul class="nlist">${out.map(newsRow).join("")}</ul></details>` : ""}`;
+    depoisDaBusca("news-list", ativo);
     if (!newsJob) renderNewsJob(null);
   }
   // Apps do celular (1.56.0): os que a IA (ou a pessoa) escolheu e os já conferidos, com de quem é o celular; os novos
@@ -1798,14 +1830,16 @@
     const sl = $('#view [data-slot="rec-list"]');
     if (!sl || !recOv) return;
     const gs = recGroups().sort((a, b) => Number(!a.r) - Number(!b.r) || a.it.name.localeCompare(b.it.name, "pt-BR"));
-    sl.innerHTML = gs.length ? `<ul class="nlist">${gs.map(({ r, items, it, open }) => {
+    const ativo = buscando("rec-list");
+    sl.innerHTML = gs.length ? `${buscaHtml("rec-list", gs.length)}<ul class="nlist">${gs.map(({ r, items, it, open }) => {
       const rooms = [...new Set(items.map((x) => x.room))];
       const where = rooms.length > 1 ? plural(rooms.length, "cômodo", "cômodos") : (D.roomById.get(rooms[0])?.name || "");
       const st = r ? `${plural(r.n, "recurso", "recursos")} · ${whenShort(r.at)}` : "Ainda não buscado";
-      return `<li><button type="button" class="nrow" data-act="rec-open" data-id="${esc(open.id)}">
+      return `<li data-busca="${buscaDe(items)}"><button type="button" class="nrow" data-act="rec-open" data-id="${esc(open.id)}">
         <span class="nb"><b>${esc(it.name)}</b><span class="nm">${esc(where)} · ${esc(st)}</span></span>
         ${r ? `<span class="pill">${int(r.n)}</span>` : ""}${ic("chev", "sm")}</button></li>`;
     }).join("")}</ul>` : `<p class="muted">Nenhum item em Eletrônicos.</p>`;
+    depoisDaBusca("rec-list", ativo);
   }
   // a janela dos recursos de um eletrônico: o guardado, sem chamar a IA; sem nada guardado, busca
   function openRec(it) {
@@ -4898,6 +4932,7 @@
     else if (k === "room-filter") onRoomFilter(t.dataset.room, t.value);
     else if (k === "apps-busca") { appsDetBusca = t.value; filtraAppsDet(); }
     else if (k === "news-apps-busca") { newsAppsBusca = t.value; filtraNewsApps(); }
+    else if (k === "news-busca") { newsBusca[t.dataset.buscaDe] = t.value; filtraBusca(t.dataset.buscaDe); }
     else if (k === "home-q" && t.value.trim()) {
       focusSearch = true;
       nav(hashOf({ name: "search", q: { q: t.value } }));

@@ -65,6 +65,22 @@ async def body(r, p):
     r.check(len(rows) > 1 and all(x[1].endswith("Ainda não buscado") and x[2] == [] for x in rows[1:]), f"os outros ainda não buscados, embaixo ({rows[1:3]})")
     r.eq(await pg.locator('#p-news-rec .btn').count(), 0, "1.68.0: sem botão na seção: a busca fica em Conferir novidades")
     await r.shot(pg, "eletronicos")
+    # 1.73.0: Buscar eletrônico (com mais de 6), como o Buscar app: pelo nome, pelo código ou pelo cômodo, sem acento
+    busca = '[data-busca-de="rec-list"]'
+    r.eq((len(rows), await pg.locator(busca).count()), (6, 0), "com 6 ou menos, sem a busca")
+    r.api("POST", "api/items", {"room": "sala", "name": "Caixa de som Bluetooth", "cat": "eletronicos", "value": 120})
+    await r.open(pg, "#/novidades", "#p-news-rec")
+    await pg.wait_for_selector(busca, timeout=8000)
+    r.check(await pg.locator("#p-news-rec .nlist > li").count() == 7 and await pg.locator(busca).is_visible(), "com mais de 6, a busca")
+    r.eq(await pg.get_attribute(busca, "placeholder"), "Buscar eletrônico", "o nome da busca")
+    await pg.fill(busca, "smart tv")
+    r.eq(await pg.evaluate("[...document.querySelectorAll('#p-news-rec .nlist > li:not([hidden]) .nb b')].map(b => b.textContent)"), [tv[0]], "pelo nome")
+    sala = await pg.evaluate("[...document.querySelectorAll('#p-news-rec .nlist > li')].filter(li => /Sala/.test(li.dataset.busca)).length")
+    await pg.fill(busca, "sala")
+    r.eq(await pg.locator("#p-news-rec .nlist > li:not([hidden])").count(), sala, "pelo cômodo")
+    await pg.fill(busca, "zzz")
+    r.check("Nenhum eletrônico com" in await pg.text_content("#p-news-rec .news-nada"), "nada: o aviso")
+    await pg.fill(busca, "")
     # Conferir novidades › Só eletrônicos (1.68.0): os recursos dos que ainda não têm; o Conferido das novidades fica
     corpos = []
     pg.on("request", lambda q: corpos.append(q.post_data) if q.url.endswith("/api/news/all") else None)
