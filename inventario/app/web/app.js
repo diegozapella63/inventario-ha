@@ -3845,7 +3845,22 @@
     const sc = { view: base.name };
     if (sheet && sheet.itemId && D.itemById.has(sheet.itemId)) { sc.view = "item"; sc.item = sheet.itemId; }
     else if (base.name === "room") sc.room = base.id;
-    else if (base.name === "search") sc.q = (base.q && base.q.q) || "";
+    else if (base.name === "search") {
+      // 1.75.0: what the screen found (its filters, fields and order), not a search of its own on the server
+      const q = base.q || {};
+      sc.q = q.q || "";
+      const { list } = searchItems(q);
+      sc.ids = list.slice(0, 40).map((i) => i.id);
+      sc.total = list.length;
+      const tipo = D.bensItems.length ? q.tipo || "" : "", f = [];
+      if (tipo) f.push((TIPOS.find(([k]) => k === tipo) || ["", ""])[1]);
+      if (!tipoBens(tipo)) {
+        const r = D.rooms.find((x) => x.id === q.room);
+        if (r) f.push(r.name);
+        if (q.cat && CAT[q.cat]) f.push(CAT[q.cat]);
+      }
+      if (f.filter(Boolean).length) sc.filtros = f.filter(Boolean).join(" · ");
+    }
     else if (base.name === "data") sc.tab = moreTab(base.tab);
     return sc;
   }

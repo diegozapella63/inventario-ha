@@ -101,7 +101,31 @@ def instrucoes(srv) -> str:
             + (", " + " e ".join(extras) if extras else "") + ". Valores em reais, como número; o valor de um item é o de todas "
             "as unidades juntas. Comece por inventario_resumo: os ids dos cômodos e das categorias servem nas outras ferramentas; "
             "um item se acha com inventario_buscar_itens, pelo id (sal-003) ou pelo código (SAL-003). Antes de gravar, diga à "
-            "pessoa o que vai ser feito, e não mude um valor que ela não pediu.")
+            "pessoa o que vai ser feito, e não mude um valor que ela não pediu."
+            + (" Valor de hoje ligado: o valor de cada item, as somas e os filtros são os de hoje, como na tela (o valor "
+               "gravado perde a depreciação do GerencIA desde valor_desde); valor_gravado é o que a pessoa informou, e é o "
+               "que inventario_editar_item muda." if _taxas(srv) else ""))
+
+
+def _taxas(srv):
+    """1.75.0: com o Valor de hoje ligado (a depreciação do GerencIA), as taxas de cada categoria; senão, None."""
+    return srv.gerencia_taxas() if srv.deprec_enabled() else None
+
+
+def _v(srv, it, taxas) -> float:
+    """O valor do item como a tela mostra: o de hoje, com o Valor de hoje ligado; senão, o gravado."""
+    return round(_bruto(srv, it, taxas), 2)
+
+
+def _bruto(srv, it, taxas) -> float:
+    """O mesmo, sem arredondar: as somas (do cômodo, da categoria, da busca) somam assim, como a tela (que soma os valores
+    e arredonda só o total; antes, somar os já arredondados dava alguns centavos de diferença)."""
+    if taxas:
+        return srv.item_hoje(it, taxas)
+    try:
+        return float(it.get("value") or 0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 # ---------------------------------------------------------------- ajudantes
@@ -212,7 +236,7 @@ def _zona_ok(srv, room, zona_dada: bool):
         raise ErroFerramenta("Um bem não tem zona. Mande sem a zona.")
 
 
-def _linha(srv, it, cats=None) -> dict:
+def _linha(srv, it, cats=None, taxas=None) -> dict:
     """Um item numa lista: o que a IA precisa para falar dele e achá-lo de novo."""
     cats = cats if cats is not None else srv.STORE.cat_map()
     out = {"id": it["id"], "codigo": srv.STORE.tag(it), "nome": it.get("name") or "", "comodo": _nome_comodo(srv, it.get("room"))}
@@ -221,7 +245,9 @@ def _linha(srv, it, cats=None) -> dict:
     out["categoria"] = cats.get(it.get("cat"), cats.get("outros", "Outros"))
     if str(it.get("qty") or "1") != "1":
         out["quantidade"] = it.get("qty")
-    out["valor"] = _num(it.get("value"))
+    out["valor"] = _v(srv, it, taxas)
+    if taxas:
+        out["valor_gravado"] = _num(it.get("value"))
     return out
 
 
@@ -248,6 +274,8 @@ def _quem(pessoa, cliente) -> str | None:
 def _resumo(srv) -> str:
     rooms, items = srv.visible_data()
     cats = srv.STORE.cat_map()
+    taxas = _taxas(srv)
+    val = lambda i: _bruto(srv, i, taxas)  # noqa: E731
     zonas = srv.zones_enabled()
     por_comodo = {}
     for it in items:
@@ -256,12 +284,12 @@ def _resumo(srv) -> str:
     for r in sorted(rooms, key=lambda r: r.get("order", 0)):
         its = por_comodo.get(r["id"], [])
         c = {"id": r["id"], "codigo": r.get("code") or "", "nome": r.get("name") or r["id"], "itens": len(its),
-             "valor": round(sum(_num(i.get("value")) for i in its), 2)}
+             "valor": round(sum(val(i) for i in its), 2)}
         if r.get("kind") == "bens":
             grupos = {}
             for i in its:
                 g = cats.get(i.get("cat")) if i.get("cat") in ("imoveis", "veiculos") else "Outros"
-                grupos[g] = round(grupos.get(g, 0) + _num(i.get("value")), 2)
+                grupos[g] = round(grupos.get(g, 0) + val(i), 2)
             bens = dict(c, por_tipo=grupos)
             continue
         if zonas:
@@ -272,10 +300,12 @@ def _resumo(srv) -> str:
                     zs.append(z)
             c["zonas"] = zs
         comodos.append(c)
-    total = round(sum(_num(i.get("value")) for i in items), 2)
+    total = round(sum(val(i) for i in items), 2)
     out = {"total": total, "itens": len(items)}
+    if taxas:
+        out["valores"] = "de hoje, como na tela (Valor de hoje ligado: a depreciação do GerencIA)"
     if bens is not None:
-        out["dentro_de_casa"] = round(total - bens["valor"], 2)
+        out["dentro_de_casa"] = round(sum(val(i) for i in items if i.get("room") != bens["id"]), 2)
     out["comodos"] = comodos
     if srv.bens_enabled():
         out["bens"] = bens or {"itens": 0, "valor": 0, "obs": "Ainda sem bens: o primeiro cadastrado com comodo Bens cria a área."}
@@ -283,10 +313,10 @@ def _resumo(srv) -> str:
     for i in items:
         k = i.get("cat") if i.get("cat") in cats else "outros"
         n, v = conta.get(k, (0, 0.0))
-        conta[k] = (n + 1, v + _num(i.get("value")))
+        conta[k] = (n + 1, v + val(i))
     out["categorias"] = [{"id": k, "nome": v, "itens": conta.get(k, (0, 0))[0], "valor": round(conta.get(k, (0, 0.0))[1], 2)} for k, v in cats.items()]
-    out["mais_valiosos"] = [_linha(srv, i, cats) for i in sorted(items, key=lambda i: -_num(i.get("value")))[:MAX_RESUMO]]
-    out["ultimos_cadastrados"] = [dict(_linha(srv, i, cats), cadastrado_em=str(i.get("createdAt") or "")[:10])
+    out["mais_valiosos"] = [_linha(srv, i, cats, taxas) for i in sorted(items, key=lambda i: -val(i))[:MAX_RESUMO]]
+    out["ultimos_cadastrados"] = [dict(_linha(srv, i, cats, taxas), cadastrado_em=str(i.get("createdAt") or "")[:10])
                                   for i in sorted(items, key=lambda i: str(i.get("createdAt") or ""), reverse=True)[:MAX_RESUMO]]
     out["opcoes"] = {"zonas": zonas, "bens": srv.bens_enabled()}
     return _json(out)
@@ -314,13 +344,14 @@ def _buscar(srv, a) -> str:
     lim = a.get("limite", PADRAO_LISTA)
     if isinstance(lim, bool) or not isinstance(lim, (int, float)) or not 1 <= int(lim) <= MAX_LISTA:
         raise ErroFerramenta(f"limite: de 1 a {MAX_LISTA}.")
+    taxas = _taxas(srv)
     achados = []
     for it in items:
         if room and it.get("room") != room["id"]:
             continue
         if cat and (it.get("cat") if it.get("cat") in cats else "outros") != cat:
             continue
-        v = _num(it.get("value"))
+        v = _v(srv, it, taxas)
         if (vmin is not None and v < vmin) or (vmax is not None and v > vmax):
             continue
         if zona is not None and zona not in srv.fold(it.get("zone") or ""):
@@ -333,7 +364,7 @@ def _buscar(srv, a) -> str:
         achados.append(it)
     order = {r["id"]: r.get("order", 0) for r in rooms}
     if ordem == "valor":
-        achados.sort(key=lambda i: -_num(i.get("value")))
+        achados.sort(key=lambda i: -_v(srv, i, taxas))
     elif ordem == "nome":
         achados.sort(key=lambda i: srv.fold(i.get("name") or ""))
     elif ordem == "recentes":
@@ -341,8 +372,8 @@ def _buscar(srv, a) -> str:
     else:
         achados.sort(key=lambda i: (order.get(i.get("room"), 999), i.get("seq") or 0))
     mostrar = achados[:int(lim)]
-    return _json({"encontrados": len(achados), "mostrando": len(mostrar), "valor_total": round(sum(_num(i.get("value")) for i in achados), 2),
-                  "itens": [_linha(srv, i, cats) for i in mostrar]})
+    return _json({"encontrados": len(achados), "mostrando": len(mostrar), "valor_total": round(sum(_bruto(srv, i, taxas) for i in achados), 2),
+                  "itens": [_linha(srv, i, cats, taxas) for i in mostrar]})
 
 
 ORIGENS = {"foto": "catalogado por foto", "informado": "valor informado", "ia": "leitura por IA", "voz": "cadastro por voz",
@@ -362,7 +393,10 @@ def _ver(srv, a) -> str:
     cid = it.get("cat") if it.get("cat") in cats else "outros"
     out["categoria"] = {"id": cid, "nome": cats.get(cid, "Outros")}
     out["quantidade"] = str(it.get("qty") or "1")
-    out["valor"] = _num(it.get("value"))
+    taxas = _taxas(srv)
+    out["valor"] = _v(srv, it, taxas)
+    if taxas:
+        out["valor_gravado"] = _num(it.get("value"))
     m = re.match(r"\s*(\d+)", out["quantidade"])
     n = int(m.group(1)) if m else 1
     if n > 1:

@@ -4378,10 +4378,10 @@ def _money(v) -> str:
     return "R$ " + (s[:-3] if s.endswith(",00") else s)
 
 
-def _item_line(it: dict, cats: dict) -> str:
+def _item_line(it: dict, cats: dict, valor=None) -> str:
     room = STORE.room(it.get("room")) or {}
     bits = [f"{STORE.tag(it)} {it.get('name', '')}", room.get("name", ""), cats.get(it.get("cat"), "Outros"),
-            f"qtd {it.get('qty') or '1'}", _money(it.get("value"))]
+            f"qtd {it.get('qty') or '1'}", _money(valor(it) if valor else it.get("value"))]
     if it.get("zone") and zones_enabled():
         bits.insert(2, f"zona {it['zone']}")
     return " | ".join(b for b in bits if b)
@@ -4392,16 +4392,30 @@ def chat_context(screen: dict) -> str:
     screen = screen if isinstance(screen, dict) else {}
     cats = STORE.cat_map()
     rooms, items = visible_data()  # com Usar bens desligado, a IA não vê os bens
-    total = sum(float(i.get("value") or 0) for i in items)
-    lines = [f"Inventário: {len(items)} itens em {len(rooms)} cômodos, total {_money(total)}."]
+    # 1.75.0: os valores da tela: com o Valor de hoje ligado (a depreciação do GerencIA), o de hoje, não o gravado
+    taxas = gerencia_taxas() if deprec_enabled() else None
+    val = (lambda i: item_hoje(i, taxas)) if taxas else (lambda i: float(i.get("value") or 0))  # noqa: E731
+    # e os Bens (o que fica fora de casa) à parte: não são um cômodo
+    bens_ids = {r["id"] for r in rooms if r.get("kind") == "bens"}
+    casa = [r for r in rooms if r["id"] not in bens_ids]
+    em_casa = [i for i in items if i["room"] not in bens_ids]
+    bens = [i for i in items if i["room"] in bens_ids]
+    total = sum(val(i) for i in em_casa)
+    lines = [f"Inventário da casa: {len(em_casa)} itens em {len(casa)} cômodos, total {_money(total)}."]
+    if taxas:
+        lines.append("Os valores são os de hoje, como na tela: o valor de cada item com a perda por ano da categoria "
+                     "(a depreciação do GerencIA), desde a data do valor.")
     by_room = []
-    for r in sorted(rooms, key=lambda r: r.get("order", 0)):
+    for r in sorted(casa, key=lambda r: r.get("order", 0)):
         its = [i for i in items if i["room"] == r["id"]]
-        by_room.append(f"{r['code']} {r['name']}: {len(its)} itens, {_money(sum(float(i.get('value') or 0) for i in its))}")
+        by_room.append(f"{r['code']} {r['name']}: {len(its)} itens, {_money(sum(val(i) for i in its))}")
     lines.append("Cômodos: " + "; ".join(by_room) + ".")
-    top = sorted(items, key=lambda i: -float(i.get("value") or 0))[:10]
+    if bens:
+        lines.append(f"Bens (o que fica fora de casa, como imóveis e veículos; não é um cômodo): {len(bens)} itens, "
+                     f"{_money(sum(val(i) for i in bens))}. Com eles, o patrimônio é {_money(total + sum(val(i) for i in bens))}.")
+    top = sorted(items, key=lambda i: -val(i))[:10]
     if top:
-        lines.append("Mais valiosos: " + "; ".join(f"{i.get('name')} ({_money(i.get('value'))})" for i in top) + ".")
+        lines.append("Mais valiosos: " + "; ".join(f"{i.get('name')} ({_money(val(i))})" for i in top) + ".")
     view = str(screen.get("view") or "")
     where = {"home": "Início", "search": "Buscar", "rooms": "Cômodos", "room": "um cômodo", "item": "a ficha de um item",
              "report": "Relatório do inventário", "data": "Mais"}.get(view, "o app")
@@ -4409,7 +4423,7 @@ def chat_context(screen: dict) -> str:
     it = STORE.item(str(screen.get("item") or "")) if screen.get("item") else None
     room = STORE.room(str(screen.get("room") or "")) if screen.get("room") else None
     if it:
-        lines.append("Item na tela: " + _item_line(it, cats) + ".")
+        lines.append("Item na tela: " + _item_line(it, cats, val) + ".")
         if it.get("details"):
             lines.append("Detalhes: " + " ".join(str(it["details"]).split())[:600])
         lines.append(f"Fotos: {len(it.get('photos') or [])}. Cadastrado em {str(it.get('createdAt') or '')[:10]}.")
@@ -4419,14 +4433,32 @@ def chat_context(screen: dict) -> str:
     elif room:
         its = [i for i in STORE.sorted_items() if i["room"] == room["id"]]
         lines.append(f"Cômodo na tela: {room['code']} {room['name']}, {len(its)} itens:")
-        lines += ["- " + _item_line(i, cats) for i in its[:80]]
+        lines += ["- " + _item_line(i, cats, val) for i in its[:80]]
+        if len(its) > 80:
+            lines.append(f"- … e mais {len(its) - 80} que não couberam aqui (são {len(its)} ao todo).")
+    elif view == "search" and isinstance(screen.get("ids"), list):
+        # 1.75.0: os itens que a tela achou, na ordem dela (com os filtros de cômodo, categoria e tipo, e os mesmos
+        # campos: nome, detalhes, zona, cômodo, código e categoria); antes, a IA buscava de novo, só no nome e nos detalhes
+        q = " ".join(str(screen.get("q") or "").split())[:100]
+        filtros = " ".join(str(screen.get("filtros") or "").split())[:120]
+        vis = {i["id"]: i for i in items}
+        hits = [vis[x] for x in screen["ids"][:40] if isinstance(x, str) and x in vis]
+        try:
+            n = max(len(hits), min(100000, int(screen.get("total") or 0)))
+        except (TypeError, ValueError):
+            n = len(hits)
+        head = "Busca na tela" + (f' "{q}"' if q else "") + (f" ({filtros})" if filtros else "")
+        lines.append(f"{head}: {n} {'item' if n == 1 else 'itens'}" + (", na ordem da tela:" if hits else "."))
+        lines += ["- " + _item_line(i, cats, val) for i in hits]
+        if n > len(hits):
+            lines.append(f"- … e mais {n - len(hits)} que não couberam aqui (são {n} ao todo).")
     elif view == "search":
         q = " ".join(str(screen.get("q") or "").split())[:100]
         if q:
             lines.append(f"Busca na tela: \"{q}\".")
             words = [fold(w) for w in q.split()]
             hits = [i for i in items if all(w in fold(f"{i.get('name')} {i.get('details')} {i.get('zone')}") for w in words)][:40]
-            lines += ["- " + _item_line(i, cats) for i in hits] or ["(nenhum item encontrado)"]
+            lines += ["- " + _item_line(i, cats, val) for i in hits] or ["(nenhum item encontrado)"]
     elif view == "news" or (view == "data" and screen.get("tab") == "novidades"):  # a tela Novidades (antes, uma aba de Mais)
         d = news_read()
         com, seen = [], set()
@@ -4450,7 +4482,7 @@ def chat_prompt(messages: list[dict], screen: dict, user: str | None, anexos: in
         conv.append(f"{who}: {arqs}{m['text']}".rstrip())
     return "\n".join([
         f"Você é o assistente do InventarIA, o app de inventário da casa{f' de {user}' if user else ''}, dentro do Home Assistant.",
-        "Responda em português do Brasil, curto e direto, em texto simples (no máximo uma lista curta).",
+        "Responda em português do Brasil, com todos os acentos e o ç (você, às, não, alimentação), curto e direto, em texto simples (no máximo uma lista curta).",
         "Pode responder sobre o que está na tela, sobre o inventário ou sobre qualquer outro assunto.",
         "Use só os dados do inventário abaixo; não invente itens nem valores. Você não muda o inventário: se pedirem, diga como fazer no app.",
         "",

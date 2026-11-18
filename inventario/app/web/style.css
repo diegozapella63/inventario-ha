@@ -8,15 +8,17 @@
 @font-face { font-family: "Barlow Condensed"; src: url("fonts/barlowc-700.woff") format("woff"); font-weight: 700; font-style: normal; font-display: swap; }
 
 :root {
-  --paper: #eef0ef;
-  --surface: #ffffff;
-  --surface-2: #f5f6f5;
+  /* o fundo e os cartões são os do tema do Home Assistant (hatema.js, igual em todos os apps); os cinzas saem deles e do
+     texto, para todos os apps da família terem o mesmo fundo */
+  --paper: var(--ha-bg-light, #fafafa);
+  --surface: var(--ha-card-light, #ffffff);
+  --surface-2: color-mix(in srgb, var(--surface) 96%, var(--ink));
   --ink: #1d2125;
   --ink-2: #3a4148;
   --muted: #5f6670;
   --faint: #737b84;
-  --line: #dadde1;
-  --line-2: #c3c8ce;
+  --line: color-mix(in srgb, var(--surface) 84%, var(--ink));
+  --line-2: color-mix(in srgb, var(--surface) 74%, var(--ink));
   --tag: var(--a);
   --tag-hover: var(--a-hover);
   --tag-edge: var(--a-edge);
@@ -51,15 +53,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #16191c;
-    --surface: #1f2327;
-    --surface-2: #262b30;
+    --paper: var(--ha-bg-dark, #111111);
+    --surface: var(--ha-card-dark, #1c1c1c);
     --ink: #e9ecef;
     --ink-2: #c9cfd5;
     --muted: #9aa3ad;
     --faint: #868f99;
-    --line: #2f353b;
-    --line-2: #3e464e;
+    --line: color-mix(in srgb, var(--surface) 91%, var(--ink));
+    --line-2: color-mix(in srgb, var(--surface) 82%, var(--ink));
     --tag-edge: var(--a-edge-d);
     --tag-ring: var(--a-ring-d);
     --tag-soft: var(--a-soft-d);
@@ -67,7 +68,7 @@
     --warn-edge: #b38f00;
     --warn-soft: #3b3417;
     --sw-edge: transparent;
-    --seg-on: #363d44;
+    --seg-on: color-mix(in srgb, var(--surface) 87%, var(--ink));
     --bar: #c9cfd5;
     --danger: #ff8a80;
     --danger-soft: #3a1f1d;
@@ -82,15 +83,14 @@
   }
 }
 :root[data-theme="dark"] {
-  --paper: #16191c;
-  --surface: #1f2327;
-  --surface-2: #262b30;
+  --paper: var(--ha-bg-dark, #111111);
+  --surface: var(--ha-card-dark, #1c1c1c);
   --ink: #e9ecef;
   --ink-2: #c9cfd5;
   --muted: #9aa3ad;
   --faint: #868f99;
-  --line: #2f353b;
-  --line-2: #3e464e;
+  --line: color-mix(in srgb, var(--surface) 91%, var(--ink));
+  --line-2: color-mix(in srgb, var(--surface) 82%, var(--ink));
   --tag-edge: var(--a-edge-d);
   --tag-ring: var(--a-ring-d);
   --tag-soft: var(--a-soft-d);
@@ -98,7 +98,7 @@
   --warn-edge: #b38f00;
   --warn-soft: #3b3417;
   --sw-edge: transparent;
-  --seg-on: #363d44;
+  --seg-on: color-mix(in srgb, var(--surface) 87%, var(--ink));
   --bar: #c9cfd5;
   --danger: #ff8a80;
   --danger-soft: #3a1f1d;

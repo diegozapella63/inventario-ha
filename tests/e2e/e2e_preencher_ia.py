@@ -141,7 +141,7 @@ async def body(r, p):
     await upload(fotos[0])
     await pg.click('[data-ed="ai"]')
     await pg.wait_for_selector('dialog[aria-label="Leitura por IA"]', timeout=8000)
-    r.check("A IA escolhida não aceita fotos. Escolha outra." in await pg.text_content('dialog[aria-label="Leitura por IA"]'), "IA que não lê fotos: diz para escolher outra")
+    r.check("A IA escolhida não aceita fotos. Escolha outra para ler fotos." in await pg.text_content('dialog[aria-label="Leitura por IA"]'), "IA que não lê fotos: diz para escolher outra")
     await r.shot(pg, "ia-sem-fotos")
     await pg.click('dialog[aria-label="Leitura por IA"] button.primary[data-x]')
     r.eq(len(ha.calls("POST", "/core/api/services/ai_task/generate_data")), n_calls, "e não chama a IA")

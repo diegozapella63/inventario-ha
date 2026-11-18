@@ -184,6 +184,13 @@ async def body(r, p):
         focused = False
     r.check(focused, "no computador, o cursor já está no campo")
     await r.shot(pg, "computador")
+    # 1.75.0: a IA recebe o que a busca da tela achou (antes, ela buscava de novo, só no nome e nos detalhes)
+    achados = await pg.evaluate("document.querySelectorAll('#results .ilist > li').length")
+    await pg.fill("dialog.chat textarea", "quanto vale isso?")
+    await pg.press("dialog.chat textarea", "Enter")
+    await pg.wait_for_function("document.querySelectorAll('dialog.chat .msg.ai:not(.typing)').length === 1", timeout=15000)
+    r.check(f'Busca na tela "geladeira": {achados} {"item" if achados == 1 else "itens"}' in asked[-1] and "Geladeira frost free inox" in asked[-1],
+            f"a IA recebe a busca como a tela achou ({achados})")
     await ctx.close()
 
     # IA desligada: sem o botão

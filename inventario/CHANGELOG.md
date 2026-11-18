@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.75.0
+
+- **O fundo e os cartões seguem o tema do Home Assistant**, no claro e no escuro: o mesmo fundo do Home Assistant e dos outros apps da família (antes, cada app tinha o seu). Com um tema seu no Home Assistant, o app usa as cores dele; ao trocar o tema ou o modo no Home Assistant, o app muda junto.
+- **Conversar**: a IA responde com todos os acentos (algumas IAs escreviam "voce" e "Alimentacao") e usa os mesmos valores da tela. Com o **Valor de hoje** ligado, recebe o valor de hoje (antes, o gravado, e as somas dela saíam um pouco maiores que as da tela), e os **Bens** vão à parte, não como um cômodo. Na **Buscar**, ela recebe os itens que a tela achou, com os filtros de cômodo e categoria (antes buscava de novo, só no nome e nos detalhes, e às vezes não achava nada). As ferramentas do **CorrerIA** também usam o valor de hoje, e as somas delas batem com as da tela até o centavo.
+
 ## 1.74.0
 
 - **Recursos** dos eletrônicos (na ficha e em Novidades › Eletrônicos): agora sempre pesquisam na internet, no fabricante, no manual ou na ficha técnica de hoje, como as novidades. Antes a IA podia responder de memória. Se a IA escolhida não pesquisar, o app avisa como ligar a busca na web.

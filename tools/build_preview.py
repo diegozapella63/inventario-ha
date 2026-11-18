@@ -23,6 +23,8 @@ app = open(f"{WEB}/app.js", encoding="utf-8").read()
 caixas = open(f"{WEB}/selectsheet.js", encoding="utf-8").read()
 # os campos de texto que a pessoa aumenta (o mesmo arquivo dos outros apps)
 campos = open(f"{WEB}/textareas.js", encoding="utf-8").read()
+# o fundo e os cartões do tema do Home Assistant (o mesmo arquivo dos outros apps)
+tema = open(f"{WEB}/hatema.js", encoding="utf-8").read()
 prev = open(f"{ROOT}/preview/preview.js", encoding="utf-8").read()
 version = re.search(r'^version:\s*"?([^"\s]+)"?\s*$', open(f"{ROOT}/inventario/config.yaml", encoding="utf-8").read(), re.M).group(1)  # a versão fica só no config.yaml
 
@@ -54,6 +56,9 @@ page = f"""<meta charset="utf-8">
 {body}
 <script>
 {caixas}
+</script>
+<script>
+{tema}
 </script>
 <script>
 {campos}

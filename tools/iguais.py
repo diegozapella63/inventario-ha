@@ -35,6 +35,9 @@ GRUPOS = [
     ("os campos de texto que a pessoa aumenta (o tamanho guardado)", [
         "gerencia-ha/gerencia/app/www/textareas.js", "inventario-ha/inventario/app/web/textareas.js",
         "economia-ha/economia/pagina/textareas.js", "correria-ha/correria/app/www/textareas.js", *_src("textareas.js")]),
+    ("o fundo e os cartões do tema do Home Assistant", [
+        "gerencia-ha/gerencia/app/www/hatema.js", "inventario-ha/inventario/app/web/hatema.js",
+        "economia-ha/economia/pagina/hatema.js", "correria-ha/correria/app/www/hatema.js", *_src("hatema.js")]),
     ("Mais › Sobre", _src("about.js")),
     ("a janela da Conversa", _src("chat.js")),
     ("o Falar (microfone)", _src("voice.js")),

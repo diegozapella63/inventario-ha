@@ -20,8 +20,44 @@ def msgs(*texts):
 class Contexto(UnitBase):
     def test_resumo_da_casa(self):
         c = server.chat_context({})
-        self.assertIn("Inventário: 38 itens em 6 cômodos", c)
+        self.assertIn("Inventário da casa: 38 itens em 6 cômodos", c)
         self.assertIn("SAL Sala de estar: 12 itens", c)
+        self.assertNotIn("valores são os de hoje", c, "sem o Valor de hoje, o valor gravado")
+
+    def test_os_valores_de_hoje_como_na_tela(self):
+        """1.75.0: com o Valor de hoje ligado (a depreciação do GerencIA), a IA recebe os valores da tela, não os gravados."""
+        import tempfile
+        arq = os.path.join(tempfile.mkdtemp(prefix="inv-ger-"), "integracao.json")
+        with open(arq, "w", encoding="utf-8") as f:
+            json.dump({"depreciacao": {"eletronicos": 20, "moveis": 10}}, f)
+        p = mock.patch.object(server, "GERENCIA_ARQ", arq)
+        p.start()
+        self.addCleanup(p.stop)
+        server._ger.update(mtime=None, taxas=None)
+        self.addCleanup(lambda: server._ger.update(mtime=None, taxas=None))
+        self.store.settings["deprec"] = True
+        self.addCleanup(lambda: self.store.settings.pop("deprec", None))
+        taxas = server.gerencia_taxas()
+        sala = [i for i in self.store.data["items"] if i["room"] == SALA]
+        hoje = server._money(sum(server.item_hoje(i, taxas) for i in sala))
+        gravado = server._money(sum(float(i.get("value") or 0) for i in sala))
+        c = server.chat_context({})
+        self.assertNotEqual(hoje, gravado, "a casa de teste tem valores antigos: o de hoje é menor")
+        self.assertIn(f"SAL Sala de estar: {len(sala)} itens, {hoje}", c)
+        self.assertNotIn(f"SAL Sala de estar: {len(sala)} itens, {gravado}", c)
+        self.assertIn("Os valores são os de hoje, como na tela", c)
+        tv = self.store.item(TV)
+        self.assertIn(server._money(server.item_hoje(tv, taxas)), server.chat_context({"view": "item", "item": TV}))
+
+    def test_os_bens_a_parte_dos_comodos(self):
+        """1.75.0: os Bens (o que fica fora de casa) não entram como um cômodo."""
+        area = self.store.create_room({"kind": "bens"})
+        self.store.create_items([{"room": area["id"], "name": "Carro hatch", "cat": "veiculos", "value": 60000}], None)
+        c = server.chat_context({})
+        self.assertIn("Inventário da casa: 38 itens em 6 cômodos", c, "sem a área Bens")
+        self.assertNotIn("BEN Bens:", c, "não está entre os cômodos")
+        self.assertIn("Bens (o que fica fora de casa, como imóveis e veículos; não é um cômodo): 1 itens, R$ 60.000.", c)
+        self.assertIn("Com eles, o patrimônio é", c)
 
     def test_mais_valiosos(self):
         top = max(self.store.data["items"], key=lambda i: i["value"])
@@ -59,6 +95,25 @@ class Contexto(UnitBase):
     def test_busca_sem_resultado(self):
         self.assertIn("(nenhum item encontrado)", server.chat_context({"view": "search", "q": "xyzabc"}))
 
+    def test_busca_leva_o_que_a_tela_achou(self):
+        """1.75.0: a busca da tela (com os filtros de cômodo e categoria, e o código e o cômodo no texto) vai como a tela
+        achou, na ordem dela; antes, a IA buscava de novo só no nome e nos detalhes e achava outra coisa."""
+        sala = [i["id"] for i in self.store.data["items"] if i["room"] == SALA]
+        c = server.chat_context({"view": "search", "q": "sala", "ids": sala[:3], "total": 12, "filtros": "Sala de estar"})
+        self.assertIn('Busca na tela "sala" (Sala de estar): 12 itens, na ordem da tela:', c)
+        self.assertEqual(c.count("\n- SAL-"), 3)
+        self.assertIn("- … e mais 9 que não couberam aqui (são 12 ao todo).", c)
+        c = server.chat_context({"view": "search", "q": "xyzabc", "ids": [], "total": 0})
+        self.assertIn('Busca na tela "xyzabc": 0 itens.', c)
+        c = server.chat_context({"view": "search", "ids": ["nao-existe", TV], "total": "?"})
+        self.assertIn("Busca na tela: 1 item, na ordem da tela:", c, "um id que não existe fica de fora")
+
+    def test_comodo_grande_diz_quantos_ficaram_de_fora(self):
+        for k in range(80):
+            self.store.data["items"].append(dict(self.store.data["items"][0], id=f"extra-{k}", room=SALA, seq=100 + k))
+        c = server.chat_context({"view": "room", "room": SALA})
+        self.assertIn("- … e mais 12 que não couberam aqui (são 92 ao todo).", c)
+
     def test_busca_sem_acento_acha_com_acento(self):
         self.assertIn("Sofá de 3 lugares", server.chat_context({"view": "search", "q": "sofa"}))
 
@@ -86,7 +141,7 @@ class Contexto(UnitBase):
     def test_tela_estranha_nao_quebra(self):
         for sc in (None, "texto", [], {"view": 3, "item": {"x": 1}}):
             with self.subTest(sc=sc):
-                self.assertIn("Inventário:", server.chat_context(sc))
+                self.assertIn("Inventário da casa:", server.chat_context(sc))
 
     def test_valores_em_reais(self):
         self.assertEqual(server._money(1234.5), "R$ 1.234,50")
@@ -97,7 +152,7 @@ class Contexto(UnitBase):
 class Instrucoes(UnitBase):
     def test_portugues_curto_e_sem_inventar(self):
         p = server.chat_prompt(msgs("oi"), {}, None)
-        self.assertIn("Responda em português do Brasil, curto e direto", p)
+        self.assertIn("Responda em português do Brasil, com todos os acentos e o ç (você, às, não, alimentação), curto e direto", p)  # 1.75.0: com os acentos
         self.assertIn("não invente itens nem valores", p)
 
     def test_nao_muda_o_inventario(self):

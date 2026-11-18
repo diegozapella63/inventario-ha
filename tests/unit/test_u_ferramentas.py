@@ -518,3 +518,55 @@ class Origem(UnitBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ValorDeHoje(Base):
+    """1.75.0: com o Valor de hoje ligado (a depreciação do GerencIA), as ferramentas dão os valores da tela: o resumo, a
+    busca (as somas e os filtros) e o item, com o valor gravado ao lado (o que o editar muda)."""
+
+    def setUp(self):
+        super().setUp()
+        import tempfile
+        arq = os.path.join(tempfile.mkdtemp(prefix="inv-ger-"), "integracao.json")
+        with open(arq, "w", encoding="utf-8") as f:
+            json.dump({"depreciacao": {"eletronicos": 20, "moveis": 10}}, f)
+        p = mock.patch.object(S, "GERENCIA_ARQ", arq)
+        p.start()
+        self.addCleanup(p.stop)
+        S._ger.update(mtime=None, taxas=None)
+        self.addCleanup(lambda: S._ger.update(mtime=None, taxas=None))
+        self.store.settings["deprec"] = True
+        self.addCleanup(lambda: self.store.settings.pop("deprec", None))
+        self.taxas = S.gerencia_taxas()
+
+    def hoje(self, its):
+        return round(sum(S.item_hoje(i, self.taxas) for i in its), 2)  # como a tela: soma e só depois arredonda
+
+    def test_resumo_com_os_valores_de_hoje(self):
+        r = self.json("resumo")
+        sala = [i for i in self.store.data["items"] if i["room"] == "sala"]
+        c = next(c for c in r["comodos"] if c["id"] == "sala")
+        gravado = round(sum(float(i["value"]) for i in sala), 2)
+        self.assertEqual(c["valor"], round(sum(S.item_hoje(i, self.taxas) for i in sala), 2))
+        self.assertLess(c["valor"], gravado, "a casa de teste tem valores antigos: o de hoje é menor")
+        self.assertIn("de hoje", r["valores"])
+        top = r["mais_valiosos"][0]
+        self.assertIn("valor_gravado", top)
+        self.assertLess(top["valor"], top["valor_gravado"])
+        self.assertIn("valor_gravado é o que a pessoa informou", F.instrucoes(S))
+
+    def test_buscar_e_ver_com_os_valores_de_hoje(self):
+        b = self.json("buscar_itens", {"comodo": "sala", "limite": 50})
+        sala = [i for i in self.store.data["items"] if i["room"] == "sala"]
+        self.assertEqual(b["valor_total"], round(sum(S.item_hoje(i, self.taxas) for i in sala), 2))
+        v = self.json("ver_item", {"id": "sal-007"})
+        it = self.store.item("sal-007")
+        self.assertEqual((v["valor"], v["valor_gravado"]), (round(S.item_hoje(it, self.taxas), 2), float(it["value"])))
+
+    def test_desligado_o_valor_gravado(self):
+        self.store.settings["deprec"] = False
+        v = self.json("ver_item", {"id": "sal-007"})
+        self.assertEqual(v["valor"], float(self.store.item("sal-007")["value"]))
+        self.assertNotIn("valor_gravado", v)
+        self.assertNotIn("valores", self.json("resumo"))
+        self.assertNotIn("valor_gravado", F.instrucoes(S))
