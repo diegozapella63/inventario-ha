@@ -1718,25 +1718,30 @@ def usage_sensor_loop():
 
 
 def ai_status():
-    search = STORE.settings.get("ai_search") or ""
+    """1.72.0: a IA de cada uso, como nos outros apps: Para conversar (ai_chat; vazia, a preferida do Home Assistant),
+    Para ler fotos e PDFs (ai_entity) e Para pesquisar na internet (ai_search); a de fotos ou de pesquisa vazia é a de
+    conversar. Pronta: a que lê as fotos aceita fotos."""
+    search, chat = STORE.settings.get("ai_search") or "", STORE.settings.get("ai_chat") or ""
     if not SUPERVISOR_TOKEN and not AI_MOCK:
-        return {"ready": False, "reason": "no_api", "entities": [], "agents": [], "selected": "", "search": search}
+        return {"ready": False, "reason": "no_api", "entities": [], "agents": [], "selected": "", "chat": chat, "search": search}
     try:
         ents, agents = ai_entities()
     except ApiError as e:
-        return {"ready": False, "reason": "error", "message": e.msg, "entities": [], "agents": [], "selected": "", "search": search}
+        return {"ready": False, "reason": "error", "message": e.msg, "entities": [], "agents": [], "selected": "", "chat": chat, "search": search}
     sel, missing = STORE.settings.get("ai_entity") or "", ""
     if sel and not any(e["id"] == sel for e in ents):
-        missing, sel = sel, ""  # a escolhida saiu do Home Assistant: vale a preferida de lá, como no Falar
+        missing, sel = sel, ""  # a escolhida saiu do Home Assistant: vale a de conversar, como no Falar
+    if chat and not any(e["id"] == chat for e in ents):
+        missing, chat = missing or chat, ""
     usable = [e for e in ents if e["attachments"]]
-    ready = bool(usable) if not sel else any(e["id"] == sel and e["attachments"] for e in ents)
+    eff = sel or chat  # a que lê as fotos de verdade
+    ready = bool(usable) if not eff else any(e["id"] == eff and e["attachments"] for e in ents)
     return {"ready": ready, "reason": None if ready else ("no_entity" if not ents else "no_vision"),
-            "entities": ents, "agents": agents, "selected": sel, "missing": missing, "search": search}
+            "entities": ents, "agents": agents, "selected": sel, "chat": chat, "missing": missing, "search": search}
 
 
-def photo_entity() -> str:
-    """A IA escolhida para ler fotos e textos; se ela saiu do Home Assistant, vazio (a preferida de lá)."""
-    sel = STORE.settings.get("ai_entity") or ""
+def _ai_existing(sel: str) -> str:
+    """A IA escolhida, se ela ainda está no Home Assistant (saiu: vazio)."""
     if not sel or AI_MOCK or not SUPERVISOR_TOKEN:
         return sel
     try:
@@ -1744,6 +1749,17 @@ def photo_entity() -> str:
     except ApiError:
         return sel
     return sel if any(e["id"] == sel for e in ents + agents) else ""
+
+
+def chat_entity() -> str:
+    """1.72.0: a IA Para conversar (a Conversa, o Falar e as triagens, só texto); vazia ou fora do Home Assistant, a
+    preferida de lá."""
+    return _ai_existing(STORE.settings.get("ai_chat") or "")
+
+
+def photo_entity() -> str:
+    """A IA Para ler fotos e PDFs; vazia ou fora do Home Assistant, a de conversar."""
+    return _ai_existing(STORE.settings.get("ai_entity") or "") or chat_entity()
 
 
 AI_RULES = """Para cada item, devolva:
@@ -2211,7 +2227,7 @@ def ai_from_speech(body: dict) -> dict:
     spoken = text(body.get("text"), 4000, "texto", required=True)
     room = ai_fixed_room(body)
     prompt = ai_prompt("voice", room, "", spoken)
-    entity = photo_entity()
+    entity = chat_entity()
     with AiCall("fala", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
         if AI_MOCK:
             time.sleep(0.8)
@@ -2601,8 +2617,8 @@ def ai_find_pages(name: str, details: str, entity: str, qty: str = "1") -> dict:
 
 
 def search_entity() -> str:
-    """IA da busca de fotos; vazio = a tarefa de IA preferida do Home Assistant, como na leitura de fotos."""
-    return STORE.settings.get("ai_search") or ""
+    """A IA Para pesquisar na internet (as fotos da internet e as novidades); vazia, a de conversar."""
+    return STORE.settings.get("ai_search") or chat_entity()
 
 
 def _web_job_files(jid: str):
@@ -3318,7 +3334,7 @@ def triage_prompt(items: list[dict]) -> str:
 def ai_triage(items: list[dict]) -> set[str]:
     """Os ids em que vale procurar novidades, numa pergunta à IA (sem busca na web) para cada bloco de itens."""
     chosen: set[str] = set()
-    entity = photo_entity()
+    entity = chat_entity()
     for k in range(0, len(items), TRIAGE_CHUNK):
         part = items[k:k + TRIAGE_CHUNK]
         prompt = triage_prompt(part)
@@ -3669,7 +3685,7 @@ def apps_triage_prompt(apps: list[tuple[str, str]]) -> str:
 def ai_apps_triage(apps: list[tuple[str, str]]) -> dict:
     """{pacote: {"conferir", "nome"}} para cada app, numa pergunta à IA (sem busca na web) para cada bloco."""
     out = {}
-    entity = photo_entity()
+    entity = chat_entity()
     for k in range(0, len(apps), TRIAGE_CHUNK):
         part = apps[k:k + TRIAGE_CHUNK]
         prompt = apps_triage_prompt(part)
@@ -4471,11 +4487,6 @@ def chat_com_arquivos(prompt: str, entity: str, anexos: list):
                 pass
 
 
-def chat_entity() -> str:
-    """A IA da conversa: a de buscar na internet (um assistente com busca responde também o que é de fora), senão a de ler fotos."""
-    return search_entity() or photo_entity()
-
-
 def ai_chat(body: dict, user: str | None) -> dict:
     need_ai_on()
     raw = body.get("messages") if isinstance(body, dict) else None
@@ -4776,6 +4787,7 @@ def r_data(h, query):
         out = STORE.public()
     out.update({"version": VERSION, "user": h.user(),
                 "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai_search": STORE.settings.get("ai_search") or "",
+                             "ai_chat": STORE.settings.get("ai_chat") or "",
                              "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "bens": bens_enabled(), "ha_sensors": sensors_enabled(),
                              "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target(), "correria": correria_enabled(),
                              "news_hora": news_hora(), "news_aviso": news_aviso(), "news_para": news_para_salvo(),
@@ -5053,6 +5065,7 @@ def r_settings_put(h, query):
         raise ApiError(400, "Pedido inválido.")
     upd = {}  # confere tudo antes: um campo ruim não deixa os outros valendo pela metade
     for key, rx, msg in (("ai_entity", r"ai_task\.[a-z0-9_]+", "Entidade de IA inválida."),
+                         ("ai_chat", r"ai_task\.[a-z0-9_]+", "Entidade de IA inválida."),
                          ("ai_search", r"(ai_task|conversation)\.[a-z0-9_]+", "Entidade de IA inválida."),
                          ("voice_stt", r"stt\.[a-z0-9_]+", "Fala para texto inválida.")):
         if key in body:

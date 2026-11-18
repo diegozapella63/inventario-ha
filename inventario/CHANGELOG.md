@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.72.0
+
+- **Integrações › IA** (antes "IA do Home Assistant"): agora há uma IA para cada uso, como nos outros apps. **Para conversar** (a Conversa e o Falar), **Para ler fotos e PDFs** (ler fotos, catalogar e a Conversa com uma foto ou um PDF) e **Para pesquisar na internet** (as fotos da internet e as novidades). A de fotos e a de pesquisar começam **Igual à de conversar**. Assim uma IA mais barata conversa e uma mais caprichada lê as fotos e pesquisa.
+- A Conversa não usa mais a IA de pesquisar: vai pela **Para conversar**. Se você tinha escolhido só a de pesquisar, escolha também a de conversar.
+
 ## 1.71.0
 
 - **Apps do celular**: um app só por nome. Quando o mesmo app aparece com dois pacotes (o que a IA achou num print e o que o celular usa de verdade, por exemplo), os dois viram um. Fica o que o celular usa, levando o nome dado, a escolha e as novidades do outro, e o repetido não volta. **Encontrar apps com IA** também não adiciona um app com o nome de um que já está na lista.

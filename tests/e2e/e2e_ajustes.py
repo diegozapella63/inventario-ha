@@ -40,8 +40,19 @@ async def body(r, p):
       return b && [!!b.querySelector('.status'), !!b.querySelector('[data-act=ai-refresh]'), !!b.querySelector('[data-input=ai-entity]'), !!b.querySelector('[data-input=ai-search]'),
         Math.round(b.getBoundingClientRect().left - sw.getBoundingClientRect().left) > 10, b.getBoundingClientRect().top >= sw.getBoundingClientRect().bottom - 1]; })()""")
     r.eq(caixa, [True, True, True, True, True, True], "Usar IA: o estado, o Verificar de novo e as IAs num quadro recuado embaixo dela")
+    # 1.72.0: a IA de cada uso, como nos outros apps: Para conversar, Para ler fotos e PDFs e Para pesquisar na internet
+    r.eq((await pg.text_content("#p-ai h2")).strip(), "IA", "o cartão se chama só IA")
+    titulos = await pg.evaluate("[...document.querySelectorAll('#p-ai .sub-box li .ot b')].map(b => b.textContent.trim()).slice(1)")
+    r.eq(titulos, ["Para conversar", "Para ler fotos e PDFs", "Para pesquisar na internet"], "as três IAs, na ordem da família")
+    opts = await pg.evaluate("[...document.querySelectorAll('[data-input=ai-chat] option')].map(o => o.textContent)")
+    r.eq(opts, ["Padrão do Home Assistant", "Google AI Task", "IA só de texto"], "Para conversar: as tarefas de IA")
+    await pg.select_option('[data-input="ai-chat"]', "ai_task.texto_apenas")
+    await pg.locator(".toast", has_text="IA para conversar atualizada").wait_for(timeout=5000)
+    r.eq(r.data()["settings"]["ai_chat"], "ai_task.texto_apenas", "a escolha da IA para conversar fica gravada")
+    await pg.wait_for_selector('#p-ai .status.warn', timeout=5000)
+    r.check("Escolha outra para ler fotos" in await pg.text_content("#p-ai .sub-box"), "a de conversar não lê fotos e a de fotos está vazia: avisa")
     opts = await pg.evaluate("[...document.querySelectorAll('[data-input=ai-entity] option')].map(o => [o.textContent, o.disabled])")
-    r.eq(opts, [["Padrão do Home Assistant", False], ["Google AI Task", False], ["IA só de texto (não lê fotos)", True]], "IA para ler fotos: a que não lê fotos fica desligada")
+    r.eq(opts, [["Igual à de conversar", False], ["Google AI Task", False], ["IA só de texto (não lê fotos)", True]], "Para ler fotos e PDFs: a que não lê fotos fica desligada")
     await pg.select_option('[data-input="ai-entity"]', "ai_task.google_ai_task")
     await pg.locator(".toast").first.wait_for()
     await pg.wait_for_timeout(300)
@@ -50,8 +61,11 @@ async def body(r, p):
     r.check(groups == [["Tarefas de IA", ["ai_task.google_ai_task", "ai_task.texto_apenas"]], ["Assistentes de conversa", ["conversation.google_generative_ai"]]],
             f"IA para buscar na internet: tarefas e assistentes, sem o assistente sem IA ({groups})")
     await pg.select_option('[data-input="ai-search"]', "conversation.google_generative_ai")
-    await pg.locator(".toast", has_text="IA para buscar fotos atualizada").wait_for(timeout=5000)
+    await pg.locator(".toast", has_text="IA para pesquisar na internet atualizada").wait_for(timeout=5000)
     r.eq(r.data()["settings"]["ai_search"], "conversation.google_generative_ai", "e a de buscar também")
+    await pg.wait_for_selector('#p-ai .status.ok', timeout=5000)
+    await pg.select_option('[data-input="ai-chat"]', "")
+    await pg.locator(".toast", has_text="IA para conversar atualizada").wait_for(timeout=5000)
 
     # Falar
     await pg.wait_for_selector('[data-input="voice-stt"]', timeout=10000)
@@ -113,7 +127,7 @@ async def body(r, p):
     await pg.click('label.switch:has([data-input="ai-on"])')
     await pg.locator(".toast", has_text="IA desligada").wait_for(timeout=8000)
     r.check(r.data()["settings"]["ai"] is False, "Usar IA desligada fica gravada")
-    for sel, label in (("[data-input=ai-entity]", "IA para ler fotos"), ("#p-usage", "Uso da IA"), ("#p-sensors", "Sensores"), ('[data-act="catalog"]', "Catalogar no alto")):
+    for sel, label in (("[data-input=ai-entity]", "IA para ler fotos e PDFs"), ("#p-usage", "Uso da IA"), ("#p-sensors", "Sensores"), ('[data-act="catalog"]', "Catalogar no alto")):
         r.eq(await pg.locator(sel).count(), 0, f"IA desligada: sem {label}")
     r.eq(await pg.locator("#p-voice").count(), 0, "IA desligada: sem o Falar")
     r.check("Os botões de IA e o Falar ficam escondidos." in await pg.text_content("#p-ai"), "e diz que o Falar some junto")

@@ -66,7 +66,7 @@ class ComHomeAssistant(unittest.TestCase):
 
     def setUp(self):
         self.ha.ai_error = None
-        self.app.ok("PUT", "api/settings", {"ai_search": "", "ai_entity": ""})
+        self.app.ok("PUT", "api/settings", {"ai_search": "", "ai_entity": "", "ai_chat": ""})
 
     def test_leva_a_tela_e_o_nome_de_quem_pergunta(self):
         self.ha.ai_reply = lambda kind, payload: "A TV vale R$ 2.300."
@@ -83,24 +83,25 @@ class ComHomeAssistant(unittest.TestCase):
         instr = self.ha.calls("POST", "/core/api/services/ai_task")[-1]["body"]["instructions"]
         self.assertIn("Pessoa: qual o mais caro?\nAssistente: O notebook.\nPessoa: e o mais barato?", instr)
 
-    def test_assistente_de_conversa_da_busca(self):
+    def test_a_ia_de_cada_uso(self):
+        """1.72.0: a Conversa vai para a IA Para conversar (não mais para a de pesquisar); vazia, a preferida do Home
+        Assistant."""
+        self.ha.ai_reply = lambda kind, payload: "ok"
         self.app.ok("PUT", "api/settings", {"ai_search": "conversation.google_generative_ai"})
-        self.ha.conversation_reply = lambda payload: "Sim, saiu um modelo novo."
-        out = self.app.ok("POST", "api/chat", {"messages": conversa("saiu modelo novo da minha TV?")})
-        self.assertEqual(out["entity"], "conversation.google_generative_ai")
+        self.assertEqual(self.app.ok("POST", "api/chat", {"messages": conversa("oi")})["entity"], "padrão do Home Assistant")
+        self.assertNotIn("entity_id", self.ha.calls("POST", "/core/api/services/ai_task")[-1]["body"])
+        self.app.ok("PUT", "api/settings", {"ai_chat": "ai_task.texto_apenas"})
+        self.assertEqual(self.app.ok("POST", "api/chat", {"messages": conversa("oi")})["entity"], "ai_task.texto_apenas")
+        self.assertEqual(self.ha.calls("POST", "/core/api/services/ai_task")[-1]["body"]["entity_id"], "ai_task.texto_apenas")
+        self.app.ok("PUT", "api/settings", {"ai_chat": "ai_task.sumiu"})
+        self.assertEqual(self.app.ok("POST", "api/chat", {"messages": conversa("oi")})["entity"], "padrão do Home Assistant", "saiu do Home Assistant: a preferida")
+        self.assertEqual(self.app.request("PUT", "api/settings", {"ai_chat": "conversation.google_generative_ai"})[0], 400, "para conversar, só tarefas de IA")
 
     def test_cota_em_portugues(self):
         self.ha.ai_error = (429, "RESOURCE_EXHAUSTED: quota")
         st, _, out = self.app.request("POST", "api/chat", {"messages": conversa("oi")})
         self.assertEqual(st, 502)
         self.assertIn("cota da IA acabou", out["error"])
-
-    def test_erro_do_assistente(self):
-        self.app.ok("PUT", "api/settings", {"ai_search": "conversation.google_generative_ai"})
-        self.ha.conversation_reply = lambda payload: "ERRO:Não entendi"
-        st, _, out = self.app.request("POST", "api/chat", {"messages": conversa("oi")})
-        self.assertEqual(st, 502)
-        self.assertIn("respondeu com erro", out["error"])
 
     def test_resposta_vem_em_json(self):
         self.ha.ai_reply = lambda kind, payload: "Linha 1\n- item"

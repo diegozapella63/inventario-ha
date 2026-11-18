@@ -668,7 +668,8 @@ class ItensFalados(Base):
         self.assertEqual([i["existing"] for i in res["items"]], ["Geladeira frost free inox", ""], "o sofá é da sala, não da cozinha")
 
     def test_ia_escolhida_recebe_o_pedido(self):
-        self.store.settings["ai_entity"] = "ai_task.google_ai_task"
+        self.store.settings["ai_entity"] = "ai_task.texto_apenas"  # 1.72.0: a de fotos não; o Falar vai pela de conversar
+        self.store.settings["ai_chat"] = "ai_task.google_ai_task"
         S.ai_from_speech({"text": "um sofá"})
         self.assertEqual(self.ha.calls("POST", "/core/api/services/ai_task")[-1]["body"]["entity_id"], "ai_task.google_ai_task")
         self.assertEqual(S.usage_summary()["recent"][0]["entity"], "ai_task.google_ai_task")

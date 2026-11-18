@@ -74,7 +74,7 @@ Para configurar:
 
 1. Em **Configurações > Dispositivos e serviços > Adicionar integração**, escolha a integração e siga os passos.
 2. Na página da integração, adicione uma **tarefa de IA** (AI Task) e escolha um modelo que leia imagens.
-3. No app, abra **Mais > Configurações > Integrações** e escolha essa IA em **IA para ler fotos**. "Padrão do Home Assistant" usa a IA preferida definida em **Configurações > Sistema > Geral**.
+3. No app, abra **Mais > Configurações > Integrações > IA** e escolha a IA de cada uso: **Para conversar** (a Conversa e o Falar; "Padrão do Home Assistant" usa a IA preferida definida em **Configurações > Sistema > Geral**), **Para ler fotos e PDFs** (ler fotos, catalogar e a Conversa com uma foto ou um PDF) e **Para pesquisar na internet** (veja abaixo). A de fotos e a de pesquisar começam **Igual à de conversar**. Assim dá para usar uma IA mais barata para conversar, como o Claude Haiku ou o Gemini Flash-Lite, e uma mais caprichada para ler as fotos.
 
 Na hora da leitura, o app copia a foto por alguns segundos para `media/inventario/ia-temp`, chama a IA pelo Home Assistant e apaga a cópia em seguida. A IA não recebe número de série, IMEI ou dados pessoais: as instruções pedem só descrição do objeto.
 
@@ -125,7 +125,7 @@ A IA precisa ter a **busca na web** ligada:
 - **Google Gemini**: a Pesquisa Google só funciona num assistente de conversa. Ligue **Enable Google Search tool** nele e escolha esse assistente.
 - **OpenAI**: nas opções da tarefa de IA, ligue **Enable web search** (precisa do gpt-4o ou de um modelo mais novo).
 
-Escolha a IA em **Mais > Configurações > Integrações > IA para buscar fotos na internet**. Como na leitura de fotos, "Padrão do Home Assistant" usa a tarefa de IA preferida definida no Home Assistant; para o Gemini, escolha o assistente de conversa na lista.
+Escolha a IA em **Mais > Configurações > Integrações > IA > Para pesquisar na internet** (vale para as fotos da internet e para as novidades). "Igual à de conversar" usa a mesma da Conversa; para o Gemini, escolha o assistente de conversa na lista.
 
 A IA recebe só o nome, o começo dos detalhes e a quantidade do item. O app baixa as fotos apenas de endereços públicos da internet (nunca da rede da casa) e guarda só a foto que você escolher; as outras são apagadas em até 30 minutos. Cada busca usa a busca na web da sua IA, que pode ter custo à parte.
 

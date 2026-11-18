@@ -131,6 +131,20 @@ class Entidades(ComHA):
 
 
 class Estado(ComHA):
+    def test_a_de_conversar_le_as_fotos_quando_a_de_fotos_esta_vazia(self):
+        """1.72.0: sem IA para ler fotos, quem lê é a de conversar (precisa aceitar fotos); a que saiu do Home Assistant avisa;
+        com uma de conversar ou de fotos que saiu, vale a preferida de lá."""
+        self.store.settings["ai_chat"] = "ai_task.texto_apenas"
+        st = S.ai_status()
+        self.assertEqual((st["ready"], st["reason"], st["chat"], st["selected"]), (False, "no_vision", "ai_task.texto_apenas", ""))
+        self.assertEqual(S.photo_entity(), "ai_task.texto_apenas")
+        self.store.settings["ai_entity"] = GOOGLE
+        self.assertEqual((S.ai_status()["ready"], S.photo_entity(), S.chat_entity()), (True, GOOGLE, "ai_task.texto_apenas"))
+        self.store.settings.update(ai_chat="ai_task.sumiu", ai_entity="")
+        st = S.ai_status()
+        self.assertEqual((st["ready"], st["chat"], st["missing"]), (True, "", "ai_task.sumiu"))
+        self.assertEqual((S.chat_entity(), S.photo_entity(), S.search_entity()), ("", "", ""), "saiu: a preferida do Home Assistant")
+
     def test_pronta_sem_motivo_e_sem_escolha(self):
         st = S.ai_status()
         self.assertEqual((st["ready"], st["reason"], st["selected"], st["search"]), (True, None, "", ""))
@@ -240,6 +254,13 @@ class Opcoes(UnitBase):
     def test_busca_nao_herda_a_ia_de_fotos(self):
         self.store.settings["ai_entity"] = GOOGLE
         self.assertEqual(S.search_entity(), "", "vazio = a tarefa de IA preferida do Home Assistant")
+
+    def test_vazias_sao_a_de_conversar(self):
+        """1.72.0: a de pesquisar e a de fotos vazias são a de conversar; a de conversar vazia, a preferida do Home Assistant."""
+        self.store.settings["ai_chat"] = GOOGLE
+        self.assertEqual((S.chat_entity(), S.search_entity(), S.photo_entity()), (GOOGLE, GOOGLE, GOOGLE))
+        self.store.settings.update(ai_search=GEMINI, ai_entity="ai_task.leitura")
+        self.assertEqual((S.chat_entity(), S.search_entity(), S.photo_entity()), (GOOGLE, GEMINI, "ai_task.leitura"))
 
 
 # ---------------------------------------------------------------------------- leitura de foto

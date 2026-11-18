@@ -9,7 +9,7 @@
   const catsOf = (d) => { if (!Array.isArray(d.cats) || !d.cats.length) d.cats = clone(DEF_CATS); return d.cats; };
   const CATS = { has: (k) => ST.data && catsOf(ST.data).some((c) => c.id === k) };
   const foldName = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const ST = { data: null, rev: 1, blobs: new Map(), jobs: new Map(), settings: { ai_entity: "", ai_search: "", ai: true, zones: false, ha_sensors: false, voice_stt: "", news: true, news_every: 0, news_notify: "", bens: true, correria: false },
+  const ST = { data: null, rev: 1, blobs: new Map(), jobs: new Map(), settings: { ai_entity: "", ai_search: "", ai_chat: "", ai: true, zones: false, ha_sensors: false, voice_stt: "", news: true, news_every: 0, news_notify: "", bens: true, correria: false },
     news: { itens: {}, triagem: {}, ultima: null, apps: {}, apps_triagem: {}, apagadas: {} } };
   const now = () => new Date().toISOString();
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -109,7 +109,7 @@
     if (method === "GET" && path === "api/data") {
       const st = ST.settings;
       return { ...clone(d), rev: ST.rev, version: "%%V%%", user: null, features: { ai: true, share: false },
-        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false, correria: st.correria === true, accent: st.accent ?? null, accent_daily: st.accent_daily ?? null, news_hora: st.news_hora || "10:00", news_aviso: st.news_aviso === true, news_para: st.news_para || [], news_apps: st.news_apps === true }, correria_uso: null };
+        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, ai_chat: st.ai_chat || "", voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false, correria: st.correria === true, accent: st.accent ?? null, accent_daily: st.accent_daily ?? null, news_hora: st.news_hora || "10:00", news_aviso: st.news_aviso === true, news_para: st.news_para || [], news_apps: st.news_apps === true }, correria_uso: null };
     }
     if (method === "GET" && path === "api/rev") return { rev: ST.rev, correria_uso: null };
     if (method === "POST" && path === "api/items") {
@@ -262,7 +262,7 @@
     }
     if (method === "GET" && path === "api/ai/status") {
       return { ready: true, preview: true, reason: null, entities: [{ id: "ai_task.exemplo", name: "Exemplo simulado", attachments: true }],
-        agents: [{ id: "conversation.exemplo", name: "Assistente de exemplo" }], selected: ST.settings.ai_entity || "", search: ST.settings.ai_search || "" };
+        agents: [{ id: "conversation.exemplo", name: "Assistente de exemplo" }], selected: ST.settings.ai_entity || "", chat: ST.settings.ai_chat || "", search: ST.settings.ai_search || "" };
     }
     const aiOff = () => { if (ST.settings.ai === false) fail("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações.", 409); };
     if (method === "GET" && path.startsWith("api/voice/status")) {

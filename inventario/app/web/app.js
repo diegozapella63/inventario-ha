@@ -880,7 +880,7 @@
   // -- início
   const secIc = (name) => `<span class="sec-ic" aria-hidden="true">${ic(name)}</span>`;
   // 1.59.1: a janela de uma caixa de seleção (selectsheet.js) abre com o ícone do que se escolhe, como as seções
-  const SS_IC = { "search-tipo": "layers", "search-room": "rooms", "search-cat": "grid", "search-ord": "sort", "ai-entity": "camera", "ai-search": "search",
+  const SS_IC = { "search-tipo": "layers", "search-room": "rooms", "search-cat": "grid", "search-ord": "sort", "ai-entity": "camera", "ai-search": "search", "ai-chat": "chat",
     "voice-stt": "mic", room: "rooms", cat: "grid", "news-hora": "clock", "news-every": "refresh" };
   if (window.__selectSheet) window.__selectSheet.icon = (sel) => {
     const k = SS_IC[sel.dataset.input] || SS_IC[sel.dataset.rf] || SS_IC[sel.dataset.ctIn] || SS_IC[sel.name];
@@ -1878,7 +1878,7 @@
   const switchHtml = (key, on, labelledby) => `<label class="switch"><input type="checkbox" role="switch" data-input="${key}" aria-labelledby="${labelledby}"${on ? " checked" : ""}><span class="track" aria-hidden="true"></span></label>`;
   function moreIntegrations() {
     const on = aiOn();
-    // na ordem da família: os outros apps (o GerencIA, quando publica a depreciação) › CorrerIA › IA do Home Assistant ›
+    // na ordem da família: os outros apps (o GerencIA, quando publica a depreciação) › CorrerIA › IA ›
     // Falar › Uso da IA › Sensores
     return `
     ${S.gerencia && S.gerencia.taxas ? `<section class="panel" id="p-gerencia">
@@ -1897,7 +1897,7 @@
       ${correriaOn() ? `<p class="help" data-slot="correria-uso">${esc(correriaUsoTxt())}</p>` : ""}
     </section>
     <section class="panel" id="p-ai">
-      <h2>${secIc("scan")}IA do Home Assistant</h2>
+      <h2>${secIc("scan")}IA</h2>
       <p class="lead">A IA configurada no Home Assistant: Claude, OpenAI, Gemini ou Ollama.</p>
       <ul class="opts"><li${on ? ' class="tem-sub"' : ""}><div class="ot"><b id="ai-on-h">${oti("spark")}Usar IA</b><span>${on ? "Ler fotos, catalogar e buscar na internet." : "Os botões de IA e o Falar ficam escondidos."}</span></div>
         <div class="oa">${switchHtml("ai-on", on, "ai-on-h")}</div></li></ul>
@@ -1994,7 +1994,7 @@
       return `<li><b>${esc(USAGE_KIND[c.kind] || c.kind)}</b><span>${esc(aiName(c.entity))}</span>${res ? `<span class="r-erro">${esc(res)}</span>` : ""}
         <span class="t">${esc(String(c.seconds).replace(".", ","))} s · ≈ ${milTokens(c.tokens)} tokens${c.images ? ` · ${plural(c.images, "imagem", "imagens")}` : ""} · ${esc(whenShort(c.at))}</span></li>`;
     }).join("");
-    const ids = [...Object.keys(u.month.entities || {}), ...Object.keys(u.week.entities || {}), S.settings.ai_entity || "", S.settings.ai_search || ""];
+    const ids = [...Object.keys(u.month.entities || {}), ...Object.keys(u.week.entities || {}), S.settings.ai_entity || "", S.settings.ai_search || "", S.settings.ai_chat || ""];
     let prov = aiProvider([...ids, ...ids.filter(Boolean).map(aiName)]);
     if (!prov) {
       const ps = new Set([...(aiCache.data?.entities || []), ...(aiCache.data?.agents || [])].map((e) => aiProvider([e.id, e.name])).filter(Boolean));
@@ -2507,10 +2507,10 @@
     switch (st.reason) {
       case "no_api": return "O app não tem acesso à API do Home Assistant.";
       case "no_entity": return "Nenhuma integração de IA encontrada no Home Assistant.";
-      case "no_vision": return st.selected ? "A IA escolhida não aceita fotos. Escolha outra." : "As IAs configuradas não aceitam fotos.";
+      case "no_vision": return st.selected || st.chat ? "A IA escolhida não aceita fotos. Escolha outra para ler fotos." : "As IAs configuradas não aceitam fotos.";
       case "error": return st.message || "Não deu para consultar o Home Assistant.";
       case "preview": return "Na prévia, a leitura é simulada.";
-      default: { const e = (st.entities || []).find((x) => x.id === st.selected); return (e ? `Usando ${e.name}.` : "Usando a IA preferida do Home Assistant.") + (st.missing ? " A escolhida saiu do Home Assistant." : ""); }
+      default: { const e = (st.entities || []).find((x) => x.id === (st.selected || st.chat)); return (e ? `Usando ${e.name}.` : "Usando a IA preferida do Home Assistant.") + (st.missing ? " A escolhida saiu do Home Assistant." : ""); }
     }
   }
   const AI_STEPS = `<ol class="steps">
@@ -2529,14 +2529,19 @@
     slot.innerHTML = `<ul class="opts">
       <li><div class="ot"><b><span class="status ${cls}"><i></i>${st.ready ? "Pronta para ler fotos" : "Não configurada"}</span></b><span>${esc(aiReasonText(st))}</span></div>
         <div class="oa"><button class="btn" data-act="ai-refresh">${ic("refresh")}Verificar de novo</button></div></li>
-      ${ents.length ? `<li><div class="ot"><b>${oti("camera")}IA para ler fotos</b><span>Padrão do Home Assistant usa a IA preferida definida lá.</span></div>
-        <div class="oa"><select class="select" data-input="ai-entity" aria-label="IA para ler fotos">
+      ${ents.length ? `<li><div class="ot"><b>${oti("chat")}Para conversar</b><span>A Conversa e o Falar.</span></div>
+        <div class="oa"><select class="select" data-input="ai-chat" aria-label="IA para conversar">
           <option value="">Padrão do Home Assistant</option>
+          ${ents.map((e) => opt(e, st.chat)).join("")}
+        </select></div></li>
+      <li><div class="ot"><b>${oti("camera")}Para ler fotos e PDFs</b><span>Ler fotos, catalogar e a Conversa com uma foto ou um PDF.</span></div>
+        <div class="oa"><select class="select" data-input="ai-entity" aria-label="IA para ler fotos e PDFs">
+          <option value="">Igual à de conversar</option>
           ${ents.map((e) => `<option value="${esc(e.id)}"${e.id === st.selected ? " selected" : ""}${e.attachments ? "" : " disabled"}>${esc(e.name)}${e.attachments ? "" : " (não lê fotos)"}</option>`).join("")}
         </select></div></li>` : ""}
-      ${ents.length || agents.length ? `<li><div class="ot"><b>${oti("search")}IA para buscar fotos na internet</b><span>Padrão do Home Assistant usa a IA preferida definida lá. Precisa da busca na web: na Anthropic, "Enable web search"; no Gemini, um assistente de conversa com "Enable Google Search tool".</span></div>
-        <div class="oa"><select class="select" data-input="ai-search" aria-label="IA para buscar fotos na internet">
-          <option value="">Padrão do Home Assistant</option>
+      ${ents.length || agents.length ? `<li><div class="ot"><b>${oti("search")}Para pesquisar na internet</b><span>Fotos da internet e novidades. Precisa da busca na web: na Anthropic, "Enable web search"; no Gemini, um assistente de conversa com "Enable Google Search tool".</span></div>
+        <div class="oa"><select class="select" data-input="ai-search" aria-label="IA para pesquisar na internet">
+          <option value="">Igual à de conversar</option>
           ${ents.length ? `<optgroup label="Tarefas de IA">${ents.map((e) => opt(e, st.search)).join("")}</optgroup>` : ""}
           ${agents.length ? `<optgroup label="Assistentes de conversa">${agents.map((e) => opt(e, st.search)).join("")}</optgroup>` : ""}
         </select></div></li>` : ""}
@@ -4915,7 +4920,11 @@
     else if (k === "accent" && t.checked) setAccent(t.value);
     else if (k === "accent-daily") setAccentDaily(t.checked);
     else if (k === "ai-entity") {
-      try { await API.put("api/settings", { ai_entity: t.value }); S.settings.ai_entity = t.value; const slot = $('#view [data-slot="ai-panel"]'); if (slot) { renderAiPanel(slot, await aiStatus(true)); paintVoiceLead(); } toast("IA para ler fotos atualizada"); }
+      try { await API.put("api/settings", { ai_entity: t.value }); S.settings.ai_entity = t.value; const slot = $('#view [data-slot="ai-panel"]'); if (slot) { renderAiPanel(slot, await aiStatus(true)); paintVoiceLead(); } toast("IA para ler fotos e PDFs atualizada"); }
+      catch (er) { fail(er); }
+    }
+    else if (k === "ai-chat") {  // 1.72.0: a IA para conversar
+      try { await API.put("api/settings", { ai_chat: t.value }); S.settings.ai_chat = t.value; const slot = $('#view [data-slot="ai-panel"]'); if (slot) { renderAiPanel(slot, await aiStatus(true)); paintVoiceLead(); } toast("IA para conversar atualizada"); }
       catch (er) { fail(er); }
     }
     else if (k === "voice-stt") {
@@ -4929,7 +4938,7 @@
       } catch (er) { fail(er); t.disabled = false; }
     }
     else if (k === "ai-search") {
-      try { await API.put("api/settings", { ai_search: t.value }); S.settings.ai_search = t.value; aiCache.at = 0; toast("IA para buscar fotos atualizada"); }
+      try { await API.put("api/settings", { ai_search: t.value }); S.settings.ai_search = t.value; aiCache.at = 0; toast("IA para pesquisar na internet atualizada"); }
       catch (er) { fail(er); }
     }
     else if (k === "news-every") saveNews({ news_every: +t.value }, `Conferir a cada ${+t.value} dias`);

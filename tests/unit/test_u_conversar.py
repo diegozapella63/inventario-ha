@@ -167,19 +167,16 @@ class Pergunta(UnitBase):
         ha.ai_reply = lambda kind, payload: {"text": "Oi!"}
         self.assertEqual(server.ai_chat({"messages": msgs("oi")}, None)["reply"], "Oi!")
 
-    def test_usa_o_assistente_de_conversa_da_busca(self):
-        ha = self.fake_ha()
-        ha.conversation_reply = lambda payload: "Pela busca: sim."
-        self.store.settings["ai_search"] = "conversation.google_generative_ai"
-        res = server.ai_chat({"messages": msgs("tem modelo novo?")}, None)
-        self.assertEqual((res["reply"], res["entity"]), ("Pela busca: sim.", "conversation.google_generative_ai"))
-
-    def test_sem_ia_de_busca_usa_a_de_fotos(self):
+    def test_a_ia_para_conversar(self):
+        """1.72.0: a Conversa vai para a IA Para conversar; a de pesquisar e a de fotos ficam com o que é delas."""
         ha = self.fake_ha()
         ha.ai_reply = lambda kind, payload: "ok"
-        self.store.settings["ai_entity"] = "ai_task.google_ai_task"
+        self.store.settings.update(ai_entity="ai_task.google_ai_task", ai_search="conversation.google_generative_ai")
+        self.assertEqual(server.ai_chat({"messages": msgs("oi")}, None)["entity"], "padrão do Home Assistant")
+        self.assertNotIn("entity_id", ha.calls("POST", "/core/api/services/ai_task")[-1]["body"])
+        self.store.settings["ai_chat"] = "ai_task.texto_apenas"
         server.ai_chat({"messages": msgs("oi")}, None)
-        self.assertEqual(ha.calls("POST", "/core/api/services/ai_task")[-1]["body"]["entity_id"], "ai_task.google_ai_task")
+        self.assertEqual(ha.calls("POST", "/core/api/services/ai_task")[-1]["body"]["entity_id"], "ai_task.texto_apenas")
 
     def test_resposta_vazia_e_erro(self):
         ha = self.fake_ha()
@@ -220,7 +217,7 @@ class Pergunta(UnitBase):
             return "É uma TV de 55 polegadas."
         ha.ai_reply = responder
         self.store.settings["ai_entity"] = "ai_task.google_ai_task"
-        self.store.settings["ai_search"] = "conversation.google_generative_ai"
+        self.store.settings["ai_chat"] = "ai_task.texto_apenas"
         jpg = "data:image/jpeg;base64," + base64.b64encode(b"\xff\xd8\xff\xe0" + b"\1" * 60).decode()
         pdf = base64.b64encode(b"%PDF-1.4 manual").decode()
         m = msgs("o que é isto?")
@@ -235,10 +232,10 @@ class Pergunta(UnitBase):
         # sem texto vale (só o PDF); a próxima pergunta vai sem o arquivo
         server.ai_chat({"messages": [{"role": "user", "text": "", "anexos": ["manual.pdf"]}], "anexos": [{"nome": "manual.pdf", "b64": pdf}]}, None)
         self.assertEqual(vistos[-1], ("application/pdf", True), "um PDF também, sem texto")
-        n = len(ha.calls("POST", "/core/api/services/ai_task"))
-        ha.conversation_reply = lambda payload: "Um ano."
+        ha.ai_reply = lambda kind, payload: "Um ano."
         res = server.ai_chat({"messages": m + [{"role": "assistant", "text": "É uma TV."}, {"role": "user", "text": "e a garantia?"}]}, None)
-        self.assertEqual((res["reply"], len(ha.calls("POST", "/core/api/services/ai_task"))), ("Um ano.", n), "sem arquivo, a IA da conversa de sempre")
+        self.assertEqual((res["reply"], ha.calls("POST", "/core/api/services/ai_task")[-1]["body"]["entity_id"]), ("Um ano.", "ai_task.texto_apenas"),
+                         "sem arquivo, a IA para conversar")
 
     def test_arquivos_que_nao_servem(self):
         with mock.patch.object(server, "AI_MOCK", True), mock.patch.object(server.time, "sleep"):

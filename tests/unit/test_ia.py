@@ -181,7 +181,7 @@ class Falado(UnitBase):
     def test_assistente_de_conversa(self):
         ha = self.fake_ha()
         ha.conversation_reply = lambda body: '{"items": [{"name": "Banco"}]}'
-        self.store.settings["ai_entity"] = "conversation.google_generative_ai"
+        self.store.settings["ai_chat"] = "conversation.google_generative_ai"  # 1.72.0: o Falar vai pela de conversar
         self.assertEqual(S.ai_from_speech({"text": "um banco"})["items"][0]["name"], "Banco")
         ha.conversation_reply = lambda body: "ERRO:Não entendi"
         self.assertApiError(502, S.ai_from_speech, {"text": "um banco"}, msg_part="respondeu com erro")

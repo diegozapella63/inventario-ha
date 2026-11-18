@@ -98,7 +98,7 @@ async def body(r, p):
     await pg.wait_for_selector('[data-slot="voice-panel"] .opts, [data-slot="voice-panel"] .status', timeout=8000)
     await pg.wait_for_timeout(600)  # os painéis de baixo (Falar, Uso da IA) terminam de carregar: a caixa não muda de lugar
     await tap(pg, ai)
-    r.eq((await pg.locator(".ss-wrap.in .ss-head b").inner_text()).strip(), "IA para ler fotos", "Integrações: o título")
+    r.eq((await pg.locator(".ss-wrap.in .ss-head b").inner_text()).strip(), "IA para ler fotos e PDFs", "Integrações: o título")
     r.eq(await pg.locator(".ss-wrap.in .ss-head .ss-ic use").get_attribute("href"), "#i-camera", "Integrações: com o ícone")
     want = await pg.locator(f"{ai} option").nth(1).get_attribute("value")
     await tap(pg, ".ss-opt >> nth=1")
