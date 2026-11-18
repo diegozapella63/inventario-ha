@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.74.0
+
+- **Recursos** dos eletrônicos (na ficha e em Novidades › Eletrônicos): agora sempre pesquisam na internet, no fabricante, no manual ou na ficha técnica de hoje, como as novidades. Antes a IA podia responder de memória. Se a IA escolhida não pesquisar, o app avisa como ligar a busca na web.
+
 ## 1.73.0
 
 - **Mais › Novidades**: **Equipamentos** e **Eletrônicos** ganharam a busca no alto, como a dos apps (com mais de 6): **Buscar equipamento** e **Buscar eletrônico** filtram pelo nome, pelo código ou pelo cômodo, sem acento. Um deixado de fora pela IA que bate abre a lista dele.

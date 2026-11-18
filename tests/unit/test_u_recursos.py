@@ -14,6 +14,12 @@ class Pedido(UnitBase):
         self.assertIn("comece por https://fab.exemplo/manual.pdf", p)
         self.assertIn('"recursos"', p)
         self.assertNotIn("Detalhes:", S.rec_prompt("Cafeteira", ""))
+        # 1.74.0: pela busca na web, com a data de hoje, e não de memória (como as novidades)
+        self.assertIn("Use a busca na web agora", p)
+        self.assertIn(f"Hoje é {S.news_today().isoformat()}.", p)
+        self.assertIn("Não use o que você lembra de antes.", p)
+        self.assertIn('{"erro": "sem_busca"}', p)
+        self.assertNotIn("Se puder", p)
 
 
 class Limpeza(UnitBase):
@@ -39,6 +45,10 @@ class Limpeza(UnitBase):
             self.assertIn("marca e o modelo", e.exception.msg)
         with mock.patch.object(S, "AI_MOCK", False), mock.patch.object(S, "ai_call_text", return_value={"recursos": [{"nome": "Timer"}]}):
             self.assertEqual(S.ai_find_rec("TV", "", "ai_task.x")["recursos"], [{"nome": "Timer", "detalhe": ""}])
+        with mock.patch.object(S, "AI_MOCK", False), mock.patch.object(S, "ai_call_text", return_value='{"erro": "sem_busca"}'):
+            with self.assertRaises(S.ApiError) as e:
+                S.ai_find_rec("TV", "", "ai_task.x")
+            self.assertIn("não usou a busca na web", e.exception.msg, "sem a busca na web, não responde de memória")
 
 
 class Todos(UnitBase):

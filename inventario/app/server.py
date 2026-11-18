@@ -3147,12 +3147,14 @@ MOCK_REC = {"produto": "Produto de exemplo", "recursos": [
 def rec_prompt(name: str, details: str) -> str:
     links = re.findall(r"https?://[^\s<>\"']+", details or "")
     return "\n".join(filter(None, [
-        "Você conhece os equipamentos e os veículos de uma casa no Brasil.",
+        "Você ajuda a usar os equipamentos e os veículos de uma casa no Brasil.",
         f"Produto: {name}",
         f"Detalhes: {details}" if details else "",
+        f"Hoje é {news_today().isoformat()}.",
         "",
-        "Se puder, use a busca na web: a página do fabricante, o manual ou a ficha técnica deste modelo"
-        + (f" (comece por {', '.join(links[:2])})" if links else "") + ".",
+        # 1.74.0: pela busca na web, como as novidades (de memória, a IA trazia o que lembrava, às vezes de outro modelo)
+        "Use a busca na web agora: a página do fabricante, o manual ou a ficha técnica deste modelo"
+        + (f" (comece por {', '.join(links[:2])})" if links else "") + ", como estão hoje. Não use o que você lembra de antes.",
         f"Liste os recursos que este modelo tem e que a pessoa pode usar no dia a dia (funções, modos, conexões, ajustes, "
         f"atalhos, o que ele faz sozinho), do mais útil para o menos: no máximo {REC_MAX}, cada um com um nome curto e uma "
         "frase em português que diz para que serve ou como usar.",
@@ -3160,7 +3162,8 @@ def rec_prompt(name: str, details: str) -> str:
         "primeiro detalhe.",
         "Responda somente com um objeto JSON, sem texto antes ou depois:",
         '{"produto": "nome do produto que você identificou", "recursos": [{"nome": "nome curto", "detalhe": "uma frase"}], '
-        '"fonte": "endereço da página usada, ou vazio"}',
+        '"fonte": "endereço da página usada"}',
+        'Se não conseguir usar a busca na web, responda apenas {"erro": "sem_busca"}.',
     ]))
 
 
@@ -3200,6 +3203,9 @@ def ai_find_rec(name: str, details: str, entity: str) -> dict:
                 call.result = "formato"
                 log.info("recursos: resposta da IA fora do formato: %s", " ".join(str(raw or "").split())[:400])
                 raise ApiError(502, "A IA respondeu fora do formato. Tente de novo.") from None
+            if isinstance(data, dict) and data.get("erro"):
+                call.result = "sem_busca"
+                raise ApiError(502, "A IA não usou a busca na web. " + SEARCH_HOWTO)
     found = rec_clean(data)
     if not found["recursos"]:
         raise ApiError(502, "A IA não achou os recursos deste item. Ponha a marca e o modelo no nome ou nos detalhes e tente de novo.")
