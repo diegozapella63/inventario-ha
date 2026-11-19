@@ -401,6 +401,15 @@ button.chip { font: inherit; font-size: 14.5px; text-align: left; }
 .chat-ed-row { display: flex; align-items: center; gap: 8px; padding: 2px 2px 2px 12px; border-radius: 12px; background: var(--surface); }
 .chat-empty .chat-ed-row { background: var(--surface-2); }
 .chat-ed-row span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* 1.77.0: um toque na pergunta muda o texto; Perguntas prontas e Mais perguntas fecham pelo título */
+.chat-ed-txt { flex: 1; min-width: 0; min-height: 24px; padding: 8px 0; border: 0; background: none; color: inherit; font: inherit; line-height: 1.35; resize: none; field-sizing: content; overflow-wrap: anywhere; }
+.chat-ed-txt:focus { outline: none; }
+.chat-ed-row:has(.chat-ed-txt:focus) { box-shadow: 0 0 0 1.5px var(--accent); }
+.chat-ed-dobra { width: 100%; min-height: 40px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.chat-ed-dobra > span:not(.chat-ed-seta) { flex: 1; min-width: 0; }
+.chat-ed-seta { flex: none; width: 20px; height: 20px; display: grid; place-items: center; color: var(--muted); transform: rotate(90deg); transition: transform .15s; }
+.chat-ed-dobra[aria-expanded="false"] .chat-ed-seta { transform: none; }
+.chat-ed-dobra:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 12px; }
 /* 1.76.0: os modelos de Editar perguntas: um toque põe na lista */
 .chat-ed-mais { margin-top: 6px; }
 .chat-ed-modelo { width: 100%; border: 1.5px dashed var(--line); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }

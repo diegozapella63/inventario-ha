@@ -3913,6 +3913,18 @@
   function saveQuestions(list) {
     try { if (list == null) localStorage.removeItem(PERG_KEY); else localStorage.setItem(PERG_KEY, JSON.stringify(list)); } catch { /* modo privado */ }
   }
+  // 1.77.0: em Editar perguntas, Perguntas prontas e Mais perguntas fecham num toque no título, com a seta no canto (o
+  // aparelho lembra, em inv.perguntas-fechadas); de início, as duas abertas. Um toque numa pergunta muda o texto dela.
+  const PERG_SHUT = "inv.perguntas-fechadas";
+  function edShut() {
+    try { const v = JSON.parse(localStorage.getItem(PERG_SHUT) || "[]"); return new Set(Array.isArray(v) ? v : []); } catch { return new Set(); }
+  }
+  function edToggle(k) {
+    const s = edShut();
+    if (s.has(k)) s.delete(k); else s.add(k);
+    try { localStorage.setItem(PERG_SHUT, JSON.stringify([...s])); } catch { /* modo privado */ }
+  }
+  const edHead = (k, icon, title, shut, cls = "") => `<button type="button" class="chat-ed-h chat-ed-dobra${cls}" data-ed-fold="${k}" aria-expanded="${!shut}">${ic(icon, "sm")}<span>${title}</span><span class="chat-ed-seta" aria-hidden="true">${ic("chev", "sm")}</span></button>`;
   const CHAT_MAX_ARQ = 4;
   function openChat() {
     if (!aiOn()) return;
@@ -3939,12 +3951,13 @@
     const dlg = entry.dlg, box = $('[data-slot="msgs"]', dlg), form = $("[data-chat]", dlg), ta = form.t, extra = $('[data-slot="extra"]', dlg);
     const quickBlock = () => {
       const ed = U.ed;
-      if (ed) return `<div class="chat-ed"><p class="chat-ed-h">${ic("edit", "sm")}Perguntas prontas</p>
-          ${ed.list.map((q, i) => `<div class="chat-ed-row"><span>${esc(q)}</span><button type="button" class="btn ghost icon" data-ed-rm="${i}" aria-label="Tirar “${esc(q)}”" title="Tirar">${ic("close", "sm")}</button></div>`).join("")}
+      const shut = edShut();
+      if (ed) return `<div class="chat-ed">${edHead("prontas", "edit", `Perguntas prontas (${ed.list.length})`, shut.has("prontas"))}
+          ${shut.has("prontas") ? "" : `${ed.list.map((q, i) => `<div class="chat-ed-row"><textarea class="chat-ed-txt" data-ed-q="${i}" rows="${Math.min(4, Math.max(1, Math.ceil(q.length / 32)))}" maxlength="120" enterkeyhint="done" data-size="off" aria-label="Mudar “${esc(q)}”">${esc(q)}</textarea><button type="button" class="btn ghost icon" data-ed-rm="${i}" aria-label="Tirar “${esc(q)}”" title="Tirar">${ic("close", "sm")}</button></div>`).join("")}
           <div class="chat-ed-new"><input class="input" data-ed-in maxlength="120" placeholder="Nova pergunta" aria-label="Nova pergunta" enterkeyhint="done" value="${esc(ed.draft || "")}">
-            <button type="button" class="btn" data-ed-add>${ic("plus")}Adicionar</button></div>
-          ${((more) => (more.length ? `<p class="chat-ed-h chat-ed-mais">${ic("spark", "sm")}Mais perguntas (${more.length})</p>
-            ${more.map((q) => `<button type="button" class="chat-ed-row chat-ed-modelo" data-ed-put="${esc(q)}" aria-label="Pôr “${esc(q)}”"><span>${esc(q)}</span><span class="chat-ed-mais-ic">${ic("plus", "sm")}</span></button>`).join("")}` : ""))(
+            <button type="button" class="btn" data-ed-add>${ic("plus")}Adicionar</button></div>`}
+          ${((more) => (more.length ? `${edHead("mais", "spark", `Mais perguntas (${more.length})`, shut.has("mais"), " chat-ed-mais")}
+            ${shut.has("mais") ? "" : more.map((q) => `<button type="button" class="chat-ed-row chat-ed-modelo" data-ed-put="${esc(q)}" aria-label="Pôr “${esc(q)}”"><span>${esc(q)}</span><span class="chat-ed-mais-ic">${ic("plus", "sm")}</span></button>`).join("")}` : ""))(
             chatModels(sc).filter((q) => !ed.list.includes(q)))}
           <div class="chat-ed-acts"><button type="button" class="btn" data-ed-def>${ic("refresh")}Padrão</button><button type="button" class="btn primary" data-ed-ok>${ic("check")}Pronto</button></div></div>`;
       const qs = chatQuestions(sc);
@@ -4055,8 +4068,14 @@
     form.addEventListener("submit", (e) => { e.preventDefault(); send(ta.value); });
     ta.addEventListener("input", () => { grow(); pri(); });
     ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(ta.value); } });
-    dlg.addEventListener("input", (e) => { if (e.target.matches("[data-ed-in]") && U.ed) U.ed.draft = e.target.value; });
-    dlg.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing && e.target.matches("[data-ed-in]")) { e.preventDefault(); addQuestion(); } });
+    dlg.addEventListener("input", (e) => {
+      if (e.target.matches("[data-ed-in]") && U.ed) U.ed.draft = e.target.value;
+      if (e.target.matches("[data-ed-q]") && U.ed) U.ed.list[Number(e.target.dataset.edQ)] = e.target.value; // mudar uma pergunta
+    });
+    dlg.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.isComposing && e.target.matches("[data-ed-in]")) { e.preventDefault(); addQuestion(); }
+      if (e.key === "Enter" && !e.isComposing && e.target.matches("[data-ed-q]")) { e.preventDefault(); e.target.blur(); }
+    });
     dlg.addEventListener("click", (e) => {
       const t = e.target;
       if (t.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
@@ -4083,9 +4102,12 @@
       const edrm = t.closest("[data-ed-rm]");
       if (edrm && U.ed) { U.ed.list.splice(Number(edrm.dataset.edRm), 1); redraw(); return; }
       if (t.closest("[data-ed-add]")) { addQuestion(); return; }
+      const fold = t.closest("[data-ed-fold]");
+      if (fold && U.ed) { edToggle(fold.dataset.edFold); redraw(); return; }
       if (t.closest("[data-ed-def]")) { saveQuestions(null); U.ed = { list: chatIdeas(sc).slice(), draft: "" }; redraw(); return; }
       if (t.closest("[data-ed-ok]") && U.ed) {
-        const d = (U.ed.draft || "").trim(), list = U.ed.list.concat(d ? [d] : []);
+        // uma pergunta mudada vale como ficou; uma apagada até ficar vazia sai
+        const d = (U.ed.draft || "").trim(), list = U.ed.list.map((q) => String(q || "").trim()).filter(Boolean).concat(d ? [d] : []);
         saveQuestions(list.join("\n") === chatIdeas(sc).join("\n") ? null : list); // as da tela: seguem a tela
         U.ed = null; redraw();
       }

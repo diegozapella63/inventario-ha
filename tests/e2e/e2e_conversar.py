@@ -85,9 +85,24 @@ async def body(r, p):
     w = await pg.evaluate("[...document.querySelectorAll('dialog.chat .chat-ed-acts .btn')].map(b => Math.round(b.getBoundingClientRect().width))")
     r.check(len(set(w)) == 1, f"Padrão e Pronto do mesmo tamanho ({w})")
     r.check(await pg.evaluate(OVERFLOW), "editar: sem rolagem para o lado")
+    # 1.77.0: um toque numa pergunta muda o texto; Perguntas prontas e Mais perguntas fecham pelo título
+    txt = pg.locator("dialog.chat [data-ed-q]").first
+    await txt.fill(ideas[1] + " Hoje")
+    await txt.press("Enter")
+    r.eq(await txt.input_value(), ideas[1] + " Hoje", "uma pergunta mudada (o Enter não quebra a linha)")
+    heads = await pg.evaluate("[...document.querySelectorAll('dialog.chat [data-ed-fold]')].map(b => b.textContent.trim())")
+    r.eq(heads, ["Perguntas prontas (6)", "Mais perguntas (20)"], "os dois títulos, com a contagem (o modelo tirado volta)")
+    await pg.click('dialog.chat [data-ed-fold="mais"]')
+    r.eq(await pg.locator("dialog.chat .chat-ed-modelo").count(), 0, "Mais perguntas fecha")
+    await pg.click('dialog.chat [data-ed-fold="prontas"]')
+    r.eq(await pg.locator("dialog.chat [data-ed-q]").count(), 0, "Perguntas prontas fecha")
+    r.eq(sorted(await pg.evaluate("JSON.parse(localStorage.getItem('inv.perguntas-fechadas'))")), ["mais", "prontas"], "o aparelho lembra")
+    await pg.click('dialog.chat [data-ed-fold="prontas"]')
+    await pg.click('dialog.chat [data-ed-fold="mais"]')
+    r.eq(await pg.locator("dialog.chat [data-ed-q]").first.input_value(), ideas[1] + " Hoje", "fechar e abrir não perde o que mudou")
     await r.shot(pg, "perguntas")
     await pg.click("dialog.chat [data-ed-ok]")
-    novas = ideas[1:] + ["Quanto vale a cozinha?"]
+    novas = [ideas[1] + " Hoje"] + ideas[2:] + ["Quanto vale a cozinha?"]
     r.eq(await pg.evaluate("[...document.querySelectorAll('dialog.chat .chat-quick .chip')].map(c => c.textContent)"), novas, "Pronto: as perguntas novas")
     r.eq(await pg.evaluate("JSON.parse(localStorage.getItem('inv.perguntas'))"), novas, "guardadas no aparelho")
     await q.click()

@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.77.0
+
+- **Conversa › Editar perguntas**: toque numa pergunta para mudar o texto dela. **Perguntas prontas** e **Mais perguntas** fecham e abrem num toque no título, com a seta no canto, e o aparelho lembra.
+
 ## 1.76.0
 
 - **Conversar**: 6 perguntas prontas (as dos bens, das zonas e das novidades só com elas ligadas). Em **Editar perguntas**, embaixo, ficam **Mais perguntas (20)**: um toque põe a pergunta na sua lista.

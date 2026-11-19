@@ -169,7 +169,7 @@ O balão ao lado do microfone, no alto da tela (e na ficha do item), abre uma co
 - Responde a IA **Para conversar** (Mais > Configurações > Integrações > IA).
 - Com o microfone da conversa (o botão redondo da direita, com a caixa vazia; escrevendo, ele vira o Enviar), dá para falar a pergunta.
 - O **clipe**, à esquerda da caixa, manda junto uma foto ou um PDF: **Tirar foto**, **Escolher fotos** (a galeria, até 4) ou **Escolher arquivo** (uma foto ou um PDF, como o manual ou a nota fiscal). Com arquivo, responde a IA **Para ler fotos e PDFs**. Na conversa fica só o nome do arquivo.
-- **Perguntas prontas**: na conversa vazia aparecem 6 perguntas da tela para tocar; o botão ✨ ao lado da caixa abre as mesmas a qualquer momento. Em **Editar perguntas**, o ✕ tira uma pergunta e **Adicionar** põe outra (aí valem em todas as telas); **Padrão** volta às de cada tela. Embaixo, **Mais perguntas (20)**: um toque põe a pergunta na lista. Ficam guardadas no aparelho.
+- **Perguntas prontas**: na conversa vazia aparecem 6 perguntas da tela para tocar; o botão ✨ ao lado da caixa abre as mesmas a qualquer momento. Em **Editar perguntas**, toque numa pergunta para mudar o texto, o ✕ tira uma pergunta e **Adicionar** põe outra (aí valem em todas as telas); **Padrão** volta às de cada tela. Embaixo, **Mais perguntas (20)**: um toque põe a pergunta na lista. **Perguntas prontas** e **Mais perguntas** fecham e abrem num toque no título. Fica tudo guardado no aparelho.
 - A IA vê todos os itens (o cômodo, a categoria, o valor, a observação e quem cadastrou) e o total de cada categoria, de qualquer tela.
 - A conversa fica até fechar o app; **Nova conversa** começa outra. Cada pergunta conta em Uso da IA.
 
