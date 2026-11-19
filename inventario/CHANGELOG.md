@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.76.0
+
+- **Conversar**: 6 perguntas prontas (as dos bens, das zonas e das novidades só com elas ligadas). Em **Editar perguntas**, embaixo, ficam **Mais perguntas (20)**: um toque põe a pergunta na sua lista.
+- **Conversar**: a IA vê todos os itens de qualquer tela (antes, fora de um cômodo ou da busca, só os totais e os 10 mais valiosos), cada categoria com quantos itens e quanto valem, a observação e quem cadastrou cada item, e a tela Bens. Agora ela responde "quantos eletrônicos eu tenho?". E sabe quem está usando o app.
+
 ## 1.75.0
 
 - **O fundo e os cartões seguem o tema do Home Assistant**, no claro e no escuro: o mesmo fundo do Home Assistant e dos outros apps da família (antes, cada app tinha o seu). Com um tema seu no Home Assistant, o app usa as cores dele; ao trocar o tema ou o modo no Home Assistant, o app muda junto.

@@ -3871,11 +3871,30 @@
     if (sc.view === "news") return "as novidades dos eletrônicos";
     return ""; // 1.60.0: fora de um item, de um cômodo, da busca ou das novidades, nada (já se sabe que é o inventário)
   }
+  // 1.76.0: 6 perguntas à vista (as da tela primeiro) e, em Editar perguntas, mais 20 modelos (um toque põe); as dos
+  // bens, das zonas e das novidades só com elas ligadas
+  function chatPool() {
+    const q = (t, ok = true) => (ok ? [t] : []);
+    return [
+      "Quais cômodos valem mais?", "Quantos eletrônicos eu tenho?", "O que eu devia pôr no seguro?", "Quanto vale a casa toda?",
+      "Quais são os 10 itens mais caros?", "Onde está o liquidificador?", "Quanto vale cada categoria?", "Quais itens estão sem valor?",
+      "Quais itens estão sem foto?", "O que eu cadastrei por último?", "Quantos itens tem cada cômodo?", "Qual categoria vale mais?",
+      ...q("Quanto valem os bens?", bensOn()), ...q("Quais imóveis e veículos eu tenho?", bensOn()), ...q("Quais zonas tem a cozinha?", zonesOn()),
+      ...q("Alguma novidade importante nos eletrônicos?", newsOn()), "Quais eletrodomésticos eu tenho?", "Quais móveis valem mais?",
+      "Tem algum item repetido?", "Quanto valem os itens do escritório?", "Quais itens têm mais de uma unidade?", "O que tem no quarto?",
+      "Quanto valem os eletrônicos?", "Quais itens têm observação?", "Quais aparelhos de cozinha eu tenho?", "Qual é o item mais antigo?",
+      "Faz uma lista do que levar numa mudança", "Quais itens eu devia fotografar para o seguro?", "Separa os itens por categoria", "Quantos itens eu tenho ao todo?",
+    ];
+  }
   function chatIdeas(sc) {
-    if (sc.item) return ["Vale a pena pôr no seguro?", "Como conservar melhor?", "Quanto vale hoje, mais ou menos?"];
-    if (sc.room) return ["Qual o item mais caro daqui?", "O que falta cadastrar num cômodo assim?"];
-    if (sc.view === "news") return ["Alguma novidade importante?", "Tem algum recall?"];
-    return ["Quais cômodos valem mais?", "O que eu devia pôr no seguro?", "Quantos eletrônicos eu tenho?"];
+    const first = sc.item ? ["Vale a pena pôr no seguro?", "Como conservar melhor?", "Quanto vale hoje, mais ou menos?"]
+      : sc.room ? ["Qual o item mais caro daqui?", "O que falta cadastrar num cômodo assim?"]
+        : sc.view === "news" ? ["Alguma novidade importante?", "Tem algum recall?"] : [];
+    return [...new Set([...first, ...chatPool()])].slice(0, 6);
+  }
+  function chatModels(sc) {
+    const at = chatIdeas(sc);
+    return chatPool().filter((t) => !at.includes(t)).slice(0, 20);
   }
   function chatHtml(t) { // texto simples da IA: negrito, listas, links e quebras de linha
     return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(https?:\/\/[^\s<]+[^\s<.,;:)!?])/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
@@ -3924,6 +3943,9 @@
           ${ed.list.map((q, i) => `<div class="chat-ed-row"><span>${esc(q)}</span><button type="button" class="btn ghost icon" data-ed-rm="${i}" aria-label="Tirar “${esc(q)}”" title="Tirar">${ic("close", "sm")}</button></div>`).join("")}
           <div class="chat-ed-new"><input class="input" data-ed-in maxlength="120" placeholder="Nova pergunta" aria-label="Nova pergunta" enterkeyhint="done" value="${esc(ed.draft || "")}">
             <button type="button" class="btn" data-ed-add>${ic("plus")}Adicionar</button></div>
+          ${((more) => (more.length ? `<p class="chat-ed-h chat-ed-mais">${ic("spark", "sm")}Mais perguntas (${more.length})</p>
+            ${more.map((q) => `<button type="button" class="chat-ed-row chat-ed-modelo" data-ed-put="${esc(q)}" aria-label="Pôr “${esc(q)}”"><span>${esc(q)}</span><span class="chat-ed-mais-ic">${ic("plus", "sm")}</span></button>`).join("")}` : ""))(
+            chatModels(sc).filter((q) => !ed.list.includes(q)))}
           <div class="chat-ed-acts"><button type="button" class="btn" data-ed-def>${ic("refresh")}Padrão</button><button type="button" class="btn primary" data-ed-ok>${ic("check")}Pronto</button></div></div>`;
       const qs = chatQuestions(sc);
       return `${qs.length ? `<div class="chat-ideas">${qs.map((t) => `<button type="button" class="chip" data-idea>${ic("spark", "sm")}${esc(t)}</button>`).join("")}</div>` : ""}
@@ -4056,6 +4078,8 @@
       const rm = t.closest("[data-file-rm]");
       if (rm) { U.files.splice(Number(rm.dataset.fileRm), 1); drawExtra(); return; }
       if (t.closest("[data-ed-open]")) { Object.assign(U, { ed: { list: chatQuestions(sc).slice(), draft: "" }, menu: false }); redraw(); return; }
+      const put = t.closest("[data-ed-put]");
+      if (put && U.ed) { if (!U.ed.list.includes(put.dataset.edPut)) U.ed.list.push(put.dataset.edPut); redraw(); return; }
       const edrm = t.closest("[data-ed-rm]");
       if (edrm && U.ed) { U.ed.list.splice(Number(edrm.dataset.edRm), 1); redraw(); return; }
       if (t.closest("[data-ed-add]")) { addQuestion(); return; }

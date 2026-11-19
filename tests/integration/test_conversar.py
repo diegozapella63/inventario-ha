@@ -75,7 +75,7 @@ class ComHomeAssistant(unittest.TestCase):
         self.assertEqual((st, out["reply"]), (200, "A TV vale R$ 2.300."))
         instr = self.ha.calls("POST", "/core/api/services/ai_task")[-1]["body"]["instructions"]
         self.assertIn("Item na tela: SAL-007 Smart TV 55 polegadas", instr)
-        self.assertIn("da casa de Davi", instr)
+        self.assertIn("Quem está usando agora: Davi.", instr)
 
     def test_conversa_inteira_vai_junto(self):
         self.ha.ai_reply = lambda kind, payload: "ok"

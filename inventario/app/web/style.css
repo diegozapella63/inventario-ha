@@ -401,6 +401,11 @@ button.chip { font: inherit; font-size: 14.5px; text-align: left; }
 .chat-ed-row { display: flex; align-items: center; gap: 8px; padding: 2px 2px 2px 12px; border-radius: 12px; background: var(--surface); }
 .chat-empty .chat-ed-row { background: var(--surface-2); }
 .chat-ed-row span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* 1.76.0: os modelos de Editar perguntas: um toque põe na lista */
+.chat-ed-mais { margin-top: 6px; }
+.chat-ed-modelo { width: 100%; border: 1.5px dashed var(--line); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.chat-empty .chat-ed-modelo { background: none; }
+.chat-ed-mais-ic { width: 40px; height: 40px; flex: none !important; display: grid; place-items: center; color: var(--accent-ink, var(--accent)); }
 .chat-ed-new { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .chat-ed-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 /* o microfone grande, com um anel que acompanha a voz */

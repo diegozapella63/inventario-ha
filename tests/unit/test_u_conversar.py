@@ -101,7 +101,8 @@ class Contexto(UnitBase):
         sala = [i["id"] for i in self.store.data["items"] if i["room"] == SALA]
         c = server.chat_context({"view": "search", "q": "sala", "ids": sala[:3], "total": 12, "filtros": "Sala de estar"})
         self.assertIn('Busca na tela "sala" (Sala de estar): 12 itens, na ordem da tela:', c)
-        self.assertEqual(c.count("\n- SAL-"), 3)
+        busca = c.split("Busca na tela", 1)[1].split("Todos os itens", 1)[0]
+        self.assertEqual(busca.count("\n- SAL-"), 3)
         self.assertIn("- … e mais 9 que não couberam aqui (são 12 ao todo).", c)
         c = server.chat_context({"view": "search", "q": "xyzabc", "ids": [], "total": 0})
         self.assertIn('Busca na tela "xyzabc": 0 itens.', c)
@@ -113,6 +114,33 @@ class Contexto(UnitBase):
             self.store.data["items"].append(dict(self.store.data["items"][0], id=f"extra-{k}", room=SALA, seq=100 + k))
         c = server.chat_context({"view": "room", "room": SALA})
         self.assertIn("- … e mais 12 que não couberam aqui (são 92 ao todo).", c)
+
+    def test_todos_os_itens_e_as_categorias(self):
+        """1.76.0: de qualquer tela, todos os itens (o código, o cômodo, a categoria, o valor, a observação e quem cadastrou)
+        e o total de cada categoria; antes, fora de um cômodo ou da busca, só os totais e os 10 mais valiosos ("Quantos
+        eletrônicos eu tenho?" ficava sem resposta)."""
+        c = server.chat_context({})
+        self.assertIn("Todos os itens (38;", c)
+        self.assertEqual(c.count("\n- "), 38)
+        ele = [i for i in self.store.data["items"] if i.get("cat") == "eletronicos"]
+        self.assertIn(f"Eletrônicos: {len(ele)} itens, {server._money(sum(float(i['value']) for i in ele))}", c)
+        it = self.store.data["items"][0]
+        it["flag"], it["createdBy"] = "Na garantia até 2027", "Ana"
+        self.assertIn(" | obs: Na garantia até 2027 | cadastrado por Ana", server.chat_context({}))
+        # muitos: corta e diz quantos
+        for k in range(server.MAX_ITENS_CHAT):
+            self.store.data["items"].append(dict(it, id=f"x{k}", seq=200 + k, flag="", createdBy=""))
+        c = server.chat_context({})
+        self.assertIn(f"- … e mais 38 que não couberam aqui (são {server.MAX_ITENS_CHAT + 38} ao todo).", c)
+
+    def test_os_bens_na_lista_depois_dos_comodos(self):
+        area = self.store.create_room({"kind": "bens"})
+        self.store.create_items([{"room": area["id"], "name": "Carro hatch", "cat": "veiculos", "value": 60000}], None)
+        c = server.chat_context({"view": "bens"})
+        self.assertIn("A pessoa está em: Bens (o que fica fora de casa).", c)
+        lista = c.split("Todos os itens", 1)[1]
+        self.assertTrue(lista.rstrip().endswith("Carro hatch | Bens | Veículos | qtd 1 | R$ 60.000"), lista[-200:])
+        self.assertIn("Veículos: 1 item, R$ 60.000", c)
 
     def test_busca_sem_acento_acha_com_acento(self):
         self.assertIn("Sofá de 3 lugares", server.chat_context({"view": "search", "q": "sofa"}))
@@ -162,7 +190,7 @@ class Instrucoes(UnitBase):
         self.assertIn("qualquer outro assunto", server.chat_prompt(msgs("oi"), {}, None))
 
     def test_nome_de_quem_usa(self):
-        self.assertIn("da casa de Davi", server.chat_prompt(msgs("oi"), {}, "Davi"))
+        self.assertIn("Quem está usando agora: Davi. Cada item diz quem o cadastrou", server.chat_prompt(msgs("oi"), {}, "Davi"))
         self.assertIn("da casa, dentro", server.chat_prompt(msgs("oi"), {}, None))
 
     def test_conversa_na_ordem(self):

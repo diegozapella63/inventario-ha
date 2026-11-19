@@ -4378,12 +4378,20 @@ def _money(v) -> str:
     return "R$ " + (s[:-3] if s.endswith(",00") else s)
 
 
+MAX_ITENS_CHAT = 600  # 1.76.0: a lista de todos os itens que vai para a Conversar
+
+
 def _item_line(it: dict, cats: dict, valor=None) -> str:
     room = STORE.room(it.get("room")) or {}
     bits = [f"{STORE.tag(it)} {it.get('name', '')}", room.get("name", ""), cats.get(it.get("cat"), "Outros"),
             f"qtd {it.get('qty') or '1'}", _money(valor(it) if valor else it.get("value"))]
     if it.get("zone") and zones_enabled():
         bits.insert(2, f"zona {it['zone']}")
+    # 1.76.0: a observação e quem cadastrou, como a ficha mostra
+    if str(it.get("flag") or "").strip():
+        bits.append("obs: " + " ".join(str(it["flag"]).split())[:120])
+    if str(it.get("createdBy") or "").strip():
+        bits.append(f"cadastrado por {' '.join(str(it['createdBy']).split())[:60]}")
     return " | ".join(b for b in bits if b)
 
 
@@ -4416,9 +4424,19 @@ def chat_context(screen: dict) -> str:
     top = sorted(items, key=lambda i: -val(i))[:10]
     if top:
         lines.append("Mais valiosos: " + "; ".join(f"{i.get('name')} ({_money(val(i))})" for i in top) + ".")
+    # 1.76.0: cada categoria, como a tela Gráficos (antes a IA não tinha como dizer quantos eletrônicos há)
+    conta: dict = {}
+    for i in items:
+        k = i.get("cat") if i.get("cat") in cats else "outros"
+        n, v = conta.get(k, (0, 0.0))
+        conta[k] = (n + 1, v + val(i))
+    if conta:
+        lines.append("Categorias (com os bens): " + "; ".join(
+            f"{cats.get(k, 'Outros')}: {n} {'item' if n == 1 else 'itens'}, {_money(v)}" for k, (n, v) in sorted(conta.items(), key=lambda kv: -kv[1][1])) + ".")
     view = str(screen.get("view") or "")
     where = {"home": "Início", "search": "Buscar", "rooms": "Cômodos", "room": "um cômodo", "item": "a ficha de um item",
-             "report": "Relatório do inventário", "data": "Mais"}.get(view, "o app")
+             "report": "Relatório do inventário", "data": "Mais", "bens": "Bens (o que fica fora de casa)", "graficos": "Gráficos",
+             "news": "Novidades", "categorias": "Categorias", "config": "Configurações"}.get(view, "o app")
     lines.append(f"A pessoa está em: {where}.")
     it = STORE.item(str(screen.get("item") or "")) if screen.get("item") else None
     room = STORE.room(str(screen.get("room") or "")) if screen.get("room") else None
@@ -4471,6 +4489,15 @@ def chat_context(screen: dict) -> str:
         for i, v in com[:20]:
             ns = v["news"]["novidades"]
             lines.append(f"- {i['name']}: " + "; ".join(f"[{n.get('tipo')}] {n.get('titulo')}" for n in ns[:3]))
+    # 1.76.0: todos os itens (antes, fora de um cômodo ou da busca, a IA só via os totais e os 10 mais valiosos), na ordem
+    # da tela: os cômodos e, por último, os Bens
+    ordem = {r["id"]: (1 if r.get("kind") == "bens" else 0, r.get("order", 0)) for r in rooms}
+    todos = sorted(items, key=lambda i: (ordem.get(i.get("room"), (2, 0)), i.get("seq") or 0))
+    if todos:
+        lines.append(f"Todos os itens ({len(todos)}; código e nome | cômodo | categoria | quantidade | valor):")
+        lines += ["- " + _item_line(i, cats, val) for i in todos[:MAX_ITENS_CHAT]]
+        if len(todos) > MAX_ITENS_CHAT:
+            lines.append(f"- … e mais {len(todos) - MAX_ITENS_CHAT} que não couberam aqui (são {len(todos)} ao todo).")
     return "\n".join(lines)
 
 
@@ -4481,7 +4508,9 @@ def chat_prompt(messages: list[dict], screen: dict, user: str | None, anexos: in
         arqs = f"[mandou {', '.join(m['anexos'])}] " if m.get("anexos") else ""
         conv.append(f"{who}: {arqs}{m['text']}".rstrip())
     return "\n".join([
-        f"Você é o assistente do InventarIA, o app de inventário da casa{f' de {user}' if user else ''}, dentro do Home Assistant.",
+        "Você é o assistente do InventarIA, o app de inventário da casa, dentro do Home Assistant.",
+        # 1.76.0: quem usa agora (cada item diz quem cadastrou): "você" é essa pessoa
+        *([f"Quem está usando agora: {user}. Cada item diz quem o cadastrou; os itens são da casa toda."] if user else []),
         "Responda em português do Brasil, com todos os acentos e o ç (você, às, não, alimentação), curto e direto, em texto simples (no máximo uma lista curta).",
         "Pode responder sobre o que está na tela, sobre o inventário ou sobre qualquer outro assunto.",
         "Use só os dados do inventário abaixo; não invente itens nem valores. Você não muda o inventário: se pedirem, diga como fazer no app.",
