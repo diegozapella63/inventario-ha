@@ -1621,6 +1621,9 @@ def economia_compras(out: dict) -> dict:
     return {"na_lista": out.get("na_lista") is True, "vezes": out.get("vezes") if isinstance(out.get("vezes"), int) and not isinstance(out.get("vezes"), bool) else 0,
             "ultima": dia(out.get("ultima")), "compras": [dia(c) for c in (out.get("compras") or [])[:5] if dia(c)],
             "reposicao": {"texto": str(rep.get("texto") or "")[:60], "proxima": dia(rep.get("proxima")), "na_hora": rep.get("na_hora") is True} if rep else None,
+            # 1.86.0 (EconomIA 1.48.0): o item de lá que casou pelo nome parecido, e as listas prontas, para o Pôr na lista perguntar
+            "item": " ".join(str(out.get("item") or "").split())[:200],
+            "listas": [" ".join(x.split())[:60] for x in (out.get("listas") if isinstance(out.get("listas"), list) else [])[:20] if isinstance(x, str) and x.strip()],
             "texto": str(out.get("texto") or "")[:300]}
 
 
@@ -1643,6 +1646,8 @@ def r_economia_fazer(h, query):
     if acao not in ("lista", "repor"):
         raise ApiError(400, "acao vale lista ou repor.")
     pedido = {"nome": it["name"], "acao": acao}
+    if acao == "lista" and isinstance(body.get("lista"), str) and body["lista"].strip():
+        pedido["lista"] = " ".join(body["lista"].split())[:60]  # com várias listas prontas lá, a escolhida na tela
     if acao == "repor":
         if not clean_dur(it.get("dur")):
             raise ApiError(400, "Informe a Duração estimada do consumível para repor de tempos em tempos.")

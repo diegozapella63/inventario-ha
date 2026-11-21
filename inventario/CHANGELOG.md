@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.86.0
+
+- **Compras no EconomIA**: o consumível acha o item do EconomIA (1.48.0) também pelo nome parecido, e a ficha mostra o nome do item de lá. Com mais de uma lista pronta lá, o **Pôr na lista** pergunta em qual.
+- **Buscar foto na internet**: a mesma foto com outro nome de arquivo e outro tamanho também aparece uma vez só (a tela compara o desenho das fotos).
+
 ## 1.85.1
 
 - **Editar item**: o **Apagar** também fica na janela de editar, ao lado do Salvar (antes, só na ficha).

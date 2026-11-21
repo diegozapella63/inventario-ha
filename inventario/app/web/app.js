@@ -2937,6 +2937,43 @@
     if (p.value > 0 && !(+cur.value > 0)) out.value = p.value;
     return out;
   }
+  // 1.86.0: a mesma foto com outro endereço e outro tamanho (o servidor só vê os bytes e o nome do arquivo): a tela compara
+  // o desenho. Cada foto vira 64 bits (9 × 8 tons de cinza: cada ponto é mais claro que o da direita?); duas com até 4 bits
+  // de diferença são a mesma, e fica a maior. Uma foto lisa (todos os bits iguais) ou que não abriu não é comparada.
+  function fotoBits(src) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const fim = setTimeout(() => resolve(null), 6000);
+      img.onload = () => {
+        clearTimeout(fim);
+        try {
+          const c = document.createElement("canvas");
+          c.width = 9; c.height = 8;
+          const g = c.getContext("2d", { willReadFrequently: true });
+          g.fillStyle = "#fff"; g.fillRect(0, 0, 9, 8); // o fundo transparente vira branco
+          g.drawImage(img, 0, 0, 9, 8);
+          const d = g.getImageData(0, 0, 9, 8).data, cinza = (i) => d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114;
+          const bits = [];
+          for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bits.push(cinza(y * 9 + x) > cinza(y * 9 + x + 1) + 6 ? 1 : 0); // a folga: um fundo liso não vira ruído
+          const uns = bits.reduce((a, b) => a + b, 0);
+          resolve(uns === 0 || uns === 64 ? null : bits);
+        } catch { resolve(null); }
+      };
+      img.onerror = () => { clearTimeout(fim); resolve(null); };
+      img.src = src;
+    });
+  }
+  async function semRepetidas(lista, srcDe) {
+    const bits = await Promise.all(lista.map((x) => fotoBits(srcDe(x))));
+    const fica = [];
+    lista.forEach((x, i) => {
+      const b = bits[i], area = (x.w || 0) * (x.h || 0);
+      const igual = b && fica.find((f) => f.b && f.b.reduce((n, v, k) => n + (v !== b[k] ? 1 : 0), 0) <= 4);
+      if (!igual) fica.push({ x, b, area });
+      else if (area > igual.area) Object.assign(igual, { x, area });
+    });
+    return fica.map((f) => f.x);
+  }
   const webImg = (job, n) => (window.INV_WEB_IMG ? window.INV_WEB_IMG(job, n) : `api/web-photos/${job}/${n}`);
   function webPhotoSearch({ name, details = "", qty = "1", fills = null, cons = false }) {
     if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return Promise.resolve(null); }
@@ -2983,7 +3020,8 @@
           show(`<p class="formerr">${esc(st.msg)}</p>${prodCard(false)}`);
           return;
         }
-        results = st.results || [];
+        results = await semRepetidas(st.results || [], (x) => webImg(job, x.n));
+        if (my !== gen) return;
         show(`${prodCard(true)}<p class="wsum">${results.length === 1 ? "1 foto encontrada" : `${results.length} fotos encontradas`}.</p>
           <div class="wgrid" role="radiogroup" aria-label="Fotos encontradas">${results.map((x) => `<button type="button" class="wimg" role="radio" aria-checked="false" data-n="${x.n}">
             <img src="${esc(webImg(job, x.n))}" alt="Foto de ${esc(x.site)}" loading="lazy"><span>${esc(x.site)}</span></button>`).join("")}</div>
@@ -3391,14 +3429,18 @@
     if (!st) return `<p class="muted">Carregando…</p>`;
     if (st.erro) return `<p class="muted">${esc(st.erro)}</p>`;
     const c = st.c, rep = c.reposicao;
+    // 1.86.0: o item de lá que casou pelo nome parecido aparece com o nome dele ("Creme de mãos Nivea 50 g")
+    const outro = c.item && c.item.trim().toLowerCase() !== it.name.trim().toLowerCase() ? ` · ${c.item}` : "";
     const linhas = [
-      ["Lista de compras", c.na_lista ? "Está na lista" : "Fora da lista"],
+      ["Lista de compras", c.na_lista ? `Está na lista${outro}` : `Fora da lista${c.vezes ? outro : ""}`],
       ["Última compra", c.ultima ? `${diaBr(c.ultima)}${c.vezes > 1 ? ` · ${int(c.vezes)} compras` : ""}` : "Nenhuma"],
       ["Reposição", rep ? `${rep.texto}${rep.na_hora ? " · na hora de repor" : rep.proxima ? ` · volta em ${diaBr(rep.proxima)}` : ""}` : "Não"],
     ];
     return `<ul class="tlist clist">${linhas.map(([t, v]) => `<li><b>${esc(t)}</b><span>${esc(v)}</span></li>`).join("")}</ul>
       <div class="cbtns">${c.na_lista ? "" : `<button type="button" class="btn" data-act="compra-fazer" data-acao="lista" data-id="${esc(it.id)}">${ic("plus")}Pôr na lista</button>`}
-        ${rep || !durNum(it.dur) ? "" : `<button type="button" class="btn" data-act="compra-fazer" data-acao="repor" data-id="${esc(it.id)}">${ic("clock")}Repor a cada ${esc(durText(it.dur))}</button>`}</div>`;
+        ${rep || !durNum(it.dur) ? "" : `<button type="button" class="btn" data-act="compra-fazer" data-acao="repor" data-id="${esc(it.id)}">${ic("clock")}Repor a cada ${esc(durText(it.dur))}</button>`}</div>
+      ${st.escolher && !c.na_lista && (c.listas || []).length > 1 ? `<div class="sub-box clistas"><p class="muted">${ic("checks", "sm")}Em qual lista?</p>
+        <div class="chips grid">${c.listas.map((n) => `<button type="button" class="chip" data-act="compra-fazer" data-acao="lista" data-lista="${esc(n)}" data-id="${esc(it.id)}">${esc(n)}</button>`).join("")}</div></div>` : ""}`;
   }
   function paintCompras(it) {
     const el = sheet && sheet.itemId === it.id ? $('[data-slot="compras-lista"]', sheet.dlg) : null;
@@ -3415,9 +3457,12 @@
   async function compraFazer(b) {
     const it = D.itemById.get(b.dataset.id);
     if (!it || b.disabled) return;
+    const st = COMPRAS.id === it.id ? COMPRAS.st : null;
+    // 1.86.0: com várias listas prontas no EconomIA, o Pôr na lista pergunta em qual (os nomes vêm de lá)
+    if (b.dataset.acao === "lista" && !b.dataset.lista && st && st.c && (st.c.listas || []).length > 1) { st.escolher = !st.escolher; paintCompras(it); return; }
     b.disabled = true;
     try {
-      const r = await API.post("api/economia/compras", { item: it.id, acao: b.dataset.acao });
+      const r = await API.post("api/economia/compras", { item: it.id, acao: b.dataset.acao, ...(b.dataset.lista ? { lista: b.dataset.lista } : {}) });
       Object.assign(COMPRAS, { id: it.id, nome: it.name, st: { c: r.compras } });
       paintCompras(it);
       toast(r.compras.texto || (b.dataset.acao === "lista" ? "Na lista de compras do EconomIA." : "Na Reposição do EconomIA."));

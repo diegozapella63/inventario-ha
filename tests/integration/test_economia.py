@@ -33,7 +33,9 @@ class EconomiaFalso(BaseHTTPRequestHandler):
         elif type(self).recusa:
             st, out = type(self).recusa
         elif corpo_pedido:
-            if corpo_pedido.get("acao") == "lista":
+            if corpo_pedido.get("acao") == "lista" and type(self).estado.get("listas") and not corpo_pedido.get("lista"):
+                st, out = 400, {"erro": "Diga em qual lista pôr (lista): " + ", ".join(str(x) for x in type(self).estado["listas"]) + "."}
+            elif corpo_pedido.get("acao") == "lista":
                 type(self).estado = dict(type(self).estado, na_lista=True)
                 out = dict(type(self).estado, texto="Pus Creme de mãos na lista.")
             else:
@@ -97,7 +99,7 @@ class ComprasNoEconomia(unittest.TestCase):
     def test_as_compras_de_um_consumivel_pelo_nome(self):
         self.assertIs(self.app.data()["economia"], True)
         c = self.app.ok("GET", f"api/economia/compras?item={self.creme['id']}")["compras"]
-        self.assertEqual(c, {"na_lista": False, "vezes": 2, "ultima": "2026-10-28", "compras": ["2026-10-28", "2026-09-01"], "reposicao": None, "texto": ""})
+        self.assertEqual(c, {"na_lista": False, "vezes": 2, "ultima": "2026-10-28", "compras": ["2026-10-28", "2026-09-01"], "reposicao": None, "item": "", "listas": [], "texto": ""})
         p = EconomiaFalso.pedidos[-1]
         self.assertEqual((p["metodo"], p["caminho"], p["q"], p["chave"], p["app"]),
                          ("GET", "/api/integracao/compras", {"nome": ["Creme de mãos"]}, "Bearer " + CHAVE, "InventarIA"))
@@ -115,6 +117,19 @@ class ComprasNoEconomia(unittest.TestCase):
         st, _, out = self.app.post("api/economia/compras", {"item": self.sabao["id"], "acao": "repor"})
         self.assertEqual((st, out["error"] if "error" in out else out.get("erro")), (400, "Informe a Duração estimada do consumível para repor de tempos em tempos."))
         self.assertEqual(self.app.post("api/economia/compras", {"item": self.creme["id"], "acao": "apagar"})[0], 400)
+
+    def test_o_item_parecido_e_as_listas_prontas(self):
+        """1.86.0 (EconomIA 1.48.0): o nome do item de lá que casou, e as listas prontas, para o Pôr na lista perguntar."""
+        EconomiaFalso.estado = dict(EconomiaFalso.estado, item="  Creme de mãos   Nivea 50 g ", listas=["Mercado", " Farmácia ", 7, "", "x" * 90])
+        c = self.app.ok("GET", f"api/economia/compras?item={self.creme['id']}")["compras"]
+        self.assertEqual((c["item"], c["listas"]), ("Creme de mãos Nivea 50 g", ["Mercado", "Farmácia", "x" * 60]), "o que vem de lá é limpo")
+        st, _, out = self.app.post("api/economia/compras", {"item": self.creme["id"], "acao": "lista"})
+        self.assertEqual(st, 400, "sem a lista, o EconomIA pede")
+        c = self.app.ok("POST", "api/economia/compras", {"item": self.creme["id"], "acao": "lista", "lista": "  Farmácia "})["compras"]
+        self.assertIs(c["na_lista"], True)
+        self.assertEqual(EconomiaFalso.pedidos[-1]["corpo"], {"nome": "Creme de mãos", "acao": "lista", "lista": "Farmácia"})
+        self.app.ok("POST", "api/economia/compras", {"item": self.creme["id"], "acao": "repor", "lista": "Mercado"})
+        self.assertNotIn("lista", EconomiaFalso.pedidos[-1]["corpo"], "a lista só vai no Pôr na lista")
 
     def test_o_economia_recusa_ou_some(self):
         EconomiaFalso.recusa = (400, {"erro": "Diga em qual lista pôr (lista): Mercado, Farmácia."})

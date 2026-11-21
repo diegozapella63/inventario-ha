@@ -1538,3 +1538,5 @@ textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh;
 .cbtns { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
 .cbtns:empty { display: none; }
 .cbtns .btn { width: 100%; white-space: normal; }
+.clistas { margin-top: 10px; }
+.clistas > p { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
