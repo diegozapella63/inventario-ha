@@ -33,6 +33,9 @@ _COMODO = {"type": "string", "description": "O id, o código (ex.: SAL) ou o nom
 _CATEGORIA = {"type": "string", "description": "O id ou o nome da categoria (veja inventario_resumo). Padrão: Outros."}
 _VALOR = {"type": "number", "minimum": 0, "description": "Em reais: o valor de todas as unidades juntas."}
 _QTD = {"type": "string", "description": "Ex.: 1, 2 ou 3 pares. Padrão: 1."}
+# 1.82.0: um consumível não tem quantidade nem valor: tem a duração estimada
+_DURACAO = {"type": "integer", "minimum": 0, "maximum": 3650,
+            "description": "Só num consumível: quantos dias uma embalagem costuma durar (os atalhos da tela: 7, 15, 30, 90, 180, 365). 0 tira."}
 _ZONA = {"type": "string", "description": "Parte do cômodo, como Estante ou Rack da TV (só com as zonas ligadas)."}
 _DETALHES = {"type": "string", "description": "Marca, modelo, cor, tamanho e estado."}
 _OBS = {"type": "string", "description": "Algo para lembrar sobre o item (até 200 caracteres)."}
@@ -40,14 +43,15 @@ _OBS = {"type": "string", "description": "Algo para lembrar sobre o item (até 2
 FERRAMENTAS = [
     {"nome": "resumo", "titulo": "Resumo do inventário", "grava": False,
      "descricao": "Visão geral: o total, os cômodos (id, código, quantos itens e quanto valem; com as zonas ligadas, as zonas), "
-                  "os bens (casa, terreno, carro), os consumíveis (o que se gasta: pasta térmica, creme de massagem), as categorias (id e "
+                  "os bens (casa, terreno, carro), os consumíveis (o que se gasta: pasta térmica, creme de massagem; sem quantidade e sem valor, com a duração "
+                  "estimada e as categorias deles, categorias_consumiveis), as categorias (id e "
                   "nome), os itens mais valiosos e os últimos cadastrados. "
                   "Comece por aqui: os ids servem nas outras ferramentas.",
      "entrada": _obj({})},
     {"nome": "buscar_itens", "titulo": "Buscar itens", "grava": False,
      "descricao": "Busca itens por texto (todas as palavras, sem ligar para acentos, no nome, nos detalhes, na observação, no "
                   "código, no cômodo, na categoria e na zona), cômodo, zona, categoria e faixa de valor. Devolve quantos achou, a soma dos valores e os itens (id, código, nome, cômodo, "
-                  "zona, categoria, quantidade, valor; num consumível, também para que serve). Sem filtros, todos. Para achar pelo uso "
+                  "zona, categoria, quantidade, valor; num consumível, no lugar da quantidade e do valor, quanto dura e para que serve). Sem filtros, todos. Para achar pelo uso "
                   "(o que temos para massagem?), busque só o começo da palavra do uso (massag acha massagem e massageador): ele vale no "
                   "nome e nos detalhes, onde fica o que é e para que serve.",
      "entrada": _obj({"texto": {"type": "string", "description": "Palavras ou o código (ex.: SAL-003)."},
@@ -64,20 +68,22 @@ FERRAMENTAS = [
     {"nome": "cadastrar_itens", "titulo": "Cadastrar itens", "grava": True,
      "descricao": "Cadastra um ou mais itens num cômodo (ou em Bens: casa, terreno, carro; ou em Consumíveis: o que se gasta "
                   "e se compra de novo, como pasta térmica e creme de massagem). Cada item ganha o próximo código "
-                  "do cômodo (ex.: SAL-013). Valor: o de todas as unidades juntas; sem valor, fica 0. Num consumível, ponha em "
-                  "detalhes o que é e para que serve. As fotos se põem pela tela do app.",
+                  "do cômodo (ex.: SAL-013). Valor: o de todas as unidades juntas; sem valor, fica 0. Um consumível não tem valor nem "
+                  "quantidade: mande duracao_dias (quanto costuma durar), a categoria dos consumíveis (categorias_consumiveis do "
+                  "resumo) e, em detalhes, o que é e para que serve. As fotos se põem pela tela do app.",
      "entrada": _obj({"comodo": _COMODO,
                       "zona": {"type": "string", "description": "A zona de todos (só com as zonas ligadas; cada item pode ter a sua)."},
                       "itens": {"type": "array", "minItems": 1, "maxItems": MAX_LOTE,
                                 "items": _obj({"nome": {"type": "string", "description": "Curto, como a pessoa diria."},
-                                               "valor": _VALOR, "quantidade": _QTD, "categoria": _CATEGORIA,
+                                               "valor": _VALOR, "quantidade": _QTD, "categoria": _CATEGORIA, "duracao_dias": _DURACAO,
                                                "detalhes": _DETALHES, "observacao": _OBS, "zona": _ZONA}, ["nome"])}},
                      ["comodo", "itens"])},
     {"nome": "editar_item", "titulo": "Editar item", "grava": True,
-     "descricao": "Muda um item (só o que vier): nome, valor, quantidade, categoria, zona, detalhes ou observação. Texto vazio "
+     "descricao": "Muda um item (só o que vier): nome, valor, quantidade, categoria, zona, detalhes ou observação; num consumível, "
+                  "duracao_dias no lugar do valor e da quantidade. Texto vazio "
                   "apaga a zona, os detalhes ou a observação. Para levar a outro cômodo, use inventario_mover_itens.",
      "entrada": _obj({"id": _ID, "nome": {"type": "string"}, "valor": _VALOR, "quantidade": _QTD, "categoria": _CATEGORIA,
-                      "zona": _ZONA, "detalhes": _DETALHES, "observacao": _OBS}, ["id"])},
+                      "duracao_dias": _DURACAO, "zona": _ZONA, "detalhes": _DETALHES, "observacao": _OBS}, ["id"])},
     {"nome": "mover_itens", "titulo": "Mover itens", "grava": True,
      "descricao": "Leva um ou mais itens para outro cômodo (ou para Bens ou Consumíveis), ou muda a zona deles. Num cômodo novo, o item ganha "
                   "um código novo (o id continua o mesmo) e fica sem zona, se ela não vier.",
@@ -103,7 +109,9 @@ def instrucoes(srv) -> str:
     extras = [x for x, on in (("zonas (partes de um cômodo)", srv.zones_enabled() and srv.itens_enabled()), ("os bens (casa, terreno, carro)", srv.bens_enabled()),
                               ("os consumíveis (o que se gasta e se compra de novo, fora do patrimônio; os detalhes dizem o que é e para que serve)", srv.consumiveis_enabled())) if on]
     return ("InventarIA: o inventário da casa: " + ("cômodos, itens com valor, quantidade e categoria" if srv.itens_enabled() else "sem os itens da casa (desligados)")
-            + (", " + " e ".join(extras) if extras else "") + ". Valores em reais, como número; o valor de um item é o de todas "
+            + (", " + " e ".join(extras) if extras else "")
+            + (". Um consumível não tem quantidade nem valor: tem a categoria dos consumíveis e a duração estimada (duracao_dias)" if srv.consumiveis_enabled() else "")
+            + ". Valores em reais, como número; o valor de um item é o de todas "
             "as unidades juntas. Comece por inventario_resumo: os ids dos cômodos e das categorias servem nas outras ferramentas; "
             "um item se acha com inventario_buscar_itens, pelo id (sal-003) ou pelo código (SAL-003). Antes de gravar, diga à "
             "pessoa o que vai ser feito, e não mude um valor que ela não pediu."
@@ -207,11 +215,28 @@ def _achar_comodo(srv, v, criar_bens=False):
     return r
 
 
-def _achar_categoria(srv, v) -> str:
-    cats = srv.STORE.cats()
+def _eh_cons(srv, it) -> bool:
+    return (srv.STORE.room(it.get("room")) or {}).get("kind") == "consumiveis"
+
+
+def _duracao(srv, v) -> int:
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 or v > 3650 or int(v) != v:
+        raise ErroFerramenta("duracao_dias: um número inteiro de dias, de 0 a 3650 (7, 15, 30, 90, 180 ou 365 são os atalhos da tela).")
+    return int(v)
+
+
+def _sem_valor(x, n=""):
+    """1.82.0: um consumível não tem valor nem quantidade (a IA lê o porquê e manda de novo, com a duração)."""
+    v, q = x.get("valor"), str(x.get("quantidade") or "").strip()
+    if (isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0) or q not in ("", "1"):
+        raise ErroFerramenta(f"{n}Um consumível não tem valor nem quantidade: mande duracao_dias (quanto costuma durar), sem valor e sem quantidade.")
+
+
+def _achar_categoria(srv, v, cons: bool = False) -> str:
+    cats = srv.STORE.cons_cats() if cons else srv.STORE.cats()
     s = str(v if v is not None and not isinstance(v, (dict, list, bool)) else "").strip()
     if not s:
-        return "outros"
+        return srv.CONS_OUTROS if cons else "outros"
     f = srv.fold(s)
     c = next((c for c in cats if c["id"] == s), None) or next((c for c in cats if srv.fold(c["name"]) == f), None)
     if not c:
@@ -219,7 +244,7 @@ def _achar_categoria(srv, v) -> str:
         c = parte[0] if len(parte) == 1 else None
     if not c:
         todas = ", ".join(f"{c['name']} ({c['id']})" for c in cats)
-        raise ErroFerramenta(f"Categoria não encontrada: {s}. As categorias: {todas}.")
+        raise ErroFerramenta(f"Categoria não encontrada: {s}. As categorias{' dos consumíveis' if cons else ''}: {todas}.")
     return c["id"]
 
 
@@ -266,17 +291,21 @@ def _linha(srv, it, cats=None, taxas=None) -> dict:
     out = {"id": it["id"], "codigo": srv.STORE.tag(it), "nome": it.get("name") or "", "comodo": _nome_comodo(srv, it.get("room"))}
     if srv.zones_enabled() and it.get("zone"):
         out["zona"] = it["zone"]
+    if _eh_cons(srv, it):  # 1.78.0: o que é e para que serve, para achar pelo uso; 1.82.0: a duração, sem quantidade e sem valor
+        out["categoria"] = srv.STORE.cat_of(it)
+        out["tipo"] = "consumível"
+        if srv.clean_dur(it.get("dur")):
+            out["duracao"], out["duracao_dias"] = srv.dur_text(it.get("dur")), srv.clean_dur(it.get("dur"))
+        d = " ".join(str(it.get("details") or "").split())
+        if d:
+            out["para_que_serve"] = d[:240]
+        return out
     out["categoria"] = cats.get(it.get("cat"), cats.get("outros", "Outros"))
     if str(it.get("qty") or "1") != "1":
         out["quantidade"] = it.get("qty")
     out["valor"] = _v(srv, it, taxas)
     if taxas:
         out["valor_gravado"] = _num(it.get("value"))
-    if (srv.STORE.room(it.get("room")) or {}).get("kind") == "consumiveis":  # 1.78.0: o que é e para que serve, para achar pelo uso
-        out["tipo"] = "consumível"
-        d = " ".join(str(it.get("details") or "").split())
-        if d:
-            out["para_que_serve"] = d[:240]
     return out
 
 
@@ -285,6 +314,11 @@ def _frase(srv, it) -> str:
     bits = [srv.STORE.tag(it), _nome_comodo(srv, it.get("room"))]
     if srv.zones_enabled() and it.get("zone"):
         bits.append(f"zona {it['zone']}")
+    if _eh_cons(srv, it):  # 1.82.0: a duração, sem quantidade e sem valor
+        if srv.clean_dur(it.get("dur")):
+            bits.append(f"dura {srv.dur_text(it.get('dur'))}")
+        bits.append(f"id {it['id']}")
+        return f"{it.get('name') or ''} ({', '.join(bits)})"
     if str(it.get("qty") or "1") != "1":
         bits.append(f"quantidade {it['qty']}")
     bits += [srv._money(it.get("value")), f"id {it['id']}"]
@@ -349,7 +383,9 @@ def _resumo(srv) -> str:
     out["ultimos_cadastrados"] = [dict(_linha(srv, i, cats, taxas), cadastrado_em=str(i.get("createdAt") or "")[:10])
                                   for i in sorted(items, key=lambda i: str(i.get("createdAt") or ""), reverse=True)[:MAX_RESUMO]]
     if srv.consumiveis_enabled():
-        out["consumiveis"] = {"itens": len(consumiveis), "obs": "O que se gasta e se compra de novo; fora do total. Cadastre com comodo Consumíveis.",
+        out["categorias_consumiveis"] = [{"id": c["id"], "nome": c["name"]} for c in srv.STORE.cons_cats()]
+        out["consumiveis"] = {"itens": len(consumiveis), "obs": "O que se gasta e se compra de novo; fora do total, sem quantidade e sem valor: "
+                                                                 "com a duração estimada (duracao_dias). Cadastre com comodo Consumíveis.",
                               "lista": [_linha(srv, i, cats, taxas) for i in sorted(consumiveis, key=lambda i: i.get("seq") or 0)[:MAX_RESUMO * 3]]}
     out["opcoes"] = {"zonas": zonas, "itens_da_casa": srv.itens_enabled(), "bens": srv.bens_enabled(), "consumiveis": srv.consumiveis_enabled()}
     return _json(out)
@@ -361,7 +397,14 @@ def _buscar(srv, a) -> str:
     room = _achar_comodo(srv, a["comodo"], criar_bens=True) if a.get("comodo") not in (None, "") else None
     if isinstance(room, str):  # a área (Bens ou Consumíveis) ainda não existe: nenhum
         room = {"id": None}
-    cat = _achar_categoria(srv, a["categoria"]) if a.get("categoria") not in (None, "") else None
+    cat = None
+    if a.get("categoria") not in (None, ""):
+        try:
+            cat = _achar_categoria(srv, a["categoria"])
+        except ErroFerramenta:
+            if not srv.consumiveis_enabled():
+                raise
+            cat = _achar_categoria(srv, a["categoria"], cons=True)  # 1.82.0: uma categoria dos consumíveis
     vmin = _valor(srv, a["valor_min"]) if a.get("valor_min") not in (None, "") else None
     vmax = _valor(srv, a["valor_max"]) if a.get("valor_max") not in (None, "") else None
     if vmin is not None and vmax is not None and vmax < vmin:
@@ -382,7 +425,9 @@ def _buscar(srv, a) -> str:
     for it in items:
         if room and it.get("room") != room["id"]:
             continue
-        if cat and (it.get("cat") if it.get("cat") in cats else "outros") != cat:
+        if cat and (cat.startswith("c-") != _eh_cons(srv, it) or
+                    ((it.get("cat") if it.get("cat") in srv.STORE.cons_cat_map() else srv.CONS_OUTROS) if _eh_cons(srv, it)
+                     else (it.get("cat") if it.get("cat") in cats else "outros")) != cat):
             continue
         v = _v(srv, it, taxas)
         if (vmin is not None and v < vmin) or (vmax is not None and v > vmax):
@@ -426,18 +471,24 @@ def _ver(srv, a) -> str:
         out["comodo"]["obs"] = "Consumíveis: o que se gasta e se compra de novo; fora do patrimônio"
     if srv.zones_enabled():
         out["zona"] = it.get("zone") or ""
-    cid = it.get("cat") if it.get("cat") in cats else "outros"
-    out["categoria"] = {"id": cid, "nome": cats.get(cid, "Outros")}
-    out["quantidade"] = str(it.get("qty") or "1")
-    taxas = _taxas(srv)
-    out["valor"] = _v(srv, it, taxas)
-    if taxas:
-        out["valor_gravado"] = _num(it.get("value"))
-    m = re.match(r"\s*(\d+)", out["quantidade"])
-    n = int(m.group(1)) if m else 1
-    if n > 1:
-        out["valor_de_cada"] = round(out["valor"] / n, 2)
-    out["valor_desde"] = str(it.get("valueAt") or it.get("createdAt") or "")[:10]
+    if room.get("kind") == "consumiveis":  # 1.82.0: a categoria dos consumíveis e a duração; sem quantidade e sem valor
+        ccats = srv.STORE.cons_cat_map()
+        cid = it.get("cat") if it.get("cat") in ccats else srv.CONS_OUTROS
+        out["categoria"] = {"id": cid, "nome": ccats.get(cid, "Outros")}
+        out["duracao_dias"], out["duracao"] = srv.clean_dur(it.get("dur")), srv.dur_text(it.get("dur")) or "sem duração"
+    else:
+        cid = it.get("cat") if it.get("cat") in cats else "outros"
+        out["categoria"] = {"id": cid, "nome": cats.get(cid, "Outros")}
+        out["quantidade"] = str(it.get("qty") or "1")
+        taxas = _taxas(srv)
+        out["valor"] = _v(srv, it, taxas)
+        if taxas:
+            out["valor_gravado"] = _num(it.get("value"))
+        m = re.match(r"\s*(\d+)", out["quantidade"])
+        n = int(m.group(1)) if m else 1
+        if n > 1:
+            out["valor_de_cada"] = round(out["valor"] / n, 2)
+        out["valor_desde"] = str(it.get("valueAt") or it.get("createdAt") or "")[:10]
     out["detalhes"] = it.get("details") or ""
     out["observacao"] = it.get("flag") or ""
     out["fotos"] = len(it.get("photos") or [])
@@ -458,6 +509,7 @@ def _cadastrar(srv, a, quem) -> str:
         raise ErroFerramenta(f"No máximo {MAX_LOTE} itens de cada vez.")
     room = _achar_comodo(srv, a.get("comodo"), criar_bens=True)
     bem = bool(_area(room))
+    cons = _area(room) == "consumiveis"
     zona_geral = _texto(srv, a.get("zona"), 120, "zona") if a.get("zona") not in (None, "") else ""
     _zona_ok(srv, room, bool(zona_geral))
     corpos = []
@@ -466,12 +518,17 @@ def _cadastrar(srv, a, quem) -> str:
             raise ErroFerramenta(f"Item {n}: mande um objeto, como {{\"nome\": \"Abajur\", \"valor\": 120}}.")
         sobra = sorted(set(x) - set(POR_NOME["cadastrar_itens"]["entrada"]["properties"]["itens"]["items"]["properties"]))
         if sobra:
-            raise ErroFerramenta(f"Item {n}: campo desconhecido: {', '.join(sobra)}. Valem: nome, valor, quantidade, categoria, detalhes, observacao, zona.")
+            raise ErroFerramenta(f"Item {n}: campo desconhecido: {', '.join(sobra)}. Valem: nome, valor, quantidade, categoria, duracao_dias, detalhes, observacao, zona.")
         try:
+            if cons:
+                _sem_valor(x)
+            elif x.get("duracao_dias") not in (None, 0):
+                raise ErroFerramenta("duracao_dias só vale num consumível (comodo Consumíveis).")
             zona = _texto(srv, x.get("zona"), 120, "zona") if x.get("zona") not in (None, "") else zona_geral
             _zona_ok(srv, room, x.get("zona") not in (None, ""))
             corpos.append({"name": _texto(srv, x.get("nome"), 200, "nome", obrig=True), "value": _valor(srv, x.get("valor")),
-                           "qty": _qtd(srv, x.get("quantidade")), "cat": _achar_categoria(srv, x.get("categoria")),
+                           "qty": _qtd(srv, x.get("quantidade")), "cat": _achar_categoria(srv, x.get("categoria"), cons=cons),
+                           **({"dur": _duracao(srv, x["duracao_dias"])} if cons and x.get("duracao_dias") is not None else {}),
                            "details": _texto(srv, x.get("detalhes"), 4000, "detalhes", linhas=True), "flag": _texto(srv, x.get("observacao"), 200, "observação"),
                            "zone": "" if bem else zona, "source": "correria"})
         except (ErroFerramenta, srv.ApiError) as e:
@@ -484,7 +541,7 @@ def _cadastrar(srv, a, quem) -> str:
     novos = srv.STORE.create_items(corpos, quem)
     txt = (f"Cadastrado em {room.get('name')}: " if len(novos) == 1 else f"Cadastrados {len(novos)} itens em {room.get('name')}: ")
     txt += "; ".join(_frase(srv, it) for it in novos) + "."
-    if len(novos) > 1:
+    if len(novos) > 1 and not cons:
         txt += f" Total: {srv._money(sum(_num(i.get('value')) for i in novos))}."
     repetidos = [(it, iguais[srv.fold(it['name'])]) for it in novos if srv.fold(it["name"]) in iguais]
     if repetidos:
@@ -497,6 +554,14 @@ def _editar(srv, a, quem) -> str:
     it = _achar_item(srv, a.get("id"))
     room = srv.STORE.room(it.get("room")) or {}
     novo = {}
+    cons = room.get("kind") == "consumiveis"
+    if cons:  # 1.82.0
+        _sem_valor(a)
+        a = {k: v for k, v in a.items() if k not in ("valor", "quantidade")}
+        if "duracao_dias" in a:
+            novo["dur"] = _duracao(srv, a["duracao_dias"])
+    elif "duracao_dias" in a:
+        raise ErroFerramenta("duracao_dias só vale num consumível.")
     if "nome" in a:
         novo["name"] = _texto(srv, a["nome"], 200, "nome", obrig=True)
     if "valor" in a:
@@ -508,7 +573,7 @@ def _editar(srv, a, quem) -> str:
     if "categoria" in a:
         if a["categoria"] in (None, ""):
             raise ErroFerramenta("Categoria vazia: mande Outros para tirar a categoria.")
-        novo["cat"] = _achar_categoria(srv, a["categoria"])
+        novo["cat"] = _achar_categoria(srv, a["categoria"], cons=cons)
     if "zona" in a:
         z = _texto(srv, a["zona"], 120, "zona")
         _zona_ok(srv, room, True)
@@ -518,21 +583,25 @@ def _editar(srv, a, quem) -> str:
     if "observacao" in a:
         novo["flag"] = _texto(srv, a["observacao"], 200, "observação") or None
     if not novo:
-        raise ErroFerramenta("Diga o que muda: nome, valor, quantidade, categoria, zona, detalhes ou observacao.")
-    rotulo = {"name": "nome", "value": "valor", "qty": "quantidade", "cat": "categoria", "zone": "zona", "details": "detalhes", "flag": "observação"}
-    cats = srv.STORE.cat_map()
+        raise ErroFerramenta("Diga o que muda: nome, categoria, duracao_dias, detalhes ou observacao." if cons
+                             else "Diga o que muda: nome, valor, quantidade, categoria, zona, detalhes ou observacao.")
+    rotulo = {"name": "nome", "value": "valor", "qty": "quantidade", "cat": "categoria", "zone": "zona", "details": "detalhes", "flag": "observação",
+              "dur": "duração"}
+    cats = srv.STORE.cons_cat_map() if cons else srv.STORE.cat_map()
 
     def mostra(k, v):
         if k == "value":
             return srv._money(v)
         if k == "cat":
             return cats.get(v, "Outros")
+        if k == "dur":
+            return srv.dur_text(v) or "(sem)"
         if k == "details":
             v = " ".join(str(v or "").split())
             return f"\"{v[:80]}{'…' if len(v) > 80 else ''}\"" if v else "(vazio)"
         return f"\"{v}\"" if v not in (None, "") else "(vazio)"
 
-    antes = {k: (it.get(k) if k != "cat" else (it.get("cat") if it.get("cat") in cats else "outros")) for k in novo}
+    antes = {k: (it.get(k) if k != "cat" else (it.get("cat") if it.get("cat") in cats else (srv.CONS_OUTROS if cons else "outros"))) for k in novo}
     mudou = [k for k in novo if (antes[k] or None) != (novo[k] or None) and not (k == "value" and _num(antes[k]) == _num(novo[k]))]
     if not mudou:
         return f"Nada mudou: {_frase(srv, it)} já estava assim."

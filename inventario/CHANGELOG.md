@@ -1,5 +1,12 @@
 # Mudanças
 
+## 1.82.0
+
+- **Consumíveis sem quantidade e sem valor**: no lugar, a **Duração estimada**, com os atalhos 1 semana, 15 dias, 1 mês, 3 meses, 6 meses e 1 ano. A lista e a ficha mostram a duração em destaque. O que já estava gravado continua guardado, só não aparece.
+- **Categorias dos consumíveis**, à parte das da casa e já com sugestões: Limpeza, Higiene e cuidados, Cozinha e despensa, Farmácia, Pets, Escritório e papelaria, Manutenção e reparos, Pilhas e eletrônicos, Carro, Jardim e Outros. Em **Mais › Categorias** dá para criar, renomear e apagar. Um consumível de antes aparece em Outros até você escolher a categoria.
+- **Leitura por IA** de um consumível: escolhe a categoria dos consumíveis e estima a duração.
+- **CorrerIA e EconomIA**: cadastrar e editar consumíveis com a duração e a categoria deles; o EconomIA recebe a duração de cada um.
+
 ## 1.81.1
 
 - **Conversa**: a IA sabe quais são os outros apps da casa e, quando a pergunta é de outro app, diz em qual deles está.

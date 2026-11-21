@@ -12,9 +12,20 @@
     ["vestuario", "Roupas e calçados"], ["utilidades", "Utilidades"], ["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["outros", "Outros"],
   ];
   let CATS = DEFAULT_CATS, CAT = Object.fromEntries(CATS);
-  function applyCats(list) {
+  // 1.82.0: os consumíveis têm as categorias deles (os ids começam por "c-") e a duração estimada, em dias
+  const DEFAULT_CCATS = [
+    ["c-limpeza", "Limpeza"], ["c-higiene", "Higiene e cuidados"], ["c-despensa", "Cozinha e despensa"], ["c-farmacia", "Farmácia"],
+    ["c-pets", "Pets"], ["c-papelaria", "Escritório e papelaria"], ["c-manutencao", "Manutenção e reparos"], ["c-eletronicos", "Pilhas e eletrônicos"],
+    ["c-carro", "Carro"], ["c-jardim", "Jardim"], ["c-outros", "Outros"],
+  ];
+  let CCATS = DEFAULT_CCATS, CCAT = Object.fromEntries(CCATS);
+  const DURS = [[7, "1 semana"], [15, "15 dias"], [30, "1 mês"], [90, "3 meses"], [180, "6 meses"], [365, "1 ano"]];
+  const durNum = (d) => { const n = Math.trunc(+d); return n > 0 && n <= 3650 ? n : 0; };
+  const durText = (d) => { const n = durNum(d); return n ? (DURS.find(([k]) => k === n) || [0, n === 1 ? "1 dia" : `${n} dias`])[1] : ""; };
+  function applyCats(list, clist) {
     CATS = Array.isArray(list) && list.length ? list.map((c) => [c.id, c.name]) : DEFAULT_CATS;
     CAT = Object.fromEntries(CATS);
+    if (clist !== undefined) { CCATS = Array.isArray(clist) && clist.length ? clist.map((c) => [c.id, c.name]) : DEFAULT_CCATS; CCAT = Object.fromEntries(CCATS); }
   }
   const SOURCES = { foto: "Catalogado por foto", informado: "Valor informado", ia: "Leitura por IA", voz: "Cadastro por voz", manual: "Cadastro manual", correria: "Pelo CorrerIA" };
   const ORDERS = [["rel", "Mais relevantes"], ["val", "Maior valor"], ["valasc", "Menor valor"], ["az", "Nome, de A a Z"], ["new", "Mais recentes"], ["code", "Código"]];
@@ -230,7 +241,8 @@
       byRoom.get(it.room).push(it);
       const v = vh.get(it.id) || 0;
       if (!cons || it.room !== cons.id) total += v;
-      const c = CAT[it.cat] ? it.cat : "outros";
+      // 1.82.0: um consumível conta na categoria dele (a dos consumíveis; uma de antes, em Outros)
+      const c = cons && it.room === cons.id ? (CCAT[it.cat] ? it.cat : "c-outros") : CAT[it.cat] ? it.cat : "outros";
       const ct = catTotals.get(c) || { value: 0, count: 0 };
       ct.value += v; ct.count += 1;
       catTotals.set(c, ct);
@@ -320,7 +332,7 @@
       version: d.version || "", features: d.features || {}, settings: d.settings || {}, loaded: true, error: null, stale: false,
       correriaUso: d.correria_uso || null, gerencia: d.gerencia || null, resolvia: d.resolvia === true, atalho: d.atalho || null,
     });
-    applyCats(d.cats);
+    applyCats(d.cats, d.consCats || null);
     derive();
     syncLook();
   }
@@ -366,7 +378,7 @@
   const camposFechados = () => new Set(LS.get("campos", []));
   // e o título de cada campo com o ícone pelas palavras dele, quando não traz o seu (o padrão da família)
   const ICONE_CAMPO = [[/^Fotos/, "image"], [/^Nome|^Tarefa|^Título/, "edit"], [/^Detalhes|^Observa/, "report"], [/^Tipo|^Categoria/, "grid"],
-    [/^Cômodo|^Onde/, "rooms"], [/^Zona/, "pin"], [/^Quantidade/, "layers"], [/^Valor|^Preço/, "wallet"], [/^Código/, "tag"], [/^Lista/, "checks"],
+    [/^Cômodo|^Onde/, "rooms"], [/^Zona/, "pin"], [/^Quantidade/, "layers"], [/^Duração/, "clock"], [/^Valor|^Preço/, "wallet"], [/^Código/, "tag"], [/^Lista/, "checks"],
     [/^Prazo|^Data|^Quando/, "calendar"], [/^Hor/, "clock"], [/^Cor/, "palette"], [/^Mensagem|^Texto/, "chat"], [/^Link|^Endereço|^Página/, "external"],
     [/^Quem|^Pessoa/, "user"], [/^Ícone/, "spark"]];
   const iconeCampo = (t) => (ICONE_CAMPO.find(([re]) => re.test(t)) || [0, "edit"])[1];
@@ -882,15 +894,16 @@
     const room = D.roomById.get(it.room);
     let where;
     if (mode === "room") where = it.details ? hl(snippet(it.details), toks) : "";
-    else if (mode === "bens" || mode === "cons") where = esc(CAT[it.cat] || "Outros");
+    else if (mode === "cons" || (mode === "bens" && isCons(it.room))) where = esc(CCAT[it.cat] || "Outros");
+    else if (mode === "bens") where = esc(CAT[it.cat] || "Outros");
     else where = hl([room?.name, zonesOn() ? it.zone : ""].filter(Boolean).join(", "), toks);
     const qty = qtyClean(it.qty);
     const thumb = ph ? `<img class="thumb" src="${esc(src(ph))}" alt="" loading="lazy" decoding="async" width="56" height="56">` : `<span class="thumb">${ic("tag")}</span>`;
     const inner = `${pick === null ? thumb : `<span class="tw">${thumb}<span class="pk" aria-hidden="true">${ic("check", "sm")}</span></span>`}
       <span class="ib"><span class="nm">${hl(it.name, toks)}</span>
         <span class="meta"><span class="mt soft">${esc(tagOf(it))}</span>${where ? `<span class="z">${where}</span>` : ""}</span></span>
-      ${isCons(it.room) // um consumível: a quantidade em destaque; o valor (fora do patrimônio), só se houver
-    ? `<span class="iv cons"><span class="val">${esc(qtyShort(it.qty))}</span>${vl(it) > 0 ? `<span class="qty">${money(vl(it))}</span>` : ""}</span>`
+      ${isCons(it.room) // 1.82.0: um consumível: quanto dura (estimado); sem quantidade e sem valor
+    ? (durNum(it.dur) ? `<span class="iv cons"><span class="val">${esc(durText(it.dur))}</span></span>` : "")
     : `<span class="iv"><span class="val">${money(vl(it))}</span>${qty !== "1" ? `<span class="qty">${esc(qtyShort(it.qty))}</span>` : ""}</span>`}`;
     if (pick !== null) return `<li><button type="button" class="irow selr" data-act="sel-toggle" data-id="${esc(it.id)}" aria-pressed="${pick === true}"${pick === "off" ? " disabled" : ""}>${inner}</button></li>`;
     return `<li><a class="irow" href="#/i/${encodeURIComponent(it.id)}">${inner}</a></li>`;
@@ -1083,7 +1096,7 @@
         <p>Pasta térmica, creme de massagem, pilhas: o que se gasta e se compra de novo.</p>
         <div class="acts"><button type="button" class="btn primary" data-act="item-new" data-room="${esc(consId())}">${ic("plus")}Adicionar consumível</button></div></div></div>`;
     }
-    const groups = CATS.map(([k, name]) => [name, D.consItems.filter((it) => (CAT[it.cat] ? it.cat : "outros") === k).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))])
+    const groups = CCATS.map(([k, name]) => [name, D.consItems.filter((it) => (CCAT[it.cat] ? it.cat : "c-outros") === k).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))])
       .filter(([, its]) => its.length);
     return `<div class="mscreen cons">
       ${groups.map(([name, its]) => `<section class="zone">
@@ -1093,7 +1106,7 @@
   }
   function matches(it, toks) {
     const room = D.roomById.get(it.room);
-    const hay = norm(`${it.name} ${it.details} ${zonesOn() ? it.zone : ""} ${room?.name || ""} ${tagOf(it)} ${CAT[it.cat] || ""}`);
+    const hay = norm(`${it.name} ${it.details} ${zonesOn() ? it.zone : ""} ${room?.name || ""} ${tagOf(it)} ${(isCons(it.room) ? CCAT[it.cat] : CAT[it.cat]) || ""}`);
     return toks.every((t) => hay.includes(t));
   }
 
@@ -1138,7 +1151,7 @@
     else if (tipo === "consumiveis") list = list.filter((i) => isCons(i.room));
     if (!tipoArea(tipo)) {
       if (q.room && D.rooms.some((r) => r.id === q.room)) list = list.filter((i) => i.room === q.room); // cômodo de um link antigo: vale Todos, como diz a seleção
-      if (q.cat && CAT[q.cat]) list = list.filter((i) => (CAT[i.cat] ? i.cat : "outros") === q.cat);
+      if (q.cat && CAT[q.cat]) list = list.filter((i) => !isCons(i.room) && (CAT[i.cat] ? i.cat : "outros") === q.cat); // os consumíveis têm as categorias deles
     }
     if (toks.length) list = list.filter((i) => matches(i, toks));
     const ord = q.ord || (toks.length ? "rel" : "val");
@@ -2509,16 +2522,29 @@
               ${k === "outros" ? `<span class="cat-keep" aria-hidden="true"></span>` : `<button type="button" class="btn icon danger" data-act="cat-del" data-cat="${esc(k)}" aria-label="Apagar ${esc(v)}">${ic("trash")}</button>`}</div></li>`;
         }).join("")}
       </ul>
-    </section>`;
+    </section>
+    ${consOn() ? `<section class="panel" id="p-cats-cons">
+      <h2>${secIc("drop")}Categorias dos consumíveis</h2>
+      <ul class="opts cats">
+        <li><div class="ot"><b>${plural(CCATS.length, "categoria", "categorias")}</b></div>
+          <div class="oa"><button type="button" class="btn" data-act="cat-new" data-kind="consumiveis">${ic("plus")}Nova categoria</button></div></li>
+        ${CCATS.map(([k, v]) => {
+          const n = D.catTotals.get(k)?.count || 0;
+          return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "consumível", "consumíveis")}</span></div>
+            <div class="oa"><button type="button" class="btn icon" data-act="cat-edit" data-cat="${esc(k)}" aria-label="Renomear ${esc(v)}">${ic("edit")}</button>
+              ${k === "c-outros" ? `<span class="cat-keep" aria-hidden="true"></span>` : `<button type="button" class="btn icon danger" data-act="cat-del" data-cat="${esc(k)}" aria-label="Apagar ${esc(v)}">${ic("trash")}</button>`}</div></li>`;
+        }).join("")}
+      </ul>
+    </section>` : ""}`;
   }
-  // criar ou renomear uma categoria
-  function openCatName(id = null) {
-    const old = id ? CAT[id] : "";
+  // criar ou renomear uma categoria (kind "consumiveis": uma dos consumíveis)
+  function openCatName(id = null, kind = "") {
+    const old = id ? CAT[id] || CCAT[id] : "";
     const entry = openDialog({
       cls: "modal narrow", label: id ? "Renomear categoria" : "Nova categoria",
       html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("tag", `${id ? "Renomear categoria" : "Nova categoria"}`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-cn><div class="form">
-          <div class="field"><label for="cn-name">Nome</label><textarea id="cn-name" class="input grow" rows="1" name="name" maxlength="60" placeholder="Ex.: Ferramentas" autocomplete="off">${esc(old)}</textarea></div>
+          <div class="field"><label for="cn-name">Nome</label><textarea id="cn-name" class="input grow" rows="1" name="name" maxlength="60" placeholder="${kind === "consumiveis" || (id && CCAT[id]) ? "Ex.: Piscina" : "Ex.: Ferramentas"}" autocomplete="off">${esc(old)}</textarea></div>
           <div class="formerr" data-err hidden></div>
         </div></form>
         <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok>${ic(id ? "check" : "plus")}${id ? "Salvar" : "Criar categoria"}</button></div></div>`,
@@ -2530,8 +2556,8 @@
       if (!name) { err.hidden = false; err.textContent = "Dê um nome à categoria."; form.name.focus(); return; }
       if (id && name === old) { requestClose(entry, { force: true }); return; }
       try {
-        const res = id ? await API.put(`api/cats/${encodeURIComponent(id)}`, { name }) : await API.post("api/cats", { name });
-        setRev(res.rev); applyCats(res.cats); derive();
+        const res = id ? await API.put(`api/cats/${encodeURIComponent(id)}`, { name }) : await API.post("api/cats", { name, ...(kind ? { kind } : {}) });
+        setRev(res.rev); applyCats(res.cats, res.consCats || null); derive();
         finalizeThen(entry, () => { refreshAll(); toast(id ? "Categoria renomeada" : `${res.cat.name} criada`); });
       } catch (e) { err.hidden = false; err.textContent = e.message; }
     };
@@ -2539,9 +2565,9 @@
     entry.dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); if (e.target.closest("[data-ok]")) go(); });
   }
   async function deleteCat(id) {
-    const name = CAT[id], n = D.catTotals.get(id)?.count || 0;
+    const name = CAT[id] || CCAT[id], n = D.catTotals.get(id)?.count || 0;
     if (!name) return;
-    const ok = await confirmBox({ title: `Apagar ${name}?`, body: n ? `${plural(n, "item vai", "itens vão")} para ${esc(CAT.outros || "Outros")}.` : "", ok: "Apagar categoria", danger: true });
+    const ok = await confirmBox({ title: `Apagar ${name}?`, body: n ? `${plural(n, "item vai", "itens vão")} para ${esc((CCAT[id] ? CCAT["c-outros"] : CAT.outros) || "Outros")}.` : "", ok: "Apagar categoria", danger: true });
     if (!ok) return;
     try {
       await API.del(`api/cats/${encodeURIComponent(id)}`);
@@ -3420,8 +3446,8 @@
               <button type="button" class="btn sm" data-act="item-edit" data-id="${esc(it.id)}">${ic("plus", "sm")}Adicionar foto</button>
               ${aiOn() ? `<button type="button" class="btn sm" data-act="web-photo" data-id="${esc(it.id)}">${ic("search", "sm")}Buscar na internet</button>` : ""}</div></div></div>`}</div>
         <div class="ihead"><h1>${esc(it.name)}</h1>
-          <div class="ival">${room.kind === "consumiveis" // um consumível: a quantidade em destaque; o valor, só se houver
-            ? `<span class="big">${esc(qtyLabel(it.qty))}</span>${vl(it) > 0 ? `<span class="unit">${money(vl(it))}</span>` : ""}`
+          <div class="ival">${room.kind === "consumiveis" // 1.82.0: um consumível: quanto dura (estimado); sem quantidade e sem valor
+            ? (durNum(it.dur) ? `<span class="big">${esc(durText(it.dur))}</span><span class="unit">duração estimada</span>` : "")
             : `<span class="big">${money(vl(it))}</span>${n && n > 1 ? `<span class="unit">${int(n)} unidades, ${money(vl(it) / n)} cada</span>` : qtyClean(it.qty) !== "1" ? `<span class="unit">${esc(qtyLabel(it.qty))}</span>` : ""}`}
             ${deprecOn() && room.kind !== "consumiveis" && +it.value && Math.abs(vl(it) - it.value) >= 0.005 ? `<span class="unit" data-slot="valor-gravado">${esc(`${money(+it.value)} em ${dataCurta(it.valueAt || it.createdAt)}, ${taxaTxt(taxaDe(it))} ao ano`)}</span>` : ""}</div></div>
         ${it.details ? `<p class="idet">${esc(it.details)}</p>` : ""}
@@ -3429,8 +3455,11 @@
         <dl class="props">
           <dt>${room.kind ? "Onde" : "Cômodo"}</dt><dd><a href="${room.kind === "bens" ? "#/bens" : room.kind === "consumiveis" ? "#/consumiveis" : `#/c/${encodeURIComponent(room.id)}`}"><span class="mt soft">${esc(room.code)}</span><span class="rnm">${esc(room.name)}</span></a></dd>
           ${zonesOn() && room.kind !== "consumiveis" ? `<dt>Zona</dt><dd>${esc(it.zone || "Sem zona")}</dd>` : ""}
-          <dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
-          <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>
+          ${room.kind === "consumiveis"
+            ? `<dt>Categoria</dt><dd><span class="rnm">${esc(CCAT[it.cat] || "Outros")}</span></dd>
+          <dt>Duração estimada</dt><dd>${esc(durText(it.dur) || "Sem duração")}</dd>`
+            : `<dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
+          <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>`}
           <dt>Origem</dt><dd>${esc(SOURCES[it.source] || "Cadastro manual")}</dd>
           ${it.createdAt ? `<dt>Cadastrado</dt><dd>${esc(dateTime(it.createdAt))}${by(it.createdBy)}</dd>` : ""}
           ${it.updatedAt && it.updatedAt !== it.createdAt ? `<dt>Alterado</dt><dd>${esc(dateTime(it.updatedAt))}${by(it.updatedBy)}</dd>` : ""}
@@ -3524,6 +3553,7 @@
       // sem zonas, item novo nasce sem zona; um item existente guarda a dele, escondida
       zone: item ? item.zone || "" : !zonesOn() ? "" : from.zone != null ? from.zone : zone != null ? zone : LS.get("lastZone:" + rid, "") || "",
       cat: from.cat || "", qty: from.qty ? qtyClean(from.qty) : "1", value: from.value ? moneyInput(from.value) : "",
+      dur: durNum(from.dur) ? String(durNum(from.dur)) : "", // 1.82.0: só num consumível
       flag: from.flag || "", photos: [...(from.photos || photos || [])], photoSrc: { ...(from.photoSrc || {}) },
       source: item ? item.source || "manual" : dup ? dup.source || "manual" : "manual",
       dirty: !!(dup || (photos && photos.length)), busy: false, uploading: 0, aiBusy: false, hint: "",
@@ -3537,6 +3567,9 @@
     const saveLbl = F.id ? "Salvar alterações" : `Salvar ${what}`;
     const otherCat = BENS_GROUPS.some(([k]) => k && k === F.cat) ? "outros" : F.cat || "outros"; // Outro guarda a categoria de um item que veio de um cômodo
     const tipoBtns = () => BENS_GROUPS.map(([k, name]) => { const on = (k || "") === bensGroup(F); return `<button type="button" data-ed="tipo" data-v="${k}" aria-pressed="${on}">${ic({ imoveis: "home", veiculos: "car" }[k] || "gem", "sm")}${{ imoveis: "Imóvel", veiculos: "Veículo" }[k] || "Outro"}</button>`; }).join("");
+    // 1.82.0: a duração estimada de um consumível: os atalhos (e a de agora, se for outra, como a que veio do CorrerIA)
+    const durChips = () => [["", "Sem duração"], ...DURS, ...(durNum(F.dur) && !DURS.some(([k]) => k === durNum(F.dur)) ? [[durNum(F.dur), durText(F.dur)]] : [])]
+      .map(([k, t]) => `<label class="chip"><input type="radio" name="dur" value="${k}"${String(k) === String(F.dur || "") ? " checked" : ""}>${esc(t)}</label>`).join("");
     const roomField = `<div class="field"><label for="f-room">Cômodo</label><select id="f-room" class="select" name="room">${roomOptions(F.room)}</select></div>`;
     const zoneField = `<div class="field"><label for="f-zone">Zona</label><input id="f-zone" class="input" name="zone" data-sug="f-zones" maxlength="120" autocomplete="off" value="${esc(F.zone)}" placeholder="Ex.: Estante, Bancada"><datalist id="f-zones"></datalist></div>`;
     const entry = openDialog({
@@ -3553,8 +3586,10 @@
             <div class="field"><label for="f-details">${cons ? "O que é e para que serve" : "Detalhes"}</label><textarea id="f-details" class="textarea" name="details" rows="3" maxlength="4000" placeholder="${bem ? "Endereço, modelo, ano e estado" : cons ? "Ex.: Pasta para o processador, ao trocar o cooler" : "Marca, modelo, cor, tamanho e estado"}">${esc(F.details)}</textarea></div>
             ${bem ? `<div class="field"><span class="lbl" id="f-tipo-l">Tipo</span><div class="seg tipo" role="group" aria-labelledby="f-tipo-l" data-slot="tipo">${tipoBtns()}</div></div>`
               : `${cons ? "" : zonesOn() ? `<div class="row2">${roomField}${zoneField}</div>` : roomField}
-            <div class="field"><label for="f-cat">Categoria</label><select id="f-cat" class="select" name="cat"><option value="">Escolha a categoria</option>${CATS.map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`}
-            <div class="row3">
+            <div class="field"><label for="f-cat">Categoria</label><select id="f-cat" class="select" name="cat"><option value="">Escolha a categoria</option>${(cons ? CCATS : CATS).map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`}
+            ${cons ? `<div class="field" id="f-dur"><span class="lbl" id="f-dur-l">Duração estimada</span>
+              <div class="chips grid durs" role="radiogroup" aria-labelledby="f-dur-l" data-slot="durs">${durChips()}</div></div>` : ""}
+            <div class="row3"${cons ? " hidden" : ""}>
               <div class="field"><label for="f-qty">Quantidade</label><input id="f-qty" class="input" name="qty" maxlength="30" value="${esc(F.qty)}" inputmode="text"></div>
               <div class="field"><label for="f-value">Valor total</label><div class="money"><input id="f-value" class="input" name="value" inputmode="decimal" value="${esc(F.value)}" placeholder="0"></div>
                 <p class="unit-hint" data-slot="unit"></p><p class="err" data-err="value" hidden></p></div>
@@ -3680,9 +3715,10 @@
         const res = await API.post("api/ai/identify", { file: F.photos[0], mode: "single", room: F.room, hint: F.hint, ...(cons ? { consumivel: true } : {}) });
         const r = (res.items || [])[0];
         if (!r) throw new Error("A IA não reconheceu um item nesta foto. Tente outra foto ou escreva uma dica.");
-        const prev = { name: F.name, details: F.details, cat: F.cat, qty: F.qty, value: F.value, zone: F.zone, source: F.source };
+        const prev = { name: F.name, details: F.details, cat: F.cat, qty: F.qty, value: F.value, zone: F.zone, source: F.source, dur: F.dur };
         const emptyVal = !String(F.value || "").trim() || parseMoney(F.value) === 0;
-        Object.assign(F, { name: r.name || F.name, details: F.details.trim() ? F.details : r.details || "", cat: F.cat && F.cat !== "outros" ? F.cat : r.cat || F.cat,
+        Object.assign(F, { name: r.name || F.name, details: F.details.trim() ? F.details : r.details || "", cat: F.cat && F.cat !== "outros" && F.cat !== "c-outros" ? F.cat : r.cat || F.cat,
+          dur: cons ? F.dur || (durNum(r.dur) ? String(durNum(r.dur)) : "") : F.dur,
           qty: qtyClean(F.qty) !== "1" ? F.qty : r.qty || F.qty, value: emptyVal && r.value ? moneyInput(r.value) : F.value, zone: zonesOn() ? F.zone || r.zone || "" : F.zone, source: "ia", dirty: true });
         fill();
         toast(res.example ? "Exemplo simulado da prévia: no Home Assistant, a IA lê a foto de verdade." : "Campos preenchidos pela IA. Confira antes de salvar.", { action: "Desfazer", onAction: () => { Object.assign(F, prev); if (document.contains(dlg)) fill(); } });
@@ -3691,8 +3727,9 @@
     }
     function fill() {
       form.name.value = F.name; form.details.value = F.details;
-      if (form.cat) form.cat.value = CAT[F.cat] ? F.cat : "";
+      if (form.cat) form.cat.value = (cons ? CCAT : CAT)[F.cat] ? F.cat : "";
       if (bem) slot("tipo").innerHTML = tipoBtns();
+      if (cons) slot("durs").innerHTML = durChips();
       form.qty.value = F.qty; form.value.value = F.value; form.flag.value = F.flag;
       if (form.zone) form.zone.value = F.zone;
       renderUnit(); fieldErr("name", ""); fieldErr("value", "");
@@ -3711,6 +3748,7 @@
       // sem zonas, a zona escondida só fica se o item continuar no mesmo cômodo
       const zone = cons ? "" : zonesOn() ? F.zone.trim() : item && F.room === item.room ? item.zone || "" : "";
       const body = { name, details: F.details.trim(), room: F.room, zone, cat: F.cat || "outros", qty: F.qty.trim() || "1", value, photos: F.photos, photoSrc: F.photoSrc, flag: F.flag.trim(), source: F.source };
+      if (cons) { delete body.qty; delete body.value; body.cat = CCAT[F.cat] ? F.cat : "c-outros"; body.dur = durNum(F.dur); } // 1.82.0: sem quantidade e sem valor
       setBusy(true);
       try {
         body.room = F.room = await realRoom(F.room); // o primeiro bem (ou consumível) cria a área
@@ -4982,7 +5020,7 @@
       case "item-new": openEditor({ room: b.dataset.room || (base.name === "room" ? base.id : base.name === "bens" ? bensId() : base.name === "cons" ? consId() : null) }); break;
       case "catalog": openCatalog({ room: b.dataset.room || (base.name === "room" ? base.id : null) }); break;
       case "room-new": openRoomNew(); break;
-      case "cat-new": openCatName(); break;
+      case "cat-new": openCatName(null, b.dataset.kind || ""); break;
       case "cat-edit": openCatName(b.dataset.cat); break;
       case "cat-del": deleteCat(b.dataset.cat); break;
       case "room-edit": openRoomEdit(b.dataset.room); break;

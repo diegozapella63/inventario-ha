@@ -105,7 +105,14 @@ class LeituraPorIA(Base):
         p = S.ai_prompt("single", None, "", consumivel=True)
         self.assertIn("Este item é um consumível", p)
         self.assertIn("o que é e para que serve", p)
-        self.assertIn("preço TOTAL em reais (número, sem símbolo) de comprar novo", p)
+        # 1.82.0: sem valor e sem quantidade: as categorias dos consumíveis e quanto dura
+        self.assertNotIn("preço TOTAL", p)
+        self.assertNotIn('"qty"', p)
+        self.assertNotIn('"value"', p)
+        self.assertIn('- "dur": quantos dias uma embalagem costuma durar numa casa, um destes números: 7, 15, 30, 90, 180 ou 365', p)
+        self.assertIn("c-limpeza (Limpeza), c-higiene (Higiene e cuidados)", p)
+        self.assertNotIn("eletronicos (Eletrônicos)", p, "as categorias da casa não valem num consumível")
+        self.assertIn('{"name":"","details":"","cat":"","dur":0,', p)
         self.assertNotIn("mercado de usados", p, "um consumível não é um usado")
         self.assertNotIn('"zone"', p, "sem zona, mesmo com as zonas ligadas")
         comum = S.ai_prompt("single", None, "")
@@ -134,12 +141,13 @@ class LeituraPorIA(Base):
 
 class Conversa(Base):
     def test_consumiveis_a_parte_com_para_que_serve(self):
-        self.consumivel(qty="2")
+        self.consumivel(qty="2", dur=30, cat="c-higiene")
         txt = S.chat_context({})
         self.assertIn("Inventário da casa: 38 itens em 6 cômodos", txt, "o patrimônio sem os consumíveis")
         linha = next(ln for ln in txt.splitlines() if ln.startswith("Consumíveis (1;"))
         self.assertIn("não contam no patrimônio", linha)
-        self.assertIn("- CON-001 Creme de massagem | Outros | qtd 2 | Creme para massagem nas costas, de arnica.", txt)
+        self.assertIn("- CON-001 Creme de massagem | Higiene e cuidados | dura 1 mês | Creme para massagem nas costas, de arnica.", txt)
+        self.assertIn("sem quantidade e sem valor", linha)
         todos = txt.split("Todos os itens (")[1].split("Consumíveis (")[0]
         self.assertNotIn("Creme de massagem", todos, "fora da lista dos itens com valor")
 
@@ -168,13 +176,16 @@ class Ferramentas(Base):
 
     def test_cadastrar_cria_a_area_e_guarda_o_para_que_serve(self):
         txt = self.chamar("cadastrar_itens", {"comodo": "Consumíveis", "itens": [
-            {"nome": "Creme de massagem", "quantidade": 2, "detalhes": "Creme para massagem nas costas, de arnica."},
-            {"nome": "Pasta térmica", "valor": 45, "detalhes": "Vai entre o processador e o cooler."}]})
+            {"nome": "Creme de massagem", "duracao_dias": 90, "categoria": "Higiene e cuidados", "detalhes": "Creme para massagem nas costas, de arnica."},
+            {"nome": "Pasta térmica", "detalhes": "Vai entre o processador e o cooler."}]})
         area = self.store.consumiveis_room()
         self.assertEqual((area["code"], area["kind"]), ("CON", "consumiveis"))
-        self.assertIn("Cadastrados 2 itens em Consumíveis: Creme de massagem (CON-001", txt)
+        self.assertIn("Cadastrados 2 itens em Consumíveis: Creme de massagem (CON-001, Consumíveis, dura 3 meses, id con-001); Pasta térmica (CON-002, Consumíveis, id con-002).", txt)
+        self.assertNotIn("Total:", txt, "1.82.0: um consumível não tem valor")
         it = self.item("con-001")
-        self.assertEqual((it["room"], it["qty"], it["zone"], it["source"], it["createdBy"]), (area["id"], "2", "", "correria", "Ana"))
+        self.assertEqual((it["room"], it["qty"], it["value"], it["dur"], it["cat"], it["zone"], it["source"], it["createdBy"]),
+                         (area["id"], "1", 0, 90, "c-higiene", "", "correria", "Ana"))
+        self.assertEqual((self.item("con-002")["cat"], self.item("con-002")["dur"]), ("c-outros", 0))
         self.chamar("cadastrar_itens", {"comodo": "consumivel", "itens": [{"nome": "Pilhas AA"}]})
         self.assertEqual(len([r for r in self.store.data["rooms"] if r.get("kind") == "consumiveis"]), 1, "a mesma área")
 
@@ -237,6 +248,95 @@ class Ferramentas(Base):
         self.assertEqual(r["consumiveis"]["itens"], 1)
         self.assertIs(r["opcoes"]["itens_da_casa"], False)
         self.erro("ver_item", {"id": "sal-001"}, "Item não encontrado")
+
+
+class CategoriasEDuracao(Base):
+    """1.82.0: os consumíveis têm as categorias deles (à parte das da casa, já com sugestões) e, no lugar da quantidade e
+    do valor, a duração estimada."""
+
+    def test_as_sugestoes_e_a_lista_a_parte(self):
+        nomes = [c["name"] for c in self.store.cons_cats()]
+        self.assertEqual(nomes, ["Limpeza", "Higiene e cuidados", "Cozinha e despensa", "Farmácia", "Pets", "Escritório e papelaria",
+                                 "Manutenção e reparos", "Pilhas e eletrônicos", "Carro", "Jardim", "Outros"])
+        self.assertTrue(all(c["id"].startswith("c-") for c in self.store.cons_cats()))
+        self.assertEqual(self.store.public()["consCats"], self.store.cons_cats())
+        self.assertFalse(set(self.store.cons_cat_map()) & set(self.store.cat_map()), "nenhum id igual ao de uma categoria da casa")
+
+    def test_criar_renomear_e_apagar(self):
+        casa = list(self.store.cats())
+        c = self.store.create_cat({"name": "Piscina", "kind": "consumiveis"})
+        self.assertEqual(c, {"id": "c-piscina", "name": "Piscina"})
+        self.assertEqual([x["id"] for x in self.store.cons_cats()][-2:], ["c-piscina", "c-outros"], "Outros fica no fim")
+        self.assertEqual(self.store.cats(), casa, "a lista da casa não muda")
+        with self.assertRaises(S.ApiError):
+            self.store.create_cat({"name": "piscina", "kind": "consumiveis"})
+        self.assertEqual(self.store.create_cat({"name": "Limpeza"})["id"], "limpeza", "o mesmo nome pode existir na casa")
+        self.assertEqual(self.store.update_cat("c-piscina", {"name": "Piscina e spa"})["name"], "Piscina e spa")
+        it = self.consumivel(cat="c-piscina")
+        self.assertEqual(it["cat"], "c-piscina")
+        self.assertEqual(self.store.delete_cat("c-piscina"), 1)
+        self.assertEqual(self.item(it["id"])["cat"], "c-outros", "os dela vão para Outros dos consumíveis")
+        with self.assertRaises(S.ApiError):
+            self.store.delete_cat("c-outros")
+
+    def test_o_consumivel_sem_quantidade_e_sem_valor_com_a_duracao(self):
+        it = self.consumivel(qty="3", value=50, dur=15, cat="eletronicos")
+        self.assertEqual((it["qty"], it["value"], it["dur"], it["cat"]), ("1", 0, 15, "c-outros"), "a categoria da casa não vale; sem quantidade e sem valor")
+        n = self.store.update_item(it["id"], {"qty": "9", "value": 80, "dur": 365, "cat": "c-pets"}, "Ana")
+        self.assertEqual((n["qty"], n["value"], n["dur"], n["cat"]), ("1", 0, 365, "c-pets"))
+        self.assertEqual(self.store.update_item(it["id"], {"dur": "abc"}, "Ana")["dur"], 0)
+        self.assertEqual([S.dur_text(d) for d in (7, 15, 30, 90, 180, 365, 45, 1, 0, 9999)],
+                         ["1 semana", "15 dias", "1 mês", "3 meses", "6 meses", "1 ano", "45 dias", "1 dia", "", ""])
+        self.assertEqual(self.store.cat_of(n), "Pets")
+
+    def test_de_antes_com_categoria_da_casa_aparece_em_outros_sem_mudar_o_gravado(self):
+        it = self.consumivel()
+        it["cat"], it["value"], it["qty"] = "cozinha", 30, "2"  # como um gravado antes da 1.82.0
+        self.assertEqual(self.store.cat_of(it), "Outros")
+        self.assertEqual((it["value"], it["qty"]), (30, "2"), "o que estava gravado continua guardado")
+        self.assertEqual(self.store.update_item(it["id"], {"name": "Creme"}, "Ana")["cat"], "c-outros")
+
+    def test_mudar_de_lado_troca_a_categoria(self):
+        it = self.consumivel(cat="c-limpeza")
+        area = it["room"]
+        self.assertEqual(self.store.update_item(it["id"], {"room": "sala"}, "Ana")["cat"], "outros")
+        out = self.store.update_items([{"id": "sal-001", "room": area}], "Ana")
+        self.assertEqual(out[0]["cat"], "c-outros")
+        with self.assertRaises(S.ApiError):
+            self.store.update_items([{"id": "sal-001", "cat": "moveis"}], "Ana")
+        self.assertEqual(self.store.update_items([{"id": "sal-001", "cat": "c-limpeza"}], "Ana")[0]["cat"], "c-limpeza")
+
+    def test_a_leitura_por_ia(self):
+        its = S.clean_ai_items({"items": [{"name": "Detergente", "cat": "c-limpeza", "dur": 30, "value": 5, "qty": "3"},
+                                          {"name": "Outro", "cat": "cozinha", "dur": "x"}]}, None, consumivel=True)
+        self.assertEqual([(i["cat"], i["dur"], i["value"], i["qty"]) for i in its], [("c-limpeza", 30, 0, "1"), ("c-outros", 0, 0, "1")])
+
+    def test_ferramentas(self):
+        self.erro("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas", "valor": 20}]}, "Um consumível não tem valor nem quantidade: mande duracao_dias")
+        self.erro("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas", "quantidade": "4"}]}, "Um consumível não tem valor nem quantidade")
+        self.erro("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas", "categoria": "Móveis"}]}, "As categorias dos consumíveis: Limpeza (c-limpeza)")
+        self.erro("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas", "duracao_dias": 1.5}]}, "duracao_dias: um número inteiro de dias")
+        self.erro("cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "Vaso", "duracao_dias": 30}]}, "duracao_dias só vale num consumível")
+        self.chamar("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas AA", "categoria": "pilhas", "duracao_dias": 180}]})
+        v = self.json("ver_item", {"id": "CON-001"})
+        self.assertEqual((v["categoria"], v["duracao_dias"], v["duracao"]), ({"id": "c-eletronicos", "nome": "Pilhas e eletrônicos"}, 180, "6 meses"))
+        for k in ("quantidade", "valor", "valor_desde"):
+            self.assertNotIn(k, v)
+        txt = self.chamar("editar_item", {"id": "CON-001", "duracao_dias": 365, "categoria": "Carro"})
+        self.assertIn("duração: 6 meses → 1 ano", txt)
+        self.assertIn("categoria: Pilhas e eletrônicos → Carro", txt)
+        self.erro("editar_item", {"id": "CON-001", "valor": 10}, "Um consumível não tem valor nem quantidade")
+        self.erro("editar_item", {"id": "sal-001", "duracao_dias": 30}, "duracao_dias só vale num consumível")
+        self.erro("editar_item", {"id": "CON-001"}, "Diga o que muda: nome, categoria, duracao_dias, detalhes ou observacao.")
+        r = self.json("resumo")
+        self.assertEqual(r["categorias_consumiveis"][0], {"id": "c-limpeza", "nome": "Limpeza"})
+        linha = r["consumiveis"]["lista"][0]
+        self.assertEqual((linha["categoria"], linha["duracao"], linha["duracao_dias"]), ("Carro", "1 ano", 365))
+        self.assertNotIn("valor", linha)
+        b = self.json("buscar_itens", {"categoria": "Carro"})
+        self.assertEqual([i["nome"] for i in b["itens"]], ["Pilhas AA"], "a busca pela categoria dos consumíveis")
+        self.assertNotIn("Pilhas AA", [i["nome"] for i in self.json("buscar_itens", {"categoria": "Outros"})["itens"]])
+        self.assertIn("Um consumível não tem quantidade nem valor", F.instrucoes(S))
 
 
 if __name__ == "__main__":

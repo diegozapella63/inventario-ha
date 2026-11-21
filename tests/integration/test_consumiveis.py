@@ -37,11 +37,19 @@ class Consumiveis(ServerCase):
         lido = self.app.ok("POST", "api/ai/identify", {"file": foto, "mode": "single", "room": "consumiveis", "consumivel": True})["items"][0]
         self.assertEqual((lido["name"], lido["zone"], lido["room"]), ("Pasta térmica", "", ""))
         self.assertIn("entre o processador e o cooler", lido["details"], "o que é e para que serve")
+        self.assertEqual((lido["cat"], lido["dur"], lido["value"], lido["qty"]), ("c-manutencao", 365, 0, "1"), "1.82.0: a categoria dos consumíveis e quanto dura")
         comum = self.app.ok("POST", "api/ai/identify", {"file": foto, "mode": "single", "room": "sala"})["items"][0]
         self.assertNotEqual(comum["name"], "Pasta térmica", "sem o aviso, a leitura de um item comum")
 
-        it = self.app.ok("POST", "api/items", {"room": "consumiveis", "name": lido["name"], "details": lido["details"], "qty": "2", "value": 45})["item"]
-        self.assertEqual((it["room"], it["qty"], it["value"]), ("consumiveis", "2", 45))
+        it = self.app.ok("POST", "api/items", {"room": "consumiveis", "name": lido["name"], "details": lido["details"], "qty": "2", "value": 45,
+                                                  "cat": lido["cat"], "dur": lido["dur"]})["item"]
+        self.assertEqual((it["room"], it["qty"], it["value"], it["cat"], it["dur"]), ("consumiveis", "1", 0, "c-manutencao", 365), "1.82.0: sem quantidade e sem valor")
+        # 1.82.0: as categorias dos consumíveis, à parte: criar, e os dados da tela
+        st, _, out = self.app.post("api/cats", {"name": "Piscina", "kind": "consumiveis"})
+        self.assertEqual((st, out["cat"]), (201, {"id": "c-piscina", "name": "Piscina"}))
+        self.assertEqual(out["consCats"], self.app.data()["consCats"])
+        self.assertNotIn("c-piscina", [c["id"] for c in self.app.data()["cats"]])
+        self.assertEqual(self.app.ok("DELETE", "api/cats/c-piscina")["moved"], 0)
 
         com = self.app.get("api/integracao/comodos", headers=self.chave())[2]["comodos"]
         self.assertNotIn("consumiveis", [c["id"] for c in com], "o ResolvIA e a CronologIA não veem a área")
@@ -53,7 +61,8 @@ class Consumiveis(ServerCase):
         st, _, out = self.app.get("api/integracao/consumiveis", headers=self.chave())
         self.assertEqual((st, out["ligado"], [c["id"] for c in out["consumiveis"]]), (200, True, [it["id"]]))
         c = out["consumiveis"][0]
-        self.assertEqual((c["nome"], c["quantidade"], c["para_que_serve"] != "", sorted(c)), ("Pasta térmica", "2", True, ["categoria", "id", "nome", "para_que_serve", "quantidade"]))
+        self.assertEqual((c["nome"], c["categoria"], c["duracao_dias"], c["duracao"], c["para_que_serve"] != "", sorted(c)),
+                         ("Pasta térmica", "Manutenção e reparos", 365, "1 ano", True, ["categoria", "duracao", "duracao_dias", "id", "nome", "para_que_serve"]))
         self.assertEqual(self.app.get("api/integracao/consumiveis")[0], 401, "só com a chave")
         self.assertEqual(self.app.post("api/integracao/consumiveis", {}, headers=self.chave())[0], 404, "só leitura")
 

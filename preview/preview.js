@@ -8,6 +8,14 @@
     ["utilidades", "Utilidades"], ["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["outros", "Outros"]].map(([id, name]) => ({ id, name }));
   const catsOf = (d) => { if (!Array.isArray(d.cats) || !d.cats.length) d.cats = clone(DEF_CATS); return d.cats; };
   const CATS = { has: (k) => ST.data && catsOf(ST.data).some((c) => c.id === k) };
+  // 1.82.0: as categorias dos consumíveis (à parte) e a duração estimada, como no server.py
+  const DEF_CCATS = [["c-limpeza", "Limpeza"], ["c-higiene", "Higiene e cuidados"], ["c-despensa", "Cozinha e despensa"], ["c-farmacia", "Farmácia"], ["c-pets", "Pets"],
+    ["c-papelaria", "Escritório e papelaria"], ["c-manutencao", "Manutenção e reparos"], ["c-eletronicos", "Pilhas e eletrônicos"], ["c-carro", "Carro"], ["c-jardim", "Jardim"],
+    ["c-outros", "Outros"]].map(([id, name]) => ({ id, name }));
+  const ccatsOf = (d) => { if (!Array.isArray(d.consCats) || !d.consCats.length) d.consCats = clone(DEF_CCATS); return d.consCats; };
+  const isCons = (d, rid) => (d.rooms.find((r) => r.id === rid) || {}).kind === "consumiveis";
+  const consCat = (d, k) => (ccatsOf(d).some((c) => c.id === k) ? k : "c-outros");
+  const dur = (v) => { const n = Math.trunc(+v); return n > 0 && n <= 3650 ? n : 0; };
   const foldName = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const kindRank = (r) => ({ bens: 1, consumiveis: 2 })[r.kind] || 0; // as áreas do sistema depois dos cômodos: Bens, Consumíveis
   const ST = { data: null, rev: 1, blobs: new Map(), jobs: new Map(), settings: { ai_entity: "", ai_search: "", ai_chat: "", ai: true, zones: false, ha_sensors: false, voice_stt: "", news: true, news_every: 0, news_notify: "", bens: true, itens: true, consumiveis: false, correria: false },
@@ -51,7 +59,8 @@
     if (ids.has(id)) id += "-" + Math.random().toString(16).slice(2, 6);
     return {
       id, room: r.id, seq, zone: String(b.zone || "").trim(), name, details: String(b.details || "").trim(),
-      cat: CATS.has(b.cat) ? b.cat : "outros", qty: String(b.qty || "1").trim() || "1", value: money(b.value),
+      ...(r.kind === "consumiveis" ? { cat: consCat(d, b.cat), qty: "1", value: 0, dur: dur(b.dur) }
+        : { cat: CATS.has(b.cat) ? b.cat : "outros", qty: String(b.qty || "1").trim() || "1", value: money(b.value) }),
       photos: Array.isArray(b.photos) ? [...b.photos] : [], ...(b.photoSrc && Object.keys(b.photoSrc).length ? { photoSrc: { ...b.photoSrc } } : {}),
       checked: !!b.checked, flag: (b.flag || "").trim() || null,
       approx: true, source: b.source || "manual", createdAt: restore && b.createdAt ? b.createdAt : t, updatedAt: t,
@@ -156,9 +165,12 @@
         if (body.room && body.room !== it.room) { if (!room(d, body.room)) fail("Escolha um cômodo que exista."); it.room = body.room; it.seq = nextSeq(d, body.room); }
         for (const k of ["zone", "details", "flag", "source"]) if (k in body) it[k] = typeof body[k] === "string" ? body[k].trim() : body[k];
         if ("name" in body) { const n = String(body.name || "").trim(); if (!n) fail("Preencha o campo nome."); it.name = n; }
-        if ("cat" in body) it.cat = CATS.has(body.cat) ? body.cat : "outros";
-        if ("qty" in body) it.qty = String(body.qty || "1").trim() || "1";
-        if ("value" in body) it.value = money(body.value);
+        if (isCons(d, it.room)) { it.cat = consCat(d, "cat" in body ? body.cat : it.cat); if ("dur" in body) it.dur = dur(body.dur); }
+        else {
+          it.cat = CATS.has("cat" in body ? body.cat : it.cat) ? ("cat" in body ? body.cat : it.cat) : "outros";
+          if ("qty" in body) it.qty = String(body.qty || "1").trim() || "1";
+          if ("value" in body) it.value = money(body.value);
+        }
         if ("photos" in body) it.photos = [...(body.photos || [])];
         if ("photos" in body || "photoSrc" in body) {
           const src = Object.fromEntries(Object.entries(body.photoSrc || it.photoSrc || {}).filter(([f]) => it.photos.includes(f)));
@@ -166,6 +178,35 @@
         }
         it.updatedAt = now();
         return { item: clone(it), rev: bump() };
+      }
+    }
+    if (method === "POST" && path === "api/cats" && body.kind === "consumiveis") {
+      const cats = ccatsOf(d), name = String(body.name || "").trim().replace(/\s+/g, " ");
+      if (!name) fail("Preencha o campo nome da categoria.");
+      if (cats.some((c) => foldName(c.name) === foldName(name))) fail(`Já existe a categoria ${name}.`);
+      const base = "c-" + (foldName(name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 34) || "categoria");
+      let id = base, n = 2;
+      while (cats.some((c) => c.id === id)) id = `${base}-${n++}`;
+      const cat = { id, name };
+      const at = cats.findIndex((c) => c.id === "c-outros");
+      cats.splice(at < 0 ? cats.length : at, 0, cat);
+      return { cat: clone(cat), cats: clone(catsOf(d)), consCats: clone(cats), rev: bump() };
+    }
+    if ((m = path.match(/^api\/cats\/(c-[a-z0-9_-]+)$/)) && ccatsOf(d).some((c) => c.id === m[1])) {
+      const cats = ccatsOf(d), cat = cats.find((c) => c.id === m[1]);
+      if (method === "PUT") {
+        const name = String(body.name || "").trim().replace(/\s+/g, " ");
+        if (!name) fail("Preencha o campo nome da categoria.");
+        if (cats.some((c) => c.id !== cat.id && foldName(c.name) === foldName(name))) fail(`Já existe a categoria ${name}.`);
+        cat.name = name;
+        return { cat: clone(cat), cats: clone(catsOf(d)), consCats: clone(cats), rev: bump() };
+      }
+      if (method === "DELETE") {
+        if (cat.id === "c-outros") fail("A categoria Outros não pode ser apagada.");
+        let moved = 0;
+        d.items.forEach((i) => { if (i.cat === cat.id) { i.cat = "c-outros"; moved++; } });
+        cats.splice(cats.indexOf(cat), 1);
+        return { moved, cats: clone(catsOf(d)), consCats: clone(cats), rev: bump() };
       }
     }
     if (method === "POST" && path === "api/cats") {
@@ -571,7 +612,7 @@
         if (body.mode === "single") items = [{ ...items[0], existing: "" }];
       } else {
         items = body.mode === "single" ? EXAMPLES.slice(0, 1) : clone(EXAMPLES);
-        if (body.mode === "single" && body.consumivel) items = [{ name: "Pasta térmica", details: "Pasta que vai entre o processador e o cooler, para o calor passar. Seringa de 4 g.", cat: "utilidades", qty: "1", value: 45, zone: "", existing: "", confidence: "alta" }];
+        if (body.mode === "single" && body.consumivel) items = [{ name: "Pasta térmica", details: "Pasta que vai entre o processador e o cooler, para o calor passar. Seringa de 4 g.", cat: "c-manutencao", qty: "1", value: 0, dur: 365, zone: "", existing: "", confidence: "alta" }];
       }
       const room = fixedRoom() || (linked.length ? linked[0].room : guessRoom(/escrit|quarto/i));
       items = items.map((it) => ({ ...it, room }));

@@ -104,6 +104,15 @@ CATS = {
     "plantas": "Plantas", "livros": "Livros e jogos", "pets": "Pets", "saude": "Saúde",
     "vestuario": "Roupas e calçados", "utilidades": "Utilidades", "imoveis": "Imóveis", "veiculos": "Veículos", "outros": "Outros",
 }
+# 1.82.0: os consumíveis têm as categorias deles (à parte das da casa; os ids começam por "c-"), já com sugestões
+CONS_CATS = {
+    "c-limpeza": "Limpeza", "c-higiene": "Higiene e cuidados", "c-despensa": "Cozinha e despensa", "c-farmacia": "Farmácia",
+    "c-pets": "Pets", "c-papelaria": "Escritório e papelaria", "c-manutencao": "Manutenção e reparos", "c-eletronicos": "Pilhas e eletrônicos",
+    "c-carro": "Carro", "c-jardim": "Jardim", "c-outros": "Outros",
+}
+CONS_OUTROS = "c-outros"
+# a duração estimada de um consumível, em dias: os atalhos da tela (qualquer número de 1 a 3650 vale)
+DURACOES = ((7, "1 semana"), (15, "15 dias"), (30, "1 mês"), (90, "3 meses"), (180, "6 meses"), (365, "1 ano"))
 AREAS = ("bens", "consumiveis")  # as áreas do sistema, fora da lista de cômodos e sempre depois deles, nesta ordem
 BENS_CATS = ("imoveis", "veiculos")  # os bens fora de casa (casa, terreno, carro); o resto vai em Outros
 # as categorias fixas (sem Renomear nem Apagar): Eletrônicos (as novidades) e, desde a 1.54.0, Utilidades e Veículos
@@ -208,6 +217,37 @@ def clean_cats(raw) -> list[dict] | None:
     if "outros" not in seen:
         out.append({"id": "outros", "name": "Outros"})
     return out
+
+
+def clean_cons_cats(raw) -> list[dict] | None:
+    """As categorias dos consumíveis (1.82.0), na ordem; os ids começam por "c-" e "c-outros" sempre existe."""
+    out, seen = [], set()
+    for c in raw if isinstance(raw, list) else []:
+        if isinstance(c, dict):
+            cid, name = str(c.get("id") or ""), " ".join(str(c.get("name") or "").split())[:60]
+            if cid.startswith("c-") and SAFE_CAT.fullmatch(cid) and name and cid not in seen:
+                out.append({"id": cid, "name": name})
+                seen.add(cid)
+    if not out:
+        return None
+    if CONS_OUTROS not in seen:
+        out.append({"id": CONS_OUTROS, "name": "Outros"})
+    return out
+
+
+def clean_dur(v) -> int:
+    """A duração estimada de um consumível, em dias (0: sem duração)."""
+    try:
+        n = int(float(str(v).replace(",", ".")))
+    except (TypeError, ValueError):
+        return 0
+    return n if 0 < n <= 3650 else 0
+
+
+def dur_text(dias) -> str:
+    """7 → "1 semana"; fora dos atalhos, "45 dias"."""
+    n = clean_dur(dias)
+    return dict(DURACOES).get(n) or (f"{n} dias" if n > 1 else "1 dia" if n else "")
 
 
 def fold(t: str) -> str:
@@ -443,7 +483,7 @@ class Store:
     def public(self):
         return {
             "rev": self.data["rev"], "updatedAt": self.data.get("updatedAt"),
-            "rooms": self.data["rooms"], "items": self.data["items"], "cats": self.cats(),
+            "rooms": self.data["rooms"], "items": self.data["items"], "cats": self.cats(), "consCats": self.cons_cats(),
         }
 
     # -- categorias: a lista padrão até alguém editar; editada, fica no inventário (entra no backup e nas versões)
@@ -459,14 +499,45 @@ class Store:
     def cat_map(self) -> dict:
         return {c["id"]: c["name"] for c in self.cats()}
 
-    def _cat_name(self, body: dict, skip: str = "") -> str:
+    # -- 1.82.0: as categorias dos consumíveis, à parte (a lista padrão até alguém editar)
+    def cons_cats(self) -> list[dict]:
+        return clean_cons_cats(self.data.get("consCats")) or [{"id": k, "name": v} for k, v in CONS_CATS.items()]
+
+    def cons_cat_map(self) -> dict:
+        return {c["id"]: c["name"] for c in self.cons_cats()}
+
+    def is_cons(self, rid) -> bool:
+        room = self.room(rid)
+        return bool(room and room.get("kind") == "consumiveis")
+
+    def cat_of(self, it: dict) -> str:
+        """O nome da categoria do item: a dos consumíveis para um consumível (um de antes da 1.82.0, com uma da casa: Outros)."""
+        if self.is_cons(it.get("room")):
+            cm = self.cons_cat_map()
+            return cm.get(it.get("cat") or "") or cm.get(CONS_OUTROS, "Outros")
+        cm = self.cat_map()
+        return cm.get(it.get("cat") or "outros") or cm.get("outros", "Outros")
+
+    def _cat_name(self, body: dict, skip: str = "", cons: bool = False) -> str:
         name = " ".join(text(body.get("name"), 60, "nome da categoria", required=True).split())
-        if any(fold(c["name"]) == fold(name) and c["id"] != skip for c in self.cats()):
+        if any(fold(c["name"]) == fold(name) and c["id"] != skip for c in (self.cons_cats() if cons else self.cats())):
             raise ApiError(400, f"Já existe a categoria {name}.")
         return name
 
     def create_cat(self, body: dict) -> dict:
         with self.lock:
+            if body.get("kind") == "consumiveis":
+                name = self._cat_name(body, cons=True)
+                cats = self.cons_cats()
+                base = "c-" + (re.sub(r"[^a-z0-9]+", "-", fold(name)).strip("-")[:34] or "categoria")
+                cid, n = base, 2
+                while any(c["id"] == cid for c in cats):
+                    cid, n = f"{base}-{n}", n + 1
+                cat = {"id": cid, "name": name}
+                cats.insert(next((i for i, c in enumerate(cats) if c["id"] == CONS_OUTROS), len(cats)), cat)
+                self.data["consCats"] = cats
+                self.save()
+                return cat
             name = self._cat_name(body)
             cats = self.cats()
             base = re.sub(r"[^a-z0-9]+", "-", fold(name)).strip("-")[:36] or "categoria"
@@ -481,6 +552,13 @@ class Store:
 
     def update_cat(self, cid: str, body: dict) -> dict:
         with self.lock:
+            if cid.startswith("c-") and cid in self.cons_cat_map():
+                cats = self.cons_cats()
+                cat = next(c for c in cats if c["id"] == cid)
+                cat["name"] = self._cat_name(body, skip=cid, cons=True)
+                self.data["consCats"] = cats
+                self.save()
+                return cat
             if cid in FIXED_CATS:
                 raise ApiError(400, f"{CATS[cid]} é uma categoria fixa (as novidades e os recursos): não dá para renomear.")
             cats = self.cats()
@@ -495,8 +573,17 @@ class Store:
     def delete_cat(self, cid: str) -> int:
         """Exclui a categoria; os itens dela vão para Outros. Devolve quantos itens mudaram."""
         with self.lock:
-            if cid == "outros":
+            if cid in ("outros", CONS_OUTROS):
                 raise ApiError(400, "A categoria Outros não pode ser apagada.")
+            if cid.startswith("c-") and cid in self.cons_cat_map():  # dos consumíveis: os dela vão para Outros (dos consumíveis)
+                moved, t = 0, now_iso()
+                for it in self.data["items"]:
+                    if it.get("cat") == cid:
+                        it["cat"], it["updatedAt"] = CONS_OUTROS, t
+                        moved += 1
+                self.data["consCats"] = [c for c in self.cons_cats() if c["id"] != cid]
+                self.save()
+                return moved
             if cid in FIXED_CATS:
                 raise ApiError(400, f"{CATS[cid]} é uma categoria fixa (as novidades e os recursos): não dá para apagar.")
             cats = self.cats()
@@ -530,6 +617,12 @@ class Store:
             "approx": True, "source": text(body.get("source") or "manual", 40, "origem"),
             "createdAt": ts, "updatedAt": ts, "valueAt": ts,
         }
+        if room.get("kind") == "consumiveis":
+            # 1.82.0: um consumível tem a categoria dos consumíveis e a duração estimada; sem quantidade e sem valor
+            it["cat"] = body.get("cat") if body.get("cat") in self.cons_cat_map() else CONS_OUTROS
+            it["dur"] = clean_dur(body.get("dur"))
+            if not restore:
+                it["qty"], it["value"] = "1", 0
         src = clean_photo_src(body.get("photoSrc"), it["photos"])
         if src:
             it["photoSrc"] = src
@@ -595,11 +688,19 @@ class Store:
                 new["name"] = text(body["name"], 200, "nome", required=True)
             if "details" in body:
                 new["details"] = text(body["details"], 4000, "detalhes")
+            cons = self.is_cons(new["room"])
             if "cat" in body:
                 new["cat"] = body["cat"] if body["cat"] in self.cat_map() else "outros"
-            if "qty" in body:
+            if cons:  # 1.82.0: a categoria dos consumíveis e a duração; a quantidade e o valor não mudam por aqui
+                want = body["cat"] if "cat" in body else it.get("cat")
+                new["cat"] = want if want in self.cons_cat_map() else CONS_OUTROS
+                if "dur" in body:
+                    new["dur"] = clean_dur(body["dur"])
+            elif new.get("cat") not in self.cat_map():  # saiu dos consumíveis: a categoria de lá não vale na casa
+                new["cat"] = "outros"
+            if "qty" in body and not cons:
                 new["qty"] = text(body["qty"] or "1", 30, "quantidade") or "1"
-            if "value" in body:
+            if "value" in body and not cons:
                 new["value"] = parse_value(body["value"])
                 if new["value"] != it.get("value"):
                     new["valueAt"] = now_iso()  # quando o valor mudou (o GerencIA deprecia a partir daqui)
@@ -655,7 +756,7 @@ class Store:
                         raise ApiError(400, "Escolha um cômodo que exista.")
                     new["room"] = room["id"]
                 if "cat" in ch:
-                    if ch["cat"] not in cats:
+                    if ch["cat"] not in (self.cons_cat_map() if self.is_cons(new.get("room", it["room"])) else cats):
                         raise ApiError(400, "Escolha uma categoria que exista.")
                     new["cat"] = ch["cat"]
                 if "zone" in ch:
@@ -671,6 +772,12 @@ class Store:
                 for k in ("cat", "zone"):
                     if k in new:
                         it[k] = new[k]
+                # 1.82.0: mudou de lado (casa ou consumíveis): a categoria do outro lado não vale; vai para Outros
+                if self.is_cons(it["room"]):
+                    if it.get("cat") not in self.cons_cat_map() and "room" in new:
+                        it["cat"] = CONS_OUTROS
+                elif it.get("cat") not in cats:
+                    it["cat"] = "outros"
                 if new:
                     it["updatedAt"] = t
                     if user:
@@ -873,6 +980,11 @@ class Store:
                 i["value"] = parse_value(i.get("value"))  # "1.200,50" num .json feito à mão vira número (planilha e backup contam)
             except ApiError:
                 i["value"] = 0
+        ccats = clean_cons_cats(data.get("consCats"))  # 1.82.0
+        if ccats:
+            data["consCats"] = ccats
+        else:
+            data.pop("consCats", None)
         cats = clean_cats(data.get("cats"))
         if cats:
             data["cats"] = cats
@@ -917,7 +1029,7 @@ def export_csv_bytes() -> bytes:
                 v = 0.0
             w.writerow([
                 STORE.tag(it), room.get("name", it["room"]), it.get("zone", ""), it.get("name", ""),
-                it.get("details", ""), cats.get(it.get("cat"), cats.get("outros", "Outros")), it.get("qty", "1"),
+                it.get("details", ""), STORE.cat_of(it), it.get("qty", "1"),
                 f"{v:.2f}".replace(".", ","), ", ".join(it.get("photos") or []),
                 it.get("createdAt") or "", it.get("updatedAt") or "",
             ])
@@ -1855,13 +1967,17 @@ def ai_prompt(mode: str, room: dict | None, hint: str, spoken: str = "", consumi
                      "Junte objetos iguais num item só, com a quantidade.")
     rules = AI_RULES.format(cats=cats)
     use_zones = zones_enabled() and not consumivel
-    if consumivel:  # 1.78.0: um consumível: o que é e para que serve (é por aí que se acha depois), e o preço de um novo
+    if consumivel:  # 1.78.0: um consumível: o que é e para que serve (é por aí que se acha depois)
+        # 1.82.0: as categorias dos consumíveis e quanto dura (estimado), no lugar da quantidade e do valor
         parts.append("Este item é um consumível: algo que se gasta e se compra de novo (ex.: pasta térmica, creme de massagem, pilhas).")
+        ccats = ", ".join(f"{k} ({v})" for k, v in STORE.cons_cat_map().items())
         rules = "\n".join(
             '- "details": 1 ou 2 frases objetivas dizendo o que é e para que serve (o uso), com o tamanho ou o volume da embalagem '
             'quando estiver legível. Sem preço. Nunca inclua número de série, telefone, nome de pessoa ou endereço.' if ln.startswith('- "details"')
-            else '- "value": preço TOTAL em reais (número, sem símbolo) de comprar novo no Brasil. Se a quantidade for maior que 1, some todas as unidades.'
-            if ln.startswith('- "value"') else '- "existing": "".' if ln.startswith('- "existing"') else ln for ln in rules.splitlines())
+            else f'- "cat": uma destas chaves: {ccats}.' if ln.startswith('- "cat"')
+            else '- "dur": quantos dias uma embalagem costuma durar numa casa, um destes números: 7, 15, 30, 90, 180 ou 365; 0 se não der para estimar.'
+            if ln.startswith('- "value"') else '- "existing": "".' if ln.startswith('- "existing"') else ln
+            for ln in rules.splitlines() if not ln.startswith('- "qty"')).replace('"qty":"1","value":0,', '"dur":0,')
     if not use_zones:  # zonas desligadas: a IA nem pergunta onde fica o item
         rules = "\n".join(ln for ln in rules.splitlines() if not ln.startswith('- "zone"')).replace('"zone":"",', "")
     # o cômodo: quem fala pode citar um cômodo para cada item; sem cômodo escolhido, a IA escolhe (a da foto, pelo que ela mostra);
@@ -1928,7 +2044,7 @@ def extract_json(raw) -> dict:
     raise ApiError(502, "Não deu para entender a resposta da IA. Tente de novo.", raw=s[:2000])
 
 
-def clean_ai_items(parsed, room: dict | None, per_item: bool = False) -> list[dict]:
+def clean_ai_items(parsed, room: dict | None, per_item: bool = False, consumivel: bool = False) -> list[dict]:
     """Os itens que a IA devolveu, limpos. "room": o cômodo escolhido; sem ele, o que a IA disse (na fala, um para cada item;
     na foto, o da foto); "" se ninguém soube (a pessoa escolhe na revisão)."""
     items = parsed.get("items") if isinstance(parsed, dict) else parsed
@@ -1967,6 +2083,9 @@ def clean_ai_items(parsed, room: dict | None, per_item: bool = False) -> list[di
             "existing": existing if existing in (names.get(rid, set()) if rid else house) else "",
             "confidence": conf if conf in ("alta", "media", "baixa") else "media",
         })
+        if consumivel:  # 1.82.0: a categoria dos consumíveis e a duração; sem quantidade e sem valor
+            out[-1].update(cat=raw.get("cat") if isinstance(raw.get("cat"), str) and raw.get("cat") in STORE.cons_cat_map() else CONS_OUTROS,
+                           qty="1", value=0, dur=clean_dur(raw.get("dur")))
     return out
 
 
@@ -1987,7 +2106,7 @@ MOCK_RESULT = {"room": "escritorio", "items": [
 
 
 MOCK_CONSUMIVEL = {"name": "Pasta térmica", "details": "Pasta que vai entre o processador e o cooler, para o calor passar. Seringa de 4 g.",
-                   "cat": "utilidades", "qty": "1", "value": 45, "zone": "", "existing": "", "confidence": "alta"}
+                   "cat": "c-manutencao", "dur": 365, "zone": "", "existing": "", "confidence": "alta"}
 
 
 def ai_fixed_room(body: dict) -> dict | None:
@@ -2015,7 +2134,7 @@ def ai_identify(body: dict) -> dict:
             if mode == "single":
                 res = {"items": [MOCK_CONSUMIVEL] if consumivel else MOCK_RESULT["items"][:1]}
             call.answer(res)
-        items = clean_ai_items(res, room)
+        items = clean_ai_items(res, room, consumivel=consumivel)
         return {"items": items, "room": common_room(items), "entity": "ai_task.simulado"}
     tmp_dir = os.path.join(MEDIA_ROOT, AI_TMP_REL)
     if not os.path.isdir(MEDIA_ROOT):
@@ -2050,7 +2169,7 @@ def ai_identify(body: dict) -> dict:
         except ApiError:
             call.result = "formato"
             raise
-    items = clean_ai_items(parsed, room)
+    items = clean_ai_items(parsed, room, consumivel=consumivel)
     return {"items": items, "room": common_room(items), "entity": entity or "padrão do Home Assistant"}
 
 
@@ -4560,10 +4679,11 @@ def chat_context(screen: dict) -> str:
             lines.append(f"- … e mais {len(todos) - MAX_ITENS_CHAT} que não couberam aqui (são {len(todos)} ao todo).")
     if consumiveis:  # 1.78.0: o que se gasta (Mais > Consumíveis): com o que é e para que serve, para achar pelo uso
         lines.append(f"Consumíveis ({len(consumiveis)}; o que se gasta e se compra de novo; não são um cômodo e não contam no patrimônio; "
-                     "código e nome | categoria | quantidade | o que é e para que serve):")
+                     "sem quantidade e sem valor; código e nome | categoria | quanto dura (estimado) | o que é e para que serve):")
         for i in sorted(consumiveis, key=lambda i: i.get("seq") or 0)[:MAX_ITENS_CHAT]:
-            lines.append("- " + " | ".join(b for b in (f"{STORE.tag(i)} {i.get('name', '')}", cats.get(i.get("cat"), "Outros"),
-                                                     f"qtd {i.get('qty') or '1'}", " ".join(str(i.get("details") or "").split())[:200]) if b))
+            lines.append("- " + " | ".join(b for b in (f"{STORE.tag(i)} {i.get('name', '')}", STORE.cat_of(i),
+                                                     f"dura {dur_text(i.get('dur'))}" if clean_dur(i.get("dur")) else "",
+                                                     " ".join(str(i.get("details") or "").split())[:200]) if b))
     return "\n".join(lines)
 
 
@@ -5004,17 +5124,17 @@ def r_room_photo(h, rid, query):
 
 def r_cat_create(h, query):
     cat = STORE.create_cat(h.read_body())
-    h.send_json({"cat": cat, "cats": STORE.cats(), "rev": STORE.data["rev"]}, 201)
+    h.send_json({"cat": cat, "cats": STORE.cats(), "consCats": STORE.cons_cats(), "rev": STORE.data["rev"]}, 201)
 
 
 def r_cat_update(h, cid, query):
     cat = STORE.update_cat(cid, h.read_body())
-    h.send_json({"cat": cat, "cats": STORE.cats(), "rev": STORE.data["rev"]})
+    h.send_json({"cat": cat, "cats": STORE.cats(), "consCats": STORE.cons_cats(), "rev": STORE.data["rev"]})
 
 
 def r_cat_delete(h, cid, query):
     moved = STORE.delete_cat(cid)
-    h.send_json({"moved": moved, "cats": STORE.cats(), "rev": STORE.data["rev"]})
+    h.send_json({"moved": moved, "cats": STORE.cats(), "consCats": STORE.cons_cats(), "rev": STORE.data["rev"]})
 
 
 def r_rooms_order(h, query):
@@ -5629,9 +5749,9 @@ def r_integracao_consumiveis(h, query):
         room = STORE.consumiveis_room() if consumiveis_enabled() else None
         items = [it for it in STORE.data["items"] if room and it.get("room") == room["id"] and it.get("id")]
         items.sort(key=lambda it: (it.get("name") or "").lower())
-        cats = STORE.cat_map()
-        out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "categoria": cats.get(it.get("cat") or "outros", ""),
-                "quantidade": str(it.get("qty") or "1")[:20], "para_que_serve": " ".join(str(it.get("details") or "").split())[:240]} for it in items]
+        # 1.82.0: sem quantidade (um consumível não tem mais); a duração estimada, em dias (0: sem), para o A cada do EconomIA
+        out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "categoria": STORE.cat_of(it),
+                "duracao_dias": clean_dur(it.get("dur")), "duracao": dur_text(it.get("dur")), "para_que_serve": " ".join(str(it.get("details") or "").split())[:240]} for it in items]
     h.send_json({"versao": VERSION, "ligado": consumiveis_enabled(), "consumiveis": out[:500]})
 
 

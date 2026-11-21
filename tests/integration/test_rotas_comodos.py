@@ -365,7 +365,7 @@ class Categorias(ComodosCase):
         r0 = self.rev()
         st, _, out = self.app.post("api/cats", {"name": "Bicicletas"})
         self.addCleanup(self.app.delete, "api/cats/bicicletas")
-        self.assertEqual((st, set(out), out["rev"]), (201, {"cat", "cats", "rev"}, r0 + 1))
+        self.assertEqual((st, set(out), out["rev"]), (201, {"cat", "cats", "consCats", "rev"}, r0 + 1))
         self.assertEqual(out["cat"], {"id": "bicicletas", "name": "Bicicletas"})
         self.assertEqual(out["cats"], self.app.data()["cats"])
 
