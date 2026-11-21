@@ -12,7 +12,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 
 ## Cobertura
 
-`tools/cobertura.py` roda as três camadas e mostra quanto do `server.py` (por camada e no total) e do `app.js` (pelos visuais) os testes executam; `--sem-visuais` pula os visuais. Só biblioteca padrão: o servidor é medido com `sys.monitoring` (`cobertura/sitecustomize.py`, Python 3.12+) e a tela com a contagem do próprio Chromium (`E2E_COV` em `e2e/e2e_lib.py`). As linhas que nenhum teste roda ficam em `faltam-server.txt` e `faltam-app.txt`, na pasta que ele mostra no fim.
+`tools/cobertura.py` roda as três camadas e mostra quanto do `server.py` (por camada e no total), dos outros arquivos do servidor (`ferramentas.py`, `relatorio.py`, `pdf.py`) e do `app.js` (pelos visuais) os testes executam (cada arquivo fica acima de 95% das linhas); `--sem-visuais` pula os visuais. Só biblioteca padrão: o servidor é medido com `sys.monitoring` (`cobertura/sitecustomize.py`, Python 3.12+) e a tela com a contagem do próprio Chromium (`E2E_COV` em `e2e/e2e_lib.py`). As linhas que nenhum teste roda ficam em `faltam-server.txt` e `faltam-app.txt`, na pasta que ele mostra no fim.
 
 ## A casa de teste
 

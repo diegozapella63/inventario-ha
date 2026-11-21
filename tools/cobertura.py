@@ -58,7 +58,7 @@ def py_statements(path: str) -> dict[int, str]:
     return out
 
 
-def py_hits(folder: str) -> set[int]:
+def py_hits(folder: str, alvo: str = SERVER) -> set[int]:
     hits = set()
     for f in glob.glob(os.path.join(folder, "*.json")):
         try:
@@ -66,9 +66,14 @@ def py_hits(folder: str) -> set[int]:
         except ValueError:
             continue
         for path, lines in data.items():
-            if os.path.samefile(path, SERVER) if os.path.exists(path) else False:
+            if os.path.samefile(path, alvo) if os.path.exists(path) else False:
                 hits.update(lines)
     return hits
+
+
+def outros_py() -> list[str]:
+    """Os outros arquivos do servidor (ferramentas.py, relatorio.py, pdf.py...), fora o server.py."""
+    return sorted(os.path.join(APP, n) for n in os.listdir(APP) if n.endswith(".py") and n != "server.py")
 
 
 def py_functions(path: str):
@@ -201,6 +206,18 @@ def report(folder: str):
         f.write("\nLinhas sem teste, por função (mais linhas primeiro):\n")
         for fn, lns in sorted(by_fn.items(), key=lambda kv: -len(kv[1])):
             f.write(f"  {fn}: {len(lns)} — {', '.join(ranges(lns))}\n")
+    with open(os.path.join(folder, "faltam-server.txt"), "a", encoding="utf-8") as f:
+        for path in outros_py():
+            stm2 = set(py_statements(path))
+            h2 = set()
+            for sub, _ in LAYERS:
+                d = os.path.join(folder, sub)
+                if os.path.isdir(d):
+                    h2 |= py_hits(d, path) & stm2
+            falta = sorted(stm2 - h2)
+            nome = os.path.basename(path)
+            print(f"  {nome:<15}{pct(len(h2), len(stm2))}  ({len(stm2)} linhas; faltam {len(falta)})")
+            f.write(f"\n{nome}: linhas sem teste: {', '.join(ranges(falta)) or 'nenhuma'}\n")
     js = js_report(folder)
     if js:
         print(f"Tela (app.js), pelos testes visuais: {js['linhas']} linhas com código")
