@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.87.0
+
+- **Consumíveis e EconomIA**: quando você toca em **Comprei hoje** no EconomIA (1.49.0), o **Dura até** do consumível volta a contar de hoje, e a duração que você disser lá vira a Duração estimada daqui.
+- **Consumíveis**: a lista mostra até quando cada um dura; o que já passou da data aparece em vermelho, como **acabou**.
+
 ## 1.86.1
 
 - **Conversa no celular**: o Enter do teclado vai para a próxima linha; quem envia é o botão. Com teclado de verdade, o Enter continua enviando.

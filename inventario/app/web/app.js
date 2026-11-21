@@ -31,6 +31,8 @@
     const [tam, um, varios] = DUR_UN.find(([t]) => n % t === 0);
     return `${n / tam} ${n / tam === 1 ? um : varios}`;
   };
+  // 1.87.0: já passou do Dura até (hora de comprar de novo)
+  const durFim = (it) => { const a = durAte(it); if (!a) return false; const h = new Date(); h.setHours(0, 0, 0, 0); return new Date(+a.slice(6), +a.slice(3, 5) - 1, +a.slice(0, 2)) < h; };
   // a duração em número e unidade, para o Outra do formulário (730 → [2, 365])
   const durPartes = (d) => { const n = durNum(d); if (!n) return ["", 30]; const [tam] = DUR_UN.find(([t]) => n % t === 0); return [n / tam, tam]; };
   // até quando dura: a duração contada do dia em que foi informada (durAt; num de antes, o do cadastro); "21/11/2027"
@@ -926,7 +928,7 @@
       <span class="ib"><span class="nm">${hl(it.name, toks)}</span>
         <span class="meta"><span class="mt soft">${esc(tagOf(it))}</span>${where ? `<span class="z">${where}</span>` : ""}</span></span>
       ${isCons(it.room) // 1.82.0: um consumível: quanto dura (estimado); sem quantidade e sem valor
-    ? (durNum(it.dur) ? `<span class="iv cons"><span class="val">${esc(durText(it.dur))}</span></span>` : "")
+    ? (durNum(it.dur) ? `<span class="iv cons"><span class="val">${esc(durText(it.dur))}</span>${durAte(it) ? `<span class="qty ate${durFim(it) ? " fim" : ""}">${durFim(it) ? "acabou em" : "até"} ${esc(durAte(it).slice(6) === String(new Date().getFullYear()) ? durAte(it).slice(0, 5) : durAte(it))}</span>` : ""}</span>` : "")
     : `<span class="iv"><span class="val">${money(vl(it))}</span>${qty !== "1" ? `<span class="qty">${esc(qtyShort(it.qty))}</span>` : ""}</span>`}`;
     if (pick !== null) return `<li><button type="button" class="irow selr" data-act="sel-toggle" data-id="${esc(it.id)}" aria-pressed="${pick === true}"${pick === "off" ? " disabled" : ""}>${inner}</button></li>`;
     return `<li><a class="irow" href="#/i/${encodeURIComponent(it.id)}">${inner}</a></li>`;
@@ -3589,7 +3591,7 @@
           ${zonesOn() && room.kind !== "consumiveis" ? `<dt>Zona</dt><dd>${esc(it.zone || "Sem zona")}</dd>` : ""}
           ${room.kind === "consumiveis"
             ? `<dt>Categoria</dt><dd><span class="rnm">${esc(CCAT[it.cat] || "Outros")}</span></dd>
-          ${durAte(it) ? `<dt>Dura até</dt><dd data-slot="dura-ate">${esc(durAte(it))}</dd>` : `<dt>Duração estimada</dt><dd>Sem duração</dd>`}`
+          ${durAte(it) ? `<dt>Dura até</dt><dd data-slot="dura-ate"${durFim(it) ? ' class="fim"' : ""}>${esc(durAte(it))}${durFim(it) ? " · acabou" : ""}</dd>` : `<dt>Duração estimada</dt><dd>Sem duração</dd>`}`
             : `<dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
           <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>`}
           <dt>Origem</dt><dd>${esc(SOURCES[it.source] || "Cadastro manual")}</dd>

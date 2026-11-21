@@ -727,6 +727,8 @@ class Store:
                     new["dur"] = clean_dur(body["dur"])
                     if new["dur"] != clean_dur(it.get("dur")):
                         new["durAt"] = now_iso()  # 1.83.0: a duração mudou: o Dura até conta de hoje
+                if body.get("_comprado") is True and clean_dur(new.get("dur")):
+                    new["durAt"] = now_iso()  # 1.87.0: comprado de novo (o Comprei hoje do EconomIA): conta de hoje, com a mesma duração
             elif new.get("cat") not in self.cat_map():  # saiu dos consumíveis: a categoria de lá não vale na casa
                 new["cat"] = "outros"
             if "qty" in body and not cons:
@@ -5932,6 +5934,29 @@ def r_integracao_consumiveis(h, query):
     h.send_json({"versao": VERSION, "ligado": consumiveis_enabled(), "consumiveis": out[:500]})
 
 
+def r_integracao_comprado(h, query):
+    """1.87.0: o Comprei hoje do EconomIA num item que é um consumível daqui: o Dura até volta a contar de hoje e, se a
+    pessoa disse lá por quanto tempo vai ter, a Duração estimada muda. Pelo nome (o que o EconomIA leu em
+    /api/integracao/consumiveis); só com Usar consumíveis ligado. É a única rota de /api/integracao que grava, e só isso."""
+    body = h.read_body() or {}
+    nome = fold(" ".join(str(body.get("nome") or "").split()))
+    with STORE.lock:
+        room = STORE.consumiveis_room() if consumiveis_enabled() else None
+        it = next((i for i in STORE.data["items"] if room and i.get("room") == room["id"] and fold(" ".join(str(i.get("name") or "").split())) == nome), None) if nome else None
+    if not it:
+        raise ApiError(404, "Consumível não encontrado.")
+    mud = {"_comprado": True}
+    if body.get("dias") is not None:
+        dias = clean_dur(body.get("dias"))
+        if not dias:
+            raise ApiError(400, "dias vale de 1 a 3650.")
+        mud["dur"] = dias
+    elif not clean_dur(it.get("dur")):
+        raise ApiError(400, "Este consumível não tem Duração estimada: mande dias.")
+    novo = STORE.update_item(it["id"], mud, "EconomIA")
+    h.send_json({"versao": VERSION, "id": novo["id"], "nome": novo.get("name"), "duracao_dias": clean_dur(novo.get("dur")), "duracao": dur_text(novo.get("dur")), "dura_ate": dur_until(novo)})
+
+
 ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/data", r_data),
     ("GET", r"/api/economia/compras", r_economia_compras),
@@ -5944,6 +5969,7 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/integracao/comodos", r_integracao_comodos),
     ("GET", r"/api/integracao/itens", r_integracao_itens),
     ("GET", r"/api/integracao/consumiveis", r_integracao_consumiveis),
+    ("POST", r"/api/integracao/consumiveis/comprado", r_integracao_comprado),
     ("GET", r"/api/integracao/ferramentas", r_ferramentas_lista),
     ("POST", r"/api/integracao/ferramentas", r_ferramentas_usar),
     ("POST", r"/api/items", r_item_create),

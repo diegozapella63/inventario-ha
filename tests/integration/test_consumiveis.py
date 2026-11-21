@@ -65,6 +65,24 @@ class Consumiveis(ServerCase):
                          ("Pasta térmica", "Manutenção e reparos", 365, "1 ano", True, ["categoria", "dura_ate", "duracao", "duracao_dias", "id", "nome", "para_que_serve"]))
         self.assertRegex(c["dura_ate"], r"^\d{4}-\d{2}-\d{2}$", "1.83.0: até quando dura")
         self.assertEqual(self.app.get("api/integracao/consumiveis")[0], 401, "só com a chave")
+        # 1.87.0: o Comprei hoje do EconomIA: o Dura até volta a contar de hoje e a duração dita lá vale aqui
+        self.assertEqual(self.app.post("api/integracao/consumiveis/comprado", {"nome": "Pasta térmica"})[0], 401, "só com a chave")
+        self.app.ok("PUT", f"api/items/{it['id']}", {"dur": 365})
+        st, _, r = self.app.post("api/integracao/consumiveis/comprado", {"nome": "  pasta  TERMICA ", "dias": 90}, headers=self.chave())
+        self.assertEqual((st, r["id"], r["duracao_dias"], r["duracao"]), (200, it["id"], 90, "3 meses"))
+        self.assertRegex(r["dura_ate"], r"^\d{4}-\d{2}-\d{2}$")
+        gravado = next(i for i in self.app.data()["items"] if i["id"] == it["id"])
+        self.assertEqual((gravado["dur"], gravado["updatedBy"]), (90, "EconomIA"))
+        antes = gravado["durAt"]
+        import time
+        time.sleep(1.1)
+        st, _, r = self.app.post("api/integracao/consumiveis/comprado", {"nome": "Pasta térmica"}, headers=self.chave())
+        depois = next(i for i in self.app.data()["items"] if i["id"] == it["id"])
+        self.assertEqual((st, depois["dur"]), (200, 90), "sem os dias, a mesma duração")
+        self.assertNotEqual(depois["durAt"], antes, "comprado de novo: conta de hoje")
+        self.assertEqual(self.app.post("api/integracao/consumiveis/comprado", {"nome": "Não existe"}, headers=self.chave())[0], 404)
+        self.assertEqual(self.app.post("api/integracao/consumiveis/comprado", {"nome": "Pasta térmica", "dias": 99999}, headers=self.chave())[0], 400)
+        self.assertEqual(self.app.post("api/integracao/consumiveis/comprado", {}, headers=self.chave())[0], 404)
         self.assertEqual(self.app.post("api/integracao/consumiveis", {}, headers=self.chave())[0], 404, "só leitura")
 
         st, hd, pdf = self.app.request("GET", "api/relatorio.pdf")

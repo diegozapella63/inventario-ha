@@ -120,7 +120,10 @@ async def body(r, p):
     await r.open(pg, "#/consumiveis", ".mscreen.cons")
     grupos = await pg.evaluate("[...document.querySelectorAll('.mscreen.cons .zone')].map(z => [z.querySelector('h3').textContent.trim(), z.querySelector('.zs').textContent.trim(), [...z.querySelectorAll('.irow')].map(r => [r.querySelector('.nm').textContent, (r.querySelector('.iv .val') || {textContent: ''}).textContent, ((r.querySelector('.iv .qty') || {}).textContent || '').replace(/\u00a0/g, ' ')])])")
     r.eq([(g[0], g[1]) for g in grupos], [("Higiene e cuidados", "1 consumível"), ("Manutenção e reparos", "2 consumíveis")], "os grupos são as categorias dos consumíveis, com a contagem")
-    r.eq(grupos[1][2], [["Pasta térmica", "1 ano", ""], ["Pilhas AA", "", ""]], "cada linha com a duração em destaque (de quem tem); sem quantidade e sem valor")
+    import re as _re
+    ate = grupos[1][2][0][2]
+    r.check(_re.fullmatch(r"até \d\d/\d\d/\d{4}", ate), f"1.87.0: a linha diz até quando dura, com o ano quando não é este ({ate})")
+    r.eq([grupos[1][2][0][:2], grupos[1][2][1]], [["Pasta térmica", "1 ano"], ["Pilhas AA", "", ""]], "cada linha com a duração em destaque (de quem tem); sem quantidade e sem valor")
     r.eq(txt(await pg.text_content(".page-sub")), "3 consumíveis", "o alto diz quantos")
     r.check(await pg.locator(".uplink").count() == 1, "com ‹ Mais no alto")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
@@ -146,6 +149,9 @@ async def body(r, p):
     r.check(filtro["dur"] == 730 and filtro.get("durAt"), f"gravada em dias, com o dia em que foi informada ({filtro})")
     await pg.locator(".mscreen.cons .irow", has_text="Filtro de água").click()
     await pg.wait_for_selector("dialog.sheet h1")
+    # 1.87.0: a lista mostra até quando dura (o que já passou da data, em vermelho, como acabou)
+    linha = txt(await pg.locator(".mscreen.cons .irow", has_text="Filtro de água").locator(".iv").inner_text())
+    r.check(linha.startswith("2 anos") and "até " in linha, f"a linha diz até quando dura ({linha})")
     r.eq(txt(await pg.text_content("dialog.sheet .ival .big")), "2 anos", "a ficha diz 2 anos")
     import datetime
     y, m, d0 = (int(x) for x in filtro["durAt"][:10].split("-"))
