@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.85.1
+
+- **Editar item**: o **Apagar** também fica na janela de editar, ao lado do Salvar (antes, só na ficha).
+
 ## 1.85.0
 
 - **Compras no EconomIA**: a ficha de um consumível mostra se ele está na lista de compras do EconomIA, a última compra e a Reposição, com **Pôr na lista** e **Repor a cada** duração dele. Aparece com o EconomIA 1.47.0 ou mais novo e **Consumíveis do InventarIA** ligado lá, em Mais › Configurações › Opções › Reposição.

@@ -3703,7 +3703,8 @@
           </div>
         </form>
         <div class="dlg-f">
-          ${F.id ? "" : `<button type="button" class="btn" data-ed="again">${ic("plus")}Salvar e adicionar outro</button>`}
+          ${F.id ? `<button type="button" class="btn danger" data-ed="delete" aria-label="Apagar">${ic("trash")}<span class="lbl">Apagar</span></button>`
+            : `<button type="button" class="btn" data-ed="again">${ic("plus")}Salvar e adicionar outro</button>`}
           <span class="grow"></span>
           <button type="button" class="btn ghost hide-narrow" data-ed="cancel">${ic("close")}Cancelar</button>
           <button type="button" class="btn primary" data-ed="save">${ic("check")}${saveLbl}</button>
@@ -3903,6 +3904,12 @@
       if (!b) return;
       const act = b.dataset.ed;
       if (act === "cancel") requestClose(entry);
+      else if (act === "delete") { // 1.85.1: Apagar também na janela de editar (antes, só na ficha)
+        const it = D.itemById.get(F.id);
+        if (!it) return;
+        await deleteItem(it);
+        if (!D.itemById.get(F.id)) requestClose(entry, { force: true });
+      }
       else if (act === "tipo") { F.cat = b.dataset.v || otherCat; F.dirty = true; slot("tipo").innerHTML = tipoBtns(); }
       else if (act === "save") save(false);
       else if (act === "again") save(true);
