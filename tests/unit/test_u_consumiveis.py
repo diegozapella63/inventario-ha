@@ -2,6 +2,7 @@
 consumíveis (vem desligado; o que se gasta: pasta térmica, creme de massagem). O que aparece (visible_data), o que conta
 no patrimônio (sem os consumíveis), a área Consumíveis no Store, a leitura por IA de um consumível, o que a Conversa
 recebe e as ferramentas do CorrerIA (achar pelo uso, cadastrar, mover, o resumo)."""
+import re
 import json
 import unittest
 
@@ -146,7 +147,7 @@ class Conversa(Base):
         self.assertIn("Inventário da casa: 38 itens em 6 cômodos", txt, "o patrimônio sem os consumíveis")
         linha = next(ln for ln in txt.splitlines() if ln.startswith("Consumíveis (1;"))
         self.assertIn("não contam no patrimônio", linha)
-        self.assertIn("- CON-001 Creme de massagem | Higiene e cuidados | dura 1 mês | Creme para massagem nas costas, de arnica.", txt)
+        self.assertRegex(txt, r"- CON-001 Creme de massagem \| Higiene e cuidados \| dura 1 mês, até \d\d/\d\d/\d{4} \| Creme para massagem nas costas, de arnica\.")
         self.assertIn("sem quantidade e sem valor", linha)
         todos = txt.split("Todos os itens (")[1].split("Consumíveis (")[0]
         self.assertNotIn("Creme de massagem", todos, "fora da lista dos itens com valor")
@@ -180,7 +181,7 @@ class Ferramentas(Base):
             {"nome": "Pasta térmica", "detalhes": "Vai entre o processador e o cooler."}]})
         area = self.store.consumiveis_room()
         self.assertEqual((area["code"], area["kind"]), ("CON", "consumiveis"))
-        self.assertIn("Cadastrados 2 itens em Consumíveis: Creme de massagem (CON-001, Consumíveis, dura 3 meses, id con-001); Pasta térmica (CON-002, Consumíveis, id con-002).", txt)
+        self.assertRegex(txt, re.escape("Cadastrados 2 itens em Consumíveis: Creme de massagem (CON-001, Consumíveis, dura 3 meses, até DATA, id con-001); Pasta térmica (CON-002, Consumíveis, id con-002).").replace("DATA", r"\d\d/\d\d/\d{4}"))
         self.assertNotIn("Total:", txt, "1.82.0: um consumível não tem valor")
         it = self.item("con-001")
         self.assertEqual((it["room"], it["qty"], it["value"], it["dur"], it["cat"], it["zone"], it["source"], it["createdBy"]),
@@ -288,6 +289,28 @@ class CategoriasEDuracao(Base):
         self.assertEqual([S.dur_text(d) for d in (7, 15, 30, 90, 180, 365, 45, 1, 0, 9999)],
                          ["1 semana", "15 dias", "1 mês", "3 meses", "6 meses", "1 ano", "45 dias", "1 dia", "", ""])
         self.assertEqual(self.store.cat_of(n), "Pets")
+
+    def test_ate_quando_dura_e_a_duracao_escolhida_a_mao(self):
+        """1.83.0: a duração conta do dia em que foi informada (durAt); a escolhida à mão diz a unidade."""
+        self.assertEqual([S.dur_text(d) for d in (730, 120, 21, 45, 14, 3650)], ["2 anos", "4 meses", "3 semanas", "45 dias", "2 semanas", "10 anos"])
+        self.assertEqual(S.dur_until({"dur": 365, "createdAt": "2026-11-21T09:20:00"}), "2027-11-21", "num de antes, do cadastro")
+        self.assertEqual(S.dur_until({"dur": 30, "durAt": "2027-01-31T10:00:00", "createdAt": "2026-01-01T00:00:00"}), "2027-03-02")
+        self.assertEqual([S.dur_until(x) for x in ({"dur": 0, "createdAt": "2026-01-01"}, {"dur": 30}, None, {"dur": 30, "durAt": "2026-13-40"})], ["", "", "", ""])
+        self.assertEqual((S.dia_br("2027-11-21"), S.dia_br("")), ("21/11/2027", ""))
+        sem = self.consumivel(name="Sabão")
+        self.assertNotIn("durAt", sem, "sem duração, sem a data")
+        it = self.consumivel(dur=30)
+        self.assertEqual(it["durAt"], it["createdAt"])
+        it["durAt"] = "2026-01-10T08:00:00"  # como se tivesse sido informada em janeiro
+        self.assertEqual(self.store.update_item(it["id"], {"name": "Creme novo", "dur": 30}, "Ana")["durAt"], "2026-01-10T08:00:00", "a mesma duração: a data fica")
+        n = self.store.update_item(it["id"], {"dur": 730}, "Ana")
+        self.assertNotEqual(n["durAt"], "2026-01-10T08:00:00", "mudou a duração: conta de hoje")
+        ate = S.dur_until(n)
+        v = self.json("ver_item", {"id": it["id"]})
+        self.assertEqual((v["duracao"], v["duracao_dias"], v["dura_ate"]), ("2 anos", 730, ate))
+        linha = next(x for x in self.json("buscar_itens", {"texto": "Creme novo"})["itens"] if x["id"] == it["id"])
+        self.assertEqual(linha["dura_ate"], ate)
+        self.assertNotIn("dura_ate", self.json("ver_item", {"id": sem["id"]}))
 
     def test_de_antes_com_categoria_da_casa_aparece_em_outros_sem_mudar_o_gravado(self):
         it = self.consumivel()

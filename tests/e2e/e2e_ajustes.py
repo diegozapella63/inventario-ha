@@ -316,6 +316,7 @@ async def body(r, p):
 
     await r.open(pg, "#/categorias", "#p-cats")
     r.eq((await pg.text_content(".page-title")).strip(), "Categorias", "Categorias numa tela própria")
+    r.eq((await pg.text_content("#p-cats h2")).strip(), "Categorias de itens", "1.82.1: o cartão das categorias da casa diz de quê (as dos consumíveis têm o cartão delas)")
     r.eq((await pg.text_content("#p-cats .opts li .ot b")).strip(), "15 categorias", "15 categorias de início")
     r.eq(await pg.locator('#p-cats [data-act="cat-del"][data-cat="outros"]').count(), 0, "Outros não se exclui")
     r.eq(await pg.locator('#p-cats [data-cat="eletronicos"]').count(), 0, "Eletrônicos (a das novidades) não se renomeia nem se exclui")

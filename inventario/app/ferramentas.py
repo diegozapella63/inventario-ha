@@ -221,7 +221,7 @@ def _eh_cons(srv, it) -> bool:
 
 def _duracao(srv, v) -> int:
     if isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 or v > 3650 or int(v) != v:
-        raise ErroFerramenta("duracao_dias: um número inteiro de dias, de 0 a 3650 (7, 15, 30, 90, 180 ou 365 são os atalhos da tela).")
+        raise ErroFerramenta("duracao_dias: um número inteiro de dias, de 0 a 3650 (7, 15, 30, 90, 180 ou 365 são os atalhos da tela; qualquer outro número vale).")
     return int(v)
 
 
@@ -296,6 +296,8 @@ def _linha(srv, it, cats=None, taxas=None) -> dict:
         out["tipo"] = "consumível"
         if srv.clean_dur(it.get("dur")):
             out["duracao"], out["duracao_dias"] = srv.dur_text(it.get("dur")), srv.clean_dur(it.get("dur"))
+            if srv.dur_until(it):  # 1.83.0: até quando dura
+                out["dura_ate"] = srv.dur_until(it)
         d = " ".join(str(it.get("details") or "").split())
         if d:
             out["para_que_serve"] = d[:240]
@@ -316,7 +318,7 @@ def _frase(srv, it) -> str:
         bits.append(f"zona {it['zone']}")
     if _eh_cons(srv, it):  # 1.82.0: a duração, sem quantidade e sem valor
         if srv.clean_dur(it.get("dur")):
-            bits.append(f"dura {srv.dur_text(it.get('dur'))}")
+            bits.append(f"dura {srv.dur_text(it.get('dur'))}" + (f", até {srv.dia_br(srv.dur_until(it))}" if srv.dur_until(it) else ""))
         bits.append(f"id {it['id']}")
         return f"{it.get('name') or ''} ({', '.join(bits)})"
     if str(it.get("qty") or "1") != "1":
@@ -476,6 +478,8 @@ def _ver(srv, a) -> str:
         cid = it.get("cat") if it.get("cat") in ccats else srv.CONS_OUTROS
         out["categoria"] = {"id": cid, "nome": ccats.get(cid, "Outros")}
         out["duracao_dias"], out["duracao"] = srv.clean_dur(it.get("dur")), srv.dur_text(it.get("dur")) or "sem duração"
+        if srv.dur_until(it):
+            out["dura_ate"] = srv.dur_until(it)
     else:
         cid = it.get("cat") if it.get("cat") in cats else "outros"
         out["categoria"] = {"id": cid, "nome": cats.get(cid, "Outros")}

@@ -1089,9 +1089,9 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .more-panel > .panel:first-child, .mscreen > .panel:first-child { margin-top: 22px; }
 /* 1.60.0 (padrão da família, o do GerencIA): cada seção principal num cartão (fundo, borda e cantos arredondados);
    entre as opções de uma seção, nenhuma linha */
-.more-panel > .panel, .mscreen > .panel { margin-top: 18px; padding: 20px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
+.more-panel > .panel, .mscreen > .panel, .mscreen .chart-pair > .panel { margin-top: 18px; padding: 20px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
 .more-panel > .panel:first-child, .mscreen > .panel:first-child { margin-top: 22px; }
-@media (max-width: 380px) { .more-panel > .panel, .mscreen > .panel { padding: 18px 14px; } }
+@media (max-width: 380px) { .more-panel > .panel, .mscreen > .panel, .mscreen .chart-pair > .panel { padding: 18px 14px; } }
 /* 1.61.0: cada seção contrai e expande num toque no cabeçalho (a seta no canto) */
 .panel.dobra > h2 { cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; }
 .panel.dobra > h2 .fold-ic { margin-left: auto; display: grid; place-items: center; width: 32px; height: 32px; flex: none; color: var(--muted); transition: transform 0.15s; transform: rotate(90deg); }
@@ -1112,7 +1112,11 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .kpi b { font: 700 30px/1.05 var(--font-c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi small { color: var(--muted); font-size: 13px; }
 .charts .panel > .lead { margin-bottom: 10px; }
-@media (min-width: 1000px) { .chart-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; align-items: start; } }
+@media (min-width: 1000px) { .chart-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 18px; align-items: start; } }
+/* 1.83.0: a Outra da Duração estimada: o número e a unidade, num quadro logo abaixo dos atalhos */
+.dur-outra { margin-top: 10px; }
+.dur-outra .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dur-outra .field { margin: 0; }
 .hbars { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
 .hbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; row-gap: 7px; padding: 12px 4px 13px; border-bottom: 1px solid var(--line); color: inherit; text-decoration: none; }
 .hbar:hover, .hbar:focus-visible { background: var(--surface-2); }

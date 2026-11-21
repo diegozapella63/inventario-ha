@@ -62,7 +62,8 @@ class Consumiveis(ServerCase):
         self.assertEqual((st, out["ligado"], [c["id"] for c in out["consumiveis"]]), (200, True, [it["id"]]))
         c = out["consumiveis"][0]
         self.assertEqual((c["nome"], c["categoria"], c["duracao_dias"], c["duracao"], c["para_que_serve"] != "", sorted(c)),
-                         ("Pasta térmica", "Manutenção e reparos", 365, "1 ano", True, ["categoria", "duracao", "duracao_dias", "id", "nome", "para_que_serve"]))
+                         ("Pasta térmica", "Manutenção e reparos", 365, "1 ano", True, ["categoria", "dura_ate", "duracao", "duracao_dias", "id", "nome", "para_que_serve"]))
+        self.assertRegex(c["dura_ate"], r"^\d{4}-\d{2}-\d{2}$", "1.83.0: até quando dura")
         self.assertEqual(self.app.get("api/integracao/consumiveis")[0], 401, "só com a chave")
         self.assertEqual(self.app.post("api/integracao/consumiveis", {}, headers=self.chave())[0], 404, "só leitura")
 

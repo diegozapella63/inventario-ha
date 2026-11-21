@@ -21,7 +21,25 @@
   let CCATS = DEFAULT_CCATS, CCAT = Object.fromEntries(CCATS);
   const DURS = [[7, "1 semana"], [15, "15 dias"], [30, "1 mês"], [90, "3 meses"], [180, "6 meses"], [365, "1 ano"]];
   const durNum = (d) => { const n = Math.trunc(+d); return n > 0 && n <= 3650 ? n : 0; };
-  const durText = (d) => { const n = durNum(d); return n ? (DURS.find(([k]) => k === n) || [0, n === 1 ? "1 dia" : `${n} dias`])[1] : ""; };
+  // 1.83.0: a duração escolhida à mão, numa conta redonda, diz a unidade ("2 anos", "4 meses", "3 semanas"); a regra do dur_text do server.py
+  const DUR_UN = [[365, "ano", "anos"], [30, "mês", "meses"], [7, "semana", "semanas"], [1, "dia", "dias"]];
+  const durText = (d) => {
+    const n = durNum(d);
+    if (!n) return "";
+    const pronto = DURS.find(([k]) => k === n);
+    if (pronto) return pronto[1];
+    const [tam, um, varios] = DUR_UN.find(([t]) => n % t === 0);
+    return `${n / tam} ${n / tam === 1 ? um : varios}`;
+  };
+  // a duração em número e unidade, para o Outra do formulário (730 → [2, 365])
+  const durPartes = (d) => { const n = durNum(d); if (!n) return ["", 30]; const [tam] = DUR_UN.find(([t]) => n % t === 0); return [n / tam, tam]; };
+  // até quando dura: a duração contada do dia em que foi informada (durAt; num de antes, o do cadastro); "21/11/2027"
+  const durAte = (it) => {
+    const n = durNum(it && it.dur), m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String((it && (it.durAt || it.createdAt)) || ""));
+    if (!n || !m) return "";
+    const d = new Date(+m[1], +m[2] - 1, +m[3] + n), p = (x) => String(x).padStart(2, "0");
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+  };
   function applyCats(list, clist) {
     CATS = Array.isArray(list) && list.length ? list.map((c) => [c.id, c.name]) : DEFAULT_CATS;
     CAT = Object.fromEntries(CATS);
@@ -392,6 +410,11 @@
       const l = f.querySelector(":scope > .lbl");
       if (l && f.querySelector(":scope > .phs, :scope > .chips, :scope > [data-slot='rphotos']")) f.classList.add("dobravel");
     }
+    // 1.83.0 (como nos outros apps): na janela do item, o texto longo e as caixas de seleção também fecham pelo título
+    for (const f of root.querySelectorAll("form[data-ed-form] .form > .field, form[data-ed-form] .form > .row2 > .field")) {
+      const l = f.querySelector(":scope > label:not(.sr)");
+      if (l && f.querySelector(":scope > textarea.textarea, :scope > select")) { l.classList.add("lbl"); f.classList.add("dobravel"); }
+    }
   }
   function dobrarCampos(root) {
     const shut = camposFechados();
@@ -418,7 +441,7 @@
     dlg.innerHTML = html;
     iconesCampos(dlg);
     dobrarCampos(dlg);
-    dlg.addEventListener("click", (e) => { const l = e.target.closest(".field.dobravel > .lbl"); if (l) alternarCampo(l); });
+    dlg.addEventListener("click", (e) => { const l = e.target.closest(".field.dobravel > .lbl"); if (l) { if (l.tagName === "LABEL") e.preventDefault(); alternarCampo(l); } });
     dlg.addEventListener("keydown", (e) => { const l = (e.key === "Enter" || e.key === " ") && e.target.closest(".field.dobravel > .lbl"); if (l) { e.preventDefault(); alternarCampo(l); } });
     document.body.append(dlg);
     const entry = { dlg, routed, guard, onClose, closing: false, awaitingPop: false };
@@ -750,7 +773,7 @@
   const foldKey = (sec) => sec.id || ((sec.querySelector(":scope > h2") || {}).textContent || "").trim();
   function foldPanels() {
     const shut = new Set(LS.get("fechadas", []));
-    $$("#view .more-panel > section.panel, #view .mscreen > section.panel").forEach((sec) => {
+    $$("#view .more-panel > section.panel, #view .mscreen > section.panel, #view .mscreen .chart-pair > section.panel").forEach((sec) => {
       const h = sec.querySelector(":scope > h2");
       if (!h) return;
       if (!h.querySelector(".fold-ic")) h.insertAdjacentHTML("beforeend", `<span class="fold-ic" aria-hidden="true">${ic("chev", "sm")}</span>`);
@@ -1520,14 +1543,28 @@
     const groups = BENS_GROUPS.map(([k, name]) => ({ k, name, v: bens.filter((i) => bensGroup(i) === k).reduce((s, i) => s + vl(i), 0) })).filter((g) => g.v > 0).sort((a, b) => b.v - a.v);
     return { total, rooms, cats, items, valued, bands, top10, half, series, bens, groups, photos: house.filter((i) => (i.photos || []).length).length };
   }
-  function hbars(rows) { // barras de uma cor, da maior para a menor; cada linha leva a algum lugar
+  function hbars(rows, conta = false) { // barras de uma cor, da maior para a menor; cada linha leva a algum lugar (conta: quantos, não reais)
     const max = Math.max(...rows.map((x) => x.v), 1);
+    const fmt = conta ? int : moneyR;
     return `<ul class="hbars">${rows.map((x) => `<li><a class="hbar" href="${x.href}">
         <span class="hb-t">${x.tag || ""}<b>${esc(x.name)}</b><span class="hb-s">${esc(x.sub)}</span></span>
-        <span class="hb-v"><b>${moneyR(x.v)}</b><span>${esc(x.share)}</span></span>
+        <span class="hb-v"><b>${fmt(x.v)}</b><span>${esc(x.share)}</span></span>
         <span class="hb-bar" aria-hidden="true"><i style="width:${Math.max(0.6, (x.v / max) * 100).toFixed(2)}%"></i></span></a></li>`).join("")}</ul>`;
   }
+  // 1.83.0: os consumíveis por categoria (quantos em cada uma: um consumível não tem valor)
+  function consChart() {
+    const its = D.consItems || [];
+    if (!its.length) return "";
+    const rows = CCATS.map(([k, name]) => ({ name, n: its.filter((it) => (CCAT[it.cat] ? it.cat : "c-outros") === k).length })).filter((x) => x.n).sort((a, b) => b.n - a.n)
+      .map((x) => ({ href: "#/consumiveis", name: x.name, sub: "", v: x.n, share: pctTxt(x.n, its.length) }));
+    return `<section class="panel" id="g-cons">
+      <h2>${secIc("drop")}Categorias dos consumíveis</h2>
+      <p class="lead">${rows.length > 1 ? `${esc(rows[0].name)} tem ${int(rows[0].v)} de ${plural(its.length, "consumível", "consumíveis")}.` : `${plural(its.length, "consumível", "consumíveis")}.`}</p>
+      ${hbars(rows, true)}
+    </section>`;
+  }
   function viewCharts() {
+    if (!D.pat.length && consChart()) return `<div class="mscreen charts">${consChart()}</div>`;
     if (!D.pat.length) return `<div class="empty"><h2>Nada para mostrar ainda</h2><p>Cadastre itens para ver os gráficos.</p><div class="acts"><button class="btn primary" data-act="item-new">${ic("plus")}Adicionar item</button></div></div>`;
     const c = chartData(), T = c.total;
     const stat = (label, value, sub = "") => `<div class="kpi"><span>${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
@@ -1554,7 +1591,7 @@
       ${hbars(roomRows)}
     </section>
     <section class="panel" id="g-cats">
-      <h2>${secIc("grid")}Categorias</h2>
+      <h2>${secIc("grid")}Categorias de itens</h2>
       ${c.cats.length > 1 ? lead(`${esc(c.cats[0].name)} vale ${pctTxt(c.cats[0].v, T)} do total.`) : ""}
       ${hbars(catRows)}
     </section>
@@ -1564,6 +1601,7 @@
       ${lead(c.groups.length > 1 ? `${esc(c.groups[0].name)} são ${pctTxt(c.groups[0].v, D.bensTotal)} dos bens.` : `${plural(nb, "bem", "bens")} fora de casa, ${moneyR(D.bensTotal)}.`)}
       ${hbars(bensRows)}
     </section>` : ""}
+    ${consChart()}
     <div class="chart-pair">
     <section class="panel" id="g-bands">
       <h2>${secIc("bars")}Faixas de valor</h2>
@@ -2509,7 +2547,7 @@
   function viewCats() {
     return `
     <section class="panel" id="p-cats">
-      <h2>${secIc("tag")}Categorias</h2>
+      <h2>${secIc("tag")}Categorias de itens</h2>
       <ul class="opts cats">
         <li><div class="ot"><b>${plural(CATS.length, "categoria", "categorias")}</b></div>
           <div class="oa"><button type="button" class="btn" data-act="cat-new">${ic("plus")}Nova categoria</button></div></li>
@@ -3457,7 +3495,7 @@
           ${zonesOn() && room.kind !== "consumiveis" ? `<dt>Zona</dt><dd>${esc(it.zone || "Sem zona")}</dd>` : ""}
           ${room.kind === "consumiveis"
             ? `<dt>Categoria</dt><dd><span class="rnm">${esc(CCAT[it.cat] || "Outros")}</span></dd>
-          <dt>Duração estimada</dt><dd>${esc(durText(it.dur) || "Sem duração")}</dd>`
+          ${durAte(it) ? `<dt>Dura até</dt><dd data-slot="dura-ate">${esc(durAte(it))}</dd>` : `<dt>Duração estimada</dt><dd>Sem duração</dd>`}`
             : `<dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
           <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>`}
           <dt>Origem</dt><dd>${esc(SOURCES[it.source] || "Cadastro manual")}</dd>
@@ -3568,8 +3606,20 @@
     const otherCat = BENS_GROUPS.some(([k]) => k && k === F.cat) ? "outros" : F.cat || "outros"; // Outro guarda a categoria de um item que veio de um cômodo
     const tipoBtns = () => BENS_GROUPS.map(([k, name]) => { const on = (k || "") === bensGroup(F); return `<button type="button" data-ed="tipo" data-v="${k}" aria-pressed="${on}">${ic({ imoveis: "home", veiculos: "car" }[k] || "gem", "sm")}${{ imoveis: "Imóvel", veiculos: "Veículo" }[k] || "Outro"}</button>`; }).join("");
     // 1.82.0: a duração estimada de um consumível: os atalhos (e a de agora, se for outra, como a que veio do CorrerIA)
-    const durChips = () => [["", "Sem duração"], ...DURS, ...(durNum(F.dur) && !DURS.some(([k]) => k === durNum(F.dur)) ? [[durNum(F.dur), durText(F.dur)]] : [])]
-      .map(([k, t]) => `<label class="chip"><input type="radio" name="dur" value="${k}"${String(k) === String(F.dur || "") ? " checked" : ""}>${esc(t)}</label>`).join("");
+    // 1.83.0: e a Outra, com o número e a unidade num quadro logo abaixo (a duração que não é um atalho abre nela)
+    if (F.durOutra === undefined) F.durOutra = !!durNum(F.dur) && !DURS.some(([k]) => k === durNum(F.dur));
+    const durChips = () => [["", "Sem duração"], ...DURS, ["outra", "Outra"]]
+      .map(([k, t]) => `<label class="chip"><input type="radio" name="dur" value="${k}"${(F.durOutra ? k === "outra" : String(k) === String(F.dur || "")) ? " checked" : ""}>${esc(t)}</label>`).join("");
+    const durOutra = () => {
+      if (!F.durOutra) return "";
+      const [n, un] = durPartes(F.dur);
+      return `<div class="sub-box dur-outra"><div class="row2">
+        <div class="field"><label for="f-dur-n">Quanto</label><input id="f-dur-n" class="input" name="durN" inputmode="numeric" maxlength="4" value="${esc(F.durN ?? n)}" placeholder="Ex.: 2"></div>
+        <div class="field"><label for="f-dur-u">Unidade</label><select id="f-dur-u" class="select" name="durU">${[[1, "dias"], [7, "semanas"], [30, "meses"], [365, "anos"]]
+          .map(([k, t]) => `<option value="${k}"${k === +(F.durU ?? un) ? " selected" : ""}>${t}</option>`).join("")}</select></div></div>
+        <p class="err" data-err="dur" hidden></p></div>`;
+    };
+    const durConta = () => { const n = Math.trunc(+String(F.durN ?? "").replace(",", ".")), un = +(F.durU ?? 30); F.dur = n > 0 ? String(n * un) : ""; };
     const roomField = `<div class="field"><label for="f-room">Cômodo</label><select id="f-room" class="select" name="room">${roomOptions(F.room)}</select></div>`;
     const zoneField = `<div class="field"><label for="f-zone">Zona</label><input id="f-zone" class="input" name="zone" data-sug="f-zones" maxlength="120" autocomplete="off" value="${esc(F.zone)}" placeholder="Ex.: Estante, Bancada"><datalist id="f-zones"></datalist></div>`;
     const entry = openDialog({
@@ -3588,7 +3638,8 @@
               : `${cons ? "" : zonesOn() ? `<div class="row2">${roomField}${zoneField}</div>` : roomField}
             <div class="field"><label for="f-cat">Categoria</label><select id="f-cat" class="select" name="cat"><option value="">Escolha a categoria</option>${(cons ? CCATS : CATS).map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`}
             ${cons ? `<div class="field" id="f-dur"><span class="lbl" id="f-dur-l">Duração estimada</span>
-              <div class="chips grid durs" role="radiogroup" aria-labelledby="f-dur-l" data-slot="durs">${durChips()}</div></div>` : ""}
+              <div class="chips grid durs" role="radiogroup" aria-labelledby="f-dur-l" data-slot="durs">${durChips()}</div>
+              <div data-slot="dur-outra">${durOutra()}</div></div>` : ""}
             <div class="row3"${cons ? " hidden" : ""}>
               <div class="field"><label for="f-qty">Quantidade</label><input id="f-qty" class="input" name="qty" maxlength="30" value="${esc(F.qty)}" inputmode="text"></div>
               <div class="field"><label for="f-value">Valor total</label><div class="money"><input id="f-value" class="input" name="value" inputmode="decimal" value="${esc(F.value)}" placeholder="0"></div>
@@ -3657,8 +3708,9 @@
     const showErr = (msg) => { const el = slot("formerr"); el.hidden = !msg; el.innerHTML = msg || ""; if (msg) el.scrollIntoView({ block: "nearest", behavior: "smooth" }); };
     const fieldErr = (name, msg) => {
       const p = $(`[data-err="${name}"]`, dlg), inp = form[name];
+      if (!p) return;
       p.hidden = !msg; p.textContent = msg || "";
-      if (inp) inp.setAttribute("aria-invalid", msg ? "true" : "false");
+      if (inp && inp.setAttribute) inp.setAttribute("aria-invalid", msg ? "true" : "false");
     };
     const setBusy = (on) => {
       F.busy = on;
@@ -3674,8 +3726,18 @@
       const t = e.target;
       if (t.matches("[data-ed-hint]")) { F.hint = t.value; return; }
       if (!t.name) return;
+      if (t.name === "dur") { // 1.83.0: um atalho, ou a Outra (o número e a unidade logo abaixo)
+        F.durOutra = t.value === "outra";
+        if (F.durOutra) { [F.durN, F.durU] = durPartes(F.dur); durConta(); } else { F.dur = t.value; F.durN = F.durU = undefined; }
+        F.dirty = true;
+        slot("dur-outra").innerHTML = durOutra();
+        iconesCampos(dlg);
+        if (F.durOutra) form.durN.focus();
+        return;
+      }
       F[t.name] = t.value;
       F.dirty = true;
+      if (t.name === "durN" || t.name === "durU") { durConta(); fieldErr("dur", ""); }
       if (t.name === "qty" || t.name === "value") renderUnit();
       if (t.name === "name" && t.value.trim()) fieldErr("name", "");
       if (t.name === "value") fieldErr("value", "");
@@ -3729,7 +3791,7 @@
       form.name.value = F.name; form.details.value = F.details;
       if (form.cat) form.cat.value = (cons ? CCAT : CAT)[F.cat] ? F.cat : "";
       if (bem) slot("tipo").innerHTML = tipoBtns();
-      if (cons) slot("durs").innerHTML = durChips();
+      if (cons) { F.durOutra = undefined; F.durN = F.durU = undefined; slot("durs").innerHTML = durChips(); slot("dur-outra").innerHTML = durOutra(); iconesCampos(dlg); }
       form.qty.value = F.qty; form.value.value = F.value; form.flag.value = F.flag;
       if (form.zone) form.zone.value = F.zone;
       renderUnit(); fieldErr("name", ""); fieldErr("value", "");
@@ -3744,6 +3806,10 @@
       let bad = false;
       if (!name) { fieldErr("name", "Dê um nome ao item."); bad = true; }
       if (Number.isNaN(value)) { fieldErr("value", "Use só números, como 1200 ou 1.200,50."); bad = true; }
+      if (cons && F.durOutra && !durNum(F.dur)) { // 1.83.0: a Outra pede o número (até 10 anos)
+        $("#f-dur", dlg).classList.remove("shut");
+        fieldErr("dur", "Diga quanto dura, até 10 anos."); bad = true;
+      }
       if (bad) { (name ? form.value : form.name).focus(); return; }
       // sem zonas, a zona escondida só fica se o item continuar no mesmo cômodo
       const zone = cons ? "" : zonesOn() ? F.zone.trim() : item && F.room === item.room ? item.zone || "" : "";

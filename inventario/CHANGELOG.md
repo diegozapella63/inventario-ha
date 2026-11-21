@@ -1,5 +1,14 @@
 # Mudanças
 
+## 1.83.0
+
+- **Gráficos**: cada gráfico é um cartão que fecha e abre num toque no cabeçalho, como o dos Bens. Novo: **Categorias dos consumíveis**, com quantos há em cada uma.
+- **Categorias de itens**: o nome do cartão das categorias da casa, em Mais › Categorias e nos Gráficos, para não confundir com as dos consumíveis.
+- **Duração estimada**: a **Outra** deixa escolher o número e a unidade (dias, semanas, meses ou anos).
+- **Dura até**: a ficha do consumível mostra até quando ele dura, contando do dia em que a duração foi informada.
+- **Janela do item**: o texto longo, o Cômodo e a Categoria também fecham e abrem pelo título.
+- **CorrerIA e EconomIA**: recebem até quando cada consumível dura.
+
 ## 1.82.0
 
 - **Consumíveis sem quantidade e sem valor**: no lugar, a **Duração estimada**, com os atalhos 1 semana, 15 dias, 1 mês, 3 meses, 6 meses e 1 ano. A lista e a ficha mostram a duração em destaque. O que já estava gravado continua guardado, só não aparece.

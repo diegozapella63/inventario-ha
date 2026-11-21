@@ -72,8 +72,15 @@ async def body(r, p):
     r.eq(opcoes, ["Escolha a categoria", "Limpeza", "Higiene e cuidados", "Cozinha e despensa", "Farmácia", "Pets", "Escritório e papelaria", "Manutenção e reparos",
                   "Pilhas e eletrônicos", "Carro", "Jardim", "Outros"], "as categorias dos consumíveis, já com as sugestões (nenhuma da casa)")
     durs = await pg.evaluate("[...document.querySelectorAll('#f-dur .chip')].map(c => c.textContent.trim())")
-    r.eq(durs, ["Sem duração", "1 semana", "15 dias", "1 mês", "3 meses", "6 meses", "1 ano"], "a Duração estimada com os atalhos")
-    r.eq(txt(await pg.text_content("#f-dur .lbl")), "Duração estimada", "o título do campo")
+    r.eq(durs, ["Sem duração", "1 semana", "15 dias", "1 mês", "3 meses", "6 meses", "1 ano", "Outra"], "a Duração estimada com os atalhos e a Outra (1.83.0)")
+    r.eq(txt(await pg.text_content("#f-dur > .lbl")), "Duração estimada", "o título do campo")
+    # 1.83.0: os campos da janela fecham e abrem pelo título, como nos outros apps (o texto longo e a Categoria também)
+    for alvo, campo in (('label[for="f-details"]', "#f-details"), ('label[for="f-cat"]', "#f-cat")):
+        await pg.click(alvo)
+        r.check(not await pg.locator(campo).is_visible() and await pg.get_attribute(alvo, "aria-expanded") == "false", f"{campo} fecha pelo título")
+        await pg.click(alvo)
+        r.check(await pg.locator(campo).is_visible() and await pg.get_attribute(alvo, "aria-expanded") == "true", f"{campo} abre de novo")
+    r.eq(await pg.locator(".dur-outra").count(), 0, "sem a Outra escolhida, sem o quadro dela")
     cx = await pg.evaluate("[...document.querySelectorAll('#f-dur .chip')].map(c => { const b = c.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height), c.scrollWidth > c.clientWidth + 1]; })")
     r.check(len({c[0] for c in cx}) == 1 and len({c[1] for c in cx}) == 1 and not any(c[2] for c in cx), f"os atalhos do mesmo tamanho, sem cortar ({cx})")
     r.eq(txt(await pg.text_content('label[for="f-details"]')), "O que é e para que serve", "no lugar dos Detalhes")
@@ -119,12 +126,49 @@ async def body(r, p):
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "lista", full_page=True)
 
+    # -- 1.83.0: a duração escolhida à mão (Outra: o número e a unidade) e, na ficha, até quando dura
+    await pg.click(".tabbar .plus")
+    await pg.wait_for_selector("#f-name")
+    await pg.fill("#f-name", "Filtro de água")
+    await pg.locator("#f-dur .chip", has_text="Outra").click()
+    await pg.wait_for_selector(".dur-outra #f-dur-n")
+    r.eq(await pg.evaluate("[...document.querySelectorAll('#f-dur-u option')].map(o => o.textContent)"), ["dias", "semanas", "meses", "anos"], "a unidade da Outra")
+    await pg.click('[data-ed="save"]')
+    await pg.wait_for_timeout(300)
+    r.eq(txt(await pg.text_content('[data-err="dur"]')), "Diga quanto dura, até 10 anos.", "a Outra sem o número: a janela pede")
+    await pg.fill("#f-dur-n", "2")
+    await pg.select_option("#f-dur-u", "365")
+    r.check(await pg.evaluate(OVERFLOW), "a Outra sem rolagem para o lado")
+    await r.shot(pg, "outra")
+    await pg.click('[data-ed="save"]')
+    await pg.locator(".toast", has_text="Consumível adicionado").wait_for(timeout=8000)
+    filtro = next(i for i in r.data()["items"] if i["name"] == "Filtro de água")
+    r.check(filtro["dur"] == 730 and filtro.get("durAt"), f"gravada em dias, com o dia em que foi informada ({filtro})")
+    await pg.locator(".mscreen.cons .irow", has_text="Filtro de água").click()
+    await pg.wait_for_selector("dialog.sheet h1")
+    r.eq(txt(await pg.text_content("dialog.sheet .ival .big")), "2 anos", "a ficha diz 2 anos")
+    import datetime
+    y, m, d0 = (int(x) for x in filtro["durAt"][:10].split("-"))
+    ate = (datetime.date(y, m, d0) + datetime.timedelta(days=730)).strftime("%d/%m/%Y")
+    r.eq(txt(await pg.text_content('dialog.sheet [data-slot="dura-ate"]')), ate, "Dura até: a duração contada do dia em que foi informada")
+    await pg.click('dialog.sheet [data-act="item-edit"]')
+    await pg.wait_for_selector("#f-dur-n")
+    r.check(await pg.input_value("#f-dur-n") == "2" and await pg.input_value("#f-dur-u") == "365" and await pg.locator('#f-dur input[value="outra"]').is_checked(),
+            "ao editar, a Outra vem com o número e a unidade")
+    await pg.click('[data-ed="cancel"]')
+    await pg.wait_for_timeout(300)
+    if await pg.locator('dialog.sheet [data-act="sheet-close"]').count():
+        await pg.click('dialog.sheet [data-act="sheet-close"]')
+        await pg.wait_for_timeout(300)
+    r.api("DELETE", f"api/items/{filtro['id']}")  # o resto do teste conta os três de antes
+    await r.open(pg, "#/consumiveis", ".mscreen.cons")
+
     # -- a ficha: a quantidade em destaque, Onde: Consumíveis, sem zona
     await pg.locator(".mscreen.cons .irow", has_text="Pasta térmica").click()
     await pg.wait_for_selector("dialog.sheet h1")
     r.eq(txt(await pg.text_content("dialog.sheet .ival .big")), "1 ano", "a ficha com a duração em destaque")
     props = await pg.evaluate("[...document.querySelectorAll('dialog.sheet .props dt')].map(d => d.textContent)")
-    r.check(props[0] == "Onde" and "Zona" not in props and "Quantidade" not in props and "Duração estimada" in props, f"Onde e Duração estimada, sem Zona e sem Quantidade ({props})")
+    r.check(props[0] == "Onde" and "Zona" not in props and "Quantidade" not in props and "Dura até" in props and "Duração estimada" not in props, f"Onde e Dura até (a duração já está em destaque), sem Zona e sem Quantidade ({props})")
     r.check("para o calor passar" in txt(await pg.text_content("dialog.sheet .idet")), "com o que é e para que serve")
     await r.shot(pg, "ficha")
     await pg.click('dialog.sheet [data-act="sheet-close"]')
@@ -177,7 +221,25 @@ async def body(r, p):
 
     # -- fora do patrimônio: gráficos, relatório e os outros apps
     await r.open(pg, "#/graficos", ".kpis")
-    r.check("Pasta térmica" not in txt(await pg.text_content("#view")), "Gráficos sem os consumíveis")
+    r.check("Pasta térmica" not in txt(await pg.text_content("#view")), "Gráficos sem os consumíveis no patrimônio")
+    # 1.83.0: os consumíveis têm o gráfico deles, por categoria (quantos em cada uma), e todo gráfico é um cartão que fecha
+    r.eq(txt(await pg.text_content("#g-cons h2")), "Categorias dos consumíveis", "o gráfico das categorias dos consumíveis")
+    linhas = await pg.evaluate("[...document.querySelectorAll('#g-cons .hbar')].map(a => [a.querySelector('.hb-t b').textContent, a.querySelector('.hb-v b').textContent, a.getAttribute('href')])")
+    por_cat = {}
+    ccats = dict((c["id"], c["name"]) if isinstance(c, dict) else (c[0], c[1]) for c in r.data().get("consCats") or [])
+    for i in r.data()["items"]:
+        if i["room"] == con:
+            por_cat[i["cat"]] = por_cat.get(i["cat"], 0) + 1
+    r.check(sorted(int(x[1]) for x in linhas) == sorted(por_cat.values()) and all(x[2] == "#/consumiveis" for x in linhas) and "R$" not in txt(await pg.text_content("#g-cons")),
+            f"quantos em cada categoria, sem valor ({linhas} x {por_cat})")
+    r.eq(txt(await pg.text_content("#g-cats h2")), "Categorias de itens", "as da casa se chamam Categorias de itens")
+    secs = await pg.evaluate("[...document.querySelectorAll('.charts section.panel')].map(s => [s.id, s.classList.contains('dobra'), getComputedStyle(s).borderTopWidth !== '0px'])")
+    r.check(len(secs) >= 5 and all(s[1] and s[2] for s in secs), f"todo gráfico é um cartão que fecha pelo cabeçalho ({secs})")
+    await pg.click("#g-bands > h2")
+    r.check(not await pg.locator("#g-bands .bands").is_visible(), "Faixas de valor fecha num toque")
+    await pg.click("#g-bands > h2")
+    r.check(await pg.locator("#g-bands .bands").is_visible(), "e abre de novo")
+    await r.shot(pg, "graficos", full_page=True)
     await r.open(pg, "#/relatorio", ".report")
     r.check("Pilhas AA" not in txt(await pg.text_content(".report")), "o relatório sem os consumíveis")
     await ctx.close()

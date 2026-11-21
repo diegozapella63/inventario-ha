@@ -245,9 +245,34 @@ def clean_dur(v) -> int:
 
 
 def dur_text(dias) -> str:
-    """7 → "1 semana"; fora dos atalhos, "45 dias"."""
+    """7 → "1 semana"; fora dos atalhos, "45 dias" ou, numa conta redonda (1.83.0, a duração escolhida à mão), "2 anos",
+    "4 meses", "3 semanas". A mesma regra do durText do app.js."""
     n = clean_dur(dias)
-    return dict(DURACOES).get(n) or (f"{n} dias" if n > 1 else "1 dia" if n else "")
+    if not n or dict(DURACOES).get(n):
+        return dict(DURACOES).get(n) or ""
+    for tam, um, varios in ((365, "ano", "anos"), (30, "mês", "meses"), (7, "semana", "semanas")):
+        if n % tam == 0:
+            return f"{n // tam} {um if n // tam == 1 else varios}"
+    return f"{n} dias" if n > 1 else "1 dia"
+
+
+def dur_until(it) -> str:
+    """1.83.0: até quando um consumível dura (AAAA-MM-DD): a duração estimada contada do dia em que foi informada (durAt;
+    num de antes, o do cadastro). Sem duração ou sem data, vazio."""
+    n = clean_dur((it or {}).get("dur"))
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", str((it or {}).get("durAt") or (it or {}).get("createdAt") or ""))
+    if not n or not m:
+        return ""
+    try:
+        return (date(int(m[1]), int(m[2]), int(m[3])) + timedelta(days=n)).isoformat()
+    except (ValueError, OverflowError):
+        return ""
+
+
+def dia_br(iso) -> str:
+    """2027-11-21 → 21/11/2027."""
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", str(iso or ""))
+    return f"{m[3]}/{m[2]}/{m[1]}" if m else ""
 
 
 def fold(t: str) -> str:
@@ -621,6 +646,8 @@ class Store:
             # 1.82.0: um consumível tem a categoria dos consumíveis e a duração estimada; sem quantidade e sem valor
             it["cat"] = body.get("cat") if body.get("cat") in self.cons_cat_map() else CONS_OUTROS
             it["dur"] = clean_dur(body.get("dur"))
+            if it["dur"]:
+                it["durAt"] = ts  # 1.83.0: desde quando a duração conta (o Dura até)
             if not restore:
                 it["qty"], it["value"] = "1", 0
         src = clean_photo_src(body.get("photoSrc"), it["photos"])
@@ -631,7 +658,7 @@ class Store:
         want_id = body.get("id") if restore else None
         want_seq = body.get("seq") if restore else None
         if restore:
-            for k in ("createdAt", "createdBy", "updatedAt", "updatedBy", "valueAt", "approx", "checkedAt"):  # Desfazer volta o item como era
+            for k in ("createdAt", "createdBy", "updatedAt", "updatedBy", "valueAt", "durAt", "approx", "checkedAt"):  # Desfazer volta o item como era
                 if body.get(k) is not None:
                     it[k] = body[k]
             if not body.get("valueAt"):
@@ -696,6 +723,8 @@ class Store:
                 new["cat"] = want if want in self.cons_cat_map() else CONS_OUTROS
                 if "dur" in body:
                     new["dur"] = clean_dur(body["dur"])
+                    if new["dur"] != clean_dur(it.get("dur")):
+                        new["durAt"] = now_iso()  # 1.83.0: a duração mudou: o Dura até conta de hoje
             elif new.get("cat") not in self.cat_map():  # saiu dos consumíveis: a categoria de lá não vale na casa
                 new["cat"] = "outros"
             if "qty" in body and not cons:
@@ -4682,7 +4711,7 @@ def chat_context(screen: dict) -> str:
                      "sem quantidade e sem valor; código e nome | categoria | quanto dura (estimado) | o que é e para que serve):")
         for i in sorted(consumiveis, key=lambda i: i.get("seq") or 0)[:MAX_ITENS_CHAT]:
             lines.append("- " + " | ".join(b for b in (f"{STORE.tag(i)} {i.get('name', '')}", STORE.cat_of(i),
-                                                     f"dura {dur_text(i.get('dur'))}" if clean_dur(i.get("dur")) else "",
+                                                     f"dura {dur_text(i.get('dur'))}" + (f", até {dia_br(dur_until(i))}" if dur_until(i) else "") if clean_dur(i.get("dur")) else "",
                                                      " ".join(str(i.get("details") or "").split())[:200]) if b))
     return "\n".join(lines)
 
@@ -5751,7 +5780,7 @@ def r_integracao_consumiveis(h, query):
         items.sort(key=lambda it: (it.get("name") or "").lower())
         # 1.82.0: sem quantidade (um consumível não tem mais); a duração estimada, em dias (0: sem), para o A cada do EconomIA
         out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "categoria": STORE.cat_of(it),
-                "duracao_dias": clean_dur(it.get("dur")), "duracao": dur_text(it.get("dur")), "para_que_serve": " ".join(str(it.get("details") or "").split())[:240]} for it in items]
+                "duracao_dias": clean_dur(it.get("dur")), "duracao": dur_text(it.get("dur")), "dura_ate": dur_until(it), "para_que_serve": " ".join(str(it.get("details") or "").split())[:240]} for it in items]
     h.send_json({"versao": VERSION, "ligado": consumiveis_enabled(), "consumiveis": out[:500]})
 
 
