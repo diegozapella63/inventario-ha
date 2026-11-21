@@ -114,7 +114,7 @@ async def body(r, p):
     d3 = day(3, now)
     r.eq(rows[2][3], f"31 s · ≈ 3 mil tokens · {d3[8:10]}/{d3[5:7]} {hm(now - 3 * 86400)}", "a mais antiga diz o dia; sem imagem, não fala de imagem")
     t = await help_text()
-    r.check(t.startswith("OpenAI: consumo e custo em platform.openai.com/usage. A estimativa conta só o texto."), f"OpenAI: o link do consumo da OpenAI ({t[:80]})")
+    r.eq(t, "OpenAI: consumo e custo em platform.openai.com/usage.", "OpenAI: o link do consumo da OpenAI")
     a = await pg.evaluate("(a => [a.href, a.target, a.rel])(document.querySelector('#p-usage .help a'))")
     r.eq(a, ["https://platform.openai.com/usage", "_blank", "noopener noreferrer"], "o link abre fora do app")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
@@ -140,7 +140,7 @@ async def body(r, p):
     await pg.reload()
     await panel()
     linhas = await pg.evaluate("document.querySelector('#p-usage .help').innerHTML.split('<br>').map(l => l.replace(/<[^>]+>/g, '').trim())")
-    r.check(len(linhas) == 3 and linhas[0].startswith("Gemini: consumo e cota no Google AI Studio") and linhas[1].startswith("Claude: consumo e custo no Claude Console") and linhas[2] == "A estimativa conta só o texto.",
+    r.check(len(linhas) == 2 and linhas[0].startswith("Gemini: consumo e cota no Google AI Studio") and linhas[1].startswith("Claude: consumo e custo no Claude Console"),
             f"duas IAs em uso: o consumo de cada uma, uma por linha ({linhas})")
     r.eq(await pg.locator("#p-usage .help a").count(), 3, "com os links das duas")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
@@ -153,7 +153,7 @@ async def body(r, p):
     write("padrão do Home Assistant")
     await panel()
     t = await help_text()
-    r.check(t.startswith("Consumo exato e custo: no painel do provedor da sua IA."), f"IAs de vários provedores: o texto geral, sem link ({t[:50]})")
+    r.eq(t, "O consumo exato fica no painel do provedor da IA.", "IAs de vários provedores: o texto geral dos outros apps, sem link")
     r.eq(await pg.locator("#p-usage .help a").count(), 0, "e nenhum link")
     ha.states = [s for s in ha.states if not s["entity_id"].startswith(("ai_task.", "conversation.google"))] + [CLAUDE]
     await panel()

@@ -1106,6 +1106,7 @@
   const tipoArea = (t) => tipoBens(t) || t === "consumiveis"; // fora dos cômodos: sem o cômodo e a categoria
   function viewSearch(q) {
     const ord = q.ord || (q.q ? "rel" : "val");
+    const filtrosShut = LS.get("busca-filtros-fechado", false) === true;
     const TIPOS = tipos(), tipo = TIPOS.some(([k]) => k === q.tipo) ? q.tipo || "" : "", house = !tipoArea(tipo);
     const n = (TIPOS.length ? 1 : 0) + (house ? (itensOn() ? 2 : 1) : 0) + 1;
     return `
@@ -1114,7 +1115,8 @@
         <input class="input" type="search" name="q" data-input="search-q" value="${esc(q.q || "")}" placeholder="${zonesOn() ? "Nome, marca, detalhe ou zona" : "Nome, marca ou detalhe"}" aria-label="Buscar itens" autocomplete="off" enterkeyhint="search">
         <button type="button" class="btn ghost icon sm clear" data-act="search-clear" aria-label="Limpar busca"${q.q ? "" : " hidden"}>${ic("close", "sm")}</button>
       </form>
-      <div class="sfilters n${n}">
+      <button type="button" class="filtros-h" id="filtros-h" data-act="search-filtros" aria-expanded="${!filtrosShut}">${ic("sliders", "sm")}<span>Filtros</span>${ic("chev", "sm seta")}</button>
+      <div class="sfilters n${n}" role="group" aria-labelledby="filtros-h"${filtrosShut ? " hidden" : ""}>
         ${TIPOS.length ? `<select class="select" data-input="search-tipo" aria-label="Tipo">
           ${TIPOS.map(([k, v]) => `<option value="${k}"${k === tipo ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>` : ""}
         ${house && itensOn() ? `<select class="select" data-input="search-room" aria-label="Cômodo"><option value="">Todos os cômodos</option>
@@ -1991,6 +1993,7 @@
     </section>` : ""}
     <section class="panel" id="p-correria">
       <h2>${secIc("flash")}CorrerIA</h2>
+      <p class="lead">O CorrerIA junta os apps da casa no WhatsApp, no Claude e no Gemini.</p>
       <ul class="opts"><li><div class="ot"><b id="correria-h">${oti("chat")}Usar com o CorrerIA</b><span>${correriaOn()
         ? "Ligado: pelo WhatsApp, o Claude e o Gemini leem e mudam o inventário."
         : "Para o WhatsApp, o Claude e o Gemini lerem e mudarem o inventário."}</span></div>
@@ -2006,12 +2009,12 @@
     </section>
     ${on ? `<section class="panel" id="p-voice">
       <h2>${secIc("mic")}Falar</h2>
-      <p class="lead" data-slot="voice-lead">${voiceLead(aiCache.data)}</p>
+      <p class="lead">Quem transforma a fala em texto. Não muda o assistente de voz do Home Assistant.</p>
       <div data-slot="voice-panel"><p class="muted">Verificando…</p></div>
     </section>
     <section class="panel" id="p-usage">
       <h2>${secIc("bars")}Uso da IA</h2>
-      <p class="lead">O Home Assistant não informa tokens nem custo: o app conta as chamadas e estima os tokens.</p>
+      <p class="lead">As chamadas do app para a IA. Os tokens são estimados.</p>
       <div data-slot="usage"><p class="muted">Carregando…</p></div>
     </section>
     <section class="panel" id="p-sensors">
@@ -2105,14 +2108,14 @@
       openai: `OpenAI: consumo e custo em ${link("https://platform.openai.com/usage", "platform.openai.com/usage")}.`,
       anthropic: `Claude: consumo e custo no ${link("https://platform.claude.com/usage", "Claude Console")}; o saldo dos créditos, em ${link("https://platform.claude.com/settings/billing", "Billing")}.`,
     };
-    const provTxt = provs.length ? provs.map((k) => NOTES[k]).join("<br>") : "Consumo exato e custo: no painel do provedor da sua IA.";
+    const provTxt = provs.length ? provs.map((k) => NOTES[k]).join("<br>") : "O consumo exato fica no painel do provedor da IA.";
     slot.innerHTML = `<div class="uso-tiles">${tile("Hoje", u.today)}${tile("7 dias", u.week)}${tile("Este mês", u.month)}</div>
       <div class="uso-chart" role="group" aria-label="Chamadas de IA nos últimos 7 dias">${bars}</div>
       <div class="uso-dias" aria-hidden="true">${u.days.map((d) => `<span>${d.day === today ? "hoje" : weekday(d.day)}</span>`).join("")}</div>
       <p class="uso-cap" aria-live="polite">${dayLong(sel.day)}: <b>${plural(sel.calls || 0, "chamada", "chamadas")}</b>${sel.errors ? `, ${int(sel.errors)} com erro` : ""}${sel.quota ? `, ${int(sel.quota)} sem cota` : ""}.</p>
       ${kinds.length ? `<ul class="uso-tipos" aria-label="Nos últimos 7 dias">${kinds.map(([k, n]) => `<li>${esc(USAGE_KIND[k] || k)} <b>${int(n)}</b></li>`).join("")}</ul>` : ""}
-      <details class="uso-ult"><summary>${ic("chev", "sm")}${oti("history")}Últimas chamadas</summary><ul>${recent || "<li>Nenhuma chamada ainda.</li>"}</ul></details>
-      <p class="help">${provTxt}${provs.length > 1 ? "<br>" : " "}A estimativa conta só o texto.</p>`;
+      <details class="uso-ult"><summary>${ic("chev", "sm")}${oti("history")}Últimas chamadas${(u.recent || []).length ? ` (${u.recent.length})` : ""}</summary><ul>${recent || "<li>Nenhuma chamada ainda.</li>"}</ul></details>
+      <p class="help">${provTxt}</p>`;
   }
   function moreData() {
     return `
@@ -2606,8 +2609,8 @@
   }
   // Falar: quem separa os itens é a IA, se houver uma pronta (como no openCatalog); sem ela, o app, pelas vírgulas
   const voiceSplit = (st) => (st && !st.ready ? "o app separa pelas vírgulas" : "a IA separa os itens");
-  const voiceLead = (st) => `Fale os itens e quanto valem.${st ? ` O Home Assistant transcreve e ${voiceSplit(st)}.` : ""}`; // antes de saber, não diz quem separa
-  function paintVoiceLead() { const el = $('#view [data-slot="voice-lead"]'); if (el) el.textContent = voiceLead(aiCache.data); }
+  // 1.80.0: o cartão Falar tem o texto dos outros apps; quem separa os itens aparece na linha de quem transcreve
+  function paintVoiceLead() { const slot = $('#view [data-slot="voice-panel"]'); if (slot && S.voice) renderVoicePanel(slot); }
   function aiReasonText(st) {
     switch (st.reason) {
       case "no_api": return "O app não tem acesso à API do Home Assistant.";
@@ -3846,16 +3849,23 @@
   }
   function renderVoicePanel(slot) {
     const v = S.voice, engines = (v && v.engines) || [], sel = (v && v.selected) || "";
-    // quem transcreve é a fala para texto; o assistente de voz só diz qual é o padrão (o nome dele não é quem transcreve)
-    const using = v && v.ready ? `Transcreve com ${esc(v.name || v.engine)} (${esc(v.language || "pt-BR")})${!sel && v.assistant ? `, do assistente ${esc(v.assistant)}` : ""}.` : "";
+    // 1.80.0: os mesmos textos dos outros apps da família: quem transcreve, a Fala para texto (com Automático, que diz
+    // qual é), Verificar de novo e, sem fala para texto, Como configurar. Só aqui: sem uma IA que responda, o app separa
+    // os itens sozinho, e a linha diz
+    const split = v && v.ready && aiCache.data && !aiCache.data.ready ? " Sem a IA, o app separa os itens pelas vírgulas." : "";
+    const using = v && v.ready ? `Transcreve com ${esc(v.name || v.engine)}.${v.missing ? " O escolhido não foi encontrado: usando o automático." : ""}${split}` : "";
     slot.innerHTML = `<ul class="opts"><li><div class="ot"><b><span class="status ${v && v.ready ? "ok" : "bad"}"><i></i>${v && v.ready ? "Pronto para ouvir" : v ? "Sem fala para texto" : "Verificando…"}</span></b>
-        <span>${v && v.ready ? `${using}${v.missing ? " A escolhida saiu do Home Assistant: usando o padrão." : ""}` : esc((v && v.reason) || "")}</span></div>
+        <span>${v && v.ready ? using : esc((v && v.reason) || "")}</span></div>
       <div class="oa"><button class="btn" data-act="voice-refresh">${ic("refresh")}Verificar de novo</button></div></li>
-      ${engines.length ? `<li><div class="ot"><b id="voice-stt-l">${oti("mic")}Fala para texto</b><span>Padrão do Home Assistant usa a do assistente de voz preferido.</span></div>
+      ${engines.length ? `<li><div class="ot"><b id="voice-stt-l">${oti("mic")}Fala para texto</b></div>
         <div class="oa"><select class="select" data-input="voice-stt" aria-labelledby="voice-stt-l">
-          <option value="">Padrão do Home Assistant</option>
+          <option value="">Automático${!sel && v.ready && innerWidth >= 384 ? `: ${esc(v.name || v.engine)}` : "" /* num celular estreito o nome não cabe na caixa: a linha de cima já diz quem transcreve */}</option>
           ${engines.map((e) => `<option value="${esc(e.id)}"${e.id === sel ? " selected" : ""}>${esc(e.name)}</option>`).join("")}
-        </select></div></li>` : ""}</ul>`;
+        </select></div></li>` : ""}</ul>
+      ${v && !v.ready ? `<div class="steps-box"><b>Como configurar</b><ol class="steps">
+        <li>Com o Home Assistant Cloud, a fala para texto já vem pronta.</li>
+        <li>Sem ele, instale um motor de fala: o app Whisper (local, de graça) com a integração Wyoming, ou a fala para texto de uma IA como Google Gemini ou OpenAI.</li>
+        <li>Volte aqui, toque em Verificar de novo e escolha o motor na lista.</li></ol></div>` : ""}`;
   }
   const voiceReady = () => aiOn() && !!(S.voice && S.voice.ready); // com Usar IA desligada, o Falar some junto
   const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -5008,6 +5018,13 @@
       case "item-move": if (item) moveItem(item); break;
       case "item-delete": if (item) deleteItem(item); break;
       case "sheet-close": if (sheet) requestClose(sheet); break;
+      case "search-filtros": { // 1.80.0: Buscar › Filtros fecha e abre num toque no título (o aparelho lembra), como nos outros apps
+        const shut = !LS.get("busca-filtros-fechado", false);
+        LS.set("busca-filtros-fechado", shut);
+        b.setAttribute("aria-expanded", String(!shut));
+        const f = $("#view .sfilters"); if (f) f.hidden = shut;
+        break;
+      }
       case "search-clear": { const inp = $('#view [data-input="search-q"]'); if (inp) { inp.value = ""; inp.focus(); } updateSearch({ q: "" }); break; }
       case "search-reset": base.q = { q: base.q.q || "" }; renderView(false); try { history.replaceState(history.state, "", hashOf(base)); } catch { /* ok */ } break;
       case "more-results": searchLimit += 120; selRender(); break;

@@ -372,7 +372,10 @@ dialog.modal.chat { width: min(560px, calc(100vw - 32px)); height: min(78dvh, 68
 @media (prefers-reduced-motion: reduce) { .msg.typing i { animation: none; } }
 .chat-empty { margin: auto 0 0; display: grid; gap: 12px; color: var(--muted); }
 .chat-empty p { margin: 0; }
-.chat-ideas { display: flex; flex-wrap: wrap; gap: 8px; }
+/* 1.80.0: as perguntas prontas no meio da largura, uma por linha, como no CorrerIA (igual em todos os apps) */
+.chat-ideas { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.chat-empty, .chat-quick { text-align: center; justify-items: center; }
+.chat-empty .chat-ed, .chat-quick .chat-ed { text-align: left; justify-self: stretch; }
 button.chip { font: inherit; font-size: 14.5px; text-align: left; }
 .chat-f { flex: none; display: grid; gap: 6px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
 .chat-ctx { margin: 0 4px; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -697,6 +700,14 @@ div.croom:hover { background: none; }
 .sbar .q .ic { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); }
 .sbar .q .input { height: 52px; padding-left: 46px; padding-right: 44px; font-size: 18px; border-radius: 10px; }
 .sbar .q .clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
+/* 1.80.0: Buscar › Filtros: o título dos filtros (como nos outros apps), que fecha e abre num toque */
+.filtros-h { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 0 2px; border: 0; background: none; color: var(--ink); font: inherit; font-weight: 600; font-size: 15px; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.filtros-h > span { flex: 1; min-width: 0; }
+.filtros-h > svg:first-child { color: var(--accent-ink, var(--accent)); }
+.filtros-h .seta { color: var(--muted); transition: transform .2s; }
+.filtros-h[aria-expanded="false"] .seta { transform: rotate(-90deg); }
+.filtros-h:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.sfilters[hidden] { display: none; }
 .sfilters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .sfilters .select { height: 44px; font-size: 15px; padding-left: 10px; padding-right: 26px; background-position: right 6px center; } /* "Todas as categorias" cabe em meia largura */
 .sfilters.n4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -1206,12 +1217,14 @@ summary .ot-ic { margin-right: 2px; } /* os recolhidos também: a seta e o ícon
 .opts > li:has(> .oa > .switch) .ot { min-width: 0; } /* a chave fica à direita, mesmo no celular estreito */
 .opts .ot b { display: block; font-weight: 600; }
 .opts .ot > span { color: var(--muted); font-size: 14px; }
-.opts .oa { display: flex; gap: 8px; flex-wrap: wrap; }
+.opts .oa { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; max-width: 100%; } /* uma lista com um nome comprido (Automático: …) não passa da linha */
 .status { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
 .status i { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); }
 .status.ok i { background: var(--ok); }
 .status.warn i { background: var(--warn); }
 .status.bad i { background: var(--danger); }
+.steps-box { margin-top: 14px; }
+.steps-box > b { display: block; }
 .steps { margin: 10px 0 0; padding-left: 20px; color: var(--ink-2); font-size: 15px; display: grid; gap: 6px; }
 /* Atalho no celular: o caminho com o Copiar ao lado */
 .atalho-f { margin-top: 14px; }

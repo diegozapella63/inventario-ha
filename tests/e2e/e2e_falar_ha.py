@@ -48,8 +48,9 @@ async def body(r, p):
         add = (await pg.text_content('dialog [data-go="voice"] small')).strip()
         await pg.click("dialog [data-x]")
         await r.open(pg, "#/config/integracoes", "#p-voice")
-        await pg.wait_for_function("document.querySelector('[data-slot=\"voice-lead\"]').textContent.includes('transcreve')", timeout=8000)
-        return add, (await pg.text_content('[data-slot="voice-lead"]')).strip()
+        await pg.wait_for_selector('[data-slot="voice-panel"] .status.ok', timeout=8000)
+        # 1.80.0: o cartão Falar com os textos dos outros apps; quem separa os itens fica na linha de quem transcreve
+        return add, [(await pg.text_content("#p-voice > .lead")).strip(), " ".join((await pg.text_content('[data-slot="voice-panel"] .ot span:not(.status)')).split())]
 
     async def voice_error():
         await pg.wait_for_selector(".voice .formerr, .dlg-b > .formerr", timeout=15000)
@@ -81,7 +82,7 @@ async def body(r, p):
     await pg.select_option('[data-input="voice-stt"]', "stt.faster_whisper")
     await pg.locator(".toast", has_text="Falar agora transcreve com faster-whisper").wait_for(timeout=8000)
     st = " ".join((await pg.text_content('[data-slot="voice-panel"] .ot span:not(.status)')).split())
-    r.eq(st, "Transcreve com faster-whisper (pt).", "Integrações: a escolhida e o idioma dela")
+    r.eq(st, "Transcreve com faster-whisper.", "Integrações: a escolhida")
     await r.shot(pg, "integracoes-faster-whisper")
     await speak()
     await pg.wait_for_selector(".found li", timeout=15000)
@@ -94,9 +95,9 @@ async def body(r, p):
     ha.states = [s for s in ha.states if s["entity_id"] != "stt.faster_whisper"]
     await r.open(pg, "#/config/integracoes", ".more-tabs")
     await pg.click('[data-act="voice-refresh"]')
-    await pg.wait_for_function("(document.querySelector('[data-slot=voice-panel]') || {}).textContent?.includes('saiu do Home Assistant')", timeout=10000)
+    await pg.wait_for_function("(document.querySelector('[data-slot=voice-panel]') || {}).textContent?.includes('não foi encontrado')", timeout=10000)
     st = " ".join((await pg.text_content('[data-slot="voice-panel"] .ot span:not(.status)')).split())
-    r.check("A escolhida saiu do Home Assistant: usando o padrão." in st and "Home Assistant Cloud (pt-BR)" in st, f"a escolhida sumiu: avisa e usa o padrão ({st[:70]})")
+    r.eq(st, "Transcreve com Home Assistant Cloud. O escolhido não foi encontrado: usando o automático.", "a escolhida sumiu: avisa e usa o automático")
     await speak()
     await pg.wait_for_selector(".found li", timeout=15000)
     r.eq(stt_posts(ha)[-1]["path"], STT + "stt.home_assistant_cloud", "e transcreve com a do assistente")
@@ -153,7 +154,8 @@ async def body(r, p):
     await pg.click('[data-r="1"]')
     add, lead = await falar_says(pg)
     r.eq(add, "Diga o que tem e quanto vale; a IA separa os itens", "com uma IA pronta, Falar os itens diz que a IA separa")
-    r.eq(lead, "Fale os itens e quanto valem. O Home Assistant transcreve e a IA separa os itens.", "e o painel Falar também")
+    r.eq(lead[0], "Quem transforma a fala em texto. Não muda o assistente de voz do Home Assistant.", "o cartão Falar com o texto dos outros apps")
+    r.check(lead[1].startswith("Transcreve com ") and "separa" not in lead[1], f"com a IA, a linha só diz quem transcreve ({lead[1]})")
     await ctx.close()
 
     # -- IA ligada, mas sem uma IA no Home Assistant que responda: a fala para texto continua, e o app separa pelas vírgulas
@@ -169,7 +171,7 @@ async def body(r, p):
     await r.shot(pg, "sem-ia")
     add, lead = await falar_says(pg)
     r.eq(add, "Diga o que tem e quanto vale; o app separa pelas vírgulas", "sem IA que responda, Falar os itens diz que o app separa pelas vírgulas")
-    r.eq(lead, "Fale os itens e quanto valem. O Home Assistant transcreve e o app separa pelas vírgulas.", "e o painel Falar também")
+    r.check(lead[1].endswith("Sem a IA, o app separa os itens pelas vírgulas."), f"e o cartão Falar também ({lead[1]})")
     r.check("a IA separa" not in await pg.text_content("#p-voice"), "nada diz que a IA separa")
     await r.shot(pg, "sem-ia-integracoes", full_page=True)
     await ctx.close()

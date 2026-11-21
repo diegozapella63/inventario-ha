@@ -1,5 +1,12 @@
 # Mudanças
 
+## 1.80.0
+
+- **Buscar › Filtros**: os filtros ganharam o título **Filtros**, como nos outros apps; um toque nele fecha e abre, e o aparelho lembra.
+- **Conversa**: as perguntas prontas ficam no meio da tela, uma por linha, como no CorrerIA.
+- **Integrações › Falar**: os mesmos textos dos outros apps: **Pronto para ouvir** e quem transcreve, a **Fala para texto** com **Automático** (que diz qual é) e, sem fala para texto, **Como configurar**.
+- Os mesmos textos dos outros apps em **Uso da IA** (as **Últimas chamadas** dizem quantas são) e em **CorrerIA**.
+
 ## 1.79.1
 
 - **Agora**: o nome de cada quadro (Itens da casa, Bens, Consumíveis) cabe inteiro em qualquer celular. Em alguns, "Itens da casa" ficava cortado.

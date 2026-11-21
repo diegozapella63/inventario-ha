@@ -33,6 +33,16 @@ async def body(r, p):
 
     # -- ordens
     await r.open(pg, "#/buscar", ".ssum")
+    # 1.80.0: o título dos filtros se chama Filtros, como nos outros apps; fecha e abre num toque, e o aparelho lembra
+    fh = pg.locator(".sbar .filtros-h")
+    r.eq([(await fh.inner_text()).strip(), await fh.get_attribute("aria-expanded"), await fh.locator("svg").count()], ["Filtros", "true", 2], "Buscar: o título Filtros, com o ícone e a seta, aberto")
+    r.check(await pg.locator(".sfilters select").first.is_visible(), "aberto: os filtros à mostra")
+    await fh.click()
+    r.eq([await fh.get_attribute("aria-expanded"), await pg.locator(".sfilters").is_visible()], ["false", False], "um toque fecha os filtros")
+    await pg.reload(); await pg.wait_for_selector(".ssum")
+    r.eq([await pg.locator(".sbar .filtros-h").get_attribute("aria-expanded"), await pg.locator(".sfilters").is_visible()], ["false", False], "o aparelho lembra fechado")
+    await pg.locator(".sbar .filtros-h").click()
+    r.eq([await pg.locator(".sbar .filtros-h").get_attribute("aria-expanded"), await pg.locator(".sfilters").is_visible()], ["true", True], "outro toque abre")
     r.eq(await pg.input_value('[data-input="search-ord"]'), "val", "sem busca, a ordem começa por Maior valor")
     await order(pg, "az")
     names = await pg.evaluate(NAMES)
