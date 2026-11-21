@@ -2002,7 +2002,7 @@
     </section>
     <section class="panel" id="p-ai">
       <h2>${secIc("scan")}IA</h2>
-      <p class="lead">A IA configurada no Home Assistant: Claude, OpenAI, Gemini ou Ollama.</p>
+      <p class="lead">Usa a IA configurada no Home Assistant: Claude, OpenAI, Gemini ou Ollama.</p>
       <ul class="opts"><li${on ? ' class="tem-sub"' : ""}><div class="ot"><b id="ai-on-h">${oti("spark")}Usar IA</b><span>${on ? "Ler fotos, catalogar e buscar na internet." : "Os botões de IA e o Falar ficam escondidos."}</span></div>
         <div class="oa">${switchHtml("ai-on", on, "ai-on-h")}</div></li></ul>
       ${on ? `<div class="sub-op"><div class="sub-box" data-slot="ai-panel"><p class="muted">Verificando…</p></div></div>` : ""}
@@ -2121,27 +2121,27 @@
     return `
     <section class="panel" id="p-backup">
       <h2>${secIc("archive")}Backup na pasta share</h2>
-      <p class="lead">Cópia completa, com fotos, em <span class="codepath">share/inventario</span>. Os backups do Home Assistant também incluem o inventário.</p>
+      <p class="lead">Cópia completa, com fotos, em <span class="codepath">share/inventario</span>. Os backups do Home Assistant também incluem o InventarIA.</p>
       <div data-slot="backups"><p class="muted">Carregando backups…</p></div>
     </section>
     <section class="panel" id="p-import">
       <h2>${secIc("upload")}Importar</h2>
-      <p class="lead">Backup .zip, com fotos, ou .json do app. Antes, o app guarda uma cópia do atual.</p>
+      <p class="lead">Um .zip, com fotos, ou .json exportado pelo InventarIA. Antes, o app guarda uma cópia do que existe hoje.</p>
       <div class="sec-acao"><button class="btn" data-act="import-file">${ic("upload")}Escolher arquivo</button></div>
       <p class="help">${MULTI_PICK ? "Backup em partes: escolha todas de uma vez." : "Backup em partes: uma de cada vez, começando pela parte 1."}</p>
     </section>
     <section class="panel" id="p-history">
       <h2>${secIc("history")}Versões anteriores</h2>
-      <p class="lead">Uma cópia a cada 10 minutos de uso e antes de importar, restaurar ou apagar tudo. Ficam as 3 mais recentes.</p>
+      <p class="lead">Uma cópia a cada 10 minutos de uso e antes de importar, restaurar ou começar do zero. Ficam as 3 mais recentes.</p>
       <div class="sec-acao"><button class="btn" data-act="versions">${ic("history")}Ver versões</button></div>
     </section>
     <section class="panel" id="p-where">
       <h2>${secIc("folder")}Onde ficam os dados</h2>
-      <p class="lead">Itens em <span class="codepath">inventario.json</span> e fotos em JPG, dentro do app. Entram nos backups do Home Assistant.</p>
+      <p class="lead">Itens em <span class="codepath">inventario.json</span> e fotos em JPG, dentro do app, no backup do Home Assistant.</p>
     </section>
     <section class="panel" id="p-zero">
       <h2>${secIc("trash")}Começar do zero</h2>
-      <p class="lead">Apaga os cômodos, os bens e os itens. As categorias e as opções continuam, e uma cópia fica em Versões anteriores.</p>
+      <p class="lead">Apaga os cômodos, os bens e os itens. As categorias e as opções continuam. Uma cópia fica em Versões anteriores.</p>
       <div class="sec-acao"><button type="button" class="btn danger" data-act="erase-all"${S.items.length || S.rooms.length ? "" : " disabled"}>${ic("trash")}Apagar tudo</button></div>
     </section>`;
   }
@@ -3863,7 +3863,7 @@
           ${engines.map((e) => `<option value="${esc(e.id)}"${e.id === sel ? " selected" : ""}>${esc(e.name)}</option>`).join("")}
         </select></div></li>` : ""}</ul>
       ${v && !v.ready ? `<div class="steps-box"><b>Como configurar</b><ol class="steps">
-        <li>Com o Home Assistant Cloud, a fala para texto já vem pronta.</li>
+        <li>Com o <a class="site" href="https://www.nabucasa.com/" target="_blank" rel="noopener noreferrer">Home Assistant Cloud</a>, a fala para texto já vem pronta.</li>
         <li>Sem ele, instale um motor de fala: o app Whisper (local, de graça) com a integração Wyoming, ou a fala para texto de uma IA como Google Gemini ou OpenAI.</li>
         <li>Volte aqui, toque em Verificar de novo e escolha o motor na lista.</li></ol></div>` : ""}`;
   }

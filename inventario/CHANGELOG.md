@@ -1,5 +1,11 @@
 # Mudanças
 
+## 1.81.1
+
+- **Conversa**: a IA sabe quais são os outros apps da casa e, quando a pergunta é de outro app, diz em qual deles está.
+- **Falar › Como configurar**: o **Home Assistant Cloud** abre o site num toque.
+- **Dados** e **IA**: os textos de cima no mesmo jeito dos outros apps.
+
 ## 1.81.0
 
 - **Consumíveis no EconomIA**: com **Usar consumíveis** ligado, o EconomIA (1.46.0) pode escolher um consumível daqui para a **Reposição** dele (o que comprar de novo de tempos em tempos). Nada muda no inventário.

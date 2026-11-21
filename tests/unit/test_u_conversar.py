@@ -185,6 +185,12 @@ class Instrucoes(UnitBase):
 
     def test_nao_muda_o_inventario(self):
         self.assertIn("Você não muda o inventário", server.chat_prompt(msgs("oi"), {}, None))
+        # 1.81.1: o contexto da família (a mesma frase em todos os apps)
+        p = server.chat_prompt(msgs("oi"), {}, None)
+        self.assertIn(server.FAMILIA_IA, p)
+        for app in ("ResolvIA (listas de tarefas)", "CronologIA (agenda", "GerencIA (finanças)", "InventarIA (inventário", "MemorIA (blocos", "EconomIA (lista de compras", "CorrerIA (os apps no WhatsApp"):
+            self.assertIn(app, server.FAMILIA_IA)
+        self.assertTrue(server.FAMILIA_IA.endswith("Você só vê os dados deste app: se a pessoa perguntar algo que é de outro, diga em qual app está, sem inventar."))
 
     def test_qualquer_assunto(self):
         self.assertIn("qualquer outro assunto", server.chat_prompt(msgs("oi"), {}, None))

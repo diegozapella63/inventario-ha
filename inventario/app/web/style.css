@@ -143,6 +143,7 @@ body {
 img { display: block; max-width: 100%; }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 25; background: var(--paper); }
 a { color: inherit; }
+a.site { color: var(--accent); font-weight: 600; } /* 1.81.1: um site citado num texto abre o site */
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus { outline: none; }

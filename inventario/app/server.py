@@ -4567,6 +4567,10 @@ def chat_context(screen: dict) -> str:
     return "\n".join(lines)
 
 
+# 1.82.0: o contexto da família, igual em todos os apps: a IA só vê os dados daqui e diz em qual app está o resto
+FAMILIA_IA = ("Este app é um dos apps da casa (a família da CorrerIA Code), cada um com o seu assunto: ResolvIA (listas de tarefas), CronologIA (agenda, rotinas, remédios e placar), GerencIA (finanças), InventarIA (inventário da casa), MemorIA (blocos de anotações), EconomIA (lista de compras e preços) e CorrerIA (os apps no WhatsApp e em outras IAs). Você só vê os dados deste app: se a pessoa perguntar algo que é de outro, diga em qual app está, sem inventar.")
+
+
 def chat_prompt(messages: list[dict], screen: dict, user: str | None, anexos: int = 0) -> str:
     conv = []
     for m in messages[-CHAT_TURNS:]:
@@ -4575,6 +4579,7 @@ def chat_prompt(messages: list[dict], screen: dict, user: str | None, anexos: in
         conv.append(f"{who}: {arqs}{m['text']}".rstrip())
     return "\n".join([
         "Você é o assistente do InventarIA, o app de inventário da casa, dentro do Home Assistant.",
+        FAMILIA_IA,  # 1.82.0: os outros apps da casa, para dizer em qual está o que não é daqui
         # 1.76.0: quem usa agora (cada item diz quem cadastrou): "você" é essa pessoa
         *([f"Quem está usando agora: {user}. Cada item diz quem o cadastrou; os itens são da casa toda."] if user else []),
         "Responda em português do Brasil, com todos os acentos e o ç (você, às, não, alimentação), curto e direto, em texto simples (no máximo uma lista curta).",

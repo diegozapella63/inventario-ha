@@ -153,7 +153,8 @@ async def body(r, p):
     await pg.wait_for_function("(e => e && e.textContent.includes('Sem fala para texto'))(document.querySelector('[data-slot=voice-panel] .status'))", timeout=10000)
     r.check("Assistentes de voz" in await pg.text_content('[data-slot="voice-panel"]'), "sem fala para texto: diz onde configurar")
     passos = await pg.evaluate("[...document.querySelectorAll('#p-voice .steps-box .steps li')].map(l => l.textContent)")
-    r.check((await pg.text_content("#p-voice .steps-box > b")) == "Como configurar" and len(passos) == 3 and passos[0] == "Com o Home Assistant Cloud, a fala para texto já vem pronta.", f"e o Como configurar dos outros apps ({passos})")
+    r.check((await pg.text_content("#p-voice .steps-box > b")) == "Como configurar" and len(passos) == 3 and passos[0] == "Com o Home Assistant Cloud, a fala para texto já vem pronta."
+            and await pg.evaluate("[...document.querySelectorAll('#p-voice .steps-box a.site')].map((a) => [a.textContent, a.getAttribute('href'), a.target, a.rel]).join()") == "Home Assistant Cloud,https://www.nabucasa.com/,_blank,noopener noreferrer", f"e o Como configurar dos outros apps ({passos})")
     await r.open(pg, "#/", ".tag")
     r.eq(await pg.locator(".mic-top").count(), 0, "e o microfone sai do alto")
     await ctx.close()
