@@ -9,7 +9,8 @@
   const catsOf = (d) => { if (!Array.isArray(d.cats) || !d.cats.length) d.cats = clone(DEF_CATS); return d.cats; };
   const CATS = { has: (k) => ST.data && catsOf(ST.data).some((c) => c.id === k) };
   const foldName = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const ST = { data: null, rev: 1, blobs: new Map(), jobs: new Map(), settings: { ai_entity: "", ai_search: "", ai_chat: "", ai: true, zones: false, ha_sensors: false, voice_stt: "", news: true, news_every: 0, news_notify: "", bens: true, correria: false },
+  const kindRank = (r) => ({ bens: 1, consumiveis: 2 })[r.kind] || 0; // as áreas do sistema depois dos cômodos: Bens, Consumíveis
+  const ST = { data: null, rev: 1, blobs: new Map(), jobs: new Map(), settings: { ai_entity: "", ai_search: "", ai_chat: "", ai: true, zones: false, ha_sensors: false, voice_stt: "", news: true, news_every: 0, news_notify: "", bens: true, itens: true, consumiveis: false, correria: false },
     news: { itens: {}, triagem: {}, ultima: null, apps: {}, apps_triagem: {}, apagadas: {} } };
   const now = () => new Date().toISOString();
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -109,7 +110,7 @@
     if (method === "GET" && path === "api/data") {
       const st = ST.settings;
       return { ...clone(d), rev: ST.rev, version: "%%V%%", user: null, features: { ai: true, share: false },
-        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, ai_chat: st.ai_chat || "", voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false, correria: st.correria === true, accent: st.accent ?? null, accent_daily: st.accent_daily ?? null, news_hora: st.news_hora || "10:00", news_aviso: st.news_aviso === true, news_para: st.news_para || [], news_apps: st.news_apps === true }, correria_uso: null };
+        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, ai_chat: st.ai_chat || "", voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false, itens: st.itens !== false, consumiveis: st.consumiveis === true, correria: st.correria === true, accent: st.accent ?? null, accent_daily: st.accent_daily ?? null, news_hora: st.news_hora || "10:00", news_aviso: st.news_aviso === true, news_para: st.news_para || [], news_apps: st.news_apps === true }, correria_uso: null };
     }
     if (method === "GET" && path === "api/rev") return { rev: ST.rev, correria_uso: null };
     if (method === "POST" && path === "api/items") {
@@ -209,6 +210,16 @@
       }
       return { room: clone(r), rooms: clone(d.rooms), cats: clone(catsOf(d)), rev: bump() };
     }
+    if (method === "POST" && path === "api/rooms" && body.kind === "consumiveis") { // 1.78.0: a área Consumíveis (o que se gasta): criada uma vez
+      if (ST.settings.consumiveis !== true) fail("Os consumíveis estão desligados. Para usar, ligue em Mais > Configurações > Opções.", 409);
+      let r = d.rooms.find((x) => x.kind === "consumiveis");
+      if (!r) {
+        r = { id: room(d, "consumiveis") ? "consumiveis-2" : "consumiveis", code: d.rooms.some((x) => x.code === "CON") ? "CON2" : "CON", name: "Consumíveis", kind: "consumiveis", order: d.rooms.length, cover: 0, photos: [], updatedAt: now() };
+        d.rooms.push(r);
+        d.rooms.sort((a, b) => kindRank(a) - kindRank(b) || a.order - b.order).forEach((x, i) => { x.order = i; });
+      }
+      return { room: clone(r), rooms: clone(d.rooms), cats: clone(catsOf(d)), rev: bump() };
+    }
     if (method === "POST" && path === "api/rooms") {
       const name = String(body.name || "").trim();
       if (!name) fail("Dê um nome ao cômodo.");
@@ -219,13 +230,13 @@
       const geral = room(d, "geral");
       const r = { id, code, name, order: geral ? geral.order - 0.5 : d.rooms.length, cover: 0, photos: [], updatedAt: now() };
       d.rooms.push(r);
-      d.rooms.sort((a, b) => (a.kind === "bens") - (b.kind === "bens") || a.order - b.order).forEach((x, i) => { x.order = i; });
+      d.rooms.sort((a, b) => kindRank(a) - kindRank(b) || a.order - b.order).forEach((x, i) => { x.order = i; });
       return { room: clone(r), rooms: clone(d.rooms), rev: bump() };
     }
     if (method === "POST" && path === "api/rooms/order") {
       const pos = new Map((body.ids || []).map((id, i) => [id, i]));
       d.rooms.forEach((r) => { r.order = pos.has(r.id) ? pos.get(r.id) : 999; });
-      d.rooms.sort((a, b) => (a.kind === "bens") - (b.kind === "bens") || a.order - b.order).forEach((x, i) => { x.order = i; });
+      d.rooms.sort((a, b) => kindRank(a) - kindRank(b) || a.order - b.order).forEach((x, i) => { x.order = i; });
       return { rooms: clone(d.rooms), rev: bump() };
     }
     if ((m = path.match(/^api\/rooms\/([^/]+)\/photos$/)) && method === "POST") {
@@ -272,8 +283,8 @@
     }
     if (method === "POST" && path === "api/voice") { aiOff(); await wait(900); return { text: SPEECH, engine: "stt.exemplo", name: STT[0].name }; }
     // a IA escolhe o cômodo de cada item pelo nome dos cômodos da casa (o que não der para saber fica para a pessoa)
-    const guessRoom = (re) => { const r = d.rooms.find((x) => x.kind !== "bens" && re.test(x.name.normalize("NFD").replace(/[\u0300-\u036f]/g, ""))); return r ? r.id : ""; };
-    const fixedRoom = () => (d.rooms.some((x) => x.id === body.room && x.kind !== "bens") ? body.room : "");
+    const guessRoom = (re) => { const r = d.rooms.find((x) => !x.kind && re.test(x.name.normalize("NFD").replace(/[\u0300-\u036f]/g, ""))); return r ? r.id : ""; };
+    const fixedRoom = () => (d.rooms.some((x) => x.id === body.room && !x.kind) ? body.room : "");
     if (method === "POST" && path === "api/ai/text") {
       aiOff(); await wait(1600);
       const items = clone(SPOKEN).map((it, i) => ({ ...it, room: (i < 2 ? guessRoom(/cozinha/i) : "") || fixedRoom() }));
@@ -560,6 +571,7 @@
         if (body.mode === "single") items = [{ ...items[0], existing: "" }];
       } else {
         items = body.mode === "single" ? EXAMPLES.slice(0, 1) : clone(EXAMPLES);
+        if (body.mode === "single" && body.consumivel) items = [{ name: "Pasta térmica", details: "Pasta que vai entre o processador e o cooler, para o calor passar. Seringa de 4 g.", cat: "utilidades", qty: "1", value: 45, zone: "", existing: "", confidence: "alta" }];
       }
       const room = fixedRoom() || (linked.length ? linked[0].room : guessRoom(/escrit|quarto/i));
       items = items.map((it) => ({ ...it, room }));
@@ -567,7 +579,14 @@
     }
     if (method === "GET" && path === "api/news/people") return { people: [{ id: "person.ana", name: "Ana", phone: true, eu: true }, { id: "person.beto", name: "Beto", phone: true, eu: false }] };
     if (method === "POST" && path === "api/news/notify-test") return { ok: true, sent: body.who === "todos" ? 2 : 1, example: true };
-    if (path === "api/settings") { if (method === "PUT") Object.assign(ST.settings, body); return { ...ST.settings }; }
+    if (path === "api/settings") {
+      if (method === "PUT") {
+        const t = { itens: ST.settings.itens !== false, bens: ST.settings.bens !== false, consumiveis: ST.settings.consumiveis === true, ...body };
+        if (!t.itens && !t.bens && !t.consumiveis) fail("Pelo menos um fica ligado: itens da casa, bens ou consumíveis.", 409);
+        Object.assign(ST.settings, body);
+      }
+      return { ...ST.settings };
+    }
     if (path === "api/backups") fail(OFF + "os backups vão para a pasta share/inventario.");
     if (path === "api/history") {
       const t = Date.now(), n = d.items.length, at = (min) => new Date(t - min * 60000).toISOString();

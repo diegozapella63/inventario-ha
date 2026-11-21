@@ -104,6 +104,7 @@ CATS = {
     "plantas": "Plantas", "livros": "Livros e jogos", "pets": "Pets", "saude": "Saúde",
     "vestuario": "Roupas e calçados", "utilidades": "Utilidades", "imoveis": "Imóveis", "veiculos": "Veículos", "outros": "Outros",
 }
+AREAS = ("bens", "consumiveis")  # as áreas do sistema, fora da lista de cômodos e sempre depois deles, nesta ordem
 BENS_CATS = ("imoveis", "veiculos")  # os bens fora de casa (casa, terreno, carro); o resto vai em Outros
 # as categorias fixas (sem Renomear nem Apagar): Eletrônicos (as novidades) e, desde a 1.54.0, Utilidades e Veículos
 # (os Recursos de cada equipamento, que a IA diz)
@@ -696,6 +697,26 @@ class Store:
         """A área Bens: o que não fica dentro de casa (casa, terreno, carro). É um "cômodo" do sistema, fora da lista de cômodos."""
         return next((r for r in self.data["rooms"] if r.get("kind") == "bens"), None)
 
+    def consumiveis_room(self) -> dict | None:
+        """1.78.0: a área Consumíveis (pasta térmica, creme de massagem): o que se gasta e se compra de novo. Como a Bens,
+        um "cômodo" do sistema fora da lista de cômodos; não conta no patrimônio."""
+        return next((r for r in self.data["rooms"] if r.get("kind") == "consumiveis"), None)
+
+    def _ensure_consumiveis(self) -> dict:
+        room = self.consumiveis_room()
+        if room:
+            return room
+        ids = {r["id"] for r in self.data["rooms"]}
+        rid, n = "consumiveis", 2
+        while rid in ids:
+            rid, n = f"consumiveis-{n}", n + 1
+        room = {"id": rid, "code": self._unique_code("CON"), "name": "Consumíveis", "kind": "consumiveis",
+                "order": max([r.get("order", 0) for r in self.data["rooms"]] or [0]) + 1, "cover": 0, "photos": [], "updatedAt": now_iso()}
+        self.data["rooms"].append(room)
+        self._normalize_order()
+        self.save()
+        return room
+
     def _ensure_bens(self) -> dict:
         room = self.bens_room()
         if room:
@@ -723,6 +744,12 @@ class Store:
                 if not bens_enabled():
                     raise ApiError(409, "Os bens estão desligados. Para usar, ligue em Mais > Configurações > Opções.")
                 return self._ensure_bens()
+            if body.get("kind") == "consumiveis":  # a área Consumíveis: criada com o primeiro, depois devolve a mesma
+                if not consumiveis_enabled():
+                    raise ApiError(409, "Os consumíveis estão desligados. Para usar, ligue em Mais > Configurações > Opções.")
+                return self._ensure_consumiveis()
+            if not itens_enabled():
+                raise ApiError(409, "Os itens da casa estão desligados. Para usar, ligue em Mais > Configurações > Opções.")
             if body.get("kind"):
                 raise ApiError(400, "Tipo de cômodo inválido.")
             name = text(body.get("name"), 60, "nome do cômodo", required=True)
@@ -734,7 +761,7 @@ class Store:
                 n += 1
             code_in = text(body.get("code"), 4, "código") or name
             geral = self.room("geral")
-            house = [r.get("order", 0) for r in self.data["rooms"] if r.get("kind") != "bens"]
+            house = [r.get("order", 0) for r in self.data["rooms"] if not r.get("kind")]
             room = {
                 "id": rid, "code": self._unique_code(code_in), "name": name,
                 # novos cômodos entram no fim da lista, antes de "Geral" (e a área Bens fica sempre depois de todos)
@@ -806,7 +833,7 @@ class Store:
             return self.data["rooms"]
 
     def _normalize_order(self):
-        self.data["rooms"].sort(key=lambda r: (r.get("kind") == "bens", r.get("order", 0)))
+        self.data["rooms"].sort(key=lambda r: (AREAS.index(r.get("kind")) + 1 if r.get("kind") in AREAS else 0, r.get("order", 0)))
         for n, r in enumerate(self.data["rooms"]):
             r["order"] = n
 
@@ -1404,12 +1431,29 @@ def bens_enabled() -> bool:
     return STORE.settings.get("bens") is not False
 
 
-def visible_data() -> tuple[list, list]:
-    """Os cômodos e os itens que contam: sem a área Bens e os bens dela quando Usar bens está desligado."""
+def itens_enabled() -> bool:
+    """1.78.0: os itens da casa (os cômodos e o que há neles): vem ligado. Desligado, somem os cômodos e os itens deles
+    (do app, dos outros apps e da IA), sem apagar: ficam os bens e os consumíveis."""
+    return STORE.settings.get("itens") is not False
+
+
+def consumiveis_enabled() -> bool:
+    """1.78.0: os consumíveis (o que se gasta: pasta térmica, creme de massagem): vem desligado. Não contam no patrimônio."""
+    return STORE.settings.get("consumiveis") is True
+
+
+def area_enabled(kind) -> bool:
+    return {"bens": bens_enabled, "consumiveis": consumiveis_enabled}.get(kind or "", itens_enabled)()
+
+
+def visible_data(consumiveis: bool = True) -> tuple[list, list]:
+    """Os cômodos e os itens que aparecem: sem a área Bens, sem a Consumíveis e sem os cômodos da casa (e o que há em cada
+    um) quando a opção de cada um está desligada. consumiveis=False: só o que conta no patrimônio (os consumíveis nunca
+    contam: os outros apps, os sensores e o relatório)."""
     rooms, items = STORE.data.get("rooms") or [], STORE.data.get("items") or []
-    if bens_enabled():
+    hid = {r["id"] for r in rooms if not area_enabled(r.get("kind")) or (not consumiveis and r.get("kind") == "consumiveis")}
+    if not hid:
         return rooms, items
-    hid = {r["id"] for r in rooms if r.get("kind") == "bens"}
     return [r for r in rooms if r["id"] not in hid], [i for i in items if i.get("room") not in hid]
 
 
@@ -1778,7 +1822,7 @@ Responda somente com JSON válido, sem markdown e sem texto antes ou depois, nes
 def ai_house() -> list[tuple[dict, list[dict]]]:
     """Os cômodos da casa (sem a área Bens, que não é cômodo) e os itens de cada um, do mais caro para o mais barato."""
     with STORE.lock:
-        rooms = [r for r in STORE.data["rooms"] if r.get("kind") != "bens"]
+        rooms = [r for r in STORE.data["rooms"] if not r.get("kind")] if itens_enabled() else []
         its = list(STORE.data["items"])
     return [(r, sorted((i for i in its if i["room"] == r["id"]), key=lambda i: -(i.get("value") or 0))) for r in rooms]
 
@@ -1789,12 +1833,12 @@ def ai_room_id(v) -> str:
     if not v:
         return ""
     with STORE.lock:
-        rooms = [r for r in STORE.data["rooms"] if r.get("kind") != "bens"]
+        rooms = [r for r in STORE.data["rooms"] if not r.get("kind")] if itens_enabled() else []
     r = next((r for r in rooms if r["id"] == v), None) or next((r for r in rooms if r["name"].casefold() == v.casefold()), None)
     return r["id"] if r else ""
 
 
-def ai_prompt(mode: str, room: dict | None, hint: str, spoken: str = "") -> str:
+def ai_prompt(mode: str, room: dict | None, hint: str, spoken: str = "", consumivel: bool = False) -> str:
     cats = ", ".join(f"{k} ({v})" for k, v in STORE.cat_map().items())
     parts = ["Você ajuda a catalogar o inventário de uma casa no Brasil, para controle de patrimônio e seguro."]
     if mode == "single":
@@ -1810,7 +1854,14 @@ def ai_prompt(mode: str, room: dict | None, hint: str, spoken: str = "") -> str:
                      "embalagens vazias, objetos cortados na borda que não dê para identificar e coisas sem valor de revenda. "
                      "Junte objetos iguais num item só, com a quantidade.")
     rules = AI_RULES.format(cats=cats)
-    use_zones = zones_enabled()
+    use_zones = zones_enabled() and not consumivel
+    if consumivel:  # 1.78.0: um consumível: o que é e para que serve (é por aí que se acha depois), e o preço de um novo
+        parts.append("Este item é um consumível: algo que se gasta e se compra de novo (ex.: pasta térmica, creme de massagem, pilhas).")
+        rules = "\n".join(
+            '- "details": 1 ou 2 frases objetivas dizendo o que é e para que serve (o uso), com o tamanho ou o volume da embalagem '
+            'quando estiver legível. Sem preço. Nunca inclua número de série, telefone, nome de pessoa ou endereço.' if ln.startswith('- "details"')
+            else '- "value": preço TOTAL em reais (número, sem símbolo) de comprar novo no Brasil. Se a quantidade for maior que 1, some todas as unidades.'
+            if ln.startswith('- "value"') else '- "existing": "".' if ln.startswith('- "existing"') else ln for ln in rules.splitlines())
     if not use_zones:  # zonas desligadas: a IA nem pergunta onde fica o item
         rules = "\n".join(ln for ln in rules.splitlines() if not ln.startswith('- "zone"')).replace('"zone":"",', "")
     # o cômodo: quem fala pode citar um cômodo para cada item; sem cômodo escolhido, a IA escolhe (a da foto, pelo que ela mostra);
@@ -1889,7 +1940,7 @@ def clean_ai_items(parsed, room: dict | None, per_item: bool = False) -> list[di
     top = ai_room_id(parsed.get("room")) if isinstance(parsed, dict) else ""
     names: dict[str, set] = {}
     with STORE.lock:
-        bens = {r["id"] for r in STORE.data["rooms"] if r.get("kind") == "bens"}
+        bens = {r["id"] for r in STORE.data["rooms"] if r.get("kind")}  # as áreas (Bens, Consumíveis) não são cômodos
         for i in STORE.data["items"]:
             if i["room"] not in bens:
                 names.setdefault(i["room"], set()).add(i["name"])
@@ -1935,10 +1986,14 @@ MOCK_RESULT = {"room": "escritorio", "items": [
 ]}
 
 
+MOCK_CONSUMIVEL = {"name": "Pasta térmica", "details": "Pasta que vai entre o processador e o cooler, para o calor passar. Seringa de 4 g.",
+                   "cat": "utilidades", "qty": "1", "value": 45, "zone": "", "existing": "", "confidence": "alta"}
+
+
 def ai_fixed_room(body: dict) -> dict | None:
     """O cômodo que a pessoa escolheu (ou de onde abriu), se for um cômodo da casa; sem ele, a IA escolhe."""
     r = STORE.room(body.get("room")) if isinstance(body.get("room"), str) and body.get("room") else None
-    return r if r and r.get("kind") != "bens" else None
+    return r if r and not r.get("kind") and itens_enabled() else None
 
 
 def ai_identify(body: dict) -> dict:
@@ -1949,7 +2004,8 @@ def ai_identify(body: dict) -> dict:
     mode = "single" if body.get("mode") == "single" else "multi"
     room = ai_fixed_room(body)
     hint = text(body.get("hint"), 300, "dica")
-    prompt = ai_prompt(mode, room, hint)
+    consumivel = mode == "single" and body.get("consumivel") is True and consumiveis_enabled()
+    prompt = ai_prompt(mode, room, hint, consumivel=consumivel)
     entity = photo_entity()
     kind = "foto" if mode == "single" else "catalogo"
     if AI_MOCK:
@@ -1957,7 +2013,7 @@ def ai_identify(body: dict) -> dict:
             time.sleep(1.2)
             res = dict(MOCK_RESULT)
             if mode == "single":
-                res = {"items": MOCK_RESULT["items"][:1]}
+                res = {"items": [MOCK_CONSUMIVEL] if consumivel else MOCK_RESULT["items"][:1]}
             call.answer(res)
         items = clean_ai_items(res, room)
         return {"items": items, "room": common_room(items), "entity": "ai_task.simulado"}
@@ -4399,7 +4455,9 @@ def chat_context(screen: dict) -> str:
     """O que a IA precisa saber: o resumo da casa e o que está na tela (um item, um cômodo, uma busca, Novidades…)."""
     screen = screen if isinstance(screen, dict) else {}
     cats = STORE.cat_map()
-    rooms, items = visible_data()  # com Usar bens desligado, a IA não vê os bens
+    rooms, items = visible_data(consumiveis=False)  # com Usar bens desligado, a IA não vê os bens
+    no_patrimonio = {i["id"] for i in items}
+    consumiveis = [i for i in visible_data()[1] if i["id"] not in no_patrimonio]  # 1.78.0: à parte, fora do patrimônio
     # 1.75.0: os valores da tela: com o Valor de hoje ligado (a depreciação do GerencIA), o de hoje, não o gravado
     taxas = gerencia_taxas() if deprec_enabled() else None
     val = (lambda i: item_hoje(i, taxas)) if taxas else (lambda i: float(i.get("value") or 0))  # noqa: E731
@@ -4409,7 +4467,8 @@ def chat_context(screen: dict) -> str:
     em_casa = [i for i in items if i["room"] not in bens_ids]
     bens = [i for i in items if i["room"] in bens_ids]
     total = sum(val(i) for i in em_casa)
-    lines = [f"Inventário da casa: {len(em_casa)} itens em {len(casa)} cômodos, total {_money(total)}."]
+    lines = [f"Inventário da casa: {len(em_casa)} itens em {len(casa)} cômodos, total {_money(total)}." if itens_enabled()
+             else "Os itens da casa (os cômodos) estão desligados neste inventário."]
     if taxas:
         lines.append("Os valores são os de hoje, como na tela: o valor de cada item com a perda por ano da categoria "
                      "(a depreciação do GerencIA), desde a data do valor.")
@@ -4417,7 +4476,8 @@ def chat_context(screen: dict) -> str:
     for r in sorted(casa, key=lambda r: r.get("order", 0)):
         its = [i for i in items if i["room"] == r["id"]]
         by_room.append(f"{r['code']} {r['name']}: {len(its)} itens, {_money(sum(val(i) for i in its))}")
-    lines.append("Cômodos: " + "; ".join(by_room) + ".")
+    if by_room:
+        lines.append("Cômodos: " + "; ".join(by_room) + ".")
     if bens:
         lines.append(f"Bens (o que fica fora de casa, como imóveis e veículos; não é um cômodo): {len(bens)} itens, "
                      f"{_money(sum(val(i) for i in bens))}. Com eles, o patrimônio é {_money(total + sum(val(i) for i in bens))}.")
@@ -4498,6 +4558,12 @@ def chat_context(screen: dict) -> str:
         lines += ["- " + _item_line(i, cats, val) for i in todos[:MAX_ITENS_CHAT]]
         if len(todos) > MAX_ITENS_CHAT:
             lines.append(f"- … e mais {len(todos) - MAX_ITENS_CHAT} que não couberam aqui (são {len(todos)} ao todo).")
+    if consumiveis:  # 1.78.0: o que se gasta (Mais > Consumíveis): com o que é e para que serve, para achar pelo uso
+        lines.append(f"Consumíveis ({len(consumiveis)}; o que se gasta e se compra de novo; não são um cômodo e não contam no patrimônio; "
+                     "código e nome | categoria | quantidade | o que é e para que serve):")
+        for i in sorted(consumiveis, key=lambda i: i.get("seq") or 0)[:MAX_ITENS_CHAT]:
+            lines.append("- " + " | ".join(b for b in (f"{STORE.tag(i)} {i.get('name', '')}", cats.get(i.get("cat"), "Outros"),
+                                                     f"qtd {i.get('qty') or '1'}", " ".join(str(i.get("details") or "").split())[:200]) if b))
     return "\n".join(lines)
 
 
@@ -4855,7 +4921,7 @@ def r_data(h, query):
     out.update({"version": VERSION, "user": h.user(),
                 "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai_search": STORE.settings.get("ai_search") or "",
                              "ai_chat": STORE.settings.get("ai_chat") or "",
-                             "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "bens": bens_enabled(), "ha_sensors": sensors_enabled(),
+                             "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "bens": bens_enabled(), "itens": itens_enabled(), "consumiveis": consumiveis_enabled(), "ha_sensors": sensors_enabled(),
                              "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target(), "correria": correria_enabled(),
                              "news_hora": news_hora(), "news_aviso": news_aviso(), "news_para": news_para_salvo(),
                              "news_apps": STORE.settings.get("news_apps") is True,
@@ -5140,11 +5206,15 @@ def r_settings_put(h, query):
             if e and not re.fullmatch(rx, e):
                 raise ApiError(400, msg)
             upd[key] = e
-    for key in ("ai", "zones", "ha_sensors", "news", "news_apps", "bens", "correria", "deprec"):
+    for key in ("ai", "zones", "ha_sensors", "news", "news_apps", "bens", "itens", "consumiveis", "correria", "deprec"):
         if key in body:
             if not isinstance(body[key], bool):
                 raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
             upd[key] = body[key]
+    # 1.78.0: itens da casa, bens e consumíveis: cada um com a sua chave, e pelo menos um fica ligado
+    tipos = {"itens": itens_enabled(), "bens": bens_enabled(), "consumiveis": consumiveis_enabled(), **{k: upd[k] for k in ("itens", "bens", "consumiveis") if k in upd}}
+    if not any(tipos.values()):
+        raise ApiError(409, "Pelo menos um fica ligado: itens da casa, bens ou consumíveis.")
     if "news_every" in body:
         if isinstance(body["news_every"], bool) or body["news_every"] not in NEWS_EVERY:
             raise ApiError(400, "Escolha de quanto em quanto tempo conferir.")
@@ -5182,7 +5252,7 @@ def r_settings_put(h, query):
         _voice_cache["at"] = 0.0
     if "correria" in upd:  # grava ou apaga share/inventario/correria.json na hora
         correria_publicar()
-    if "ha_sensors" in upd or "ai" in upd or "news" in upd or "bens" in upd:  # cria ou tira os sensores na hora
+    if "ha_sensors" in upd or "ai" in upd or "news" in upd or "bens" in upd or "itens" in upd:  # cria ou tira os sensores na hora
         threading.Thread(target=publish_sensors if sensors_enabled() and ai_enabled() else remove_sensors, daemon=True).start()
     h.send_json(STORE.settings)
 
@@ -5193,7 +5263,7 @@ def r_relatorio_pdf(h, query):
     um = lambda k, padrao="": (query.get(k) or [padrao])[0]  # noqa: E731
     fotos = um("fotos", "1") != "0"
     with STORE.lock:
-        rooms, items = visible_data()
+        rooms, items = visible_data(consumiveis=False)  # o relatório é do patrimônio: sem os consumíveis
         rooms, items, cats = json.loads(json.dumps(rooms)), json.loads(json.dumps(items)), STORE.cat_map()
     hoje = deprec_enabled()
     if hoje:  # o valor de hoje, só no relatório (a cópia): o gravado não muda
@@ -5523,7 +5593,7 @@ def r_ferramentas_usar(h, query):
 
 def r_integracao_comodos(h, query):
     with STORE.lock:
-        rooms, items = visible_data()  # com Usar bens desligado, a área Bens não vai para os outros apps
+        rooms, items = visible_data(consumiveis=False)  # com Usar bens desligado, a área Bens não vai para os outros apps; os consumíveis, nunca
         rooms = sorted(rooms, key=lambda r: r.get("order", 0))
         conta = {}
         for it in items:
@@ -5537,7 +5607,7 @@ def r_integracao_itens(h, query):
     """Os itens (equipamentos, móveis…), para os outros apps: o ResolvIA liga uma tarefa a um deles; o GerencIA soma os valores
     no patrimônio (com a data do valor, para depreciar)."""
     with STORE.lock:
-        rooms, items = visible_data()  # com Usar bens desligado, os bens não entram no patrimônio do GerencIA
+        rooms, items = visible_data(consumiveis=False)  # com Usar bens desligado, os bens não entram no patrimônio do GerencIA; os consumíveis, nunca
         order = {r["id"]: r.get("order", 0) for r in rooms}
         items = sorted(items, key=lambda it: (order.get(it.get("room"), 999), (it.get("name") or "").lower()))
         out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "comodo": it.get("room") or "", "zona": (it.get("zone") or "")[:60],

@@ -223,7 +223,7 @@ async def body(r, p):
 
     # -- Usar bens desligado (Mais > Configurações > Opções): os bens somem de tudo, sem apagar
     ctx, pg = await r.page(b, "cel", "dark", accent="turquesa")
-    await r.open(pg, "#/config/opcoes", "#p-bens")
+    await r.open(pg, "#/config/opcoes", "#p-tipos")
     r.check(await pg.is_checked('[data-input="bens-on"]'), "Usar bens vem ligado")
     await pg.click('label.switch:has([data-input="bens-on"])')
     await pg.locator(".toast", has_text="Bens desligados").wait_for(timeout=5000)
@@ -259,7 +259,7 @@ async def body(r, p):
     st, _, out = r.app.request("POST", "api/rooms", {"kind": "bens"})
     r.eq(st, 409, "o servidor não cria a área Bens com eles desligados")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
-    await r.open(pg, "#/config/opcoes", "#p-bens")
+    await r.open(pg, "#/config/opcoes", "#p-tipos")
     await pg.click('label.switch:has([data-input="bens-on"])')
     await pg.locator(".toast", has_text="Bens ligados").wait_for(timeout=5000)
     await r.open(pg, "#/", ".tag")

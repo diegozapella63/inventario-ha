@@ -112,7 +112,7 @@ class Resumo(Base):
         self.assertEqual(r["mais_valiosos"][0]["codigo"], "ESC-001")
         self.assertEqual(len(r["mais_valiosos"]), 10)
         self.assertEqual(len(r["ultimos_cadastrados"]), 10)
-        self.assertEqual(r["opcoes"], {"zonas": False, "bens": True})
+        self.assertEqual(r["opcoes"], {"zonas": False, "itens_da_casa": True, "bens": True, "consumiveis": False})
         self.assertNotIn("zonas", r["comodos"][0])
         self.assertEqual(r["bens"]["itens"], 0)
 

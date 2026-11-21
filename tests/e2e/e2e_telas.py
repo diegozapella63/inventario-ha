@@ -3,7 +3,7 @@ nada passa da largura (o Chrome do celular encolheria a página), as janelas cab
 de baixo visíveis, e nenhum texto de botão fica cortado."""
 from e2e_lib import main
 
-PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/bens", "#/graficos", "#/novidades", "#/categorias", "#/config", "#/config/dados", "#/config/aparencia", "#/config/opcoes", "#/sobre"]
+PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/bens", "#/consumiveis", "#/graficos", "#/novidades", "#/categorias", "#/config", "#/config/dados", "#/config/aparencia", "#/config/opcoes", "#/sobre"]
 
 # (nome, endereço, como abrir (um seletor ou vários, um depois do outro), seletor que aparece)
 DIALOGS = [
@@ -11,6 +11,7 @@ DIALOGS = [
     ("adicionar", "#/", ".tabbar .plus", "[data-go]"),
     ("item-novo", "#/c/escritorio", '.rhead-actions [data-act="item-new"]', "#f-name"),
     ("bem-novo", "#/bens", '.mscreen [data-act="item-new"]', "#f-name"),
+    ("consumivel-novo", "#/consumiveis", ".tabbar .plus:visible, .top-actions [data-act='item-new']:visible", "#f-name"),
     ("editar-item", "#/i/esc-001", 'dialog.sheet [data-act="item-edit"].primary', "#f-name"),
     ("catalogar", "#/c/quarto", '.rhead-actions [data-act="catalog"]', '[data-ct="upload"]'),
     ("falar", "#/", ".mic-top", ".voice"),
@@ -101,6 +102,11 @@ CHECK = """() => {
 
 async def body(r, p):
     r.start(search=False)
+    # 1.78.0: com os três tipos em uso (os quadros do Agora, a tela Consumíveis e as três chaves das Opções)
+    r.api("PUT", "api/settings", {"consumiveis": True})
+    con = r.api("POST", "api/rooms", {"kind": "consumiveis"})["room"]["id"]
+    r.api("POST", "api/items", {"room": con, "name": "Creme de massagem relaxante de arnica", "details": "Creme para massagem nas costas e nas pernas.", "qty": "2 potes", "value": 1234})
+    r.api("POST", "api/items", {"room": con, "name": "Pilhas AA", "cat": "utilidades", "qty": "8"})
     b = await r.browser(p, camera=True, mic=True)
     for size in ("estreito", "cel", "tablet", "pc"):
         for scheme in ("light", "dark"):

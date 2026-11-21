@@ -39,6 +39,7 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 - **Conversar** com a IA a qualquer momento, ao lado do microfone, sobre o que está na tela ou qualquer outro assunto.
 - **Buscar** por nome, marca ou detalhe, sem se importar com acentos, com filtros por cômodo e categoria, e **Selecionar** para alterar o cômodo, a categoria e a zona de vários itens de uma vez.
 - **Bens** fora de casa (casa, terreno, carro), separados em Imóveis, Veículos e Outros: contam no patrimônio e vêm à parte no relatório.
+- **Consumíveis** (pasta térmica, creme de massagem, pilhas): o que se gasta, por categoria e com a quantidade, fora do patrimônio. Os itens da casa, os bens e os consumíveis têm cada um a sua chave.
 - **Relatório do inventário** por cômodo, com fotos e gráficos, para baixar em PDF.
 - **Gráficos**: os cômodos, as categorias e os itens que mais valem, as faixas de valor e o patrimônio mês a mês.
 - **Exportar** em CSV, JSON ou ZIP com fotos, **backup** na pasta `share/inventario`, versões automáticas a cada 10 minutos de uso e **Começar do zero** (com uma cópia antes).

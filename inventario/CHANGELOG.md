@@ -1,5 +1,14 @@
 # Mudanças
 
+## 1.78.0
+
+- **Consumíveis** (pasta térmica, creme de massagem, pilhas): o que se gasta e se compra de novo ganha uma tela própria, por categoria, com a quantidade em destaque. Ligue em **Mais › Configurações › Opções › Usar consumíveis**. Sem cômodo nem zona; no lugar dos detalhes, **O que é e para que serve**. Com uma foto, a IA preenche. Não entram no patrimônio, nos gráficos, no relatório nem no GerencIA.
+- **Usar itens da casa** (Opções): dá para desligar os cômodos e os itens da casa e ficar só com os bens ou os consumíveis. A aba **Cômodos** vira **Bens** (ou **Consumíveis**). Desligar não apaga nada, e pelo menos um dos três fica ligado.
+- **Agora**: com mais de um tipo em uso, um quadro para cada (Itens da casa, Bens, Consumíveis), lado a lado, com a contagem e o total; um toque abre.
+- **Adicionar (+)** pergunta o que é: item, bem ou consumível. **Buscar** filtra por **Tipo**. No computador, Bens e Consumíveis ficam na barra lateral.
+- **Conversar**: ouvindo, o clipe dá lugar ao **Cancelar**: o microfone para e nada é enviado.
+- **CorrerIA**: acha pelo uso ("o que temos para massagem?" traz o creme e o massageador) e cadastra consumíveis.
+
 ## 1.77.0
 
 - **Conversa › Editar perguntas**: toque numa pergunta para mudar o texto dela. **Perguntas prontas** e **Mais perguntas** fecham e abrem num toque no título, com a seta no canto, e o aparelho lembra.

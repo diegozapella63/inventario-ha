@@ -1491,3 +1491,19 @@ textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh;
   .dlg-f.news-f:has(> [data-apagar]:not([hidden])) > [data-item] { grid-column: 1 / -1; }
   .dlg-f.news-f:has(> [data-apagar]:not([hidden])) > .btn { min-width: 0; justify-content: center; }
 }
+
+/* 1.78.0: Agora, com mais de um tipo ligado (itens da casa, bens, consumíveis): um quadro para cada, lado a lado, com a
+   contagem, o total e um toque para abrir a tela do tipo */
+.tipos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 28px; }
+.tipos.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tipo { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; align-content: start; min-width: 0; padding: 14px 12px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink); text-decoration: none; }
+.tipo:hover { border-color: var(--line-2); }
+.tipo:active { background: var(--surface-2); }
+.tipo .sec-ic { width: 34px; height: 34px; border-radius: 10px; margin-bottom: 8px; }
+.tipo b { font: 600 14px/1.25 var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tipo .tn { font: 700 30px/1.05 var(--font-c); margin-top: 4px; }
+.tipo .ts { color: var(--muted); font-size: 13px; line-height: 1.2; }
+.tipo .tv { font: 600 15px/1.2 var(--font-c); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 700px) { .tipos { gap: 14px; } .tipo { padding: 18px 18px 16px; } .tipo b { font-size: 16px; } .tipo .tn { font-size: 36px; } }
+/* no celular estreito, o nome do tipo pode ir para duas linhas (os três com a mesma altura, para os números ficarem alinhados) */
+@media (max-width: 380px) { .tipos { gap: 6px; } .tipo { padding: 12px 8px; } .tipo b { font-size: 13px; white-space: normal; min-height: 2.5em; overflow-wrap: anywhere; } .tipo .ts { font-size: 12px; } .tipo .tv { font-size: 13px; } }

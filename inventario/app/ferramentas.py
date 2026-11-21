@@ -40,13 +40,16 @@ _OBS = {"type": "string", "description": "Algo para lembrar sobre o item (até 2
 FERRAMENTAS = [
     {"nome": "resumo", "titulo": "Resumo do inventário", "grava": False,
      "descricao": "Visão geral: o total, os cômodos (id, código, quantos itens e quanto valem; com as zonas ligadas, as zonas), "
-                  "os bens (casa, terreno, carro), as categorias (id e nome), os itens mais valiosos e os últimos cadastrados. "
+                  "os bens (casa, terreno, carro), os consumíveis (o que se gasta: pasta térmica, creme de massagem), as categorias (id e "
+                  "nome), os itens mais valiosos e os últimos cadastrados. "
                   "Comece por aqui: os ids servem nas outras ferramentas.",
      "entrada": _obj({})},
     {"nome": "buscar_itens", "titulo": "Buscar itens", "grava": False,
      "descricao": "Busca itens por texto (todas as palavras, sem ligar para acentos, no nome, nos detalhes, na observação, no "
                   "código, no cômodo, na categoria e na zona), cômodo, zona, categoria e faixa de valor. Devolve quantos achou, a soma dos valores e os itens (id, código, nome, cômodo, "
-                  "zona, categoria, quantidade, valor). Sem filtros, todos.",
+                  "zona, categoria, quantidade, valor; num consumível, também para que serve). Sem filtros, todos. Para achar pelo uso "
+                  "(o que temos para massagem?), busque só o começo da palavra do uso (massag acha massagem e massageador): ele vale no "
+                  "nome e nos detalhes, onde fica o que é e para que serve.",
      "entrada": _obj({"texto": {"type": "string", "description": "Palavras ou o código (ex.: SAL-003)."},
                       "comodo": _COMODO, "zona": {"type": "string"}, "categoria": {"type": "string", "description": "O id ou o nome da categoria."},
                       "valor_min": {"type": "number", "minimum": 0}, "valor_max": {"type": "number", "minimum": 0},
@@ -59,9 +62,10 @@ FERRAMENTAS = [
                   "o valor.",
      "entrada": _obj({"id": _ID}, ["id"])},
     {"nome": "cadastrar_itens", "titulo": "Cadastrar itens", "grava": True,
-     "descricao": "Cadastra um ou mais itens num cômodo (ou em Bens: casa, terreno, carro). Cada item ganha o próximo código "
-                  "do cômodo (ex.: SAL-013). Valor: o de todas as unidades juntas; sem valor, fica 0. As fotos se põem pela tela "
-                  "do app.",
+     "descricao": "Cadastra um ou mais itens num cômodo (ou em Bens: casa, terreno, carro; ou em Consumíveis: o que se gasta "
+                  "e se compra de novo, como pasta térmica e creme de massagem). Cada item ganha o próximo código "
+                  "do cômodo (ex.: SAL-013). Valor: o de todas as unidades juntas; sem valor, fica 0. Num consumível, ponha em "
+                  "detalhes o que é e para que serve. As fotos se põem pela tela do app.",
      "entrada": _obj({"comodo": _COMODO,
                       "zona": {"type": "string", "description": "A zona de todos (só com as zonas ligadas; cada item pode ter a sua)."},
                       "itens": {"type": "array", "minItems": 1, "maxItems": MAX_LOTE,
@@ -75,7 +79,7 @@ FERRAMENTAS = [
      "entrada": _obj({"id": _ID, "nome": {"type": "string"}, "valor": _VALOR, "quantidade": _QTD, "categoria": _CATEGORIA,
                       "zona": _ZONA, "detalhes": _DETALHES, "observacao": _OBS}, ["id"])},
     {"nome": "mover_itens", "titulo": "Mover itens", "grava": True,
-     "descricao": "Leva um ou mais itens para outro cômodo (ou para Bens), ou muda a zona deles. Num cômodo novo, o item ganha "
+     "descricao": "Leva um ou mais itens para outro cômodo (ou para Bens ou Consumíveis), ou muda a zona deles. Num cômodo novo, o item ganha "
                   "um código novo (o id continua o mesmo) e fica sem zona, se ela não vier.",
      "entrada": _obj({"ids": {"type": "array", "minItems": 1, "maxItems": MAX_MOVER, "items": _ID}, "comodo": _COMODO, "zona": _ZONA},
                      ["ids", "comodo"])},
@@ -96,8 +100,9 @@ def lista():
 
 def instrucoes(srv) -> str:
     """Para a IA: o que é o app e por onde começar (com o que está ligado nesta casa)."""
-    extras = [x for x, on in (("zonas (partes de um cômodo)", srv.zones_enabled()), ("os bens (casa, terreno, carro)", srv.bens_enabled())) if on]
-    return ("InventarIA: o inventário da casa: cômodos, itens com valor, quantidade e categoria"
+    extras = [x for x, on in (("zonas (partes de um cômodo)", srv.zones_enabled() and srv.itens_enabled()), ("os bens (casa, terreno, carro)", srv.bens_enabled()),
+                              ("os consumíveis (o que se gasta e se compra de novo, fora do patrimônio; os detalhes dizem o que é e para que serve)", srv.consumiveis_enabled())) if on]
+    return ("InventarIA: o inventário da casa: " + ("cômodos, itens com valor, quantidade e categoria" if srv.itens_enabled() else "sem os itens da casa (desligados)")
             + (", " + " e ".join(extras) if extras else "") + ". Valores em reais, como número; o valor de um item é o de todas "
             "as unidades juntas. Comece por inventario_resumo: os ids dos cômodos e das categorias servem nas outras ferramentas; "
             "um item se acha com inventario_buscar_itens, pelo id (sal-003) ou pelo código (SAL-003). Antes de gravar, diga à "
@@ -167,6 +172,8 @@ def _nomes_comodos(srv, rooms) -> str:
     nomes = [f"{r.get('name') or r['id']} ({r.get('code') or r['id']})" for r in sorted(rooms, key=lambda r: r.get("order", 0))]
     if srv.bens_enabled() and not any(r.get("kind") == "bens" for r in rooms):
         nomes.append("Bens (casa, terreno, carro)")
+    if srv.consumiveis_enabled() and not any(r.get("kind") == "consumiveis" for r in rooms):
+        nomes.append("Consumíveis (o que se gasta)")
     return ", ".join(nomes) or "nenhum (crie um com inventario_novo_comodo)"
 
 
@@ -189,6 +196,12 @@ def _achar_comodo(srv, v, criar_bens=False):
         r = srv.STORE.bens_room()
         if not r and criar_bens:
             return "@bens"  # quem grava cria a área depois de conferir o resto
+    if not r and f in ("consumiveis", "consumivel", "consumo"):  # 1.78.0: a área do que se gasta
+        if not srv.consumiveis_enabled():
+            raise ErroFerramenta("Os consumíveis estão desligados no InventarIA (Mais › Configurações › Opções › Usar consumíveis).")
+        r = srv.STORE.consumiveis_room()
+        if not r and criar_bens:
+            return "@consumiveis"
     if not r:
         raise ErroFerramenta(f"Cômodo não encontrado: {s}. Os cômodos: {_nomes_comodos(srv, rooms)}.")
     return r
@@ -227,13 +240,24 @@ def _nome_comodo(srv, rid) -> str:
     return (srv.STORE.room(rid) or {}).get("name") or rid or ""
 
 
+def _area(room) -> str:
+    """"bens" ou "consumiveis" se o cômodo é uma área do sistema (ou o pedido de criar uma: "@bens"); senão ""."""
+    if isinstance(room, str):
+        return room[1:] if room.startswith("@") else ""
+    return (room or {}).get("kind") or ""
+
+
+def _criar_area(srv, room):
+    return srv.STORE.create_room({"kind": room[1:]}) if isinstance(room, str) else room
+
+
 def _zona_ok(srv, room, zona_dada: bool):
     if not zona_dada:
         return
     if not srv.zones_enabled():
         raise ErroFerramenta("As zonas estão desligadas no InventarIA (Mais › Configurações › Opções › Usar zonas). Mande sem a zona.")
-    if room == "@bens" or (isinstance(room, dict) and room.get("kind") == "bens"):
-        raise ErroFerramenta("Um bem não tem zona. Mande sem a zona.")
+    if _area(room):
+        raise ErroFerramenta(("Um bem" if _area(room) == "bens" else "Um consumível") + " não tem zona. Mande sem a zona.")
 
 
 def _linha(srv, it, cats=None, taxas=None) -> dict:
@@ -248,6 +272,11 @@ def _linha(srv, it, cats=None, taxas=None) -> dict:
     out["valor"] = _v(srv, it, taxas)
     if taxas:
         out["valor_gravado"] = _num(it.get("value"))
+    if (srv.STORE.room(it.get("room")) or {}).get("kind") == "consumiveis":  # 1.78.0: o que é e para que serve, para achar pelo uso
+        out["tipo"] = "consumível"
+        d = " ".join(str(it.get("details") or "").split())
+        if d:
+            out["para_que_serve"] = d[:240]
     return out
 
 
@@ -272,7 +301,8 @@ def _quem(pessoa, cliente) -> str | None:
 # ---------------------------------------------------------------- leitura
 
 def _resumo(srv) -> str:
-    rooms, items = srv.visible_data()
+    rooms, items = srv.visible_data(consumiveis=False)  # o patrimônio; os consumíveis vêm à parte, no fim
+    consumiveis = [i for i in srv.visible_data()[1] if (srv.STORE.room(i.get("room")) or {}).get("kind") == "consumiveis"]
     cats = srv.STORE.cat_map()
     taxas = _taxas(srv)
     val = lambda i: _bruto(srv, i, taxas)  # noqa: E731
@@ -318,7 +348,10 @@ def _resumo(srv) -> str:
     out["mais_valiosos"] = [_linha(srv, i, cats, taxas) for i in sorted(items, key=lambda i: -val(i))[:MAX_RESUMO]]
     out["ultimos_cadastrados"] = [dict(_linha(srv, i, cats, taxas), cadastrado_em=str(i.get("createdAt") or "")[:10])
                                   for i in sorted(items, key=lambda i: str(i.get("createdAt") or ""), reverse=True)[:MAX_RESUMO]]
-    out["opcoes"] = {"zonas": zonas, "bens": srv.bens_enabled()}
+    if srv.consumiveis_enabled():
+        out["consumiveis"] = {"itens": len(consumiveis), "obs": "O que se gasta e se compra de novo; fora do total. Cadastre com comodo Consumíveis.",
+                              "lista": [_linha(srv, i, cats, taxas) for i in sorted(consumiveis, key=lambda i: i.get("seq") or 0)[:MAX_RESUMO * 3]]}
+    out["opcoes"] = {"zonas": zonas, "itens_da_casa": srv.itens_enabled(), "bens": srv.bens_enabled(), "consumiveis": srv.consumiveis_enabled()}
     return _json(out)
 
 
@@ -326,7 +359,7 @@ def _buscar(srv, a) -> str:
     rooms, items = srv.visible_data()
     cats = srv.STORE.cat_map()
     room = _achar_comodo(srv, a["comodo"], criar_bens=True) if a.get("comodo") not in (None, "") else None
-    if room == "@bens":  # a área Bens ainda não existe: nenhum bem
+    if isinstance(room, str):  # a área (Bens ou Consumíveis) ainda não existe: nenhum
         room = {"id": None}
     cat = _achar_categoria(srv, a["categoria"]) if a.get("categoria") not in (None, "") else None
     vmin = _valor(srv, a["valor_min"]) if a.get("valor_min") not in (None, "") else None
@@ -372,7 +405,8 @@ def _buscar(srv, a) -> str:
     else:
         achados.sort(key=lambda i: (order.get(i.get("room"), 999), i.get("seq") or 0))
     mostrar = achados[:int(lim)]
-    return _json({"encontrados": len(achados), "mostrando": len(mostrar), "valor_total": round(sum(_bruto(srv, i, taxas) for i in achados), 2),
+    fora = {r["id"] for r in rooms if r.get("kind") == "consumiveis"}  # os consumíveis não entram na soma (fora do patrimônio)
+    return _json({"encontrados": len(achados), "mostrando": len(mostrar), "valor_total": round(sum(_bruto(srv, i, taxas) for i in achados if i.get("room") not in fora), 2),
                   "itens": [_linha(srv, i, cats, taxas) for i in mostrar]})
 
 
@@ -388,6 +422,8 @@ def _ver(srv, a) -> str:
            "comodo": {"id": room.get("id") or it.get("room"), "codigo": room.get("code") or "", "nome": room.get("name") or it.get("room")}}
     if room.get("kind") == "bens":
         out["comodo"]["obs"] = "Bens: o que fica fora de casa"
+    if room.get("kind") == "consumiveis":
+        out["comodo"]["obs"] = "Consumíveis: o que se gasta e se compra de novo; fora do patrimônio"
     if srv.zones_enabled():
         out["zona"] = it.get("zone") or ""
     cid = it.get("cat") if it.get("cat") in cats else "outros"
@@ -421,7 +457,7 @@ def _cadastrar(srv, a, quem) -> str:
     if len(lote) > MAX_LOTE:
         raise ErroFerramenta(f"No máximo {MAX_LOTE} itens de cada vez.")
     room = _achar_comodo(srv, a.get("comodo"), criar_bens=True)
-    bem = room == "@bens" or room.get("kind") == "bens"
+    bem = bool(_area(room))
     zona_geral = _texto(srv, a.get("zona"), 120, "zona") if a.get("zona") not in (None, "") else ""
     _zona_ok(srv, room, bool(zona_geral))
     corpos = []
@@ -440,8 +476,7 @@ def _cadastrar(srv, a, quem) -> str:
                            "zone": "" if bem else zona, "source": "correria"})
         except (ErroFerramenta, srv.ApiError) as e:
             raise ErroFerramenta(f"Item {n}: {getattr(e, 'msg', None) or e}") from None
-    if room == "@bens":  # o primeiro bem cria a área Bens, como na tela
-        room = srv.STORE.create_room({"kind": "bens"})
+    room = _criar_area(srv, room)  # o primeiro bem (ou consumível) cria a área, como na tela
     for c in corpos:
         c["room"] = room["id"]
     _, items = srv.visible_data()
@@ -524,8 +559,7 @@ def _mover(srv, a, quem) -> str:
     zona_dada = a.get("zona") not in (None, "")
     zona = _texto(srv, a.get("zona"), 120, "zona") if zona_dada else ""
     _zona_ok(srv, room, zona_dada)
-    if room == "@bens":
-        room = srv.STORE.create_room({"kind": "bens"})
+    room = _criar_area(srv, room)
     feitos, ficaram = [], []
     for it in itens:
         if it["room"] == room["id"] and (not zona_dada or (it.get("zone") or "") == zona):
@@ -564,6 +598,10 @@ def _novo_comodo(srv, a, quem) -> str:
     nome = _texto(srv, a.get("nome"), 60, "nome do cômodo", obrig=True)
     if srv.fold(nome) == "bens":
         raise ErroFerramenta("Bens é a área do que fica fora de casa: cadastre o bem com inventario_cadastrar_itens e comodo Bens.")
+    if srv.fold(nome) in ("consumiveis", "consumivel"):
+        raise ErroFerramenta("Consumíveis é a área do que se gasta: cadastre com inventario_cadastrar_itens e comodo Consumíveis.")
+    if not srv.itens_enabled():
+        raise ErroFerramenta("Os itens da casa estão desligados no InventarIA (Mais › Configurações › Opções › Usar itens da casa).")
     rooms, _ = srv.visible_data()
     igual = next((r for r in rooms if srv.fold(r.get("name") or "") == srv.fold(nome)), None)
     if igual:

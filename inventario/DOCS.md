@@ -52,7 +52,14 @@ O valor de cada item é o que você quiser registrar, somando todas as unidades.
 ## Opções da casa
 
 - **Usar IA** (Mais > Configurações > Integrações), ligada de início: desligada, o app esconde tudo o que usa IA (Catalogar itens com IA, Digitalizar com IA, Buscar na internet, Novidades, Conversar e Falar) e não chama a IA.
-- **Usar bens** (Mais > Configurações > Opções), ligado de início: desligado, os bens somem de tudo, do menu Mais, da Agorio, da busca, dos gráficos, do relatório, da conversa com a IA e dos outros apps (ResolvIA, CronologIA e o patrimônio do GerencIA). Desligar não apaga os bens: ligado de novo, voltam como estavam.
+- **Inventário** (Mais > Configurações > Opções): o app guarda três tipos, cada um com a sua chave: **Usar itens da casa** (os cômodos e o que há neles; ligado de início), **Usar bens** (ligado de início) e **Usar consumíveis** (desligado de início). Qualquer combinação vale, pelo menos um fica ligado, e desligar não apaga nada. Com mais de um em uso, a **Agora** mostra um quadro para cada, com a contagem e o total, e um toque abre o tipo.
+  - **Sem os itens da casa**, somem os cômodos, os itens deles, as zonas, o Catalogar e o Falar; a aba **Cômodos** da barra vira **Bens** (ou **Consumíveis**), e os outros apps ficam só com os bens.
+- **Consumíveis** (Mais > Consumíveis, com **Usar consumíveis** ligado): o que se gasta e se compra de novo, como pasta térmica, creme de massagem e pilhas.
+  - **Adicionar consumível** (na tela ou no **+ Adicionar**) abre o cadastro sem **Cômodo** e sem **Zona**: o nome, **O que é e para que serve**, a categoria, a quantidade e o valor (se quiser). O código começa com **CON** (CON-001).
+  - Com uma foto, a IA preenche o nome e o que é e para que serve. É por esse texto que a busca, a Conversa e o CorrerIA acham o consumível pelo uso ("o que temos para massagem?").
+  - A tela mostra os consumíveis por categoria, com a quantidade em destaque.
+  - Os consumíveis aparecem na Agora, na busca (filtro **Tipo**) e na Conversa, mas não contam no patrimônio, nos gráficos, no relatório nem nos outros apps (ResolvIA, CronologIA e GerencIA).
+- **Usar bens** (Mais > Configurações > Opções), ligado de início: desligado, os bens somem de tudo, do menu Mais, da Agora, da busca, dos gráficos, do relatório, da conversa com a IA e dos outros apps (ResolvIA, CronologIA e o patrimônio do GerencIA). Desligar não apaga os bens: ligado de novo, voltam como estavam.
 - **Usar zonas** (Mais > Configurações > Opções), desligada de início: as zonas dividem um cômodo em partes, como Estante, Bancada ou Rack da TV. Ligadas, aparecem o campo Zona no cadastro, a zona na ficha do item, na busca e no relatório, e os itens de cada cômodo ficam separados por zona.
 
 Desligar uma opção só esconde: nada do que já foi gravado se perde, e ligar de novo traz tudo de volta.
@@ -167,7 +174,7 @@ Em Mais e em Configurações, um toque no cabeçalho de uma seção fecha ou abr
 O balão ao lado do microfone, no alto da tela (e na ficha do item), abre uma conversa com a IA. Pergunte sobre o que está na tela ("qual o item mais caro daqui?", "vale pôr no seguro?") ou sobre qualquer outro assunto. A IA recebe o resumo da casa e o que está na tela: o item, o cômodo com os itens, a busca ou as novidades. Os valores são os mesmos da tela: com o **Valor de hoje** ligado, o de hoje; os **Bens** vão à parte, não como um cômodo. Ela responde, mas não muda o inventário.
 
 - Responde a IA **Para conversar** (Mais > Configurações > Integrações > IA).
-- Com o microfone da conversa (o botão redondo da direita, com a caixa vazia; escrevendo, ele vira o Enviar), dá para falar a pergunta.
+- Com o microfone da conversa (o botão redondo da direita, com a caixa vazia; escrevendo, ele vira o Enviar), dá para falar a pergunta. Ouvindo, o botão da direita vira o **Pronto** (manda o que foi dito) e o da esquerda, o **Cancelar** (para o microfone sem mandar nada).
 - O **clipe**, à esquerda da caixa, manda junto uma foto ou um PDF: **Tirar foto**, **Escolher fotos** (a galeria, até 4) ou **Escolher arquivo** (uma foto ou um PDF, como o manual ou a nota fiscal). Com arquivo, responde a IA **Para ler fotos e PDFs**. Na conversa fica só o nome do arquivo.
 - **Perguntas prontas**: na conversa vazia aparecem 6 perguntas da tela para tocar; o botão ✨ ao lado da caixa abre as mesmas a qualquer momento. Em **Editar perguntas**, toque numa pergunta para mudar o texto, o ✕ tira uma pergunta e **Adicionar** põe outra (aí valem em todas as telas); **Padrão** volta às de cada tela. Embaixo, **Mais perguntas (20)**: um toque põe a pergunta na lista. **Perguntas prontas** e **Mais perguntas** fecham e abrem num toque no título. Fica tudo guardado no aparelho.
 - A IA vê todos os itens (o cômodo, a categoria, o valor, a observação e quem cadastrou) e o total de cada categoria, de qualquer tela.
@@ -216,7 +223,7 @@ O **CorrerIA** é o app da família que liga o inventário ao WhatsApp, ao Claud
 1. Aqui, em **Mais > Configurações > Integrações > CorrerIA**, ligue **Usar com o CorrerIA** (vem desligada). Não precisa da IA do InventarIA: quem pensa é a IA do CorrerIA, o Claude ou o Gemini.
 2. No app **CorrerIA**, conecte o WhatsApp, o Claude ou o Gemini. O InventarIA aparece lá sozinho.
 
-O que dá para fazer: ver o resumo da casa (o total, os cômodos, os bens e as categorias), buscar itens (por nome, cômodo, zona, categoria ou valor), ver um item, cadastrar um ou vários itens num cômodo (ou em Bens), editar (nome, valor, quantidade, categoria, zona, detalhes e observação), mover para outro cômodo e apagar, e criar um cômodo. As mudanças seguem as mesmas regras da tela: o item ganha o próximo código do cômodo, a data do valor muda quando o valor muda, e as versões automáticas continuam valendo. Pelo WhatsApp, o CorrerIA pede para você confirmar antes de gravar.
+O que dá para fazer: ver o resumo da casa (o total, os cômodos, os bens e as categorias), buscar itens (por nome, pelo uso, cômodo, zona, categoria ou valor), ver um item, cadastrar um ou vários itens num cômodo (ou em Bens, ou em Consumíveis), editar (nome, valor, quantidade, categoria, zona, detalhes e observação), mover para outro cômodo e apagar, e criar um cômodo. As mudanças seguem as mesmas regras da tela: o item ganha o próximo código do cômodo, a data do valor muda quando o valor muda, e as versões automáticas continuam valendo. Pelo WhatsApp, o CorrerIA pede para você confirmar antes de gravar.
 
 Fotos, backups e configurações não passam pelo CorrerIA. O item cadastrado assim mostra na ficha a origem **Pelo CorrerIA** e quem cadastrou. Embaixo da chave, o app mostra quem usou por último e quando ("Claude usou hoje às 9:41"). Desligar a chave corta a ligação na hora.
 

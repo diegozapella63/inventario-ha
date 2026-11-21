@@ -127,7 +127,7 @@
   const ALL_TABS = [["integracoes", "Integrações", "plug"], ["dados", "Dados", "archive"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
   const moreTabs = () => ALL_TABS;
   const moreTab = (t) => (ALL_TABS.some(([k]) => k === t) ? t : ALL_TABS[0][0]);
-  const IN_MORE = ["menu", "bens", "charts", "news", "cats", "data", "report", "about"]; // telas que ficam embaixo de Mais
+  const IN_MORE = ["menu", "bens", "cons", "charts", "news", "cats", "data", "report", "about"]; // telas que ficam embaixo de Mais
   function applyAccent(a) {
     if (a === ACCENT0) delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = a;
@@ -183,6 +183,17 @@
   const BENS_GROUPS = [["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["", "Outros"]];
   const bensGroup = (it) => (it.cat === "imoveis" || it.cat === "veiculos" ? it.cat : "");
   const bensOn = () => S.settings.bens !== false; // Mais > Configurações > Opções > Usar bens (desligar não apaga)
+  // 1.78.0: o inventário guarda três tipos, cada um com a sua chave (Opções; pelo menos um ligado; desligar não apaga):
+  // os itens da casa (os cômodos e o que há neles), os bens (fora de casa) e os consumíveis (o que se gasta e se compra de
+  // novo: pasta térmica, creme de massagem). Os consumíveis são outra área do sistema (kind "consumiveis"), sem cômodo nem
+  // zona, e não contam no patrimônio, nos gráficos nem no relatório; aparecem na tela deles, no Agora e na busca.
+  const CONS_NEW = "@consumiveis"; // a área ainda não existe: é criada ao gravar o primeiro consumível
+  const itensOn = () => S.settings.itens !== false;
+  const consOn = () => S.settings.consumiveis === true;
+  const tiposOn = () => [itensOn(), bensOn(), consOn()].filter(Boolean).length;
+  // a tela principal de cada tipo: a dos itens da casa é a aba Cômodos; sem eles, a aba vira Bens (ou Consumíveis)
+  const mainTab = () => (itensOn() ? "rooms" : bensOn() ? "bens" : "cons");
+  const TIPO = { rooms: ["#/comodos", "rooms", "Cômodos"], bens: ["#/bens", "home", "Bens"], cons: ["#/consumiveis", "drop", "Consumíveis"] };
   const correriaOn = () => S.settings.correria === true; // Mais > Configurações > Integrações > CorrerIA (desligado de início)
   // Valor de hoje (Mais > Configurações > Integrações > GerencIA, desligado de início): com a depreciação que o GerencIA
   // publica (a perda por ano, em %, de cada categoria; negativa: valoriza), o valor perde a taxa por ano, composta, desde
@@ -203,8 +214,11 @@
   function derive() {
     const sorted = [...S.rooms].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const area = sorted.find((r) => r.kind === "bens") || null, bens = bensOn() ? area : null;
-    const rooms = sorted.filter((r) => r !== area), all = bens ? sorted : rooms;
-    const items = area && !bens ? S.items.filter((i) => i.room !== area.id) : S.items; // os itens que contam (sem os bens, se desligados)
+    const areaC = sorted.find((r) => r.kind === "consumiveis") || null, cons = consOn() ? areaC : null;
+    const rooms = itensOn() ? sorted.filter((r) => !r.kind) : [], all = [...rooms, ...(bens ? [bens] : []), ...(cons ? [cons] : [])];
+    const hid = new Set(sorted.filter((r) => !all.includes(r)).map((r) => r.id));
+    const items = hid.size ? S.items.filter((i) => !hid.has(i.room)) : S.items; // os itens que aparecem (sem os de um tipo desligado)
+    const pat = cons ? items.filter((i) => i.room !== cons.id) : items; // os que contam no patrimônio: sem os consumíveis
     const roomById = new Map(all.map((r) => [r.id, r]));
     const byRoom = new Map(all.map((r) => [r.id, []]));
     const photoItems = new Map();
@@ -215,7 +229,7 @@
       if (!byRoom.has(it.room)) byRoom.set(it.room, []);
       byRoom.get(it.room).push(it);
       const v = vh.get(it.id) || 0;
-      total += v;
+      if (!cons || it.room !== cons.id) total += v;
       const c = CAT[it.cat] ? it.cat : "outros";
       const ct = catTotals.get(c) || { value: 0, count: 0 };
       ct.value += v; ct.count += 1;
@@ -231,16 +245,20 @@
     for (const it of items) for (const p of it.photos || []) files.add(p);
     for (const r of rooms) for (const p of r.photos || []) files.add(p.file);
     const bensItems = bens ? byRoom.get(bens.id) || [] : [], bensTotal = bens ? roomTotals.get(bens.id) || 0 : 0;
-    D = { vh, rooms, allRooms: all, bens, bensItems, bensTotal, houseTotal: total - bensTotal, houseCount: items.length - bensItems.length, items,
+    const consItems = cons ? byRoom.get(cons.id) || [] : [];
+    D = { vh, rooms, allRooms: all, bens, bensItems, bensTotal, cons, consItems, pat, houseTotal: total - bensTotal, houseCount: pat.length - bensItems.length, items,
       roomById, byRoom, roomTotals, catTotals, photoItems, total, photoCount: files.size, itemById: new Map(items.map((i) => [i.id, i])) };
   }
   const isBens = (rid) => rid === BENS_NEW || (!!D.bens && rid === D.bens.id);
-  // as opções de cômodo de um item: os cômodos e, no fim, Bens
-  const roomOptions = (sel) => [...D.rooms, ...(bensOn() ? [D.bens || { id: BENS_NEW, name: "Bens" }] : [])]
+  const isCons = (rid) => rid === CONS_NEW || (!!D.cons && rid === D.cons.id);
+  const isArea = (rid) => isBens(rid) || isCons(rid); // fora dos cômodos: sem zona, sem a seleção da busca
+  const bensId = () => D.bens?.id || BENS_NEW, consId = () => D.cons?.id || CONS_NEW;
+  // as opções de cômodo de um item: os cômodos e, no fim, Bens e Consumíveis
+  const roomOptions = (sel) => [...D.rooms, ...(bensOn() ? [D.bens || { id: BENS_NEW, name: "Bens" }] : []), ...(consOn() ? [D.cons || { id: CONS_NEW, name: "Consumíveis" }] : [])]
     .map((r) => `<option value="${esc(r.id)}"${r.id === sel ? " selected" : ""}>${esc(r.name)}</option>`).join("");
-  async function realRoom(rid) { // "@bens": cria a área Bens (uma vez) e devolve o id dela
-    if (rid !== BENS_NEW) return rid;
-    const res = await API.post("api/rooms", { kind: "bens" });
+  async function realRoom(rid) { // "@bens" ou "@consumiveis": cria a área (uma vez) e devolve o id dela
+    if (rid !== BENS_NEW && rid !== CONS_NEW) return rid;
+    const res = await API.post("api/rooms", { kind: rid.slice(1) });
     setRev(res.rev); S.rooms = res.rooms; if (res.cats) { S.cats = res.cats; applyCats(res.cats); } derive();
     return res.room.id;
   }
@@ -572,12 +590,13 @@
     const parts = path.split("/").filter(Boolean).map((p) => { try { return decodeURIComponent(p); } catch { return p; } });
     const q = Object.fromEntries(new URLSearchParams(qs));
     switch (parts[0]) {
-      case "c": return D && D.bens && parts[1] === D.bens.id ? { name: "bens", q } : { name: "room", id: parts[1], q };
+      case "c": return D && D.bens && parts[1] === D.bens.id ? { name: "bens", q } : D && D.cons && parts[1] === D.cons.id ? { name: "cons", q } : { name: "room", id: parts[1], q };
       case "bens": return bensOn() ? { name: "bens", q } : { name: "menu" }; // bens desligados: o menu Mais
+      case "consumiveis": return consOn() ? { name: "cons", q } : { name: "menu" };
       case "i": return { name: "item", id: parts[1], q };
       case "buscar": return { name: "search", q };
       case "relatorio": return { name: "report", q };
-      case "comodos": return { name: "rooms", q };
+      case "comodos": return { name: mainTab(), q }; // sem os itens da casa, a aba é Bens (ou Consumíveis)
       case "mais": // #/mais é o menu; #/mais/<aba> é o endereço antigo de Configurações (e de Novidades)
         if (!parts[1]) return { name: "menu", q };
         if (parts[1] === "novidades") return { name: newsOn() ? "news" : "menu", q };
@@ -608,6 +627,7 @@
       case "cats": return "#/categorias";
       case "charts": return "#/graficos";
       case "bens": return "#/bens";
+      case "cons": return "#/consumiveis";
       case "about": return "#/sobre";
       case "data": { const t = moreTab(r.tab); return t === ALL_TABS[0][0] ? "#/config" : `#/config/${t}`; }
       default: return "#/";
@@ -630,7 +650,7 @@
         location.replace(rendered ? hashOf(base) : "#/");
         return;
       }
-      if (!rendered) { base = isBens(it.room) ? { name: "bens", q: {} } : { name: "room", id: it.room, q: {} }; renderView(true); }
+      if (!rendered) { base = isBens(it.room) ? { name: "bens", q: {} } : isCons(it.room) ? { name: "cons", q: {} } : { name: "room", id: it.room, q: {} }; renderView(true); }
       showItemSheet(it);
       return;
     }
@@ -657,12 +677,12 @@
       <nav class="nav" aria-label="Seções">
         <a href="#/"${cr("home")}>${ic("clock")}Agora</a>
         <a href="#/buscar"${cr("search")}>${ic("search")}Buscar<kbd>/</kbd></a>
-        <a href="#/comodos"${cr("rooms")}>${ic("rooms")}Cômodos</a>
+        ${Object.keys(TIPO).filter((k) => ({ rooms: itensOn(), bens: bensOn(), cons: consOn() })[k]).map((k) => `<a href="${TIPO[k][0]}"${cr(k)}>${ic(TIPO[k][1])}${TIPO[k][2]}</a>`).join("")}
         <a href="#/relatorio"${cr("report")}>${ic("report")}Relatório</a>
-        <a href="#/mais"${IN_MORE.includes(cur.name) && cur.name !== "report" ? ' aria-current="page"' : ""}>${ic("menu")}Mais</a>
+        <a href="#/mais"${inMore(cur.name) && cur.name !== "report" && !(cur.name in TIPO) ? ' aria-current="page"' : ""}>${ic("menu")}Mais</a>
       </nav>
-      <div class="side-h"><h2>Cômodos</h2><span>${int(D.rooms.length)}</span></div>
-      <div class="side-rooms">
+      ${itensOn() ? `<div class="side-h"><h2>Cômodos</h2><span>${int(D.rooms.length)}</span></div>` : ""}
+      <div class="side-rooms"${itensOn() ? "" : " hidden"}>
         ${D.rooms.map((r) => `<a class="side-room" href="#/c/${encodeURIComponent(r.id)}"${cur.name === "room" && cur.id === r.id ? ' aria-current="page"' : ""}>
           <span class="mt soft">${esc(r.code)}</span><span class="rn">${esc(r.name)}</span><span class="rv">${numTxt(Math.round(D.roomTotals.get(r.id) || 0))}</span></a>`).join("")}
         <button type="button" class="side-room" data-act="room-new">${ic("plus", "sm")}<span class="rn">Novo cômodo</span></button>
@@ -672,37 +692,43 @@
 
   function viewTitle(r) {
     if (r.name === "room") return D.roomById.get(r.id)?.name || "Cômodo";
-    return { home: "Agora", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", bens: "Bens", charts: "Gráficos", news: "Novidades", cats: "Categorias", data: "Configurações", about: "Sobre" }[r.name] || "InventarIA";
+    return { home: "Agora", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", bens: "Bens", cons: "Consumíveis", charts: "Gráficos", news: "Novidades", cats: "Categorias", data: "Configurações", about: "Sobre" }[r.name] || "InventarIA";
   }
   // Topo de cada tela, igual nos apps da família (EconomIA, ResolvIA): nome do app com "IA" na cor
   // do app, saudação ao usuário do Home Assistant e o título grande da tela.
   // 1.59.1: o título de cada tela com o ícone (o mesmo da linha do Mais ou da aba de baixo), como as seções
-  const PAGE_IC = { home: "clock", search: "search", rooms: "rooms", menu: "more", bens: "home", charts: "bars", news: "spark", cats: "grid", data: "gear", about: "info" };
-  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", menu: "data", bens: "data", charts: "data", news: "data", cats: "data", data: "data", report: "data", about: "data" };
+  const PAGE_IC = { home: "clock", search: "search", rooms: "rooms", menu: "more", bens: "home", cons: "drop", charts: "bars", news: "spark", cats: "grid", data: "gear", about: "info" };
+  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", menu: "data", bens: "data", cons: "data", charts: "data", news: "data", cats: "data", data: "data", report: "data", about: "data" };
+  const inMore = (name) => IN_MORE.includes(name) && name !== mainTab(); // a tela do tipo que está na aba não fica embaixo do Mais
   function renderTop() {
     const el = $("#topbar");
     const r = base;
     const first = (S.user || "").trim().split(/\s+/)[0];
-    const up = r.name === "room" ? ["#/comodos", "Cômodos"] : IN_MORE.includes(r.name) && r.name !== "menu" ? ["#/mais", "Mais"] : null;
+    const up = r.name === "room" ? ["#/comodos", "Cômodos"] : inMore(r.name) && r.name !== "menu" ? ["#/mais", "Mais"] : null;
     const title = r.name === "room" || r.name === "report" ? "" : viewTitle(r);
     const sub = r.name === "rooms" && D.rooms.length
       ? `${plural(D.rooms.length, "cômodo", "cômodos")}, ${plural(D.houseCount, "item", "itens")}, ${money(D.houseTotal)}`
       : r.name === "bens" && D.bensItems.length ? `${plural(D.bensItems.length, "bem", "bens")}, ${money(D.bensTotal)}`
+      : r.name === "cons" && D.consItems.length ? plural(D.consItems.length, "consumível", "consumíveis")
       : r.name === "data" ? `${plural(S.items.length, "item", "itens")} e ${plural(D.photoCount, "foto", "fotos")} no inventário` : "";
     el.innerHTML = `
       <div class="mh-row">
         <p class="eyebrow"><span class="brand-word">${APP_ICON}Inventar<span>IA</span></span>${first ? `<span class="hello"><span class="sep"> · </span>Olá, ${esc(first)}</span>` : ""}</p>
         ${aiOn() ? `<button type="button" class="chat-top" data-act="chat" aria-label="Conversar com a IA" title="Conversar">${ic("chat")}</button>` : ""}
-        ${voiceReady() ? `<button type="button" class="mic-top" data-act="voice" aria-label="Falar: adicionar itens falando" title="Falar">${ic("mic")}</button>` : ""}
+        ${voiceReady() && itensOn() ? `<button type="button" class="mic-top" data-act="voice" aria-label="Falar: adicionar itens falando" title="Falar">${ic("mic")}</button>` : ""}
         ${r.name !== "room" ? `<div class="top-actions">
-          ${aiOn() ? `<button type="button" class="btn wide" data-act="catalog">${ic("scan")}Catalogar itens com IA</button>` : ""}
+          ${aiOn() && itensOn() ? `<button type="button" class="btn wide" data-act="catalog">${ic("scan")}Catalogar itens com IA</button>` : ""}
           <button type="button" class="btn primary wide" data-act="item-new">${ic("plus")}Adicionar item</button></div>` : ""}
       </div>
       ${up ? `<a class="uplink" href="${up[0]}">${ic("back", "sm")}${up[1]}</a>` : ""}
       ${title ? `<h1 class="page-title">${PAGE_IC[r.name] ? `<span class="sec-ic" aria-hidden="true">${ic(PAGE_IC[r.name])}</span>` : ""}${esc(title)}</h1>` : ""}
       ${sub ? `<p class="page-sub">${sub}</p>` : ""}`;
+    // a 3ª aba é a tela do tipo principal: Cômodos; sem os itens da casa, Bens (ou Consumíveis)
+    const mt = mainTab(), tab3 = $('.tabbar [data-tab="rooms"]');
+    if (tab3 && tab3.dataset.tipo !== mt) { tab3.dataset.tipo = mt; tab3.href = TIPO[mt][0]; tab3.innerHTML = `${ic(TIPO[mt][1])}${TIPO[mt][2]}`; }
+    const cur = r.name === mt ? "rooms" : TAB_OF[r.name];
     $$(".tabbar [data-tab]").forEach((a) => {
-      if (a.dataset.tab === TAB_OF[r.name]) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+      if (a.dataset.tab === cur) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
   }
 
@@ -775,6 +801,7 @@
         case "cats": html = `<div class="mscreen">${viewCats()}</div>`; break;
         case "charts": html = viewCharts(); break;
         case "bens": html = viewBens(); break;
+        case "cons": html = viewCons(); break;
         case "data": html = viewData(); break;
         case "about": html = viewAbout(); break;
         default: html = viewHome();
@@ -855,14 +882,16 @@
     const room = D.roomById.get(it.room);
     let where;
     if (mode === "room") where = it.details ? hl(snippet(it.details), toks) : "";
-    else if (mode === "bens") where = esc(CAT[it.cat] || "Outros");
+    else if (mode === "bens" || mode === "cons") where = esc(CAT[it.cat] || "Outros");
     else where = hl([room?.name, zonesOn() ? it.zone : ""].filter(Boolean).join(", "), toks);
     const qty = qtyClean(it.qty);
     const thumb = ph ? `<img class="thumb" src="${esc(src(ph))}" alt="" loading="lazy" decoding="async" width="56" height="56">` : `<span class="thumb">${ic("tag")}</span>`;
     const inner = `${pick === null ? thumb : `<span class="tw">${thumb}<span class="pk" aria-hidden="true">${ic("check", "sm")}</span></span>`}
       <span class="ib"><span class="nm">${hl(it.name, toks)}</span>
         <span class="meta"><span class="mt soft">${esc(tagOf(it))}</span>${where ? `<span class="z">${where}</span>` : ""}</span></span>
-      <span class="iv"><span class="val">${money(vl(it))}</span>${qty !== "1" ? `<span class="qty">${esc(qtyShort(it.qty))}</span>` : ""}</span>`;
+      ${isCons(it.room) // um consumível: a quantidade em destaque; o valor (fora do patrimônio), só se houver
+    ? `<span class="iv cons"><span class="val">${esc(qtyShort(it.qty))}</span>${vl(it) > 0 ? `<span class="qty">${money(vl(it))}</span>` : ""}</span>`
+    : `<span class="iv"><span class="val">${money(vl(it))}</span>${qty !== "1" ? `<span class="qty">${esc(qtyShort(it.qty))}</span>` : ""}</span>`}`;
     if (pick !== null) return `<li><button type="button" class="irow selr" data-act="sel-toggle" data-id="${esc(it.id)}" aria-pressed="${pick === true}"${pick === "off" ? " disabled" : ""}>${inner}</button></li>`;
     return `<li><a class="irow" href="#/i/${encodeURIComponent(it.id)}">${inner}</a></li>`;
   }
@@ -891,7 +920,7 @@
   // 1.59.0: o ícone pequeno antes do título de cada linha de Mais e de Configurações (padrão da família)
   const oti = (name) => `<span class="ot-ic" aria-hidden="true">${ic(name)}</span>`;
   function viewHome() {
-    if (!D.rooms.length) {
+    if (itensOn() && !D.rooms.length) {
       return `<section class="hero welcome">
         <div class="tagwrap">
           <div class="tagswing">
@@ -911,21 +940,34 @@
       </section>`;
     }
     const n = D.items.length;
-    const byValue = [...D.items].sort((a, b) => vl(b) - vl(a));
+    const byValue = [...D.pat].sort((a, b) => vl(b) - vl(a)); // o patrimônio: sem os consumíveis
     const recent = [...D.items].sort((a, b) => parseDate(b.createdAt) - parseDate(a.createdAt)).slice(0, 6);
     const maxRoom = Math.max(0, ...D.rooms.map((r) => D.roomTotals.get(r.id) || 0));
     const bigRoom = D.rooms.find((r) => (D.roomTotals.get(r.id) || 0) === maxRoom);
     const top = byValue[0], last = recent[0];
+    // o que conta no patrimônio, numa linha: os itens da casa e os bens (os consumíveis ficam de fora)
+    const conta = [itensOn() && `${plural(D.houseCount, "item", "itens")} em ${plural(D.rooms.length, "cômodo", "cômodos")}`,
+      D.bensItems.length && plural(D.bensItems.length, "bem", "bens")].filter(Boolean).join(" e ") || "Nada com valor ainda";
+    // 1.78.0: com mais de um tipo ligado, um quadro para cada (itens da casa, bens, consumíveis), lado a lado: a contagem,
+    // o total e um toque para abrir
+    const tile = (k, n1, n2, sub) => `<a class="tipo" href="${TIPO[k][0]}" data-tipo="${k}"><span class="sec-ic" aria-hidden="true">${ic(TIPO[k][1])}</span>
+      <b>${k === "rooms" ? "Itens da casa" : TIPO[k][2]}</b><span class="tn">${n1}</span><span class="ts">${n2}</span>${sub ? `<span class="tv">${sub}</span>` : ""}</a>`;
+    // (só com os consumíveis ligados ou com mais de um tipo em uso: quem só tem os itens da casa fica como antes)
+    const emUso = [itensOn() && D.houseCount, D.bensItems.length, D.consItems.length].filter(Boolean).length;
+    const tiles = tiposOn() > 1 && (consOn() || emUso > 1) ? `<nav class="tipos n${tiposOn()}" aria-label="O que o inventário guarda">
+      ${itensOn() ? tile("rooms", int(D.houseCount), D.houseCount === 1 ? "item" : "itens", moneyR(D.houseTotal)) : ""}
+      ${bensOn() ? tile("bens", int(D.bensItems.length), D.bensItems.length === 1 ? "bem" : "bens", moneyR(D.bensTotal)) : ""}
+      ${consOn() ? tile("cons", int(D.consItems.length), D.consItems.length === 1 ? "consumível" : "consumíveis", "") : ""}</nav>` : "";
     return `
     <section class="hero">
       <div class="tagwrap">
         <div class="tagswing">
           <svg class="string" viewBox="0 0 120 140" aria-hidden="true"><path d="M36 132 C 35 104, 28 50, 25 0"/></svg>
-          <div class="tag" role="img" aria-label="Patrimônio: ${esc(money(D.total))} em ${esc(plural(n, "item", "itens"))}">
+          <div class="tag" role="img" aria-label="Patrimônio: ${esc(money(D.total))} em ${esc(plural(D.pat.length, "item", "itens"))}">
             <div class="tag-body">
               <p class="tag-label">${deprecOn() ? "Patrimônio hoje" : "Patrimônio"}</p>
               <p class="tag-value"><span class="cur">R$</span>${numTxt(Math.round(D.total))}</p>
-              <p class="tag-sub">${plural(D.houseCount, "item", "itens")} em ${plural(D.rooms.length, "cômodo", "cômodos")}${D.bensItems.length ? ` e ${plural(D.bensItems.length, "bem", "bens")}` : ""}</p>
+              <p class="tag-sub">${conta}</p>
             </div>
           </div>
         </div>
@@ -942,18 +984,23 @@
       </dl>
       </div>
     </section>
-    <section class="sec">
+    ${tiles}
+    ${itensOn() ? `<section class="sec">
       <div class="sec-h"><h2>${secIc("rooms")}Cômodos</h2><button type="button" class="btn ghost sm" data-act="room-new">${ic("plus", "sm")}Novo cômodo</button></div>
       <ul class="rows">${D.rooms.map((r) => roomRow(r, maxRoom)).join("")}</ul>
-    </section>
+    </section>` : ""}
     ${D.bensItems.length ? `<section class="sec" id="home-bens">
       <div class="sec-h"><h2>${secIc("home")}Bens</h2><a class="aside" href="#/bens">Ver todos</a></div>
       <ul class="ilist">${[...D.bensItems].sort((a, b) => vl(b) - vl(a)).slice(0, 5).map((it) => itemRow(it, { mode: "bens" })).join("")}</ul>
     </section>` : ""}
-    <section class="sec">
+    ${D.consItems.length ? `<section class="sec" id="home-cons">
+      <div class="sec-h"><h2>${secIc("drop")}Consumíveis</h2><a class="aside" href="#/consumiveis">Ver todos</a></div>
+      <ul class="ilist">${[...D.consItems].sort((a, b) => parseDate(b.createdAt) - parseDate(a.createdAt)).slice(0, 5).map((it) => itemRow(it, { mode: "cons" })).join("")}</ul>
+    </section>` : ""}
+    ${recent.length ? `<section class="sec">
       <div class="sec-h"><h2>${secIc("clock")}Cadastrados recentemente</h2><a class="aside" href="#/buscar?ord=new">Ver todos</a></div>
       <ul class="ilist">${recent.map((it) => itemRow(it)).join("")}</ul>
-    </section>`;
+    </section>` : ""}`;
   }
   const emptyMark = () => '<svg class="empty-mark" viewBox="0 0 74 50" aria-hidden="true"><path d="M18 2h52a2 2 0 0 1 2 2v42a2 2 0 0 1-2 2H18L2 33V17z" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="17" cy="25" r="5" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>';
 
@@ -1029,6 +1076,21 @@
         <ul class="ilist">${its.map((it) => itemRow(it, { mode: name === "Outros" ? "bens" : "room" })).join("")}</ul></section>`).join("")}
     </div>`;
   }
+  // -- Consumíveis (1.78.0, Mais > Consumíveis): o que se gasta e se compra de novo, por categoria, com a quantidade
+  function viewCons() {
+    if (!D.consItems.length) {
+      return `<div class="mscreen"><div class="empty">${emptyMark()}<h2>Nenhum consumível ainda</h2>
+        <p>Pasta térmica, creme de massagem, pilhas: o que se gasta e se compra de novo.</p>
+        <div class="acts"><button type="button" class="btn primary" data-act="item-new" data-room="${esc(consId())}">${ic("plus")}Adicionar consumível</button></div></div></div>`;
+    }
+    const groups = CATS.map(([k, name]) => [name, D.consItems.filter((it) => (CAT[it.cat] ? it.cat : "outros") === k).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))])
+      .filter(([, its]) => its.length);
+    return `<div class="mscreen cons">
+      ${groups.map(([name, its]) => `<section class="zone">
+        <div class="zone-h"><h3><span class="zone-ic" aria-hidden="true">${ic("drop")}</span>${esc(name)}</h3><span class="zs">${plural(its.length, "consumível", "consumíveis")}</span></div>
+        <ul class="ilist">${its.map((it) => itemRow(it, { mode: "room" })).join("")}</ul></section>`).join("")}
+    </div>`;
+  }
   function matches(it, toks) {
     const room = D.roomById.get(it.room);
     const hay = norm(`${it.name} ${it.details} ${zonesOn() ? it.zone : ""} ${room?.name || ""} ${tagOf(it)} ${CAT[it.cat] || ""}`);
@@ -1037,12 +1099,15 @@
 
   // -- busca
   // o tipo, na busca (só quando há bens): os itens da casa ou um grupo de Mais > Bens; num tipo de bem, sem cômodo e categoria
-  const TIPOS = [["", "Todos os tipos"], ["casa", "Itens da casa"], ["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["outros", "Outros bens"]];
+  // 1.78.0: só os tipos que há (os itens da casa, os grupos dos bens e os consumíveis); com um só, sem o filtro
+  const tipos = () => { const t = [itensOn() && ["casa", "Itens da casa"], ...(D.bensItems.length ? [["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["outros", "Outros bens"]] : []),
+    D.consItems.length && ["consumiveis", "Consumíveis"]].filter(Boolean); return t.length > 1 ? [["", "Todos os tipos"], ...t] : []; };
   const tipoBens = (t) => t === "imoveis" || t === "veiculos" || t === "outros";
+  const tipoArea = (t) => tipoBens(t) || t === "consumiveis"; // fora dos cômodos: sem o cômodo e a categoria
   function viewSearch(q) {
     const ord = q.ord || (q.q ? "rel" : "val");
-    const tipo = D.bensItems.length && TIPOS.some(([k]) => k === q.tipo) ? q.tipo || "" : "", house = !tipoBens(tipo);
-    const n = (D.bensItems.length ? 1 : 0) + (house ? 2 : 0) + 1;
+    const TIPOS = tipos(), tipo = TIPOS.some(([k]) => k === q.tipo) ? q.tipo || "" : "", house = !tipoArea(tipo);
+    const n = (TIPOS.length ? 1 : 0) + (house ? (itensOn() ? 2 : 1) : 0) + 1;
     return `
     <section class="sbar">
       <form class="q" data-form="search" role="search">${ic("search")}
@@ -1050,11 +1115,11 @@
         <button type="button" class="btn ghost icon sm clear" data-act="search-clear" aria-label="Limpar busca"${q.q ? "" : " hidden"}>${ic("close", "sm")}</button>
       </form>
       <div class="sfilters n${n}">
-        ${D.bensItems.length ? `<select class="select" data-input="search-tipo" aria-label="Tipo">
+        ${TIPOS.length ? `<select class="select" data-input="search-tipo" aria-label="Tipo">
           ${TIPOS.map(([k, v]) => `<option value="${k}"${k === tipo ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>` : ""}
-        ${house ? `<select class="select" data-input="search-room" aria-label="Cômodo"><option value="">Todos os cômodos</option>
-          ${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === q.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select>
-        <select class="select" data-input="search-cat" aria-label="Categoria"><option value="">Todas as categorias</option>
+        ${house && itensOn() ? `<select class="select" data-input="search-room" aria-label="Cômodo"><option value="">Todos os cômodos</option>
+          ${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === q.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select>` : ""}
+        ${house ? `<select class="select" data-input="search-cat" aria-label="Categoria"><option value="">Todas as categorias</option>
           ${CATS.map(([k, v]) => `<option value="${k}"${k === q.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>` : ""}
         <select class="select ord" data-input="search-ord" aria-label="Ordenar">
           ${ORDERS.map(([k, v]) => `<option value="${k}"${k === ord ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
@@ -1065,10 +1130,11 @@
   function searchItems(q) {
     const toks = tokens(q.q || "");
     let list = D.items;
-    const tipo = D.bensItems.length ? q.tipo : "";
-    if (tipo === "casa") list = list.filter((i) => !isBens(i.room));
+    const tipo = tipos().some(([k]) => k === q.tipo) ? q.tipo : "";
+    if (tipo === "casa") list = list.filter((i) => !isArea(i.room));
     else if (tipoBens(tipo)) list = list.filter((i) => isBens(i.room) && (bensGroup(i) || "outros") === tipo);
-    if (!tipoBens(tipo)) {
+    else if (tipo === "consumiveis") list = list.filter((i) => isCons(i.room));
+    if (!tipoArea(tipo)) {
       if (q.room && D.rooms.some((r) => r.id === q.room)) list = list.filter((i) => i.room === q.room); // cômodo de um link antigo: vale Todos, como diz a seleção
       if (q.cat && CAT[q.cat]) list = list.filter((i) => (CAT[i.cat] ? i.cat : "outros") === q.cat);
     }
@@ -1100,7 +1166,7 @@
         ${filtered ? `<div class="acts"><button class="btn" data-act="search-reset">${ic("close")}Limpar filtros</button></div>` : ""}</div>`;
     }
     const shown = list.slice(0, searchLimit);
-    const pickable = list.filter((i) => !isBens(i.room)); // os bens não têm cômodo nem categoria: ficam de fora
+    const pickable = list.filter((i) => !isArea(i.room)); // os bens e os consumíveis não têm cômodo: ficam de fora
     if (SEL) { const ok = new Set(pickable.map((i) => i.id)); for (const id of [...SEL]) if (!ok.has(id)) SEL.delete(id); } // só o que está na lista
     const more = list.length > shown.length ? `<div class="more"><button class="btn" data-act="more-results">${ic("down")}Mostrar mais ${int(Math.min(120, list.length - shown.length))}</button></div>` : "";
     if (!SEL) {
@@ -1112,7 +1178,7 @@
     return `<div class="ssum sel"><button type="button" class="btn ghost icon sm" data-act="sel-end" aria-label="Cancelar seleção">${ic("close")}</button>
         <span class="sel-n">${n ? plural(n, "selecionado", "selecionados") : "Selecionar"}</span>${n ? `<b>${moneyR(selSum)}</b>` : ""}
         <button type="button" class="btn ghost sm" data-act="sel-all">${ic("checks", "sm")}${all ? "Nenhum" : "Todos"}</button></div>
-      <ul class="ilist">${shown.map((it) => itemRow(it, { toks, pick: isBens(it.room) ? "off" : SEL.has(it.id) })).join("")}</ul>${more}
+      <ul class="ilist">${shown.map((it) => itemRow(it, { toks, pick: isArea(it.room) ? "off" : SEL.has(it.id) })).join("")}</ul>${more}
       <div class="selbar"><button type="button" class="btn primary" data-act="sel-change"${n ? "" : " disabled"}>${ic("edit")}${n ? `Alterar ${plural(n, "item", "itens")}` : "Alterar"}</button></div>`;
   }
   // Buscar › Selecionar: marcar vários itens e alterar de uma vez o cômodo, a categoria e a zona (com Desfazer), como no
@@ -1135,7 +1201,7 @@
     if (!row) return;
     const id = row.dataset.id || decodeURIComponent((row.getAttribute("href") || "").split("/").pop());
     const it = D.itemById.get(id);
-    if (!it || isBens(it.room)) return;
+    if (!it || isArea(it.room)) return;
     e.preventDefault();
     try { navigator.vibrate && navigator.vibrate(12); } catch { /* sem vibração */ }
     if (!SEL) selStart(id); // já selecionando, o toque marca e desmarca
@@ -1149,7 +1215,7 @@
   // cômodo, a categoria e a zona juntos. Em outro cômodo, o item ganha um código novo e fica sem zona (ou na zona escolhida).
   const KEEP = "__manter__", OTHER = "__outra__";
   function selEdit() {
-    const its = [...SEL].map((id) => D.itemById.get(id)).filter((i) => i && !isBens(i.room));
+    const its = [...SEL].map((id) => D.itemById.get(id)).filter((i) => i && !isArea(i.room));
     if (!its.length) return;
     const n = plural(its.length, "item", "itens"), zOn = zonesOn();
     const chip = (name, value, label, on = false) => `<label class="chip"><input type="radio" name="${name}" value="${esc(value)}"${on ? " checked" : ""}>${label}</label>`;
@@ -1251,7 +1317,7 @@
     const when = `${p2(now.getDate())}/${p2(now.getMonth() + 1)}/${now.getFullYear()} às ${p2(now.getHours())}:${p2(now.getMinutes())}`;
     const day = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}`;
     // os gráficos da tela Gráficos: cômodos, categorias, faixas de valor, os mais valiosos e os bens
-    const c = D.items.length ? chartData() : null, T = D.houseTotal;
+    const c = D.pat.length ? chartData() : null, T = D.houseTotal;
     const bmax = c ? Math.max(...c.bands.map((b) => b.n), 1) : 1;
     const graf = (id, icon, title, body) => `<section class="rep-g" id="rg-${id}"><h2>${secIc(icon)}${title}</h2>${body}</section>`;
     const charts = c ? [
@@ -1291,7 +1357,7 @@
             ${zc ? `<td>${esc(it.zone || "")}</td>` : ""}<td class="r">${esc(qtyClean(it.qty))}</td><td class="r">${money(vl(it))}</td></tr>`).join("")}
           </tbody><tfoot><tr>${withPhotos ? "<td></td>" : ""}<td colspan="${zc ? 4 : 3}">${bens ? "Total dos bens" : "Subtotal"}</td><td class="r">${money(D.roomTotals.get(r.id) || 0)}</td></tr></tfoot></table></section>`;
       }).join("")}
-      ${D.items.length ? "" : `<p class="muted">Nenhum item cadastrado.</p>`}
+      ${D.pat.length ? "" : `<p class="muted">Nenhum item cadastrado.</p>`}
       ${MARCA}
     </article>`;
   }
@@ -1337,7 +1403,8 @@
   // -- Mais: um menu com o que não cabe na barra (Novidades, Relatório), Configurações e, por último, Sobre
   function viewMenu() {
     const rows = [
-      bensOn() && ["#/bens", "home", "Bens", "Casa, terreno, carro: o que fica fora de casa."],
+      bensOn() && mainTab() !== "bens" && ["#/bens", "home", "Bens", "Casa, terreno, carro: o que fica fora de casa."],
+      consOn() && mainTab() !== "cons" && ["#/consumiveis", "drop", "Consumíveis", "Pasta térmica, creme, pilhas: o que se gasta."],
       ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
       newsOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
       ["#/categorias", "grid", "Categorias", "Criar, renomear e apagar."],
@@ -1403,7 +1470,7 @@
   // o gráfico deles. O patrimônio (o número do alto e o mês a mês) soma tudo.
   function chartData() {
     const total = D.houseTotal;
-    const house = D.items.filter((i) => !isBens(i.room));
+    const house = D.pat.filter((i) => !isBens(i.room)); // o patrimônio: sem os consumíveis
     const rooms = D.rooms.map((r) => ({ r, v: D.roomTotals.get(r.id) || 0, n: (D.byRoom.get(r.id) || []).length })).filter((x) => x.n).sort((a, b) => b.v - a.v || b.n - a.n);
     const ct = new Map();
     for (const i of house) { const k = CAT[i.cat] ? i.cat : "outros", t = ct.get(k) || { value: 0, count: 0 }; t.value += vl(i); t.count++; ct.set(k, t); }
@@ -1419,12 +1486,12 @@
     for (const x of rooms) { if (acc * 2 >= total) break; acc += x.v; half++; }
     // patrimônio mês a mês, pela data de cadastro, do primeiro mês até hoje
     const ym = (d) => String(d || "").slice(0, 7);
-    const months = [...new Set(D.items.map((i) => ym(i.createdAt)).filter(Boolean))].sort();
+    const months = [...new Set(D.pat.map((i) => ym(i.createdAt)).filter(Boolean))].sort();
     let series = [];
     if (months.length >= 2) {
       const now = new Date(), last = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const add = new Map();
-      for (const i of D.items) { const m = ym(i.createdAt) || months[0]; add.set(m, (add.get(m) || 0) + vl(i)); }
+      for (const i of D.pat) { const m = ym(i.createdAt) || months[0]; add.set(m, (add.get(m) || 0) + vl(i)); }
       let [y, mo] = months[0].split("-").map(Number), sum = 0;
       for (let k = 0; k < 120; k++) { // até 10 anos
         const key = `${y}-${String(mo).padStart(2, "0")}`;
@@ -1446,7 +1513,7 @@
         <span class="hb-bar" aria-hidden="true"><i style="width:${Math.max(0.6, (x.v / max) * 100).toFixed(2)}%"></i></span></a></li>`).join("")}</ul>`;
   }
   function viewCharts() {
-    if (!D.items.length) return `<div class="empty"><h2>Nada para mostrar ainda</h2><p>Cadastre itens para ver os gráficos.</p><div class="acts"><button class="btn primary" data-act="item-new">${ic("plus")}Adicionar item</button></div></div>`;
+    if (!D.pat.length) return `<div class="empty"><h2>Nada para mostrar ainda</h2><p>Cadastre itens para ver os gráficos.</p><div class="acts"><button class="btn primary" data-act="item-new">${ic("plus")}Adicionar item</button></div></div>`;
     const c = chartData(), T = c.total;
     const stat = (label, value, sub = "") => `<div class="kpi"><span>${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
     const bmax = Math.max(...c.bands.map((b) => b.n), 1);
@@ -1703,10 +1770,10 @@
     const res = ov.itens || {}, tri = ov.triagem || {};
     const sortG = (a, b) => newsRank(a.r) - newsRank(b.r) || newsNew(b.r) - newsNew(a.r) || newsCount(b.r) - newsCount(a.r) || a.it.name.localeCompare(b.it.name, "pt-BR");
     // na lista: os que a IA escolheu e os já conferidos (um deixado de fora conferido sai de lá); embaixo, os deixados de fora
-    const chosen = newsGroups(D.items.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || res[it.id])), ov).sort(sortG);
+    const chosen = newsGroups(D.pat.filter((it) => ov.cats.includes(it.cat) && (tri[it.id] === true || res[it.id])), ov).sort(sortG);
     const vistos = chosen.filter((g) => g.r);
     newsNums = { conferidos: vistos.length, com: vistos.filter((g) => newsNew(g.r) > 0).length };
-    const out = newsGroups(D.items.filter((it) => tri[it.id] === false && !res[it.id] && ov.cats.includes(it.cat)), ov).sort(sortG);
+    const out = newsGroups(D.pat.filter((it) => tri[it.id] === false && !res[it.id] && ov.cats.includes(it.cat)), ov).sort(sortG);
     const appsVistos = ((ov.apps && ov.apps.lista) || []).filter((a) => a.res);
     newsNums.conferidos += appsVistos.length;
     newsNums.com += appsVistos.filter((a) => newsNew(a.res) > 0).length;
@@ -1815,7 +1882,7 @@
   }
   function recGroups() {
     const res = (recOv && recOv.itens) || {}, grp = (recOv && recOv.grupos) || {}, by = new Map();
-    for (const it of D.items.filter((x) => x.id in res)) {
+    for (const it of D.pat.filter((x) => x.id in res)) {
       const k = grp[it.id] || it.id;
       if (!by.has(k)) by.set(k, []);
       by.get(k).push(it);
@@ -2381,18 +2448,22 @@
   }
   function moreOptions() {
     return `${moreNewsOptions()}
-    <section class="panel" id="p-bens">
-      <h2>${secIc("home")}Bens</h2>
-      <p class="lead">Casa, terreno, carro: o que fica fora de casa.</p>
-      <ul class="opts"><li><div class="ot"><b id="bens-h">${oti("gem")}Usar bens</b><span>Desligar não apaga os bens.</span></div>
-        <div class="oa">${switchHtml("bens-on", bensOn(), "bens-h")}</div></li></ul>
+    <section class="panel" id="p-tipos">
+      <h2>${secIc("package")}Inventário</h2>
+      <p class="lead">Desligar não apaga nada.</p>
+      <ul class="opts">${[["itens-on", "itens-h", "rooms", "Usar itens da casa", "Os cômodos e o que há neles.", itensOn()],
+        ["bens-on", "bens-h", "gem", "Usar bens", "Casa, terreno, carro: o que fica fora de casa.", bensOn()],
+        ["cons-on", "cons-h", "drop", "Usar consumíveis", "Pasta térmica, creme, pilhas: o que se gasta.", consOn()]]
+        // o único ligado fica preso: pelo menos um tipo
+        .map(([k, h, i, t, d, on]) => { const so = on && tiposOn() === 1; return `<li><div class="ot"><b id="${h}">${oti(i)}${t}</b><span>${so ? "Pelo menos um fica ligado." : d}</span></div>
+        <div class="oa">${so ? switchHtml(k, on, h).replace("<input ", "<input disabled ") : switchHtml(k, on, h)}</div></li>`; }).join("")}</ul>
     </section>
-    <section class="panel" id="p-zones">
+    ${itensOn() ? `<section class="panel" id="p-zones">
       <h2>${secIc("pin")}Zonas</h2>
       <p class="lead">Partes de um cômodo, como Estante ou Rack da TV.</p>
       <ul class="opts"><li><div class="ot"><b id="zones-h">${oti("grid")}Usar zonas</b><span>Desligar não apaga as zonas.</span></div>
         <div class="oa">${switchHtml("zones-on", zonesOn(), "zones-h")}</div></li></ul>
-    </section>
+    </section>` : ""}
     ${moreShortcut()}`;
   }
   // Atalho no celular (igual em todos os apps da família): o caminho do app no Home Assistant, para um ícone na tela inicial
@@ -3346,20 +3417,22 @@
               <button type="button" class="btn sm" data-act="item-edit" data-id="${esc(it.id)}">${ic("plus", "sm")}Adicionar foto</button>
               ${aiOn() ? `<button type="button" class="btn sm" data-act="web-photo" data-id="${esc(it.id)}">${ic("search", "sm")}Buscar na internet</button>` : ""}</div></div></div>`}</div>
         <div class="ihead"><h1>${esc(it.name)}</h1>
-          <div class="ival"><span class="big">${money(vl(it))}</span>${n && n > 1 ? `<span class="unit">${int(n)} unidades, ${money(vl(it) / n)} cada</span>` : qtyClean(it.qty) !== "1" ? `<span class="unit">${esc(qtyLabel(it.qty))}</span>` : ""}
-            ${deprecOn() && +it.value && Math.abs(vl(it) - it.value) >= 0.005 ? `<span class="unit" data-slot="valor-gravado">${esc(`${money(+it.value)} em ${dataCurta(it.valueAt || it.createdAt)}, ${taxaTxt(taxaDe(it))} ao ano`)}</span>` : ""}</div></div>
+          <div class="ival">${room.kind === "consumiveis" // um consumível: a quantidade em destaque; o valor, só se houver
+            ? `<span class="big">${esc(qtyLabel(it.qty))}</span>${vl(it) > 0 ? `<span class="unit">${money(vl(it))}</span>` : ""}`
+            : `<span class="big">${money(vl(it))}</span>${n && n > 1 ? `<span class="unit">${int(n)} unidades, ${money(vl(it) / n)} cada</span>` : qtyClean(it.qty) !== "1" ? `<span class="unit">${esc(qtyLabel(it.qty))}</span>` : ""}`}
+            ${deprecOn() && room.kind !== "consumiveis" && +it.value && Math.abs(vl(it) - it.value) >= 0.005 ? `<span class="unit" data-slot="valor-gravado">${esc(`${money(+it.value)} em ${dataCurta(it.valueAt || it.createdAt)}, ${taxaTxt(taxaDe(it))} ao ano`)}</span>` : ""}</div></div>
         ${it.details ? `<p class="idet">${esc(it.details)}</p>` : ""}
         ${it.flag ? `<p class="inote">${ic("info")}<span>${esc(it.flag)}</span></p>` : ""}
         <dl class="props">
-          <dt>${room.kind === "bens" ? "Onde" : "Cômodo"}</dt><dd><a href="${room.kind === "bens" ? "#/bens" : `#/c/${encodeURIComponent(room.id)}`}"><span class="mt soft">${esc(room.code)}</span><span class="rnm">${esc(room.name)}</span></a></dd>
-          ${zonesOn() ? `<dt>Zona</dt><dd>${esc(it.zone || "Sem zona")}</dd>` : ""}
+          <dt>${room.kind ? "Onde" : "Cômodo"}</dt><dd><a href="${room.kind === "bens" ? "#/bens" : room.kind === "consumiveis" ? "#/consumiveis" : `#/c/${encodeURIComponent(room.id)}`}"><span class="mt soft">${esc(room.code)}</span><span class="rnm">${esc(room.name)}</span></a></dd>
+          ${zonesOn() && room.kind !== "consumiveis" ? `<dt>Zona</dt><dd>${esc(it.zone || "Sem zona")}</dd>` : ""}
           <dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
           <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>
           <dt>Origem</dt><dd>${esc(SOURCES[it.source] || "Cadastro manual")}</dd>
           ${it.createdAt ? `<dt>Cadastrado</dt><dd>${esc(dateTime(it.createdAt))}${by(it.createdBy)}</dd>` : ""}
           ${it.updatedAt && it.updatedAt !== it.createdAt ? `<dt>Alterado</dt><dd>${esc(dateTime(it.updatedAt))}${by(it.updatedBy)}</dd>` : ""}
         </dl>
-        ${S.resolvia ? `<div class="inews itasks" data-slot="item-tarefas">
+        ${S.resolvia && room.kind !== "consumiveis" ? `<div class="inews itasks" data-slot="item-tarefas">
           <h3 class="inews-h">${ic("checks")}Tarefas no ResolvIA</h3>
           <div data-slot="tarefas-lista" aria-live="polite">${tarefasHtml(it)}</div>
           <button type="button" class="btn" data-act="tarefa-nova" data-id="${esc(it.id)}">${ic("plus")}Nova tarefa</button></div>` : ""}
@@ -3438,9 +3511,10 @@
 
   // ------------------------------------------------------------------ editor de item
   function openEditor({ item = null, dup = null, room = null, zone = null, photos = null } = {}) {
-    if (!D.rooms.length) { toast("Crie um cômodo antes de adicionar itens."); openRoomNew(); return; }
     const from = item || dup || {};
-    const rid = from.room || (room && (D.roomById.has(room) || room === BENS_NEW) ? room : lastRoom());
+    // sem os itens da casa, o que se adiciona é um bem (ou um consumível)
+    const rid = from.room || (room && (D.roomById.has(room) || room === BENS_NEW || room === CONS_NEW) ? room : itensOn() ? lastRoom() : bensOn() ? bensId() : consId());
+    if (!rid) { toast("Crie um cômodo antes de adicionar itens."); openRoomNew(); return; }
     const F = {
       id: item ? item.id : null, base: item ? item.updatedAt : null,
       name: from.name || "", details: from.details || "", room: rid,
@@ -3453,7 +3527,9 @@
     };
     // um bem (casa, terreno, carro) não tem cômodo, zona nem a lista de categorias da casa: só o tipo (Imóvel, Veículo
     // ou Outro, os grupos de Mais > Bens). Para levar um bem a um cômodo, Mover.
-    const bem = isBens(rid), what = bem ? "bem" : "item";
+    // 1.78.0: um consumível (pasta térmica, creme de massagem) também não tem cômodo nem zona: tem a categoria, a
+    // quantidade e, no lugar dos detalhes, o que é e para que serve (é por aí que se acha depois)
+    const bem = isBens(rid), cons = isCons(rid), what = bem ? "bem" : cons ? "consumível" : "item";
     const title = item ? `Editar ${what}` : dup ? `Duplicar ${what}` : `Novo ${what}`;
     const saveLbl = F.id ? "Salvar alterações" : `Salvar ${what}`;
     const otherCat = BENS_GROUPS.some(([k]) => k && k === F.cat) ? "outros" : F.cat || "outros"; // Outro guarda a categoria de um item que veio de um cômodo
@@ -3463,17 +3539,17 @@
     const entry = openDialog({
       cls: "modal", label: title,
       html: `<div class="dlg">
-        <div class="dlg-h"><h2>${dlgT(what === "bem" ? "gem" : "package", `${title}`)}</h2><button type="button" class="btn ghost icon" data-ed="cancel" aria-label="Fechar">${ic("close")}</button></div>
+        <div class="dlg-h"><h2>${dlgT(bem ? "gem" : cons ? "drop" : "package", `${title}`)}</h2><button type="button" class="btn ghost icon" data-ed="cancel" aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b drop" data-ed-form novalidate autocomplete="off">
           <div class="form">
             <div class="field"><span class="lbl">Fotos</span><div class="phs" data-slot="photos"></div>
               ${COARSE ? "" : `<p class="help">Também dá para arrastar ou colar (Ctrl+V).</p>`}</div>
             ${aiOn() ? `<div class="aibox" data-slot="ai"></div>` : ""}
-            <div class="field"><label for="f-name">Nome</label><textarea id="f-name" class="input grow" rows="1" name="name" maxlength="200" placeholder="${bem ? "Ex.: Apartamento na praia" : "Ex.: Cafeteira Nespresso Inissia"}" enterkeyhint="next">${esc(F.name)}</textarea>
+            <div class="field"><label for="f-name">Nome</label><textarea id="f-name" class="input grow" rows="1" name="name" maxlength="200" placeholder="${bem ? "Ex.: Apartamento na praia" : cons ? "Ex.: Pasta térmica" : "Ex.: Cafeteira Nespresso Inissia"}" enterkeyhint="next">${esc(F.name)}</textarea>
               <p class="err" data-err="name" hidden></p></div>
-            <div class="field"><label for="f-details">Detalhes</label><textarea id="f-details" class="textarea" name="details" rows="3" maxlength="4000" placeholder="${bem ? "Endereço, modelo, ano e estado" : "Marca, modelo, cor, tamanho e estado"}">${esc(F.details)}</textarea></div>
+            <div class="field"><label for="f-details">${cons ? "O que é e para que serve" : "Detalhes"}</label><textarea id="f-details" class="textarea" name="details" rows="3" maxlength="4000" placeholder="${bem ? "Endereço, modelo, ano e estado" : cons ? "Ex.: Pasta para o processador, ao trocar o cooler" : "Marca, modelo, cor, tamanho e estado"}">${esc(F.details)}</textarea></div>
             ${bem ? `<div class="field"><span class="lbl" id="f-tipo-l">Tipo</span><div class="seg tipo" role="group" aria-labelledby="f-tipo-l" data-slot="tipo">${tipoBtns()}</div></div>`
-              : `${zonesOn() ? `<div class="row2">${roomField}${zoneField}</div>` : roomField}
+              : `${cons ? "" : zonesOn() ? `<div class="row2">${roomField}${zoneField}</div>` : roomField}
             <div class="field"><label for="f-cat">Categoria</label><select id="f-cat" class="select" name="cat"><option value="">Escolha a categoria</option>${CATS.map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`}
             <div class="row3">
               <div class="field"><label for="f-qty">Quantidade</label><input id="f-qty" class="input" name="qty" maxlength="30" value="${esc(F.qty)}" inputmode="text"></div>
@@ -3598,7 +3674,7 @@
       if (!(await needAi())) return;
       F.aiBusy = true; renderAi();
       try {
-        const res = await API.post("api/ai/identify", { file: F.photos[0], mode: "single", room: F.room, hint: F.hint });
+        const res = await API.post("api/ai/identify", { file: F.photos[0], mode: "single", room: F.room, hint: F.hint, ...(cons ? { consumivel: true } : {}) });
         const r = (res.items || [])[0];
         if (!r) throw new Error("A IA não reconheceu um item nesta foto. Tente outra foto ou escreva uma dica.");
         const prev = { name: F.name, details: F.details, cat: F.cat, qty: F.qty, value: F.value, zone: F.zone, source: F.source };
@@ -3630,11 +3706,11 @@
       if (Number.isNaN(value)) { fieldErr("value", "Use só números, como 1200 ou 1.200,50."); bad = true; }
       if (bad) { (name ? form.value : form.name).focus(); return; }
       // sem zonas, a zona escondida só fica se o item continuar no mesmo cômodo
-      const zone = zonesOn() ? F.zone.trim() : item && F.room === item.room ? item.zone || "" : "";
+      const zone = cons ? "" : zonesOn() ? F.zone.trim() : item && F.room === item.room ? item.zone || "" : "";
       const body = { name, details: F.details.trim(), room: F.room, zone, cat: F.cat || "outros", qty: F.qty.trim() || "1", value, photos: F.photos, photoSrc: F.photoSrc, flag: F.flag.trim(), source: F.source };
       setBusy(true);
       try {
-        body.room = F.room = await realRoom(F.room); // o primeiro bem cria a área Bens
+        body.room = F.room = await realRoom(F.room); // o primeiro bem (ou consumível) cria a área
         const res = F.id
           ? await API.put(`api/items/${encodeURIComponent(F.id)}`, { ...body, _base: F.base })
           : await API.post("api/items", body);
@@ -3650,7 +3726,7 @@
           F.dirty = false;
           requestClose(entry, { force: true });
           if (F.id) toast("Alterações salvas");
-          else toast(isBens(res.item.room) ? "Bem adicionado" : "Item adicionado", { action: "Ver", onAction: () => nav(`#/i/${encodeURIComponent(res.item.id)}`) });
+          else toast(isBens(res.item.room) ? "Bem adicionado" : isCons(res.item.room) ? "Consumível adicionado" : "Item adicionado", { action: "Ver", onAction: () => nav(`#/i/${encodeURIComponent(res.item.id)}`) });
         }
       } catch (e) {
         if (e.status === 409 && e.data && e.data.item) {
@@ -3852,9 +3928,9 @@
       const { list } = searchItems(q);
       sc.ids = list.slice(0, 40).map((i) => i.id);
       sc.total = list.length;
-      const tipo = D.bensItems.length ? q.tipo || "" : "", f = [];
+      const TIPOS = tipos(), tipo = TIPOS.some(([k]) => k === q.tipo) ? q.tipo || "" : "", f = [];
       if (tipo) f.push((TIPOS.find(([k]) => k === tipo) || ["", ""])[1]);
-      if (!tipoBens(tipo)) {
+      if (!tipoArea(tipo)) {
         const r = D.rooms.find((x) => x.id === q.room);
         if (r) f.push(r.name);
         if (q.cat && CAT[q.cat]) f.push(CAT[q.cat]);
@@ -3880,6 +3956,7 @@
       "Quais são os 10 itens mais caros?", "Onde está o liquidificador?", "Quanto vale cada categoria?", "Quais itens estão sem valor?",
       "Quais itens estão sem foto?", "O que eu cadastrei por último?", "Quantos itens tem cada cômodo?", "Qual categoria vale mais?",
       ...q("Quanto valem os bens?", bensOn()), ...q("Quais imóveis e veículos eu tenho?", bensOn()), ...q("Quais zonas tem a cozinha?", zonesOn()),
+      ...q("Quais consumíveis nós temos?", consOn()),
       ...q("Alguma novidade importante nos eletrônicos?", newsOn()), "Quais eletrodomésticos eu tenho?", "Quais móveis valem mais?",
       "Tem algum item repetido?", "Quanto valem os itens do escritório?", "Quais itens têm mais de uma unidade?", "O que tem no quarto?",
       "Quanto valem os eletrônicos?", "Quais itens têm observação?", "Quais aparelhos de cozinha eu tenho?", "Qual é o item mais antigo?",
@@ -3942,6 +4019,7 @@
           ${chatAbout(sc) ? `<p class="chat-ctx">Sobre ${esc(chatAbout(sc))}</p>` : ""}
           <div class="chat-extra" data-slot="extra"></div>
           <div class="chat-in"><button type="button" class="btn icon chat-clip" data-clip aria-label="Anexar" title="Anexar" aria-expanded="false">${ic("clip")}</button>
+            <button type="button" class="btn icon chat-cancel" data-mic-x aria-label="Cancelar: não enviar o que falei" title="Cancelar" hidden>${ic("close")}</button>
             <textarea class="input" name="t" rows="1" data-size="off" maxlength="2000" placeholder="Pergunte o que quiser" aria-label="Mensagem" enterkeyhint="send"></textarea>
             <button type="button" class="btn icon chat-q" data-quick aria-label="Perguntas prontas" title="Perguntas prontas" aria-expanded="false" hidden>${ic("spark")}</button>
             <span data-slot="pri"></span></div>
@@ -3968,7 +4046,13 @@
     const priHtml = () => (voiceReady() && (rec || (!ta.value.trim() && !U.files.length))
       ? `<button type="button" class="btn icon${rec ? " on" : ""}" data-mic aria-label="${rec ? "Pronto: enviar o que falei" : "Falar a pergunta"}">${ic(rec ? "check" : "mic")}</button>`
       : `<button type="submit" class="btn primary icon" aria-label="Enviar">${ic("send")}</button>`);
-    const pri = () => { const slot = $('[data-slot="pri"]', dlg), html = priHtml(); if (slot.innerHTML.trim() !== html) slot.innerHTML = html; };
+    // 1.78.0: ouvindo, o clipe dá lugar ao Cancelar (para o microfone sem mandar nada) e a caixa diz Ouvindo…
+    const pri = () => {
+      const slot = $('[data-slot="pri"]', dlg), html = priHtml(); if (slot.innerHTML.trim() !== html) slot.innerHTML = html;
+      $("[data-mic-x]", dlg).hidden = !rec; $("[data-clip]", dlg).hidden = !!rec;
+      $("[data-quick]", dlg).hidden = !CHAT.msgs.length || !!rec;
+      ta.disabled = !!rec; ta.placeholder = rec ? "Ouvindo…" : "Pergunte o que quiser";
+    };
     const drawExtra = () => {
       const open = CHAT.msgs.length && (U.quick || U.ed);
       extra.innerHTML = (open ? `<div class="chat-quick">${quickBlock()}</div>` : "")
@@ -4063,7 +4147,8 @@
       const r = new (window.INV_RECORDER || Recorder)(() => {});
       try { await r.start(); } catch (err) { r.cancel(); toast(micError(err), { error: true }); return; }
       rec = r;
-      pri();
+      Object.assign(U, { menu: false, quick: false, ed: null });
+      redraw();
     }
     form.addEventListener("submit", (e) => { e.preventDefault(); send(ta.value); });
     ta.addEventListener("input", () => { grow(); pri(); });
@@ -4083,6 +4168,7 @@
       const idea = t.closest("[data-idea]");
       if (idea) { send(idea.textContent); return; }
       if (t.closest("[data-retry]")) { CHAT.msgs = CHAT.msgs.filter((m) => !m.error); const fs = U.files; U.files = []; render(); ask(fs); return; }
+      if (t.closest("[data-mic-x]")) { if (rec) { rec.cancel(); rec = null; } pri(); ta.focus(); return; } // Cancelar: nada é enviado
       if (t.closest("[data-mic]")) { dictate(); return; }
       if (t.closest("[data-quick]")) { Object.assign(U, { quick: !(U.quick || U.ed), ed: null, menu: false }); drawExtra(); return; }
       if (t.closest("[data-clip]")) { U.menu = !U.menu; if (U.menu) U.quick = false; drawExtra(); return; }
@@ -4616,19 +4702,21 @@
   let addMenuOpening = false;
   async function openAddMenu() {
     const rid = base.name === "room" ? base.id : null;
-    if (base.name === "bens") { openEditor({ room: D.bens?.id || BENS_NEW }); return; } // em Bens, Adicionar é um bem (sem foto do cômodo nem Falar)
+    if (base.name === "bens") { openEditor({ room: bensId() }); return; } // em Bens, Adicionar é um bem (sem foto do cômodo nem Falar)
+    if (base.name === "cons") { openEditor({ room: consId() }); return; } // em Consumíveis, um consumível
     if (addMenuOpening) return;
     // com o Falar, a linha diz quem separa os itens: a IA, se houver uma pronta, ou o app (o mesmo teste do openCatalog)
     let st = null;
-    if (voiceReady()) { addMenuOpening = true; try { st = await aiStatus(); } finally { addMenuOpening = false; } }
+    if (voiceReady() && itensOn()) { addMenuOpening = true; try { st = await aiStatus(); } finally { addMenuOpening = false; } }
     // Novo cômodo fica na aba Cômodos; aqui só o que entra no inventário
     const opts = [
-      ["item", "plus", "Adicionar item", "Com foto e valor, preenchendo os campos"],
-      aiOn() && ["catalog", "scan", "Catalogar itens com IA", "A IA lista vários itens de uma foto"],
-      voiceReady() && ["voice", "mic", "Falar os itens", `Diga o que tem e quanto vale; ${voiceSplit(st)}`],
-      bensOn() && base.name !== "rooms" && !rid && ["bem", "home", "Adicionar bem", "Casa, terreno, carro: o que fica fora de casa"], // por último: o único que é bem, não item; nos cômodos, só itens
+      itensOn() && ["item", "plus", "Adicionar item", "Com foto e valor, preenchendo os campos"],
+      itensOn() && aiOn() && ["catalog", "scan", "Catalogar itens com IA", "A IA lista vários itens de uma foto"],
+      itensOn() && voiceReady() && ["voice", "mic", "Falar os itens", `Diga o que tem e quanto vale; ${voiceSplit(st)}`],
+      bensOn() && base.name !== "rooms" && !rid && ["bem", "home", "Adicionar bem", "Casa, terreno, carro: o que fica fora de casa"], // por último: o que não é item da casa; nos cômodos, só itens
+      consOn() && base.name !== "rooms" && !rid && ["cons", "drop", "Adicionar consumível", "Pasta térmica, creme, pilhas: o que se gasta"],
     ].filter(Boolean);
-    if (opts.length === 1) { openEditor({ room: rid }); return; } // sem IA e sem Falar: direto no item, sem um menu de uma linha só
+    if (opts.length === 1) { openEditor({ room: { item: rid, bem: bensId(), cons: consId() }[opts[0][0]] }); return; } // uma opção só: direto nela, sem um menu de uma linha
     const entry = openDialog({
       cls: "modal narrow", label: "Adicionar",
       html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("plus", `Adicionar`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
@@ -4641,7 +4729,7 @@
       const b = e.target.closest("[data-go]");
       if (!b) return;
       const go = b.dataset.go;
-      finalizeThen(entry, () => { if (go === "item") openEditor({ room: rid }); else if (go === "bem") openEditor({ room: D.bens?.id || BENS_NEW }); else if (go === "catalog") openCatalog({ room: rid }); else if (go === "voice") openCatalog({ room: rid, voice: true }); });
+      finalizeThen(entry, () => { if (go === "item") openEditor({ room: rid }); else if (go === "bem") openEditor({ room: bensId() }); else if (go === "cons") openEditor({ room: consId() }); else if (go === "catalog") openCatalog({ room: rid }); else if (go === "voice") openCatalog({ room: rid, voice: true }); });
     });
   }
 
@@ -4806,9 +4894,9 @@
   // antes uma versão (Versões anteriores). As categorias e as opções continuam.
   async function eraseAll() {
     // tudo o que está gravado, inclusive os bens com Usar bens desligado
-    const bensIds = new Set(S.rooms.filter((r) => r.kind === "bens").map((r) => r.id));
-    const nb = S.items.filter((i) => bensIds.has(i.room)).length, ni = S.items.length - nb, nr = S.rooms.length - bensIds.size;
-    const parts = [nr && plural(nr, "cômodo", "cômodos"), ni && plural(ni, "item", "itens"), nb && plural(nb, "bem", "bens")].filter(Boolean);
+    const bensIds = new Set(S.rooms.filter((r) => r.kind === "bens").map((r) => r.id)), consIds = new Set(S.rooms.filter((r) => r.kind === "consumiveis").map((r) => r.id));
+    const nb = S.items.filter((i) => bensIds.has(i.room)).length, nc = S.items.filter((i) => consIds.has(i.room)).length, ni = S.items.length - nb - nc, nr = S.rooms.length - bensIds.size - consIds.size;
+    const parts = [nr && plural(nr, "cômodo", "cômodos"), ni && plural(ni, "item", "itens"), nb && plural(nb, "bem", "bens"), nc && plural(nc, "consumível", "consumíveis")].filter(Boolean);
     const ok = await confirmBox({ title: "Apagar tudo?",
       body: `${parts.length ? `Saem ${parts.length > 1 ? `${parts.slice(0, -1).join(", ")} e ${parts[parts.length - 1]}` : parts[0]}. ` : ""}As categorias e as opções continuam, e uma cópia fica em Versões anteriores.`,
       ok: "Apagar tudo", danger: true });
@@ -4881,7 +4969,7 @@
     const item = b.dataset.id ? D.itemById.get(b.dataset.id) : null;
     switch (act) {
       case "add-menu": openAddMenu(); break;
-      case "item-new": openEditor({ room: b.dataset.room || (base.name === "room" ? base.id : base.name === "bens" ? D.bens?.id || BENS_NEW : null) }); break;
+      case "item-new": openEditor({ room: b.dataset.room || (base.name === "room" ? base.id : base.name === "bens" ? bensId() : base.name === "cons" ? consId() : null) }); break;
       case "catalog": openCatalog({ room: b.dataset.room || (base.name === "room" ? base.id : null) }); break;
       case "room-new": openRoomNew(); break;
       case "cat-new": openCatName(); break;
@@ -4928,7 +5016,7 @@
       case "sel-toggle": { const id = b.dataset.id; if (SEL) { if (SEL.has(id)) SEL.delete(id); else SEL.add(id); selRender(); } break; }
       case "sel-change": if (SEL && SEL.size) selEdit(); break;
       case "sel-all": if (SEL) { // todos os da lista (os que já apareceram e os que vêm com Mostrar mais), ou nenhum
-        const ids = searchItems(base.q).list.filter((i) => !isBens(i.room)).map((i) => i.id);
+        const ids = searchItems(base.q).list.filter((i) => !isArea(i.room)).map((i) => i.id);
         SEL = new Set(ids.length && ids.every((id) => SEL.has(id)) ? [] : ids); selRender();
       } break;
       case "export": download(b.dataset.kind); break;
@@ -5005,7 +5093,7 @@
     const k = t.dataset && t.dataset.input;
     if (!k) return;
     if (k === "search-tipo") { // num tipo de bem, cômodo e categoria saem (e as seleções somem)
-      base.q = { ...base.q, tipo: t.value, ...(tipoBens(t.value) ? { room: "", cat: "" } : {}) };
+      base.q = { ...base.q, tipo: t.value, ...(tipoArea(t.value) ? { room: "", cat: "" } : {}) };
       try { history.replaceState(history.state, "", hashOf(base)); } catch { /* sem histórico */ }
       searchLimit = 120; renderView(false);
     }
@@ -5048,19 +5136,21 @@
       if (t.checked && !newsPara().length && me) patch.news_para = [me.id];
       saveNews(patch, t.checked ? "Aviso no celular ligado" : "Aviso no celular desligado");
     }
-    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on" || k === "bens-on" || k === "correria-on" || k === "deprec-on") {
-      const key = { "ai-on": "ai", "zones-on": "zones", "news-on": "news", "bens-on": "bens", "correria-on": "correria", "deprec-on": "deprec" }[k] || "ha_sensors", on = t.checked;
+    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on" || k === "bens-on" || k === "itens-on" || k === "cons-on" || k === "correria-on" || k === "deprec-on") {
+      const key = { "ai-on": "ai", "zones-on": "zones", "news-on": "news", "bens-on": "bens", "itens-on": "itens", "cons-on": "consumiveis", "correria-on": "correria", "deprec-on": "deprec" }[k] || "ha_sensors", on = t.checked;
       t.disabled = true;
       try {
         await API.put("api/settings", { [key]: on });
         S.settings[key] = on;
         aiCache.at = 0;
-        if (key === "bens" || key === "deprec") derive(); // os bens (ou o valor de hoje) entram ou saem de tudo (patrimônio, busca, gráficos, relatório)
+        if (key === "bens" || key === "deprec" || key === "itens" || key === "consumiveis") derive(); // os bens (ou o valor de hoje) entram ou saem de tudo (patrimônio, busca, gráficos, relatório)
         renderView(false);
         toast(key === "ai" ? (on ? "IA ligada" : "IA desligada: os botões de IA ficaram escondidos")
           : key === "ha_sensors" ? (on ? "Sensores criados no Home Assistant" : "Sensores desligados: saíram do Home Assistant")
           : key === "news" ? (on ? "Novidades ligadas" : "Novidades desligadas")
           : key === "bens" ? (on ? "Bens ligados" : "Bens desligados: os bens gravados continuam guardados")
+          : key === "itens" ? (on ? "Itens da casa ligados" : "Itens da casa desligados: os cômodos e os itens continuam guardados")
+          : key === "consumiveis" ? (on ? "Consumíveis ligados" : "Consumíveis desligados: os gravados continuam guardados")
           : key === "correria" ? (on ? "CorrerIA ligado" : "CorrerIA desligado")
           : key === "deprec" ? (on ? "Valor de hoje ligado" : "Valor de hoje desligado")
           : on ? "Zonas ligadas" : "Zonas desligadas: as zonas gravadas continuam guardadas");
@@ -5126,7 +5216,7 @@
     const d = dx < 0 ? 1 : -1; // dedo para a esquerda: a próxima aba
     let to = null;
     if (base.name === "room") to = d < 0 ? "#/comodos" : null;
-    else if (IN_MORE.includes(base.name) && base.name !== "menu") to = d < 0 ? "#/mais" : null; // Relatório, Novidades, Configurações, Sobre: volta ao menu
+    else if (inMore(base.name) && base.name !== "menu") to = d < 0 ? "#/mais" : null; // Relatório, Novidades, Configurações, Sobre: volta ao menu
     else {
       const i = SWIPE_TABS.findIndex(([n]) => n === base.name), j = i + d;
       if (i >= 0 && j >= 0 && j < SWIPE_TABS.length) to = SWIPE_TABS[j][1];

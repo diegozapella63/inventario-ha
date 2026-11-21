@@ -116,8 +116,9 @@ async def body(r, p):
     r.eq(panel, ["tabpanel", "mt-opcoes"], "o conteúdo é o painel da aba, ligado a ela")
     sw = await pg.evaluate("""[...document.querySelectorAll('input[type=checkbox][data-input$=-on]')].map(i => [i.dataset.input, i.getAttribute('role'),
       (document.getElementById(i.getAttribute('aria-labelledby')) || {}).textContent, i.checked])""")
-    r.eq(sw, [["news-on", "switch", "Usar novidades", True], ["bens-on", "switch", "Usar bens", True], ["zones-on", "switch", "Usar zonas", False]],
-         "Usar novidades, Usar bens e Usar zonas são chaves (role=switch) com nome; novidades e bens ligados, zonas desligadas")
+    r.eq(sw, [["news-on", "switch", "Usar novidades", True], ["itens-on", "switch", "Usar itens da casa", True], ["bens-on", "switch", "Usar bens", True],
+              ["cons-on", "switch", "Usar consumíveis", False], ["zones-on", "switch", "Usar zonas", False]],
+         "Usar novidades, os três tipos (itens da casa, bens, consumíveis) e Usar zonas são chaves (role=switch) com nome; consumíveis e zonas desligados")
     await pg.click('label.switch:has([data-input="zones-on"])')
     await pg.locator(".toast", has_text="Zonas ligadas").wait_for(timeout=5000)
     r.check(await pg.get_by_role("switch", name="Usar zonas").is_checked(), "ligada, o leitor de tela ouve que está ligada")
