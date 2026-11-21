@@ -108,7 +108,7 @@ async def body(r, p):
     await pg.wait_for_selector(".chat-top", timeout=8000)
     await pg.click(".chat-top")
     await pg.fill("dialog.chat textarea", "quanto vale a sala?")
-    await pg.press("dialog.chat textarea", "Enter")
+    await pg.click('dialog.chat button[type="submit"]')  # no celular, quem envia é o botão
     await pg.wait_for_selector("dialog.chat .msg.ai:not(.typing)", timeout=10000)
     r.check("Exemplo da prévia" in await pg.text_content("dialog.chat .msg.ai"), "Conversar: resposta de exemplo")
     await pg.click("dialog.chat [data-x]")

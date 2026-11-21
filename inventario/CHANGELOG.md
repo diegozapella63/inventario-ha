@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.86.1
+
+- **Conversa no celular**: o Enter do teclado vai para a próxima linha; quem envia é o botão. Com teclado de verdade, o Enter continua enviando.
+
 ## 1.86.0
 
 - **Compras no EconomIA**: o consumível acha o item do EconomIA (1.48.0) também pelo nome parecido, e a ficha mostra o nome do item de lá. Com mais de uma lista pronta lá, o **Pôr na lista** pergunta em qual.

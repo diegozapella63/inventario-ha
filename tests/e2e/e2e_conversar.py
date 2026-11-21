@@ -46,6 +46,16 @@ async def body(r, p):
     r.check("Cômodo na tela: SAL Sala de estar" in asked[-1], "a IA recebe os itens do cômodo da tela")
     r.check("SAL-001 Sofá de 3 lugares cinza-azulado" in asked[-1], "com cada item e valor")
 
+    # 1.86.1: no celular (o teclado da tela), o Enter é uma linha nova e quem envia é o botão
+    # (a tela do teste é a de um celular, com o dedo: vale o que o aparelho diz)
+    antes = await pg.locator("dialog.chat .msg").count()
+    await pg.fill("dialog.chat textarea", "linha um")
+    await pg.press("dialog.chat textarea", "Enter")
+    await pg.wait_for_timeout(200)
+    r.check(await pg.input_value("dialog.chat textarea") == "linha um\n" and await pg.locator("dialog.chat .msg").count() == antes, "no celular, o Enter vai para a próxima linha e nada é enviado")
+    # com teclado de verdade (um computador), o Enter envia
+    await pg.evaluate('() => { window.__mm = window.__mm || window.matchMedia.bind(window); window.matchMedia = (q) => (q === "(hover: none) and (pointer: coarse)" ? { matches: false } : window.__mm(q)); }')
+    await pg.fill("dialog.chat textarea", "")
     # Enter envia; Shift+Enter quebra a linha
     await pg.fill("dialog.chat textarea", "e o mais barato?")
     await pg.press("dialog.chat textarea", "Shift+Enter")
@@ -162,7 +172,7 @@ async def body(r, p):
     # erro e Tentar de novo
     ha.ai_error = (429, "RESOURCE_EXHAUSTED: quota")
     await pg.fill("dialog.chat textarea", "e a garantia?")
-    await pg.press("dialog.chat textarea", "Enter")
+    await pg.click('dialog.chat button[type="submit"]')  # no celular, quem envia é o botão
     await pg.wait_for_selector("dialog.chat .msg.err", timeout=15000)
     r.check("cota da IA acabou" in await pg.text_content("dialog.chat .msg.err"), "erro em português, na conversa")
     await r.shot(pg, "erro")
@@ -228,7 +238,7 @@ async def body(r, p):
     # 1.75.0: a IA recebe o que a busca da tela achou (antes, ela buscava de novo, só no nome e nos detalhes)
     achados = await pg.evaluate("document.querySelectorAll('#results .ilist > li').length")
     await pg.fill("dialog.chat textarea", "quanto vale isso?")
-    await pg.press("dialog.chat textarea", "Enter")
+    await pg.click('dialog.chat button[type="submit"]')  # no celular, quem envia é o botão
     await pg.wait_for_function("document.querySelectorAll('dialog.chat .msg.ai:not(.typing)').length === 1", timeout=15000)
     r.check(f'Busca na tela "geladeira": {achados} {"item" if achados == 1 else "itens"}' in asked[-1] and "Geladeira frost free inox" in asked[-1],
             f"a IA recebe a busca como a tela achou ({achados})")

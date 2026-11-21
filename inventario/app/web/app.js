@@ -4370,7 +4370,10 @@
     }
     form.addEventListener("submit", (e) => { e.preventDefault(); send(ta.value); });
     ta.addEventListener("input", () => { grow(); pri(); });
-    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(ta.value); } });
+    // 1.86.1: no celular (o teclado da tela), o Enter vai para a próxima linha e quem envia é o botão; com teclado de verdade, envia
+    const noCelular = () => matchMedia("(hover: none) and (pointer: coarse)").matches;
+    ta.setAttribute("enterkeyhint", noCelular() ? "enter" : "send");
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !noCelular()) { e.preventDefault(); send(ta.value); } });
     dlg.addEventListener("input", (e) => {
       if (e.target.matches("[data-ed-in]") && U.ed) U.ed.draft = e.target.value;
       if (e.target.matches("[data-ed-q]") && U.ed) U.ed.list[Number(e.target.dataset.edQ)] = e.target.value; // mudar uma pergunta
