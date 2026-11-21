@@ -1505,5 +1505,7 @@ textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh;
 .tipo .ts { color: var(--muted); font-size: 13px; line-height: 1.2; }
 .tipo .tv { font: 600 15px/1.2 var(--font-c); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (min-width: 700px) { .tipos { gap: 14px; } .tipo { padding: 18px 18px 16px; } .tipo b { font-size: 16px; } .tipo .tn { font-size: 36px; } }
+/* no celular, o nome um pouco menor e com menos margem, para "Itens da casa" caber com folga em qualquer fonte */
+@media (max-width: 480px) { .tipo { padding: 14px 10px; } .tipo b { font-size: 13px; } }
 /* no celular estreito, o nome do tipo pode ir para duas linhas (os três com a mesma altura, para os números ficarem alinhados) */
 @media (max-width: 380px) { .tipos { gap: 6px; } .tipo { padding: 12px 8px; } .tipo b { font-size: 13px; white-space: normal; min-height: 2.5em; overflow-wrap: anywhere; } .tipo .ts { font-size: 12px; } .tipo .tv { font-size: 13px; } }

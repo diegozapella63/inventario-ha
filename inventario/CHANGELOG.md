@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.79.1
+
+- **Agora**: o nome de cada quadro (Itens da casa, Bens, Consumíveis) cabe inteiro em qualquer celular. Em alguns, "Itens da casa" ficava cortado.
+
 ## 1.79.0
 
 - **Uso da IA**: o rodapé mostra onde ver o consumo e o saldo de **cada IA em uso** (antes, só de uma). O do Gemini agora leva ao Google AI Studio, onde o consumo e os créditos ficam de verdade; o do Claude, ao Claude Console e ao saldo dos créditos.
