@@ -1534,3 +1534,7 @@ textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh;
 @media (max-width: 480px) { .tipo { padding: 14px 10px; } .tipo b { font-size: 13px; } }
 /* no celular estreito, o nome do tipo pode ir para duas linhas (os três com a mesma altura, para os números ficarem alinhados) */
 @media (max-width: 380px) { .tipos { gap: 6px; } .tipo { padding: 12px 8px; } .tipo b { font-size: 13px; white-space: normal; min-height: 2.5em; overflow-wrap: anywhere; } .tipo .ts { font-size: 12px; } .tipo .tv { font-size: 13px; } }
+/* 1.85.0: Compras no EconomIA, na ficha do consumível: as linhas como as tarefas e os botões lado a lado, do mesmo tamanho */
+.cbtns { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.cbtns:empty { display: none; }
+.cbtns .btn { width: 100%; white-space: normal; }

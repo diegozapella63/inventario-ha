@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.85.0
+
+- **Compras no EconomIA**: a ficha de um consumível mostra se ele está na lista de compras do EconomIA, a última compra e a Reposição, com **Pôr na lista** e **Repor a cada** duração dele. Aparece com o EconomIA 1.47.0 ou mais novo e **Consumíveis do InventarIA** ligado lá, em Mais › Configurações › Opções › Reposição.
+
 ## 1.84.0
 
 - **Buscar foto na internet**: a mesma foto não aparece mais duas vezes (também quando vem em outro tamanho), e a busca traz mais fotos: pede mais páginas à IA e usa mais fotos de cada uma.

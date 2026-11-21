@@ -74,6 +74,8 @@ SHARE_DIR = os.environ.get("INV_SHARE", "/share/inventario")
 # o arquivo do GerencIA na pasta share: a depreciação de cada categoria, para o Valor de hoje
 GERENCIA_ARQ = os.environ.get("INV_GERENCIA") or os.path.join(os.path.dirname(SHARE_DIR.rstrip("/")), "gerencia", "integracao.json")
 # o do ResolvIA: com Usar equipamentos ligado lá, ele publica os equipamentos (os itens daqui) e a tarefa de cada um
+# o do EconomIA (1.85.0): com Consumíveis do InventarIA ligado lá (Opções › Reposição), ele publica o endereço e a chave
+ECONOMIA_ARQ = os.environ.get("INV_ECONOMIA") or os.path.join(os.path.dirname(SHARE_DIR.rstrip("/")), "economia", "integracao.json")
 RESOLVIA_ARQ = os.environ.get("INV_RESOLVIA") or os.path.join(os.path.dirname(SHARE_DIR.rstrip("/")), "resolvia", "integracao.json")
 MEDIA_ROOT = os.environ.get("INV_MEDIA", "/media")
 PORT = int(os.environ.get("INV_PORT", "8099"))
@@ -1558,6 +1560,94 @@ def resolvia_nova(body: dict, user=None) -> dict:
         ligada = False
     log.info("tarefa no ResolvIA: %s em %s (%s)%s%s", tarefa, lista["id"], it["id"], " (já existia)" if existe else "", f" por {user}" if user else "")
     return {"ok": True, "tarefa": tarefa, "lista": lista["id"], "nome_lista": lista["nome"], "ligada": ligada, "ja_existia": bool(existe)}
+
+
+# ---------------------------------------------------------------------------
+# Compras no EconomIA (1.85.0): na ficha de um consumível, o que o EconomIA sabe dele (se está na lista de compras, as
+# últimas compras e a Reposição) e os botões Pôr na lista e Repor. O EconomIA 1.47.0 grava share/economia/integracao.json
+# (url, ip_url, chave, compras) só com Consumíveis do InventarIA ligado em Opções › Reposição de lá, e responde pelo nome
+# do consumível. Daqui só vai o nome (e, no Repor, a duração); nada fica guardado aqui.
+
+def economia_info() -> dict | None:
+    try:
+        with open(ECONOMIA_ARQ, encoding="utf-8") as f:
+            info = json.load(f)
+    except (OSError, ValueError):
+        return None
+    ok = isinstance(info, dict) and info.get("chave") and (info.get("url") or info.get("ip_url")) and str(info.get("compras") or "").startswith("/api/")
+    return info if ok else None
+
+
+def economia_on() -> bool:
+    return STORE.settings.get("consumiveis") is True and economia_info() is not None
+
+
+def economia_pedir(method: str, query: str = "", body: dict | None = None) -> dict:
+    info = economia_info()
+    if not info:
+        raise ApiError(409, "O EconomIA não está ligado ao InventarIA. Lá, ligue Mais › Configurações › Opções › Reposição › Consumíveis do InventarIA.")
+    sem_proxy = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    ultimo = "O EconomIA não respondeu."
+    for base in (info.get("url"), info.get("ip_url")):
+        if not base:
+            continue
+        req = urllib.request.Request(str(base).rstrip("/") + info["compras"] + query, method=method,
+                                     data=json.dumps(body).encode() if body is not None else None,
+                                     headers={"Authorization": "Bearer " + str(info["chave"]), "Content-Type": "application/json", "X-App": "InventarIA"})
+        try:
+            with sem_proxy.open(req, timeout=8) as r:
+                out = json.loads(r.read(200_000))
+            if isinstance(out, dict):
+                return out
+        except urllib.error.HTTPError as e:
+            try:
+                erro = str((json.loads(e.read(20_000)) or {}).get("erro") or "")
+            except (ValueError, AttributeError, OSError):
+                erro = ""
+            if e.code == 400 and erro:
+                raise ApiError(400, erro[:300]) from None
+            if e.code == 401:
+                raise ApiError(409, "O EconomIA recusou. Lá, ligue Mais › Configurações › Opções › Reposição › Consumíveis do InventarIA.") from None
+            ultimo = "O EconomIA não aceitou o pedido. Atualize o EconomIA."
+        except (OSError, ValueError):
+            continue
+    raise ApiError(502, ultimo)
+
+
+def economia_compras(out: dict) -> dict:
+    """Só o que a tela usa, limpo (o que vem de outro app não vai direto para a página)."""
+    rep = out.get("reposicao") if isinstance(out.get("reposicao"), dict) else None
+    dia = lambda v: v if isinstance(v, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", v) else ""  # noqa: E731
+    return {"na_lista": out.get("na_lista") is True, "vezes": out.get("vezes") if isinstance(out.get("vezes"), int) and not isinstance(out.get("vezes"), bool) else 0,
+            "ultima": dia(out.get("ultima")), "compras": [dia(c) for c in (out.get("compras") or [])[:5] if dia(c)],
+            "reposicao": {"texto": str(rep.get("texto") or "")[:60], "proxima": dia(rep.get("proxima")), "na_hora": rep.get("na_hora") is True} if rep else None,
+            "texto": str(out.get("texto") or "")[:300]}
+
+
+def economia_consumivel(iid: str) -> dict:
+    it = STORE.item(iid)
+    if not it or not STORE.is_cons(it.get("room")) or not economia_on():
+        raise ApiError(404, "Consumível não encontrado.")
+    return it
+
+
+def r_economia_compras(h, query):
+    it = economia_consumivel(str((query.get("item") or [""])[0]))
+    h.send_json({"compras": economia_compras(economia_pedir("GET", "?nome=" + urllib.parse.quote(it["name"])))})
+
+
+def r_economia_fazer(h, query):
+    body = h.read_body() or {}
+    it = economia_consumivel(str(body.get("item") or ""))
+    acao = body.get("acao")
+    if acao not in ("lista", "repor"):
+        raise ApiError(400, "acao vale lista ou repor.")
+    pedido = {"nome": it["name"], "acao": acao}
+    if acao == "repor":
+        if not clean_dur(it.get("dur")):
+            raise ApiError(400, "Informe a Duração estimada do consumível para repor de tempos em tempos.")
+        pedido["dias"] = clean_dur(it.get("dur"))
+    h.send_json({"compras": economia_compras(economia_pedir("POST", "", pedido))})
 
 
 def r_resolvia_listas(h, query):
@@ -5133,7 +5223,7 @@ def r_data(h, query):
                              "news_hora": news_hora(), "news_aviso": news_aviso(), "news_para": news_para_salvo(),
                              "news_apps": STORE.settings.get("news_apps") is True,
                              "accent": app_accent(), "accent_daily": app_accent_daily(), "deprec": STORE.settings.get("deprec") is True},
-                "gerencia": {"taxas": gerencia_taxas()} if gerencia_taxas() else None, "resolvia": resolvia_on(), "atalho": ingress_path(),
+                "gerencia": {"taxas": gerencia_taxas()} if gerencia_taxas() else None, "resolvia": resolvia_on(), "economia": economia_on(), "atalho": ingress_path(),
                 "correria_uso": correria_uso() if correria_enabled() else None,
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
     h.send_json(out)
@@ -5839,6 +5929,8 @@ def r_integracao_consumiveis(h, query):
 
 ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/data", r_data),
+    ("GET", r"/api/economia/compras", r_economia_compras),
+    ("POST", r"/api/economia/compras", r_economia_fazer),
     ("GET", r"/api/resolvia/listas", r_resolvia_listas),
     ("GET", r"/api/resolvia/tarefas", r_resolvia_tarefas),
     ("POST", r"/api/resolvia/tarefa", r_resolvia_nova),

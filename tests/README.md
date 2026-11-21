@@ -73,6 +73,7 @@ Três camadas, todas rodando a cada push no GitHub (aba Actions, workflow **Test
 | `e2e_navegacao` | abas, arrastar para o lado, Voltar, endereços que não existem, atualização vinda de outro aparelho |
 | `e2e_teclado` | N, /, Esc, Ctrl+Enter, setas, Tab preso na janela, foco de volta, Enter nos formulários |
 | `e2e_teclado_fora` | o teclado do celular: com o foco num campo de texto, a página em volta do app volta para o começo |
+| `e2e_economia` | Compras no EconomIA na ficha do consumível (um EconomIA de mentira): as linhas, Pôr na lista e Repor |
 | `e2e_acessibilidade` | nomes dos botões de ícone, aria-current, janelas com nome, imagens com alt, abas e chaves |
 | `e2e_erros` | servidor fora do ar ao abrir, erro ao gravar sem perder o digitado, resposta lenta |
 | `e2e_boasvindas` | primeiro uso: criar o primeiro cômodo e importar backup |

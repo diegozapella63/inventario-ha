@@ -348,7 +348,7 @@
     Object.assign(S, {
       rooms: d.rooms || [], items: d.items || [], rev: d.rev || 0, updatedAt: d.updatedAt, user: d.user || null,
       version: d.version || "", features: d.features || {}, settings: d.settings || {}, loaded: true, error: null, stale: false,
-      correriaUso: d.correria_uso || null, gerencia: d.gerencia || null, resolvia: d.resolvia === true, atalho: d.atalho || null,
+      correriaUso: d.correria_uso || null, gerencia: d.gerencia || null, resolvia: d.resolvia === true, economia: d.economia === true, atalho: d.atalho || null,
     });
     applyCats(d.cats, d.consCats || null);
     derive();
@@ -3356,6 +3356,7 @@
     if (recOn(it)) loadItemRec(it);
     if (newsOn() && it.cat === "eletronicos") loadItemNews(it); // as novidades são só dos eletrônicos
     if (S.resolvia) loadTarefas(it);
+    if (S.economia && isCons(it.room)) loadCompras(it);
   }
   // -- Tarefas no ResolvIA (com Usar equipamentos ligado lá): as abertas ligadas ao item e a Nova tarefa, que entra numa
   // lista do Home Assistant e fica ligada ao item (e ao cômodo) no ResolvIA. O servidor faz as duas coisas.
@@ -3380,6 +3381,47 @@
     API.get(`api/resolvia/tarefas?item=${encodeURIComponent(it.id)}`)
       .then((r) => { if (TAREFAS.id === it.id) { TAREFAS.st = { lista: r.tarefas || [] }; paintTarefas(it); } })
       .catch((e) => { if (TAREFAS.id === it.id) { TAREFAS.st = { erro: e.message }; paintTarefas(it); } });
+  }
+  // -- Compras no EconomIA (1.85.0; com Consumíveis do InventarIA ligado lá): na ficha de um consumível, se ele está na
+  // lista de compras, as últimas compras e a Reposição, e os botões Pôr na lista e Repor (a cada duração dele).
+  const COMPRAS = { id: null, st: null }; // st: {c} | {erro} | null (carregando)
+  const diaBr = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(d || "") ? `${d.slice(8)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : "");
+  function comprasHtml(it) {
+    const st = COMPRAS.id === it.id ? COMPRAS.st : null;
+    if (!st) return `<p class="muted">Carregando…</p>`;
+    if (st.erro) return `<p class="muted">${esc(st.erro)}</p>`;
+    const c = st.c, rep = c.reposicao;
+    const linhas = [
+      ["Lista de compras", c.na_lista ? "Está na lista" : "Fora da lista"],
+      ["Última compra", c.ultima ? `${diaBr(c.ultima)}${c.vezes > 1 ? ` · ${int(c.vezes)} compras` : ""}` : "Nenhuma"],
+      ["Reposição", rep ? `${rep.texto}${rep.na_hora ? " · na hora de repor" : rep.proxima ? ` · volta em ${diaBr(rep.proxima)}` : ""}` : "Não"],
+    ];
+    return `<ul class="tlist clist">${linhas.map(([t, v]) => `<li><b>${esc(t)}</b><span>${esc(v)}</span></li>`).join("")}</ul>
+      <div class="cbtns">${c.na_lista ? "" : `<button type="button" class="btn" data-act="compra-fazer" data-acao="lista" data-id="${esc(it.id)}">${ic("plus")}Pôr na lista</button>`}
+        ${rep || !durNum(it.dur) ? "" : `<button type="button" class="btn" data-act="compra-fazer" data-acao="repor" data-id="${esc(it.id)}">${ic("clock")}Repor a cada ${esc(durText(it.dur))}</button>`}</div>`;
+  }
+  function paintCompras(it) {
+    const el = sheet && sheet.itemId === it.id ? $('[data-slot="compras-lista"]', sheet.dlg) : null;
+    if (el) el.innerHTML = comprasHtml(it);
+  }
+  function loadCompras(it) {
+    if (COMPRAS.id === it.id && COMPRAS.st && COMPRAS.nome === it.name) { paintCompras(it); return; }
+    Object.assign(COMPRAS, { id: it.id, nome: it.name, st: null });
+    paintCompras(it);
+    API.get(`api/economia/compras?item=${encodeURIComponent(it.id)}`)
+      .then((r) => { if (COMPRAS.id === it.id) { COMPRAS.st = { c: r.compras }; paintCompras(it); } })
+      .catch((e) => { if (COMPRAS.id === it.id) { COMPRAS.st = { erro: e.message }; paintCompras(it); } });
+  }
+  async function compraFazer(b) {
+    const it = D.itemById.get(b.dataset.id);
+    if (!it || b.disabled) return;
+    b.disabled = true;
+    try {
+      const r = await API.post("api/economia/compras", { item: it.id, acao: b.dataset.acao });
+      Object.assign(COMPRAS, { id: it.id, nome: it.name, st: { c: r.compras } });
+      paintCompras(it);
+      toast(r.compras.texto || (b.dataset.acao === "lista" ? "Na lista de compras do EconomIA." : "Na Reposição do EconomIA."));
+    } catch (e) { b.disabled = false; fail(e); }
   }
   const PRAZOS = [["", "Sem prazo"], [0, "Hoje"], [1, "Amanhã"], [7, "Em 7 dias"], [30, "Em 30 dias"], ["outra", "Outra data"]];
   const PRAZO_IC = { "": "close", 0: "sun", 1: "clock", 7: "calendar", 30: "calendar" };
@@ -3513,6 +3555,9 @@
           <h3 class="inews-h">${ic("checks")}Tarefas no ResolvIA</h3>
           <div data-slot="tarefas-lista" aria-live="polite">${tarefasHtml(it)}</div>
           <button type="button" class="btn" data-act="tarefa-nova" data-id="${esc(it.id)}">${ic("plus")}Nova tarefa</button></div>` : ""}
+        ${S.economia && room.kind === "consumiveis" ? `<div class="inews itasks icompras" data-slot="item-compras">
+          <h3 class="inews-h">${ic("receipt")}Compras no EconomIA</h3>
+          <div data-slot="compras-lista" aria-live="polite">${comprasHtml(it)}</div></div>` : ""}
         ${recOn(it) ? `<div class="inews irec" data-slot="item-rec" aria-live="polite">${itemRecHtml(it)}</div>` : ""}
         ${newsOn() && it.cat === "eletronicos" ? `<div class="inews" data-slot="item-news" aria-live="polite">${itemNewsHtml(it)}</div>` : ""}
       </div>
@@ -5142,6 +5187,7 @@
       case "sel-start": selStart(); break;
       case "sel-end": selEnd(); break;
       case "sel-toggle": { const id = b.dataset.id; if (SEL) { if (SEL.has(id)) SEL.delete(id); else SEL.add(id); selRender(); } break; }
+      case "compra-fazer": compraFazer(b); break;
       case "sel-change": if (SEL && SEL.size) selEdit(); break;
       case "sel-all": if (SEL) { // todos os da lista (os que já apareceram e os que vêm com Mostrar mais), ou nenhum
         const ids = searchItems(base.q).list.filter((i) => !isArea(i.room)).map((i) => i.id);
