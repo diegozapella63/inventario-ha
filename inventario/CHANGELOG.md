@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.83.1
+
+- **Gráficos**: nas Faixas de valor, os rótulos cabem no celular estreito.
+
 ## 1.83.0
 
 - **Gráficos**: cada gráfico é um cartão que fecha e abre num toque no cabeçalho, como o dos Bens. Novo: **Categorias dos consumíveis**, com quantos há em cada uma.

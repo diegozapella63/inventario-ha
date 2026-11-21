@@ -1140,6 +1140,13 @@ dialog.viewer { width: 100vw; height: 100vh; height: 100dvh; background: #0f1113
 .bd-l { font-size: 12.5px; line-height: 1.2; text-align: center; color: var(--ink-2); white-space: nowrap; }
 .bd-v { font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bands-cap { margin: 10px 0 0; font-size: 13px; }
+/* 1.83.1: dentro do cartão, no celular estreito, as faixas usam a margem do cartão e a letra menor, para o rótulo caber */
+@media (max-width: 380px) {
+  .chart-pair > .panel .bands { margin-left: -10px; margin-right: -10px; }
+  .chart-pair > .panel .band { padding: 0 0 8px; }
+  .chart-pair > .panel .bd-l { font-size: 11px; letter-spacing: -0.02em; }
+  .chart-pair > .panel .bd-v { font-size: 10.5px; letter-spacing: -0.02em; }
+}
 .area { position: relative; margin-top: 4px; touch-action: pan-y; }
 .area svg { display: block; overflow: visible; }
 .area .g, .area .base { stroke: var(--line); stroke-width: 1; }
