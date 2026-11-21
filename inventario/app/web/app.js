@@ -2057,13 +2057,8 @@
     const x = all.find((e) => e.id === id);
     return x ? x.name : id === "ai_task.simulado" ? "IA simulada (teste)" : id.replace(/^[a-z_]+\./, "").replace(/_/g, " ");
   }
-  function aiProvider(words) {
-    const j = norm(words.join(" "));
-    if (/google|gemini/.test(j)) return "google";
-    if (/openai|chatgpt|gpt/.test(j)) return "openai";
-    if (/anthropic|claude/.test(j)) return "anthropic";
-    return "";
-  }
+  // todos os provedores das IAs (pelo id e pelo nome de cada uma), cada um uma vez
+  const aiProviders = (words) => { const j = norm(words.join(" ")); return [["google", /google|gemini/], ["openai", /openai|chatgpt|gpt/], ["anthropic", /anthropic|claude/]].filter(([, re]) => re.test(j)).map(([k]) => k); };
   function usageExample() {
     const day = (i) => ymd(new Date(Date.now() - (6 - i) * 864e5));
     const recent = [["catalogo", "ok", 8.4, 2100, 1], ["foto", "ok", 5.1, 1300, 1], ["busca", "ok", 31.0, 1900, 0], ["foto", "cota", 1.2, 900, 1]]
@@ -2096,23 +2091,28 @@
         <span class="t">${esc(String(c.seconds).replace(".", ","))} s · ≈ ${milTokens(c.tokens)} tokens${c.images ? ` · ${plural(c.images, "imagem", "imagens")}` : ""} · ${esc(whenShort(c.at))}</span></li>`;
     }).join("");
     const ids = [...Object.keys(u.month.entities || {}), ...Object.keys(u.week.entities || {}), S.settings.ai_entity || "", S.settings.ai_search || "", S.settings.ai_chat || ""];
-    let prov = aiProvider([...ids, ...ids.filter(Boolean).map(aiName)]);
-    if (!prov) {
-      const ps = new Set([...(aiCache.data?.entities || []), ...(aiCache.data?.agents || [])].map((e) => aiProvider([e.id, e.name])).filter(Boolean));
-      if (ps.size === 1) prov = [...ps][0];
+    // 1.79.0: uma linha para cada provedor das IAs em uso (a de conversar, a de ler fotos e a de pesquisar podem ser de
+    // provedores diferentes), com o endereço que cada um documenta: a API do Gemini no Google AI Studio (Dashboard >
+    // Usage; os créditos, em Billing), a do Claude no Claude Console (Usage; o saldo dos créditos, em Settings > Billing)
+    let provs = aiProviders([...ids, ...ids.filter(Boolean).map(aiName)]);
+    if (!provs.length) { // usou a padrão do Home Assistant: o provedor das IAs de lá, se for um só
+      const ps = new Set([...(aiCache.data?.entities || []), ...(aiCache.data?.agents || [])].flatMap((e) => aiProviders([e.id, e.name])));
+      if (ps.size === 1) provs = [...ps];
     }
     const link = (href, txt) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${txt}</a>`;
-    const provTxt = prov === "google" ? `Consumo exato do Gemini: ${link("https://console.cloud.google.com/apis/dashboard", "Google Cloud Console")}, em Generative Language API. A cota grátis volta de madrugada (4h ou 5h).`
-      : prov === "openai" ? `Consumo exato e custo da OpenAI: ${link("https://platform.openai.com/usage", "platform.openai.com/usage")}.`
-      : prov === "anthropic" ? `Consumo exato e custo da Anthropic: ${link("https://platform.claude.com/usage", "Claude Console, Usage")}.`
-      : "Consumo exato e custo: no painel do provedor da sua IA.";
+    const NOTES = {
+      google: `Gemini: consumo e cota no ${link("https://aistudio.google.com/", "Google AI Studio")}, em Dashboard › Usage; o saldo dos créditos, em Billing. A cota grátis volta de madrugada (4h ou 5h).`,
+      openai: `OpenAI: consumo e custo em ${link("https://platform.openai.com/usage", "platform.openai.com/usage")}.`,
+      anthropic: `Claude: consumo e custo no ${link("https://platform.claude.com/usage", "Claude Console")}; o saldo dos créditos, em ${link("https://platform.claude.com/settings/billing", "Billing")}.`,
+    };
+    const provTxt = provs.length ? provs.map((k) => NOTES[k]).join("<br>") : "Consumo exato e custo: no painel do provedor da sua IA.";
     slot.innerHTML = `<div class="uso-tiles">${tile("Hoje", u.today)}${tile("7 dias", u.week)}${tile("Este mês", u.month)}</div>
       <div class="uso-chart" role="group" aria-label="Chamadas de IA nos últimos 7 dias">${bars}</div>
       <div class="uso-dias" aria-hidden="true">${u.days.map((d) => `<span>${d.day === today ? "hoje" : weekday(d.day)}</span>`).join("")}</div>
       <p class="uso-cap" aria-live="polite">${dayLong(sel.day)}: <b>${plural(sel.calls || 0, "chamada", "chamadas")}</b>${sel.errors ? `, ${int(sel.errors)} com erro` : ""}${sel.quota ? `, ${int(sel.quota)} sem cota` : ""}.</p>
       ${kinds.length ? `<ul class="uso-tipos" aria-label="Nos últimos 7 dias">${kinds.map(([k, n]) => `<li>${esc(USAGE_KIND[k] || k)} <b>${int(n)}</b></li>`).join("")}</ul>` : ""}
       <details class="uso-ult"><summary>${ic("chev", "sm")}${oti("history")}Últimas chamadas</summary><ul>${recent || "<li>Nenhuma chamada ainda.</li>"}</ul></details>
-      <p class="help">${provTxt} A estimativa conta só o texto.</p>`;
+      <p class="help">${provTxt}${provs.length > 1 ? "<br>" : " "}A estimativa conta só o texto.</p>`;
   }
   function moreData() {
     return `

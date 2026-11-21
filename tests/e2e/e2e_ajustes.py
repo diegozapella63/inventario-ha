@@ -87,7 +87,7 @@ async def body(r, p):
     await pg.click(".uso-ult summary")
     ult = await pg.text_content(".uso-ult li")
     r.check("Digitalizar com IA" in ult and "Google AI Task" in ult, f"última chamada, com a IA usada ({' '.join(ult.split())[:60]})")
-    r.check("Google Cloud Console" in await pg.text_content("#p-usage .help"), "link do consumo exato do Gemini")
+    r.check("Google AI Studio" in await pg.text_content("#p-usage .help"), "link do consumo exato do Gemini")
     await pg.locator(".uso-bar").first.click()
     cap = await pg.text_content(".uso-cap")
     r.check("0 chamadas" in cap, f"tocar num dia mostra o dia ({cap.strip()})")

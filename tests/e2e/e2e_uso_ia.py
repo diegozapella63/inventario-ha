@@ -114,7 +114,7 @@ async def body(r, p):
     d3 = day(3, now)
     r.eq(rows[2][3], f"31 s · ≈ 3 mil tokens · {d3[8:10]}/{d3[5:7]} {hm(now - 3 * 86400)}", "a mais antiga diz o dia; sem imagem, não fala de imagem")
     t = await help_text()
-    r.check(t.startswith("Consumo exato e custo da OpenAI: platform.openai.com/usage."), f"OpenAI: o link do consumo da OpenAI ({t[:60]})")
+    r.check(t.startswith("OpenAI: consumo e custo em platform.openai.com/usage. A estimativa conta só o texto."), f"OpenAI: o link do consumo da OpenAI ({t[:80]})")
     a = await pg.evaluate("(a => [a.href, a.target, a.rel])(document.querySelector('#p-usage .help a'))")
     r.eq(a, ["https://platform.openai.com/usage", "_blank", "noopener noreferrer"], "o link abre fora do app")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
@@ -126,13 +126,28 @@ async def body(r, p):
     write("ai_task.claude_ai_task")
     await panel()
     t = await help_text()
-    r.check(t.startswith("Consumo exato e custo da Anthropic: Claude Console, Usage."), f"Anthropic: o link do Claude Console ({t[:60]})")
-    r.eq(await pg.get_attribute("#p-usage .help a", "href"), "https://platform.claude.com/usage", "que leva ao uso da Anthropic")
+    r.check(t.startswith("Claude: consumo e custo no Claude Console; o saldo dos créditos, em Billing."), f"Claude: o Claude Console e o saldo ({t[:80]})")
+    r.eq(await pg.evaluate("[...document.querySelectorAll('#p-usage .help a')].map(a => a.getAttribute('href'))"), ["https://platform.claude.com/usage", "https://platform.claude.com/settings/billing"], "que levam ao uso e ao saldo dos créditos")
     write("ai_task.google_ai_task")
     await panel()
     t = await help_text()
-    r.check(t.startswith("Consumo exato do Gemini: Google Cloud Console") and "A cota grátis volta de madrugada" in t, f"Google: o Cloud Console e quando a cota volta ({t[:60]})")
-    r.eq(await pg.get_attribute("#p-usage .help a", "href"), "https://console.cloud.google.com/apis/dashboard", "que leva ao painel do Google")
+    r.check(t.startswith("Gemini: consumo e cota no Google AI Studio, em Dashboard › Usage; o saldo dos créditos, em Billing.") and "A cota grátis volta de madrugada" in t and "Cloud Console" not in t,
+            f"1.79.0: Google: o AI Studio (não o Cloud Console) e quando a cota volta ({t[:80]})")
+    r.eq(await pg.get_attribute("#p-usage .help a", "href"), "https://aistudio.google.com/", "que leva ao Google AI Studio")
+    # 1.79.0: uma IA para conversar (Google) e outra nas chamadas (Claude): uma linha de cada, com o link de cada uma
+    write("ai_task.claude_ai_task")
+    r.api("PUT", "api/settings", {"ai_chat": "ai_task.google_ai_task"})
+    await pg.reload()
+    await panel()
+    linhas = await pg.evaluate("document.querySelector('#p-usage .help').innerHTML.split('<br>').map(l => l.replace(/<[^>]+>/g, '').trim())")
+    r.check(len(linhas) == 3 and linhas[0].startswith("Gemini: consumo e cota no Google AI Studio") and linhas[1].startswith("Claude: consumo e custo no Claude Console") and linhas[2] == "A estimativa conta só o texto.",
+            f"duas IAs em uso: o consumo de cada uma, uma por linha ({linhas})")
+    r.eq(await pg.locator("#p-usage .help a").count(), 3, "com os links das duas")
+    r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
+    await pg.evaluate("document.querySelector('#p-usage').scrollIntoView()")
+    await r.shot(pg, "uso-duas-ias")
+    r.api("PUT", "api/settings", {"ai_chat": ""})
+    await pg.reload()
 
     # -- usou a IA padrão: o provedor vem das IAs do Home Assistant, se houver um só
     write("padrão do Home Assistant")
@@ -142,7 +157,7 @@ async def body(r, p):
     r.eq(await pg.locator("#p-usage .help a").count(), 0, "e nenhum link")
     ha.states = [s for s in ha.states if not s["entity_id"].startswith(("ai_task.", "conversation.google"))] + [CLAUDE]
     await panel()
-    r.check((await help_text()).startswith("Consumo exato e custo da Anthropic"), "só a Anthropic no Home Assistant: o link dela")
+    r.check((await help_text()).startswith("Claude: consumo e custo no Claude Console"), "só a Anthropic no Home Assistant: o link dela")
     await ctx.close()
 
     # -- chamadas de verdade entram na hora: erro e cota

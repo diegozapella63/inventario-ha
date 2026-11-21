@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.79.0
+
+- **Uso da IA**: o rodapé mostra onde ver o consumo e o saldo de **cada IA em uso** (antes, só de uma). O do Gemini agora leva ao Google AI Studio, onde o consumo e os créditos ficam de verdade; o do Claude, ao Claude Console e ao saldo dos créditos.
+
 ## 1.78.0
 
 - **Consumíveis** (pasta térmica, creme de massagem, pilhas): o que se gasta e se compra de novo ganha uma tela própria, por categoria, com a quantidade em destaque. Ligue em **Mais › Configurações › Opções › Usar consumíveis**. Sem cômodo nem zona; no lugar dos detalhes, **O que é e para que serve**. Com uma foto, a IA preenche. Não entram no patrimônio, nos gráficos, no relatório nem no GerencIA.
