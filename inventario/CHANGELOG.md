@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.81.0
+
+- **Consumíveis no EconomIA**: com **Usar consumíveis** ligado, o EconomIA (1.46.0) pode escolher um consumível daqui para a **Reposição** dele (o que comprar de novo de tempos em tempos). Nada muda no inventário.
+
 ## 1.80.0
 
 - **Buscar › Filtros**: os filtros ganharam o título **Filtros**, como nos outros apps; um toque nele fecha e abre, e o aparelho lembra.

@@ -49,6 +49,14 @@ class Consumiveis(ServerCase):
         self.assertNotIn(it["id"], [i["id"] for i in its], "o GerencIA não soma os consumíveis no patrimônio")
         self.assertEqual(len(its), len(self.app.data()["items"]) - 1, "todos os outros")
 
+        # 1.81.0: os consumíveis à parte, para o EconomIA (a Reposição): o nome, a categoria, a quantidade e para que serve; sem valor
+        st, _, out = self.app.get("api/integracao/consumiveis", headers=self.chave())
+        self.assertEqual((st, out["ligado"], [c["id"] for c in out["consumiveis"]]), (200, True, [it["id"]]))
+        c = out["consumiveis"][0]
+        self.assertEqual((c["nome"], c["quantidade"], c["para_que_serve"] != "", sorted(c)), ("Pasta térmica", "2", True, ["categoria", "id", "nome", "para_que_serve", "quantidade"]))
+        self.assertEqual(self.app.get("api/integracao/consumiveis")[0], 401, "só com a chave")
+        self.assertEqual(self.app.post("api/integracao/consumiveis", {}, headers=self.chave())[0], 404, "só leitura")
+
         st, hd, pdf = self.app.request("GET", "api/relatorio.pdf")
         self.assertEqual((st, pdf[:5]), (200, b"%PDF-"))
         self.assertNotIn("Pasta t".encode("latin-1"), pdf, "o relatório é do patrimônio: sem os consumíveis")
@@ -56,6 +64,7 @@ class Consumiveis(ServerCase):
 
         self.app.ok("PUT", "api/settings", {"consumiveis": False})
         self.assertIn(it["id"], [i["id"] for i in self.app.data()["items"]], "desligado: continua guardado")
+        self.assertEqual(self.app.get("api/integracao/consumiveis", headers=self.chave())[2], {"versao": self.app.get("api/health")[2]["version"], "ligado": False, "consumiveis": []}, "desligado: nenhum para os outros apps")
         self.assertEqual(self.app.post("api/rooms", {"kind": "consumiveis"})[0], 409)
 
     def test_sem_os_itens_da_casa(self):

@@ -58,7 +58,7 @@ O valor de cada item é o que você quiser registrar, somando todas as unidades.
   - **Adicionar consumível** (na tela ou no **+ Adicionar**) abre o cadastro sem **Cômodo** e sem **Zona**: o nome, **O que é e para que serve**, a categoria, a quantidade e o valor (se quiser). O código começa com **CON** (CON-001).
   - Com uma foto, a IA preenche o nome e o que é e para que serve. É por esse texto que a busca, a Conversa e o CorrerIA acham o consumível pelo uso ("o que temos para massagem?").
   - A tela mostra os consumíveis por categoria, com a quantidade em destaque.
-  - Os consumíveis aparecem na Agora, na busca (filtro **Tipo**) e na Conversa, mas não contam no patrimônio, nos gráficos, no relatório nem nos outros apps (ResolvIA, CronologIA e GerencIA).
+  - Os consumíveis aparecem na Agora, na busca (filtro **Tipo**) e na Conversa, mas não contam no patrimônio, nos gráficos, no relatório nem nos outros apps (ResolvIA, CronologIA e GerencIA). O **EconomIA** pode escolher um consumível daqui para a **Reposição** dele (o que comprar de novo de tempos em tempos).
 - **Usar bens** (Mais > Configurações > Opções), ligado de início: desligado, os bens somem de tudo, do menu Mais, da Agora, da busca, dos gráficos, do relatório, da conversa com a IA e dos outros apps (ResolvIA, CronologIA e o patrimônio do GerencIA). Desligar não apaga os bens: ligado de novo, voltam como estavam.
 - **Usar zonas** (Mais > Configurações > Opções), desligada de início: as zonas dividem um cômodo em partes, como Estante, Bancada ou Rack da TV. Ligadas, aparecem o campo Zona no cadastro, a zona na ficha do item, na busca e no relatório, e os itens de cada cômodo ficam separados por zona.
 

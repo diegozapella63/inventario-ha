@@ -5617,6 +5617,19 @@ def r_integracao_itens(h, query):
     h.send_json({"versao": VERSION, "itens": out[:2000], "categorias": cats})
 
 
+def r_integracao_consumiveis(h, query):
+    """1.81.0: os consumíveis (o que se gasta e se compra de novo: pasta térmica, creme de massagem), para o EconomIA pôr
+    na Reposição. Só com Usar consumíveis ligado; fora do patrimônio, sem valor."""
+    with STORE.lock:
+        room = STORE.consumiveis_room() if consumiveis_enabled() else None
+        items = [it for it in STORE.data["items"] if room and it.get("room") == room["id"] and it.get("id")]
+        items.sort(key=lambda it: (it.get("name") or "").lower())
+        cats = STORE.cat_map()
+        out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "categoria": cats.get(it.get("cat") or "outros", ""),
+                "quantidade": str(it.get("qty") or "1")[:20], "para_que_serve": " ".join(str(it.get("details") or "").split())[:240]} for it in items]
+    h.send_json({"versao": VERSION, "ligado": consumiveis_enabled(), "consumiveis": out[:500]})
+
+
 ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/data", r_data),
     ("GET", r"/api/resolvia/listas", r_resolvia_listas),
@@ -5626,6 +5639,7 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/health", r_health),
     ("GET", r"/api/integracao/comodos", r_integracao_comodos),
     ("GET", r"/api/integracao/itens", r_integracao_itens),
+    ("GET", r"/api/integracao/consumiveis", r_integracao_consumiveis),
     ("GET", r"/api/integracao/ferramentas", r_ferramentas_lista),
     ("POST", r"/api/integracao/ferramentas", r_ferramentas_usar),
     ("POST", r"/api/items", r_item_create),
