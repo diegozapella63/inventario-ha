@@ -124,7 +124,7 @@ actions:
 
 ## Fotos da internet
 
-Para itens sem foto, **Buscar na internet** pede à IA do Home Assistant que procure o produto na web, no site do fabricante e em lojas grandes. O app abre as páginas que a IA encontrou, pega a foto principal de cada uma, descarta o que não é foto ou é pequeno demais e mostra as opções. A foto escolhida entra no item como **foto ilustrativa**, com o site de onde veio, na ficha do item e no relatório. Para o seguro, uma foto sua do item continua valendo mais.
+Para itens sem foto, **Buscar na internet** pede à IA do Home Assistant que procure o produto na web, no site do fabricante e em lojas grandes. O app abre as páginas que a IA encontrou, pega a foto principal de cada uma, descarta o que não é foto ou é pequeno demais e mostra as opções. A foto escolhida entra no item como **foto ilustrativa**, com o site de onde veio, na ficha do item e no relatório. Para o seguro, uma foto sua do item continua valendo mais. A mesma foto não aparece duas vezes (também em outro tamanho). Num consumível, a busca não traz valor e sugere uma categoria dos consumíveis.
 
 Na mesma chamada, a IA também descreve o produto que achou: nome com marca e modelo, detalhes, categoria e um valor estimado. A janela mostra o que vai para o item, já marcado em **Preencher também**, e dá para desmarcar. Os dados só preenchem o que está vazio: num item novo, o nome também vem da IA; num item que já existe, o nome e um valor já dado não mudam. **Usar só os dados, sem foto** preenche sem escolher foto, e serve também quando a busca não acha fotos. No editor, o aviso tem **Desfazer**.
 

@@ -362,7 +362,8 @@ class PerguntaEmTexto(ComHA):
         self.ha.ai_reply = lambda kind, body: "resposta da IA"
         self.assertEqual(S.ai_call_text("InventarIA: teste", "instruções", ""), "resposta da IA")
         body = self.ultimo("/core/api/services/ai_task/generate_data")["body"]
-        self.assertEqual(body, {"task_name": "InventarIA: teste", "instructions": "instruções"}, "sem escolha, sem entity_id")
+        self.assertEqual(body, {"task_name": "InventarIA: teste", "instructions": S.IA_SO_MATERIAL + "\n\ninstruções"}, "sem escolha, sem entity_id; 1.83.2: a guarda na frente")
+        self.assertEqual((S.so_material(S.so_material("x")), S.so_material("")), (S.IA_SO_MATERIAL + "\n\nx", ""), "uma vez só; nada, nada")
 
     def test_tarefa_escolhida_vai_no_pedido(self):
         S.ai_call_text("InventarIA: teste", "x", "ai_task.google_ai_task")
@@ -388,7 +389,7 @@ class PerguntaEmTexto(ComHA):
         self.ha.conversation_reply = lambda body: '{"items": []}'
         self.assertEqual(S.ai_call_text("t", "liste os itens", "conversation.google_generative_ai"), '{"items": []}')
         call = self.ultimo("/core/api/services/conversation/process")
-        self.assertEqual(call["body"], {"text": "liste os itens", "agent_id": "conversation.google_generative_ai"})
+        self.assertEqual(call["body"], {"text": S.IA_SO_MATERIAL + "\n\nliste os itens", "agent_id": "conversation.google_generative_ai"})
         self.assertEqual(self.ha.calls("POST", "/core/api/services/ai_task"), [], "não usa a tarefa de IA")
 
     def test_assistente_de_conversa_sem_fala_devolve_texto_vazio(self):

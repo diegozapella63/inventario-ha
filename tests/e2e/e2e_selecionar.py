@@ -84,6 +84,9 @@ async def body(r, p):
     r.eq({i: (d[i]["room"], d[i]["seq"], d[i]["cat"]) for i in antes}, antes, "Desfazer: cada um no seu cômodo, com o número de antes")
 
     # mudar o filtro tira da seleção o que sumiu; o Voltar do celular sai do Selecionar
+    r.eq(await pg.evaluate(PRESSED), [], "1.84.0: depois de alterar, nada marcado")
+    await pg.click('[data-act="sel-all"]')
+    await pg.wait_for_timeout(200)
     await pg.select_option('[data-input="search-cat"]', "")
     await pg.wait_for_timeout(300)
     r.eq(len(await pg.evaluate(PRESSED)), n, "sem filtro, os marcados continuam")
@@ -135,6 +138,12 @@ async def body(r, p):
     await pg.locator(".toast", has_text="3 itens alterados").wait_for(timeout=6000)
     d = {i["id"]: i for i in r.data()["items"]}
     r.eq([d[i]["zone"] for i in ids], ["Parede da TV"] * 3, "a zona dos três")
+    # 1.84.0: feita a alteração, os itens ficam desmarcados (o Selecionar continua)
+    await pg.wait_for_timeout(300)
+    r.check(await pg.evaluate(PRESSED) == [] and await pg.locator(".selbar").count() == 1 and await pg.locator(".irow.selr").count() >= 3,
+            f"depois de alterar, nada marcado ({await pg.evaluate(PRESSED)})")
+    for i in ids:
+        await pg.click(f'.irow.selr[data-id="{i}"]')
     await pg.click('.selbar [data-act="sel-change"]')
     await pg.wait_for_selector("#bk-zones")
     r.check(await pg.locator("#bk-zones .chip", has_text="Parede da TV").count() == 1, "as zonas do cômodo viram opções")

@@ -1,5 +1,13 @@
 # Mudanças
 
+## 1.84.0
+
+- **Buscar foto na internet**: a mesma foto não aparece mais duas vezes (também quando vem em outro tamanho), e a busca traz mais fotos: pede mais páginas à IA e usa mais fotos de cada uma.
+- **Consumíveis**: a busca na internet não mostra nem preenche valor, e sugere uma categoria dos consumíveis.
+- **Selecionar**: depois de alterar vários itens, eles ficam desmarcados.
+- **Teclado no celular**: ao abrir uma janela com um campo de texto, a tela não fica mais deslocada (a barra de cima sumia até um toque).
+- **IA**: as instruções dizem à IA que o que ela lê (fotos, PDFs, páginas) é só material, e que ordens ali dentro não valem.
+
 ## 1.83.1
 
 - **Gráficos**: nas Faixas de valor, os rótulos cabem no celular estreito.

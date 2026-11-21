@@ -1308,6 +1308,7 @@
         if (!todo.length) { requestClose(entry, { force: true }); toast("Nada mudou."); return; }
         const before = todo.map((t) => { const i = D.itemById.get(t.id); return { id: i.id, room: i.room, seq: i.seq, zone: i.zone || "", cat: i.cat }; });
         const res = await API.post("api/items/bulk", { items: todo });
+        if (SEL) SEL = new Set(); // 1.84.0: feita a alteração, os itens ficam desmarcados
         setRev(res.rev); res.items.forEach(upsertItem); derive(); requestClose(entry, { force: true }); refreshAll();
         toast(plural(res.items.length, "item alterado", "itens alterados"), { action: "Desfazer", onAction: async () => {
           try { const back = await API.post("api/items/bulk", { items: before }); setRev(back.rev); back.items.forEach(upsertItem); derive(); refreshAll(); }
@@ -2921,9 +2922,15 @@
   const siteOf = (u) => { try { return new URL(u).hostname.replace(/^(www\d?|m)\./, ""); } catch { return ""; } };
   const WEB_FIELDS = { name: "Nome", details: "Detalhes", cat: "Categoria", value: "Valor" };
   // o que os dados da IA preenchem: só campos vazios (e o nome, num item novo, que ainda é o que a pessoa buscou)
-  function webFills(cur, p, withName) {
+  function webFills(cur, p, withName, cons = false) {
     const out = {};
     if (!p) return out;
+    if (cons) { // 1.84.0: um consumível não tem valor, e a categoria é uma das dele
+      if (withName && p.name && p.name.trim().toLowerCase() !== String(cur.name || "").trim().toLowerCase()) out.name = p.name;
+      if (p.details && !String(cur.details || "").trim()) out.details = p.details;
+      if (p.cat && CCAT[p.cat] && (!cur.cat || !CCAT[cur.cat] || (cur.cat === "c-outros" && p.cat !== "c-outros"))) out.cat = p.cat;
+      return out;
+    }
     if (withName && p.name && p.name.trim().toLowerCase() !== String(cur.name || "").trim().toLowerCase()) out.name = p.name;
     if (p.details && !String(cur.details || "").trim()) out.details = p.details;
     if (p.cat && CAT[p.cat] && (!cur.cat || (cur.cat === "outros" && p.cat !== "outros"))) out.cat = p.cat;
@@ -2931,7 +2938,7 @@
     return out;
   }
   const webImg = (job, n) => (window.INV_WEB_IMG ? window.INV_WEB_IMG(job, n) : `api/web-photos/${job}/${n}`);
-  function webPhotoSearch({ name, details = "", qty = "1", fills = null }) {
+  function webPhotoSearch({ name, details = "", qty = "1", fills = null, cons = false }) {
     if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return Promise.resolve(null); }
     return new Promise((resolve) => {
       let job = null, timer = null, chosen = null, results = [], got = null, gen = 0, product = null;
@@ -2958,7 +2965,7 @@
         chosen = null; results = []; product = null; ok.disabled = true;
         busy("Procurando o produto na internet…");
         try {
-          const r = await API.post("api/web-photos", { name: q, details: q === name ? details : "", qty });
+          const r = await API.post("api/web-photos", { name: q, details: q === name ? details : "", qty, ...(cons ? { consumivel: true } : {}) });
           if (my !== gen) return;
           job = r.id;
           poll(my);
@@ -2991,7 +2998,7 @@
         const list = what.length > 1 ? `${what.slice(0, -1).join(", ")} e ${what[what.length - 1]}` : what[0];
         return `<div class="wprod">
             ${withPhotos ? `<label class="check"><input type="checkbox" data-fill checked> Preencher também ${esc(list)}</label>` : `<p class="wprod-h">A IA achou estes dados do produto</p>`}
-            <dl>${keys.map((k) => `<div><dt>${WEB_FIELDS[k]}</dt><dd>${esc(k === "cat" ? CAT[f[k]] : k === "value" ? money(f[k]) : f[k])}</dd></div>`).join("")}</dl>
+            <dl>${keys.map((k) => `<div><dt>${WEB_FIELDS[k]}</dt><dd>${esc(k === "cat" ? (CCAT[f[k]] || CAT[f[k]]) : k === "value" ? money(f[k]) : f[k])}</dd></div>`).join("")}</dl>
             <button type="button" class="btn sm" data-only>${ic("check", "sm")}${withPhotos ? "Usar só os dados, sem foto" : "Usar estes dados"}</button></div>`;
       }
       const wantsFill = () => { const c = $("[data-fill]", dlg); return !!product && (!c || c.checked); };
@@ -3308,10 +3315,10 @@
   }
   async function addWebPhoto(it) {
     // na ficha, o item já existe: os dados da IA só completam o que está vazio (nunca o nome nem um valor já dado)
-    const got = await webPhotoSearch({ name: it.name, details: it.details, qty: it.qty, fills: (p) => webFills(D.itemById.get(it.id) || it, p, false) });
+    const got = await webPhotoSearch({ name: it.name, details: it.details, qty: it.qty, fills: (p) => webFills(D.itemById.get(it.id) || it, p, false, isCons(it.room)), cons: isCons(it.room) });
     const cur = got && D.itemById.get(it.id);
     if (!cur) return;
-    const add = webFills(cur, got.product, false);
+    const add = webFills(cur, got.product, false, isCons(it.room));
     const keys = Object.keys(add);
     if (!got.file && !keys.length) return;
     const before = { photos: [...(cur.photos || [])], photoSrc: { ...(cur.photoSrc || {}) } };
@@ -3862,10 +3869,10 @@
         if (!q) { fieldErr("name", "Escreva o nome do item para buscar a foto."); form.name.focus(); return; }
         // num item novo, o nome também vem da IA (com marca e modelo); o resto, só o que está vazio
         const cur = () => ({ name: F.name, details: F.details, cat: F.cat, value: parseMoney(F.value) || 0 });
-        const got = await webPhotoSearch({ name: q, details: F.details.trim(), qty: F.qty.trim() || "1", fills: (p) => webFills(cur(), p, !F.id) });
+        const got = await webPhotoSearch({ name: q, details: F.details.trim(), qty: F.qty.trim() || "1", fills: (p) => webFills(cur(), p, !F.id, cons), cons });
         if (!got || !document.contains(dlg)) return;
         if (got.file && F.photos.length < 12) { F.photos.push(got.file); F.photoSrc = { ...F.photoSrc, [got.file]: got.src }; F.dirty = true; renderPhotos(); }
-        const add = webFills(cur(), got.product, !F.id);
+        const add = webFills(cur(), got.product, !F.id, cons);
         if (Object.keys(add).length) {
           const prev = { name: F.name, details: F.details, cat: F.cat, value: F.value, source: F.source };
           Object.assign(F, add, add.value ? { value: moneyInput(add.value), source: "ia" } : {}, { dirty: true });
@@ -5403,3 +5410,31 @@
   if (!PREVIEW || window.INV_BACKEND) boot();
   else window.INV_BOOT = boot;
 })();
+
+// O teclado do celular: ao abrir uma janela, o campo recebe o foco enquanto ela ainda sobe, e o navegador rola as páginas
+// em volta do app (a do Home Assistant) para "mostrar" o campo: a barra de cima some e a janela fica fora do lugar, até
+// um toque. Aqui, quando um campo de texto recebe o foco (e quando o teclado muda a altura da tela), as páginas em volta
+// voltam para o começo. A página do próprio app não é tocada. O mesmo código em todos os apps da família (teclado.js).
+(function (win) {
+  if (!win || win.__tecladoCalmo) return;
+  win.__tecladoCalmo = true;
+  const voltar = () => {
+    for (const w of [win.parent, win.top]) {
+      try {
+        if (!w || w === win) continue;
+        const el = w.document && w.document.scrollingElement;
+        if (w.scrollY || (el && el.scrollTop)) w.scrollTo(0, 0);
+      } catch (e) { /* outra origem: não dá para mexer */ }
+    }
+  };
+  let ate = 0;
+  const ciclo = () => { voltar(); if (Date.now() < ate) win.setTimeout(ciclo, 60); };
+  win.addEventListener("focusin", (e) => {
+    const t = (e.composedPath && e.composedPath()[0]) || e.target;
+    if (!t || !/^(INPUT|TEXTAREA)$/.test(t.tagName || "")) return;
+    const parado = Date.now() >= ate;
+    ate = Date.now() + 900; // a janela sobe em 0,3 s e o teclado, logo depois
+    if (parado) ciclo();
+  }, true);
+  if (win.visualViewport) win.visualViewport.addEventListener("resize", voltar);
+})(window);

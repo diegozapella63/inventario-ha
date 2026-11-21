@@ -777,7 +777,12 @@ class CicloDaBusca(Base):
             self.assertTrue(chamado.wait(5))
         self.assertEqual(args[0][:2], (jid, "Cafeteira"))
         self.assertEqual(args[0][2], ("inox " + "x" * 400)[:300])
-        self.assertEqual(args[0][3:], ("conversation.google_generative_ai", "2 un"))
+        self.assertEqual(args[0][3:], ("conversation.google_generative_ai", "2 un", False))
+        with mock.patch.object(S, "_web_job_run", falso):
+            chamado.clear()
+            S.web_job_start({"name": "Creme", "consumivel": True})
+            self.assertTrue(chamado.wait(5))
+        self.assertIs(args[1][5], True, "1.84.0: a busca de um consumível")
 
     def test_quantidade_vazia_vira_1(self):
         for qty in ("", None, "   "):
@@ -837,7 +842,7 @@ class CicloDaBusca(Base):
         self.assertEqual(len(job.get("results") or []), 0)
         self.assertEqual(self.arquivos(jid), [], "a foto que já tinha baixado é apagada")
 
-    def test_no_maximo_8_fotos_de_14_candidatas(self):
+    def test_no_maximo_8_fotos_de_20_candidatas(self):
         for n in range(22):
             self.loja.foto(f"/foto/{n}.jpg", A1 + bytes([n]) * (n + 1))
         for n in range(8):
@@ -845,19 +850,21 @@ class CicloDaBusca(Base):
         jid, job = self.rodar({"paginas": [self.loja.base + f"p{n}.html" for n in range(8)],
                                "imagens": [self.loja.base + f"foto/{n}.jpg" for n in range(16, 22)]})
         self.assertEqual(job["stage"], "done", job["msg"])
-        self.assertEqual(self.loja.vezes("/foto/"), 14, "confere só as 14 primeiras")
+        self.assertEqual(self.loja.vezes("/foto/"), 20, "confere só as 20 primeiras (1.84.0: eram 14)")
         self.assertEqual([r["image"] for r in job["results"]], [self.loja.base + f"foto/{n}.jpg" for n in range(8)])
         self.assertEqual([r["n"] for r in job["results"]], list(range(8)))
         self.assertEqual(len(self.arquivos(jid)), 8)
 
-    def test_duas_fotos_por_pagina(self):
+    def test_as_duas_primeiras_de_cada_pagina_antes_das_outras(self):
         for n in range(4):
             self.loja.foto(f"/foto/{n}.jpg", A1 + bytes([n]) * (n + 1))
         self.loja.pagina("/quatro.html", '<meta property="og:image" content="/foto/0.jpg"><meta name="twitter:image" content="/foto/1.jpg">'
                                          '<meta itemprop="image" content="/foto/2.jpg"><link rel="image_src" href="/foto/3.jpg">')
-        _, job = self.rodar({"paginas": [self.loja.base + "quatro.html"]})
-        self.assertEqual([r["image"] for r in job["results"]], [self.loja.base + "foto/0.jpg", self.loja.base + "foto/1.jpg"])
-        self.assertEqual(self.loja.vezes("/foto/2.jpg") + self.loja.vezes("/foto/3.jpg"), 0)
+        self.loja.foto("/foto/x.jpg", A1 + b"x" * 9)
+        self.loja.pagina("/uma.html", '<meta property="og:image" content="/foto/x.jpg">')
+        _, job = self.rodar({"paginas": [self.loja.base + "quatro.html", self.loja.base + "uma.html"]})
+        # 1.84.0: as outras fotos de uma página também vêm (antes, só duas), depois das primeiras de todas as páginas
+        self.assertEqual([r["image"] for r in job["results"]], [self.loja.base + f"foto/{n}.jpg" for n in (0, 1, "x", 2, 3)])
 
     def test_campos_de_cada_foto_e_os_arquivos(self):
         jid, job = self.rodar({"paginas": [self.site.base + "produto-b.html"], "imagens": [self.site.base + "img/e.jpg"]})
