@@ -232,6 +232,8 @@ O que dá para fazer: ver o resumo da casa (o total, os cômodos, os bens e as c
 
 Fotos, backups e configurações não passam pelo CorrerIA. O item cadastrado assim mostra na ficha a origem **Pelo CorrerIA** e quem cadastrou. Embaixo da chave, o app mostra quem usou por último e quando ("Claude usou hoje às 9:41"). Desligar a chave corta a ligação na hora.
 
+**Guardar a foto num item** e **ler várias coisas de uma foto** (1.93.0, com o CorrerIA 1.24.0): mande a foto e peça para guardar num item que já existe, ou para dizer o que há nela (você escolhe o que cadastrar).
+
 **Cadastrar pela foto** (1.92.0, com o CorrerIA 1.23.0): mande a foto de um item ou de um consumível na conversa do CorrerIA e peça para cadastrar. A IA do InventarIA lê a foto (o nome, o que é, a categoria) e a foto fica no item; com a IA desligada aqui, diga o nome junto.
 
 ## Atualizar o app

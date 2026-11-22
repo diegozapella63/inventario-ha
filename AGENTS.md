@@ -156,6 +156,8 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 
 1.92.0: a ferramenta `cadastrar_por_foto` (`anexo: ["image/jpeg"]`; o CorrerIA 1.23.0 manda a foto da conversa em `anexo`, fora dos argumentos; `chamar(..., anexo=)`, `_por_foto` no ferramentas.py): guarda a foto (`save_photo`), sem `nome` lê com o `ai_identify` (fora da trava do Store; num consumível com `consumivel: true`) e cadastra pelo `_cadastrar(..., fotos=[arquivo])`; a IA desligada, a foto que não veio ou não foi lida viram erros que mandam perguntar o nome.
 
+1.93.0: mais duas ferramentas com `anexo: ["image/jpeg"]`: `anexar_foto` (a foto da conversa num item que já existe, `_anexar_foto`) e `ler_arquivo` (leitura: o `ai_identify` no modo `multi`, `_ler_arquivo`; devolve o que há na foto, não cadastra e apaga a foto lida). As três que recebem a foto rodam fora da trava do Store (`chamar`).
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.

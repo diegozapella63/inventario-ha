@@ -8,6 +8,7 @@ Cada ferramenta: {nome, titulo, descricao, entrada (JSON Schema), grava, apaga}.
 (srv), para não importar o servidor daqui, e devolve o texto para a IA; um argumento ruim levanta ErroFerramenta (400)."""
 from __future__ import annotations
 
+import os
 import json
 import re
 
@@ -68,6 +69,14 @@ FERRAMENTAS = [
                   "observação, quantas fotos tem, de onde veio, quando e por quem foi cadastrado e alterado, e desde quando vale "
                   "o valor.",
      "entrada": _obj({"id": _ID}, ["id"])},
+    # 1.93.0: o Digitalizar com IA de várias coisas numa foto, pelo CorrerIA (leitura: fica com as outras leituras)
+    {"nome": "ler_arquivo", "titulo": "Ler a foto", "grava": False, "anexo": ["image/jpeg"],
+     "descricao": "Lê com a IA do InventarIA a foto que a pessoa acabou de mandar na conversa e devolve as coisas que há nela "
+                  "(uma estante, uma bancada, um cômodo: o nome, a categoria e o que é cada uma). Não cadastra nada: depois, "
+                  "cadastre com inventario_cadastrar_itens os que a pessoa quiser. Para cadastrar UMA coisa com a foto no item, "
+                  "use inventario_cadastrar_por_foto.",
+     "entrada": _obj({"comodo": {"type": "string", "description": "O cômodo da foto, se a pessoa disse (ajuda a IA)."},
+                      "dica": {"type": "string", "description": "O que a pessoa disse sobre a foto, se disse."}})},
     {"nome": "cadastrar_itens", "titulo": "Cadastrar itens", "grava": True,
      "descricao": "Cadastra um ou mais itens num cômodo (ou em Bens: casa, terreno, carro; ou em Consumíveis: o que se gasta "
                   "e se compra de novo, como pasta térmica e creme de massagem). Cada item ganha o próximo código "
@@ -110,6 +119,12 @@ FERRAMENTAS = [
      "entrada": _obj({"comodo": _COMODO, "nome": {"type": "string", "description": "Só se a pessoa disse o nome; sem ele, a IA lê a foto."},
                       "valor": _VALOR, "categoria": _CATEGORIA, "duracao_dias": _DURACAO, "usado_em": _USADO, "detalhes": _DETALHES,
                       "zona": _ZONA}, ["comodo"])},
+    # 1.93.0 (o dono: "todos os apps que tenham as funções de PDF ou imagem ou foto funcionem no correria/rondas"): as outras
+    # duas funções de foto da tela: a foto num item que já existe e o Digitalizar com IA de várias coisas numa foto só
+    {"nome": "anexar_foto", "titulo": "Pôr a foto no item", "grava": True, "anexo": ["image/jpeg"],
+     "descricao": "Guarda num item que já existe a foto que a pessoa acabou de mandar na conversa (a nota, o estado, a "
+                  "etiqueta). Ache o item antes, com inventario_buscar_itens. Só serve logo depois de a pessoa mandar a foto.",
+     "entrada": _obj({"id": {"type": "string", "description": "O id ou o código do item (SAL-003)."}}, ["id"])},
 ]
 POR_NOME = {f["nome"]: f for f in FERRAMENTAS}
 
@@ -776,13 +791,9 @@ def conferir_argumentos(nome, argumentos) -> dict:
 def _por_foto(srv, a, quem, anexo) -> str:
     """A foto da conversa vira um item: guarda a foto, lê com a IA daqui se faltar o nome (fora da trava do Store: a
     leitura demora) e cadastra pelas regras do cadastrar_itens, com a foto no item."""
-    b64 = anexo.get("b64") if isinstance(anexo, dict) and isinstance(anexo.get("b64"), str) else ""
-    b64 = b64.split(",", 1)[1] if b64.startswith("data:") and "," in b64 else b64
-    if not b64:
-        raise ErroFerramenta("Não chegou nenhuma foto. Peça para a pessoa mandar a foto de novo, com o pedido junto.")
     cons = a.get("duracao_dias") not in (None, 0) or a.get("usado_em") not in (None, "") or srv.fold(str(a.get("comodo") or "")) in ("consumiveis", "consumivel")
     item = {k: a[k] for k in ("nome", "valor", "categoria", "duracao_dias", "usado_em", "detalhes", "zona") if a.get(k) not in (None, "")}
-    arquivo = srv.save_photo({"full": b64})["file"]
+    arquivo = _foto_do_anexo(srv, anexo)
     if not item.get("nome"):
         if not srv.ai_enabled():
             raise ErroFerramenta("A foto chegou, mas a IA do InventarIA está desligada e não dá para ler o que é. Pergunte o nome do item e chame de novo com nome.")
@@ -806,13 +817,65 @@ def _por_foto(srv, a, quem, anexo) -> str:
             raise
 
 
+def _foto_do_anexo(srv, anexo) -> str:
+    """Guarda a foto que veio do CorrerIA e devolve o nome do arquivo."""
+    b64 = anexo.get("b64") if isinstance(anexo, dict) and isinstance(anexo.get("b64"), str) else ""
+    b64 = b64.split(",", 1)[1] if b64.startswith("data:") and "," in b64 else b64
+    if not b64:
+        raise ErroFerramenta("Não chegou nenhuma foto. Peça para a pessoa mandar a foto de novo, com o pedido junto.")
+    return srv.save_photo({"full": b64})["file"]
+
+
+def _anexar_foto(srv, a, quem, anexo) -> str:
+    """1.93.0: a foto da conversa num item que já existe (como o Adicionar foto da ficha)."""
+    with srv.STORE.lock:
+        it = _achar_item(srv, a.get("id"))
+        arquivo = _foto_do_anexo(srv, anexo)
+        fotos = list(it.get("photos") or []) + [arquivo]
+        srv.STORE.update_item(it["id"], {"photos": fotos}, quem)
+        return f"Foto guardada em {it.get('name')} ({srv.STORE.tag(it)}): agora {'tem 1 foto' if len(fotos) == 1 else f'tem {len(fotos)} fotos'}."
+
+
+def _ler_arquivo(srv, a, anexo) -> str:
+    """1.93.0: o Digitalizar com IA de várias coisas numa foto, pelo CorrerIA: a IA daqui lê e devolve o que há; nada é
+    cadastrado e a foto não fica guardada."""
+    if not srv.ai_enabled():
+        raise ErroFerramenta("A IA do InventarIA está desligada (Mais › Configurações › Integrações › Usar IA): não dá para ler a foto. Diga isso à pessoa.")
+    arquivo = _foto_do_anexo(srv, anexo)
+    try:
+        corpo = {"file": arquivo, "mode": "multi", "hint": " ".join(str(a.get("dica") or "").split())[:300]}
+        if a.get("comodo") not in (None, ""):
+            room = _achar_comodo(srv, a.get("comodo"))
+            if not isinstance(room, str) and not _area(room):
+                corpo["room"] = room["id"]
+        try:
+            lidos = srv.ai_identify(corpo).get("items") or []
+        except srv.ApiError as e:
+            raise ErroFerramenta(f"O InventarIA não conseguiu ler a foto ({e.msg}) Diga isso à pessoa, sem inventar o que há nela.") from None
+    finally:
+        for pasta in (srv.PHOTOS_DIR, srv.THUMBS_DIR):
+            try:
+                os.unlink(os.path.join(pasta, arquivo))
+            except OSError:
+                pass
+    if not lidos:
+        return "A IA do InventarIA leu a foto e não reconheceu nenhum item nela. Diga isso à pessoa e pergunte o que ela quer fazer."
+    cats = srv.STORE.cat_map()
+    linhas = []
+    for it in lidos:
+        extra = "; ".join(x for x in (cats.get(it.get("cat")), " ".join(str(it.get("details") or "").split())[:160]) if x)
+        linhas.append(f"- {it['name']}" + (f" ({extra})" if extra else "") + (f" [parece já estar cadastrado: {it['existing']}]" if it.get("existing") else ""))
+    return (f"Na foto (lida pela IA do InventarIA) {'há 1 item' if len(lidos) == 1 else f'há {len(lidos)} itens'}:\n" + "\n".join(linhas)
+            + "\nNada foi cadastrado. Mostre à pessoa e cadastre com inventario_cadastrar_itens os que ela quiser (o valor é ela quem diz).")
+
+
 def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
     """Roda a ferramenta (as de gravar mudam o inventário pelo Store, que grava, sobe a rev e faz a versão automática)."""
     a = conferir_argumentos(nome, argumentos)
     quem = _quem(pessoa, cliente)
-    if nome == "cadastrar_por_foto":
+    if nome in ("cadastrar_por_foto", "anexar_foto", "ler_arquivo"):  # as que recebem a foto (a leitura por IA fica fora da trava do Store)
         try:
-            return _por_foto(srv, a, quem, anexo)
+            return _por_foto(srv, a, quem, anexo) if nome == "cadastrar_por_foto" else _anexar_foto(srv, a, quem, anexo) if nome == "anexar_foto" else _ler_arquivo(srv, a, anexo)
         except srv.ApiError as e:
             raise ErroFerramenta(e.msg) from None
     try:

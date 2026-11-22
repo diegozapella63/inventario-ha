@@ -4,6 +4,7 @@ no patrimônio (sem os consumíveis), a área Consumíveis no Store, a leitura p
 recebe e as ferramentas do CorrerIA (achar pelo uso, cadastrar, mover, o resumo)."""
 import re
 import json
+import os
 from unittest import mock
 import unittest
 
@@ -515,6 +516,44 @@ class PelaFoto(Base):
         with mock.patch.object(S, "ai_identify", return_value={"items": [{"name": "Esponja", "details": "", "cat": "nao-existe"}]}):
             self.foto({"comodo": "Consumíveis"})
         self.assertEqual(next(i for i in self.store.data["items"] if i["name"] == "Esponja")["cat"], S.CONS_OUTROS)
+
+    def test_anexar_foto_num_item_que_ja_existe(self):
+        """1.93.0: a foto da conversa num item (pelo id ou pelo código)."""
+        f = F.POR_NOME["anexar_foto"]
+        self.assertEqual((f["anexo"], f["grava"]), (["image/jpeg"], True))
+        it = next(i for i in self.store.data["items"] if i["room"] == "sala")
+        antes = len(it.get("photos") or [])
+        txt = F.chamar(S, "anexar_foto", {"id": self.store.tag(it)}, ANA, "CorrerIA", anexo=self.FOTO)
+        self.assertIn(f"Foto guardada em {it['name']} ({self.store.tag(it)}): agora tem {antes + 1} foto", txt)
+        self.assertEqual(len(self.store.item(it["id"])["photos"]), antes + 1)
+        with self.assertRaises(F.ErroFerramenta) as cm:
+            F.chamar(S, "anexar_foto", {"id": it["id"]}, ANA, "CorrerIA")
+        self.assertIn("Não chegou nenhuma foto", str(cm.exception))
+
+    def test_ler_arquivo_varias_coisas_numa_foto_sem_cadastrar(self):
+        """1.93.0: o Digitalizar com IA de várias coisas, pelo CorrerIA: devolve o que há; nada muda e a foto não fica."""
+        f = F.POR_NOME["ler_arquivo"]
+        self.assertEqual((f["anexo"], f["grava"]), (["image/jpeg"], False))
+        antes = (len(self.store.data["items"]), set(os.listdir(S.PHOTOS_DIR)))
+        lido = {"items": [{"name": "Abajur", "details": "Abajur de mesa\ncom cúpula.", "cat": "decoracao", "existing": ""}, {"name": "Sofá", "details": "", "cat": "moveis", "existing": "Sofá de 3 lugares"}]}
+        with mock.patch.object(S, "ai_identify", return_value=lido) as ia:
+            txt = F.chamar(S, "ler_arquivo", {"comodo": "Sala de estar", "dica": "a estante"}, ANA, "CorrerIA", anexo=self.FOTO)
+        self.assertEqual(txt, "Na foto (lida pela IA do InventarIA) há 2 itens:\n- Abajur (Decoração e arte; Abajur de mesa com cúpula.)\n- Sofá (Móveis) [parece já estar cadastrado: Sofá de 3 lugares]\n"
+                              "Nada foi cadastrado. Mostre à pessoa e cadastre com inventario_cadastrar_itens os que ela quiser (o valor é ela quem diz).")
+        c = ia.call_args.args[0]
+        self.assertEqual((c["mode"], c["room"], c["hint"]), ("multi", "sala", "a estante"))
+        self.assertEqual((len(self.store.data["items"]), set(os.listdir(S.PHOTOS_DIR))), antes, "nada cadastrado e a foto lida não fica guardada")
+        with mock.patch.object(S, "ai_identify", return_value={"items": []}):
+            self.assertIn("não reconheceu nenhum item", F.chamar(S, "ler_arquivo", {}, ANA, "CorrerIA", anexo=self.FOTO))
+        with mock.patch.object(S, "ai_identify", side_effect=S.ApiError(502, "A IA não devolveu resposta.")):
+            with self.assertRaises(F.ErroFerramenta) as cm:
+                F.chamar(S, "ler_arquivo", {}, ANA, "CorrerIA", anexo=self.FOTO)
+        self.assertIn("sem inventar o que há nela", str(cm.exception))
+        self.assertEqual(set(os.listdir(S.PHOTOS_DIR)), antes[1], "nem quando a leitura falha")
+        self.store.settings["ai"] = False
+        with self.assertRaises(F.ErroFerramenta) as cm:
+            F.chamar(S, "ler_arquivo", {}, ANA, "CorrerIA", anexo=self.FOTO)
+        self.assertIn("A IA do InventarIA está desligada", str(cm.exception))
 
     def test_erros_que_dizem_o_que_fazer(self):
         with self.assertRaises(F.ErroFerramenta) as cm:

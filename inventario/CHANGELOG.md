@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.93.0
+
+- **Mais fotos pelo CorrerIA**: além de cadastrar pela foto, agora dá para mandar uma foto e pedir para **guardá-la num item** que já existe, ou pedir para **ler várias coisas de uma foto** (uma estante, uma bancada): a IA do InventarIA diz o que há nela e você escolhe o que cadastrar. Precisa do CorrerIA 1.24.0.
+
 ## 1.92.0
 
 - **Cadastrar pela foto, pelo CorrerIA**: mande a foto de um item ou de um consumível na conversa do CorrerIA (ou no meio de uma ronda) e peça para cadastrar. A IA do InventarIA lê a foto (o nome, o que é, a categoria) e a foto fica no item. Precisa do CorrerIA 1.23.0 e do Usar IA ligado aqui; sem a IA, diga o nome junto.
