@@ -277,7 +277,6 @@ class Cadastrar(Base):
         antes = (self.rev(), len(self.store.data["items"]))
         self.erro("cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "Bom"}, {"nome": "Ruim", "valor": "caro"}]}, "Item 2: Valor inválido")
         self.erro("cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "Bom"}, {"nome": ""}]}, "Item 2: Preencha o campo nome.")
-        self.erro("cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "Bom"}, {"nome": "X", "categoria": "Ferramentas"}]}, "Item 2: Categoria não encontrada")
         self.erro("cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "Bom", "foto": "a.jpg"}]}, "Item 1: campo desconhecido: foto")
         self.erro("cadastrar_itens", {"comodo": "sala", "itens": ["Abajur"]}, "Item 1: mande um objeto")
         self.erro("cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "N" * 201}]}, "passou do limite de 200")

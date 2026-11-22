@@ -2144,6 +2144,11 @@ def ai_prompt(mode: str, room: dict | None, hint: str, spoken: str = "", consumi
                      "Corrija nomes, marcas e modelos que a transcrição claramente trocou.")
         parts.append("Valor: se a pessoa disse quanto o item vale ou quanto pagou, use exatamente esse valor (somando as unidades). "
                      "Só estime, como explicado abaixo, quando ela não disse.")
+    elif consumivel:  # 1.94.0 (o dono, com a foto dos cremes: "o foco são os cremes e você me vem com toalha?")
+        parts.append("Liste só os consumíveis da foto, até 25: o que se gasta e se compra de novo (cremes, loções, sabonetes, xampus, "
+                     "produtos de limpeza, remédios, pilhas, comida). Ignore os móveis, a louça, as toalhas, os aparelhos, a decoração e "
+                     "tudo o que não se gasta. Junte embalagens iguais num item só. Use a marca e o nome que estiverem legíveis no rótulo; "
+                     "sem rótulo legível, o tipo do produto.")
     else:
         parts.append("Liste cada objeto da foto que valha a pena catalogar, até 25. Ignore paredes, piso, tomadas, interruptores, "
                      "embalagens vazias, objetos cortados na borda que não dê para identificar e coisas sem valor de revenda. "
@@ -2152,7 +2157,8 @@ def ai_prompt(mode: str, room: dict | None, hint: str, spoken: str = "", consumi
     use_zones = zones_enabled() and not consumivel
     if consumivel:  # 1.78.0: um consumível: o que é e para que serve (é por aí que se acha depois)
         # 1.82.0: as categorias dos consumíveis e quanto dura (estimado), no lugar da quantidade e do valor
-        parts.append("Este item é um consumível: algo que se gasta e se compra de novo (ex.: pasta térmica, creme de massagem, pilhas).")
+        if mode == "single":
+            parts.append("Este item é um consumível: algo que se gasta e se compra de novo (ex.: pasta térmica, creme de massagem, pilhas).")
         ccats = ", ".join(f"{k} ({v})" for k, v in STORE.cons_cat_map().items())
         rules = "\n".join(
             '- "details": 1 ou 2 frases objetivas dizendo o que é e para que serve (o uso), com o tamanho ou o volume da embalagem '
@@ -2165,7 +2171,7 @@ def ai_prompt(mode: str, room: dict | None, hint: str, spoken: str = "", consumi
         rules = "\n".join(ln for ln in rules.splitlines() if not ln.startswith('- "zone"')).replace('"zone":"",', "")
     # o cômodo: quem fala pode citar um cômodo para cada item; sem cômodo escolhido, a IA escolhe (a da foto, pelo que ela mostra);
     # se não der para saber, "" e a pessoa escolhe na revisão
-    house = ai_house() if mode != "single" else []
+    house = ai_house() if mode != "single" and not consumivel else []  # um consumível não tem cômodo
     if mode == "voice" and house:
         guess = ('o cômodo onde esse objeto claramente fica (ex.: geladeira na cozinha); "" se não der para saber com segurança' if not room
                  else '""')
@@ -2306,7 +2312,9 @@ def ai_identify(body: dict) -> dict:
     mode = "single" if body.get("mode") == "single" else "multi"
     room = ai_fixed_room(body)
     hint = text(body.get("hint"), 300, "dica")
-    consumivel = mode == "single" and body.get("consumivel") is True and consumiveis_enabled()
+    # 1.94.0: várias coisas numa foto também podem ser consumíveis (a etapa dos consumíveis de uma ronda do CorrerIA)
+    consumivel = body.get("consumivel") is True and consumiveis_enabled()
+    room = None if consumivel and mode == "multi" else room
     prompt = ai_prompt(mode, room, hint, consumivel=consumivel)
     entity = photo_entity()
     kind = "foto" if mode == "single" else "catalogo"
@@ -2316,6 +2324,8 @@ def ai_identify(body: dict) -> dict:
             res = dict(MOCK_RESULT)
             if mode == "single":
                 res = {"items": [MOCK_CONSUMIVEL] if consumivel else MOCK_RESULT["items"][:1]}
+            elif consumivel:
+                res = {"items": [MOCK_CONSUMIVEL, dict(MOCK_CONSUMIVEL, name="Creme para as mãos", details="Creme hidratante para as mãos. Bisnaga de 60 g.", cat="c-outros", dur=90)]}
             call.answer(res)
         items = clean_ai_items(res, room, consumivel=consumivel)
         return {"items": items, "room": common_room(items), "entity": "ai_task.simulado"}

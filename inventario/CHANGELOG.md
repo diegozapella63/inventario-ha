@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.94.0
+
+- Pelo CorrerIA, a foto de vários **consumíveis** (os cremes do banheiro, a prateleira da despensa) é lida só pelos consumíveis: sem os móveis, as toalhas e os aparelhos, com a duração estimada de cada um e dizendo os que já estão cadastrados.
+- Cadastrar pelo CorrerIA com uma categoria que não existe não dá mais erro depois do Sim: o item fica em **Outros**.
+
 ## 1.93.0
 
 - **Mais fotos pelo CorrerIA**: além de cadastrar pela foto, agora dá para mandar uma foto e pedir para **guardá-la num item** que já existe, ou pedir para **ler várias coisas de uma foto** (uma estante, uma bancada): a IA do InventarIA diz o que há nela e você escolhe o que cadastrar. Precisa do CorrerIA 1.24.0.

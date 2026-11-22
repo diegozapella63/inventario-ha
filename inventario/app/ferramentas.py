@@ -76,6 +76,8 @@ FERRAMENTAS = [
                   "cadastre com inventario_cadastrar_itens os que a pessoa quiser. Para cadastrar UMA coisa com a foto no item, "
                   "use inventario_cadastrar_por_foto.",
      "entrada": _obj({"comodo": {"type": "string", "description": "O cômodo da foto, se a pessoa disse (ajuda a IA)."},
+                      "consumiveis": {"type": "boolean", "description": "true quando a foto é de consumíveis (cremes, produtos de limpeza, "
+                                      "comida: o que se gasta e se compra de novo): a leitura traz só eles, com a duração estimada, e diz os que já estão cadastrados."},
                       "dica": {"type": "string", "description": "O que a pessoa disse sobre a foto, se disse."}})},
     {"nome": "cadastrar_itens", "titulo": "Cadastrar itens", "grava": True,
      "descricao": "Cadastra um ou mais itens num cômodo (ou em Bens: casa, terreno, carro; ou em Consumíveis: o que se gasta "
@@ -262,7 +264,7 @@ def _sem_valor(x, n=""):
         raise ErroFerramenta(f"{n}Um consumível não tem valor nem quantidade: mande duracao_dias (quanto costuma durar), sem valor e sem quantidade.")
 
 
-def _achar_categoria(srv, v, cons: bool = False) -> str:
+def _achar_categoria(srv, v, cons: bool = False, solta: bool = False) -> str:
     cats = srv.STORE.cons_cats() if cons else srv.STORE.cats()
     s = str(v if v is not None and not isinstance(v, (dict, list, bool)) else "").strip()
     if not s:
@@ -272,6 +274,10 @@ def _achar_categoria(srv, v, cons: bool = False) -> str:
     if not c:
         parte = [c for c in cats if f and (f in srv.fold(c["name"]) or f in c["id"])]
         c = parte[0] if len(parte) == 1 else None
+    if not c and solta:
+        # 1.94.0 (o dono, depois do Sim: "Não deu: Categoria não encontrada: Consumíveis", "toda hora isso de não achar"): uma
+        # categoria que não existe não trava o cadastro: o item fica em Outros, como na tela quando ninguém escolhe
+        return srv.CONS_OUTROS if cons else "outros"
     if not c:
         todas = ", ".join(f"{c['name']} ({c['id']})" for c in cats)
         raise ErroFerramenta(f"Categoria não encontrada: {s}. As categorias{' dos consumíveis' if cons else ''}: {todas}.")
@@ -597,7 +603,7 @@ def _cadastrar(srv, a, quem, fotos=None) -> str:
             zona = _texto(srv, x.get("zona"), 120, "zona") if x.get("zona") not in (None, "") else zona_geral
             _zona_ok(srv, room, x.get("zona") not in (None, ""))
             corpos.append({"name": _texto(srv, x.get("nome"), 200, "nome", obrig=True), "value": _valor(srv, x.get("valor")),
-                           "qty": _qtd(srv, x.get("quantidade")), "cat": _achar_categoria(srv, x.get("categoria"), cons=cons),
+                           "qty": _qtd(srv, x.get("quantidade")), "cat": _achar_categoria(srv, x.get("categoria"), cons=cons, solta=True),
                            **({"dur": _duracao(srv, x["duracao_dias"])} if cons and x.get("duracao_dias") is not None else {}),
                            **({"usedIn": _usado_em(srv, x["usado_em"])} if cons and x.get("usado_em") not in (None, "") else {}),
                            "details": _texto(srv, x.get("detalhes"), 4000, "detalhes", linhas=True), "flag": _texto(srv, x.get("observacao"), 200, "observação"),
@@ -808,13 +814,7 @@ def _por_foto(srv, a, quem, anexo) -> str:
         if lidos[0].get("cat"):
             item.setdefault("categoria", lidos[0]["cat"])
     with srv.STORE.lock:
-        try:
-            return _cadastrar(srv, {"comodo": a.get("comodo"), "itens": [item]}, quem, fotos=[arquivo])
-        except ErroFerramenta as e:  # uma categoria que a IA leu e não é deste lado (casa ou consumíveis): fica em Outros
-            if "categoria" in item and "Categoria não encontrada" in str(e) and "categoria" not in a:
-                item.pop("categoria")
-                return _cadastrar(srv, {"comodo": a.get("comodo"), "itens": [item]}, quem, fotos=[arquivo])
-            raise
+        return _cadastrar(srv, {"comodo": a.get("comodo"), "itens": [item]}, quem, fotos=[arquivo])
 
 
 def _foto_do_anexo(srv, anexo) -> str:
@@ -844,7 +844,12 @@ def _ler_arquivo(srv, a, anexo) -> str:
     arquivo = _foto_do_anexo(srv, anexo)
     try:
         corpo = {"file": arquivo, "mode": "multi", "hint": " ".join(str(a.get("dica") or "").split())[:300]}
-        if a.get("comodo") not in (None, ""):
+        cons = a.get("consumiveis") is True or srv.fold(str(a.get("comodo") or "")) in ("consumiveis", "consumivel")
+        if cons and not srv.consumiveis_enabled():
+            raise ErroFerramenta("Os consumíveis estão desligados no InventarIA (Mais › Configurações › Opções › Usar consumíveis). Diga isso à pessoa.")
+        if cons:
+            corpo["consumivel"] = True
+        elif a.get("comodo") not in (None, ""):
             room = _achar_comodo(srv, a.get("comodo"))
             if not isinstance(room, str) and not _area(room):
                 corpo["room"] = room["id"]
@@ -860,6 +865,21 @@ def _ler_arquivo(srv, a, anexo) -> str:
                 pass
     if not lidos:
         return "A IA do InventarIA leu a foto e não reconheceu nenhum item nela. Diga isso à pessoa e pergunte o que ela quer fazer."
+    if cons:  # 1.94.0: só os consumíveis, com a duração estimada e os que já existem (pelo nome, sem acento nem maiúsculas)
+        ccats = srv.STORE.cons_cat_map()
+        with srv.STORE.lock:
+            area = next((r["id"] for r in srv.STORE.data["rooms"] if r.get("kind") == "consumiveis"), None)
+            tem = {srv.fold(i["name"]): i["name"] for i in srv.STORE.data["items"] if area and i["room"] == area}
+        linhas = []
+        for it in lidos:
+            extra = "; ".join(x for x in (ccats.get(it.get("cat")), " ".join(str(it.get("details") or "").split())[:160],
+                                          f"duração estimada: {it['dur']} dias" if it.get("dur") else "") if x)
+            ja = tem.get(srv.fold(it["name"]))
+            linhas.append(f"- {it['name']}" + (f" ({extra})" if extra else "") + (f" [já está nos consumíveis: {ja}]" if ja else ""))
+        return (f"Na foto (lida pela IA do InventarIA) {'há 1 consumível' if len(lidos) == 1 else f'há {len(lidos)} consumíveis'}:\n" + "\n".join(linhas)
+                + "\nNada foi cadastrado. São todos consumíveis: não pergunte se são bens nem peça valor. Mostre a lista à pessoa e proponha "
+                  "cadastrar com inventario_cadastrar_itens, no cômodo «Consumíveis», os que ainda não estão cadastrados, com duracao_dias "
+                  "(a que a pessoa disse; sem ela, a estimada, dizendo que é estimada), a categoria e os detalhes daqui.")
     cats = srv.STORE.cat_map()
     linhas = []
     for it in lidos:

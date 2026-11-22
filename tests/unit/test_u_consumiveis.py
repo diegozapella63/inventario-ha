@@ -339,7 +339,6 @@ class CategoriasEDuracao(Base):
     def test_ferramentas(self):
         self.erro("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas", "valor": 20}]}, "Um consumível não tem valor nem quantidade: mande duracao_dias")
         self.erro("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas", "quantidade": "4"}]}, "Um consumível não tem valor nem quantidade")
-        self.erro("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas", "categoria": "Móveis"}]}, "As categorias dos consumíveis: Limpeza (c-limpeza)")
         self.erro("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas", "duracao_dias": 1.5}]}, "duracao_dias: um número inteiro de dias")
         self.erro("cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "Vaso", "duracao_dias": 30}, {"nome": "Mesa", "valor": 10}]}, "Item 1: A duração só vale num consumível: mande comodo \"Consumíveis\"")
         self.chamar("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas AA", "categoria": "pilhas", "duracao_dias": 180}]})
@@ -554,6 +553,52 @@ class PelaFoto(Base):
         with self.assertRaises(F.ErroFerramenta) as cm:
             F.chamar(S, "ler_arquivo", {}, ANA, "CorrerIA", anexo=self.FOTO)
         self.assertIn("A IA do InventarIA está desligada", str(cm.exception))
+
+    def test_categoria_que_nao_existe_nao_trava_o_cadastro(self):
+        """1.94.0 (o dono, depois do Sim: "Não deu: Categoria não encontrada: Consumíveis"): fica em Outros, dos dois lados;
+        ao editar, o erro continua dizendo as que há."""
+        F.chamar(S, "cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Protetor solar", "categoria": "Consumíveis", "duracao_dias": 60}]}, ANA, "CorrerIA")
+        F.chamar(S, "cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "Coisa", "categoria": "Não existe"}]}, ANA, "CorrerIA")
+        por = {i["name"]: i for i in self.store.data["items"]}
+        self.assertEqual((por["Protetor solar"]["cat"], por["Protetor solar"]["dur"], por["Coisa"]["cat"]), (S.CONS_OUTROS, 60, "outros"))
+        with self.assertRaises(F.ErroFerramenta) as cm:
+            F.chamar(S, "editar_item", {"id": por["Coisa"]["id"], "categoria": "Não existe"}, ANA, "CorrerIA")
+        self.assertIn("Categoria não encontrada: Não existe. As categorias:", str(cm.exception))
+
+    def test_ler_arquivo_de_consumiveis_traz_so_eles(self):
+        """1.94.0 (o dono, na etapa dos consumíveis de uma ronda, com a foto dos cremes: veio o gabinete, a cuba e uma toalha, pedindo
+        valor): com consumiveis: true a leitura é a dos consumíveis, com a duração estimada e os que já existem; sem valor."""
+        self.assertEqual(F.POR_NOME["ler_arquivo"]["entrada"]["properties"]["consumiveis"]["type"], "boolean")
+        self.foto({"comodo": "Consumíveis", "nome": "Creme para as mãos", "duracao_dias": 90})
+        antes = len(self.store.data["items"])
+        p = S.ai_prompt("multi", None, "", consumivel=True)
+        self.assertIn("Liste só os consumíveis da foto", p)
+        self.assertIn("Ignore os móveis, a louça, as toalhas", p)
+        self.assertIn('"dur": quantos dias', p)
+        for fora in ("Liste cada objeto da foto que valha a pena catalogar", '- "value"', '- "qty"', '"room"', "Itens já cadastrados"):
+            self.assertNotIn(fora, p)
+        lido = {"items": [{"name": "Loção corporal", "details": "Loção hidratante.\n200 ml.", "cat": "c-higiene", "dur": 90},
+                          {"name": "creme para as maos", "details": "", "cat": "nada", "dur": 0}]}
+        with mock.patch.object(S, "ai_identify", return_value={"items": S.clean_ai_items(lido, None, consumivel=True)}) as ia:
+            txt = F.chamar(S, "ler_arquivo", {"consumiveis": True, "comodo": "Banheiro"}, ANA, "CorrerIA", anexo=self.FOTO)
+        c = ia.call_args.args[0]
+        self.assertEqual((c["mode"], c["consumivel"], "room" in c), ("multi", True, False))
+        linhas = txt.split("\n")
+        self.assertEqual(linhas[0], "Na foto (lida pela IA do InventarIA) há 2 consumíveis:")
+        self.assertIn("Loção hidratante. 200 ml.; duração estimada: 90 dias)", linhas[1])
+        self.assertEqual(linhas[2], "- creme para as maos (Outros) [já está nos consumíveis: Creme para as mãos]")
+        self.assertIn("São todos consumíveis: não pergunte se são bens nem peça valor.", linhas[3])
+        self.assertNotIn("o valor é ela quem diz", txt)
+        self.assertEqual(len(self.store.data["items"]), antes)
+        # o cômodo «Consumíveis» diz o mesmo; a leitura de verdade (a IA simulada) também vai pelos consumíveis
+        with mock.patch.object(S, "AI_MOCK", True):
+            txt = F.chamar(S, "ler_arquivo", {"comodo": "consumíveis"}, ANA, "CorrerIA", anexo=self.FOTO)
+        self.assertIn("há 2 consumíveis:\n- Pasta térmica (", txt)
+        self.assertIn("[já está nos consumíveis: Creme para as mãos]", txt)
+        self.store.settings["consumiveis"] = False
+        with self.assertRaises(F.ErroFerramenta) as cm:
+            F.chamar(S, "ler_arquivo", {"consumiveis": True}, ANA, "CorrerIA", anexo=self.FOTO)
+        self.assertIn("Os consumíveis estão desligados", str(cm.exception))
 
     def test_erros_que_dizem_o_que_fazer(self):
         with self.assertRaises(F.ErroFerramenta) as cm:
