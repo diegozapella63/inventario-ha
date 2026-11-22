@@ -3757,6 +3757,11 @@
     // sem os itens da casa, o que se adiciona é um bem (ou um consumível)
     const rid = from.room || (room && (D.roomById.has(room) || room === BENS_NEW || room === CONS_NEW) ? room : itensOn() ? lastRoom() : bensOn() ? bensId() : consId());
     if (!rid) { toast("Crie um cômodo antes de adicionar itens."); openRoomNew(); return; }
+    const usadoBotoes = () => {
+      const bt = (v, icone, nome, on) => `<button type="button" class="pick${on ? " on" : ""}" data-usado="${esc(v)}" aria-pressed="${on}">${ic(icone, "sm")}<span>${esc(nome)}</span></button>`;
+      return bt("", "close", "Nenhum", !F.usedIn.length) + (D.rooms.length > 1 ? bt("*", "home", "Todos", D.rooms.every((r) => F.usedIn.includes(r.id))) : "")
+        + D.rooms.map((r) => bt(r.id, "rooms", r.name, F.usedIn.includes(r.id))).join("");
+    };
     const F = {
       id: item ? item.id : null, base: item ? item.updatedAt : null,
       name: from.name || "", details: from.details || "", room: rid,
@@ -3810,7 +3815,7 @@
             ${bem ? `<div class="field"><span class="lbl" id="f-tipo-l">Tipo</span><div class="seg tipo" role="group" aria-labelledby="f-tipo-l" data-slot="tipo">${tipoBtns()}</div></div>`
               : `${cons ? "" : zonesOn() ? `<div class="row2">${roomField}${zoneField}</div>` : roomField}
             <div class="field"><label for="f-cat">Categoria</label><select id="f-cat" class="select" name="cat"><option value="">Escolha a categoria</option>${(cons ? CCATS : CATS).map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`}
-            ${cons && consComodoOn() ? `<div class="field"><span class="lbl" id="f-usado-l">Cômodos onde é usado</span><div class="chips grid" id="f-usado" role="group" aria-labelledby="f-usado-l">${D.rooms.map((r) => `<label class="chip"><input type="checkbox" name="usadoEm" value="${esc(r.id)}"${F.usedIn.includes(r.id) ? " checked" : ""}>${esc(r.name)}</label>`).join("")}</div></div>` : ""}
+            ${cons && consComodoOn() ? `<div class="field"><span class="lbl" id="f-usado-l">Cômodos onde é usado</span><div class="pick-grid" id="f-usado" role="group" aria-labelledby="f-usado-l">${usadoBotoes()}</div></div>` : ""}
             ${cons ? `<div class="field" id="f-dur"><span class="lbl" id="f-dur-l">Duração estimada</span>
               <div class="chips grid durs" role="radiogroup" aria-labelledby="f-dur-l" data-slot="durs">${durChips()}</div>
               <div data-slot="dur-outra">${durOutra()}</div></div>` : ""}
@@ -3917,8 +3922,18 @@
       if (t.name === "name" && t.value.trim()) fieldErr("name", "");
       if (t.name === "value") fieldErr("value", "");
     });
+    // 1.91.1 (o dono: "no mesmo padrão de seleção do resto dos apps"): Nenhum e Todos em cima, depois um botão por cômodo, em duas colunas
+    form.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-usado]");
+      if (!b) return;
+      const v = b.dataset.usado, todos = D.rooms.map((r) => r.id);
+      if (v === "") F.usedIn = [];
+      else if (v === "*") F.usedIn = todos.every((id) => F.usedIn.includes(id)) ? [] : todos;
+      else F.usedIn = todos.filter((id) => (id === v) !== F.usedIn.includes(id));
+      F.dirty = true;
+      $("#f-usado", form).innerHTML = usadoBotoes();
+    });
     form.addEventListener("change", (e) => {
-      if (e.target.name === "usadoEm") { F.usedIn = $$('input[name="usadoEm"]:checked', form).map((i) => i.value); F.dirty = true; return; } // 1.91.0: um ou vários
       if (e.target.name === "room") {
         F.room = e.target.value;
         if (form.zone && !item) { F.zone = LS.get("lastZone:" + F.room, "") || ""; form.zone.value = F.zone; } // a zona lembrada é a deste cômodo

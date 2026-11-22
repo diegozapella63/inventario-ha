@@ -704,6 +704,13 @@ button.zone-h h3 { flex: 1; }
 button.zone-h .seta { color: var(--muted); flex: none; transition: transform .2s; transform: rotate(90deg); }
 .dobra-z.fechada > .zone-h .seta { transform: none; }
 .dobra-z.fechada > .ilist { display: none; }
+/* 1.91.1: a escolha dos cômodos como nos outros apps: duas colunas, Nenhum e Todos em cima */
+.pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pick-grid .pick { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; min-width: 0; padding: 6px 10px; border: 1px solid var(--line-2); border-radius: 14px;
+  background: var(--surface); color: var(--ink-2); font: inherit; font-size: 15px; line-height: 1.2; text-align: center; cursor: pointer; overflow-wrap: anywhere; }
+.pick-grid .pick svg { flex: none; }
+.pick-grid .pick.on { background: var(--tag); border-color: var(--tag-edge); color: var(--tag-ink); font-weight: 600; }
+.pick-grid .pick:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .agrupar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
 .agrupar > span { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; margin-right: 4px; }
 .agrupar .chip { gap: 6px; cursor: pointer; }

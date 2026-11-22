@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.91.1
+
+- **Cômodos onde é usado** no padrão dos outros apps: **Nenhum** e **Todos** em cima e um botão por cômodo, em duas colunas.
+
 ## 1.91.0
 
 - **Consumíveis em mais de um cômodo**: no consumível, **Cômodos onde é usado** agora deixa marcar vários. A lista e a ficha mostram todos.

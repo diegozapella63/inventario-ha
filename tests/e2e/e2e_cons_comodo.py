@@ -40,12 +40,21 @@ async def body(r, p):
     await pg.click('.btn.primary[data-act="item-edit"]')
     await pg.wait_for_selector("#f-usado", state="attached", timeout=5000)
     r.eq(txt(await pg.text_content("#f-usado-l")), "Cômodos onde é usado", "o campo no editor")
-    ops = await pg.locator("#f-usado .chip").all_inner_texts()
-    r.check("Cozinha" in ops and "Consumíveis" not in ops and "Bens" not in ops, f"os cômodos da casa, sem as áreas ({ops})")
-    # 1.91.0: mais de um cômodo, cada um um botão de marcar
-    for rid in ("cozinha", "quarto"):
-        await pg.locator("#f-usado .chip", has=pg.locator(f'input[value="{rid}"]')).click()
-    r.eq(await pg.locator('#f-usado input:checked').count(), 2, "dois marcados")
+    ops = [txt(t) for t in await pg.locator("#f-usado .pick").all_inner_texts()]
+    r.check(ops[:2] == ["Nenhum", "Todos"] and "Cozinha" in ops and "Consumíveis" not in ops and "Bens" not in ops, f"Nenhum, Todos e os cômodos da casa, sem as áreas ({ops})")
+    # 1.91.1: como nos outros apps: botões em duas colunas, com ícone, do mesmo tamanho
+    r.eq(await pg.locator("#f-usado .pick svg").count(), len(ops), "todo botão com ícone")
+    cx = await pg.evaluate("[...document.querySelectorAll('#f-usado .pick')].slice(0, 4).map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.width), Math.round(r.height)]; })")
+    r.check(cx[0][0] == cx[2][0] and cx[1][0] == cx[3][0] and cx[0][0] != cx[1][0] and len({(w, h) for _, w, h in cx}) == 1 and cx[0][2] >= 50, f"duas colunas, do mesmo tamanho ({cx})")
+    r.eq(await pg.get_attribute('#f-usado [data-usado=""]', "aria-pressed"), "true", "começa em Nenhum")
+    await pg.click('#f-usado [data-usado="*"]')
+    r.eq(await pg.locator('#f-usado .pick.on').count(), len(ops) - 1, "Todos marca todos os cômodos (e o Todos)")
+    await pg.click('#f-usado [data-usado=""]')
+    r.eq(await pg.locator('#f-usado .pick.on').count(), 1, "Nenhum desmarca")
+    for rid in ("cozinha", "quarto"):  # 1.91.0: mais de um cômodo
+        await pg.click(f'#f-usado [data-usado="{rid}"]')
+    r.eq(await pg.locator('#f-usado .pick.on').count(), 2, "dois marcados")
+    await r.shot(pg, "editor-comodos")
     await pg.click('[data-ed="save"]')
     await pg.wait_for_function("document.querySelector('[data-slot=\"usado-em\"]') && document.querySelector('[data-slot=\"usado-em\"]').textContent.includes('Quarto')", timeout=5000)
     r.eq(txt(await pg.text_content('[data-slot="usado-em"]')), "Cozinha, Quarto", "a ficha diz os dois")
