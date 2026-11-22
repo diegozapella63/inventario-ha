@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.91.2
+
+- **Cômodos onde é usado**: os botões voltaram a mostrar o nome de cada cômodo (na 1.91.1 saíram só com o ícone).
+
 ## 1.91.1
 
 - **Cômodos onde é usado** no padrão dos outros apps: **Nenhum** e **Todos** em cima e um botão por cômodo, em duas colunas.

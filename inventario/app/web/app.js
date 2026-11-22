@@ -3758,7 +3758,7 @@
     const rid = from.room || (room && (D.roomById.has(room) || room === BENS_NEW || room === CONS_NEW) ? room : itensOn() ? lastRoom() : bensOn() ? bensId() : consId());
     if (!rid) { toast("Crie um cômodo antes de adicionar itens."); openRoomNew(); return; }
     const usadoBotoes = () => {
-      const bt = (v, icone, nome, on) => `<button type="button" class="pick${on ? " on" : ""}" data-usado="${esc(v)}" aria-pressed="${on}">${ic(icone, "sm")}<span>${esc(nome)}</span></button>`;
+      const bt = (v, icone, nome, on) => `<button type="button" class="pk${on ? " on" : ""}" data-usado="${esc(v)}" aria-pressed="${on}">${ic(icone, "sm")}<span>${esc(nome)}</span></button>`;
       return bt("", "close", "Nenhum", !F.usedIn.length) + (D.rooms.length > 1 ? bt("*", "home", "Todos", D.rooms.every((r) => F.usedIn.includes(r.id))) : "")
         + D.rooms.map((r) => bt(r.id, "rooms", r.name, F.usedIn.includes(r.id))).join("");
     };
