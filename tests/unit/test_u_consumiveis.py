@@ -4,6 +4,7 @@ no patrimônio (sem os consumíveis), a área Consumíveis no Store, a leitura p
 recebe e as ferramentas do CorrerIA (achar pelo uso, cadastrar, mover, o resumo)."""
 import re
 import json
+from unittest import mock
 import unittest
 
 from _boot import UnitBase, server as S
@@ -472,6 +473,67 @@ class VariosComodosENaRonda(Base):
         self.assertNotIn("usedIn", it, "sem Consumíveis por cômodo, sem o cômodo")
         self.store.settings["consumiveis"] = False
         self.erro("cadastrar_itens", {"comodo": "Cozinha", "itens": [{"nome": "Pano", "duracao_dias": 7}]}, "A duração só vale num consumível")
+
+
+class PelaFoto(Base):
+    """1.92.0: a foto que a pessoa mandou na conversa do CorrerIA vira um item (o dono mandou a foto de um consumível com
+    "coloca 6 meses" no meio de uma ronda): a foto fica no item e, sem o nome, a IA daqui lê."""
+
+    FOTO = {"tipo": "image/jpeg", "nome": "foto.jpg", "b64": "data:image/jpeg;base64," + __import__("base64").b64encode(b"\xff\xd8" + b"x" * 200).decode()}
+
+    def setUp(self):
+        super().setUp()
+        self.store.settings["cons_comodo"] = True
+
+    def foto(self, args, anexo="sim"):
+        return F.chamar(S, "cadastrar_por_foto", args, ANA, "CorrerIA", anexo=self.FOTO if anexo == "sim" else anexo)
+
+    def test_declara_que_recebe_a_foto(self):
+        f = F.POR_NOME["cadastrar_por_foto"]
+        self.assertEqual((f["anexo"], f["grava"], f["entrada"]["required"]), (["image/jpeg"], True, ["comodo"]))
+
+    def test_sem_nome_a_ia_le_a_foto_e_o_consumivel_fica_com_ela(self):
+        lido = {"items": [{"name": "Sabão líquido", "details": "Sabão para lavar roupa, 3 litros.", "cat": "c-limpeza"}]}
+        with mock.patch.object(S, "ai_identify", return_value=lido) as ia:
+            txt = self.foto({"comodo": "Cozinha", "duracao_dias": 180})
+        self.assertIn("Cadastrado em Consumíveis: Sabão líquido", txt)
+        self.assertEqual((ia.call_args.args[0]["mode"], ia.call_args.args[0]["consumivel"]), ("single", True))
+        it = next(i for i in self.store.data["items"] if i["name"] == "Sabão líquido")
+        self.assertEqual((it["dur"], it["cat"], it["usedIn"], it["details"], it["source"]), (180, "c-limpeza", ["cozinha"], "Sabão para lavar roupa, 3 litros.", "correria"))
+        self.assertEqual(it["photos"], [ia.call_args.args[0]["file"]], "a foto da conversa fica no item")
+        self.assertTrue(S.photo_exists(it["photos"][0]))
+
+    def test_com_o_nome_nao_chama_a_ia_e_vale_num_comodo_da_casa(self):
+        with mock.patch.object(S, "ai_identify") as ia:
+            txt = self.foto({"comodo": "sala", "nome": "Vaso azul", "valor": 80})
+        ia.assert_not_called()
+        self.assertIn("Cadastrado em Sala de estar: Vaso azul", txt)
+        it = next(i for i in self.store.data["items"] if i["name"] == "Vaso azul")
+        self.assertEqual((it["room"], it["value"], len(it["photos"])), ("sala", 80, 1))
+
+    def test_a_categoria_que_a_ia_leu_e_nao_existe_vira_outros(self):
+        with mock.patch.object(S, "ai_identify", return_value={"items": [{"name": "Esponja", "details": "", "cat": "nao-existe"}]}):
+            self.foto({"comodo": "Consumíveis"})
+        self.assertEqual(next(i for i in self.store.data["items"] if i["name"] == "Esponja")["cat"], S.CONS_OUTROS)
+
+    def test_erros_que_dizem_o_que_fazer(self):
+        with self.assertRaises(F.ErroFerramenta) as cm:
+            self.foto({"comodo": "sala"}, anexo=None)
+        self.assertIn("Não chegou nenhuma foto", str(cm.exception))
+        self.store.settings["ai"] = False
+        with self.assertRaises(F.ErroFerramenta) as cm:
+            self.foto({"comodo": "sala"})
+        self.assertIn("a IA do InventarIA está desligada", str(cm.exception))
+        self.store.settings["ai"] = True
+        for volta, parte in (({"items": []}, "Não reconheci nada na foto"), (S.ApiError(502, "A IA não devolveu resposta."), "Não consegui ler a foto")):
+            with mock.patch.object(S, "ai_identify", **({"side_effect": volta} if isinstance(volta, Exception) else {"return_value": volta})):
+                with self.assertRaises(F.ErroFerramenta) as cm:
+                    self.foto({"comodo": "sala"})
+            self.assertIn(parte, str(cm.exception))
+            self.assertIn("Pergunte o nome", str(cm.exception))
+        with self.assertRaises(F.ErroFerramenta) as cm:
+            self.foto({"comodo": "sala", "nome": "X"}, anexo={"b64": "data:image/png;base64,iVBORw0KGgo="})
+        self.assertIn("JPG", str(cm.exception))
 
 
 if __name__ == "__main__":

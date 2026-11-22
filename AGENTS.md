@@ -154,6 +154,8 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 
 1.91.0: `it.usedIn` é uma lista de ids (`Store.home_rooms`: um id só, o de antes, vale como lista de um; `used_in(it)` devolve a lista dos cômodos e `used_in_text` os nomes); no editor, `#f-usado` é o `.pick-grid` (1.91.1, como no CronologIA: Nenhum, Todos e um `.pk` por cômodo (não `.pick`: essa classe é da grade de fotos e escondia o nome), `data-usado`, `usadoBotoes`); nas ferramentas, `usado_em` aceita vários separados por ponto e vírgula e sai como «A, B»; o `/api/integracao/consumiveis` leva `comodo` (o primeiro) e `comodos`. `viewCons`: **Agrupar por** (`.agrupar`, `cons-agrupar` no aparelho: `cat` ou `comodo`, só com Consumíveis por cômodo) e os grupos que fecham (`.zone.dobra-z`, `data-zk`, `cons-fechados`). `_cadastrar` (ferramentas.py): um lote em que todo item tem `duracao_dias` ou `usado_em`, mandado com um cômodo da casa, vai para os Consumíveis e o cômodo vira o `usado_em` (a IA manda o cômodo da ronda).
 
+1.92.0: a ferramenta `cadastrar_por_foto` (`anexo: ["image/jpeg"]`; o CorrerIA 1.23.0 manda a foto da conversa em `anexo`, fora dos argumentos; `chamar(..., anexo=)`, `_por_foto` no ferramentas.py): guarda a foto (`save_photo`), sem `nome` lê com o `ai_identify` (fora da trava do Store; num consumível com `consumivel: true`) e cadastra pelo `_cadastrar(..., fotos=[arquivo])`; a IA desligada, a foto que não veio ou não foi lida viram erros que mandam perguntar o nome.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.

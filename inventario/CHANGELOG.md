@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.92.0
+
+- **Cadastrar pela foto, pelo CorrerIA**: mande a foto de um item ou de um consumível na conversa do CorrerIA (ou no meio de uma ronda) e peça para cadastrar. A IA do InventarIA lê a foto (o nome, o que é, a categoria) e a foto fica no item. Precisa do CorrerIA 1.23.0 e do Usar IA ligado aqui; sem a IA, diga o nome junto.
+
 ## 1.91.2
 
 - **Cômodos onde é usado**: os botões voltaram a mostrar o nome de cada cômodo (na 1.91.1 saíram só com o ícone).

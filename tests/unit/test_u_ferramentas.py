@@ -42,7 +42,7 @@ class Lista(Base):
         for f in fs:
             with self.subTest(f=f["nome"]):
                 self.assertRegex(f["nome"], r"^[a-z0-9_]{1,40}$")
-                self.assertEqual(set(f), {"nome", "titulo", "descricao", "entrada", "grava", "apaga"})
+                self.assertEqual(set(f) - {"anexo"}, {"nome", "titulo", "descricao", "entrada", "grava", "apaga"})  # 1.92.0: a que recebe a foto leva `anexo`
                 self.assertTrue(f["titulo"] and len(f["titulo"]) <= 40)
                 self.assertGreater(len(f["descricao"]), 30)
                 e = f["entrada"]

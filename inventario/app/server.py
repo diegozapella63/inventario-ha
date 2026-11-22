@@ -5933,7 +5933,7 @@ def r_ferramentas_usar(h, query):
     except OSError:
         pass
     try:
-        texto = ferramentas.chamar(sys.modules[__name__], nome, corpo.get("argumentos"), pessoa, cliente)
+        texto = ferramentas.chamar(sys.modules[__name__], nome, corpo.get("argumentos"), pessoa, cliente, anexo=corpo.get("anexo"))
     except LookupError as e:
         raise ApiError(404, str(e)) from None
     except ferramentas.ErroFerramenta as e:

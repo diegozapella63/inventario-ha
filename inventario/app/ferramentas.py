@@ -73,7 +73,7 @@ FERRAMENTAS = [
                   "e se compra de novo, como pasta térmica e creme de massagem). Cada item ganha o próximo código "
                   "do cômodo (ex.: SAL-013). Valor: o de todas as unidades juntas; sem valor, fica 0. Um consumível não tem valor nem "
                   "quantidade: mande duracao_dias (quanto costuma durar), a categoria dos consumíveis (categorias_consumiveis do "
-                  "resumo) e, em detalhes, o que é e para que serve. As fotos se põem pela tela do app.",
+                  "resumo) e, em detalhes, o que é e para que serve. Com uma foto que a pessoa mandou na conversa, use cadastrar_por_foto.",
      "entrada": _obj({"comodo": _COMODO,
                       "zona": {"type": "string", "description": "A zona de todos (só com as zonas ligadas; cada item pode ter a sua)."},
                       "itens": {"type": "array", "minItems": 1, "maxItems": MAX_LOTE,
@@ -99,6 +99,17 @@ FERRAMENTAS = [
      "descricao": "Cria um cômodo, no fim da lista. codigo: de 1 a 4 letras ou números, o começo do código dos itens (ex.: GAR, "
                   "para GAR-001); sem ele, as 3 primeiras letras do nome.",
      "entrada": _obj({"nome": {"type": "string"}, "codigo": {"type": "string"}}, ["nome"])},
+    # 1.92.0 (o dono, numa ronda: mandou a foto de um consumível com "coloca 6 meses" e a foto foi para o GerencIA): a foto que a
+    # pessoa mandou na conversa vira um item. `anexo` diz ao CorrerIA que esta ferramenta recebe o arquivo (ele manda em
+    # `anexo`, fora dos argumentos). Sem o nome, a IA daqui lê a foto, como o Digitalizar com IA da tela.
+    {"nome": "cadastrar_por_foto", "titulo": "Cadastrar pela foto", "grava": True, "anexo": ["image/jpeg"],
+     "descricao": "Cadastra UM item a partir da foto que a pessoa mandou na conversa: a foto fica no item e, se você não "
+                  "souber o nome, não mande nome: a IA do InventarIA lê a foto (o nome, o que é, a categoria). Use sempre "
+                  "que a pessoa manda uma foto e pede para cadastrar, adicionar ou pôr no inventário ou nos consumíveis. "
+                  "Num consumível, comodo \"Consumíveis\" com duracao_dias (6 meses = 180) e, se for de um cômodo, usado_em.",
+     "entrada": _obj({"comodo": _COMODO, "nome": {"type": "string", "description": "Só se a pessoa disse o nome; sem ele, a IA lê a foto."},
+                      "valor": _VALOR, "categoria": _CATEGORIA, "duracao_dias": _DURACAO, "usado_em": _USADO, "detalhes": _DETALHES,
+                      "zona": _ZONA}, ["comodo"])},
 ]
 POR_NOME = {f["nome"]: f for f in FERRAMENTAS}
 
@@ -535,7 +546,7 @@ def _ver(srv, a) -> str:
 
 # ---------------------------------------------------------------- gravação
 
-def _cadastrar(srv, a, quem) -> str:
+def _cadastrar(srv, a, quem, fotos=None) -> str:
     lote = a.get("itens")
     if not isinstance(lote, list) or not lote:
         raise ErroFerramenta("Mande os itens numa lista: itens: [{nome, valor, quantidade, categoria}].")
@@ -581,6 +592,8 @@ def _cadastrar(srv, a, quem) -> str:
     room = _criar_area(srv, room)  # o primeiro bem (ou consumível) cria a área, como na tela
     for c in corpos:
         c["room"] = room["id"]
+    if fotos and len(corpos) == 1:  # 1.92.0: a foto da conversa (cadastrar_por_foto)
+        corpos[0]["photos"] = list(fotos)
     _, items = srv.visible_data()
     iguais = {srv.fold(i.get("name") or ""): i for i in items if i.get("room") == room["id"]}
     novos = srv.STORE.create_items(corpos, quem)
@@ -760,10 +773,48 @@ def conferir_argumentos(nome, argumentos) -> dict:
     return argumentos
 
 
-def chamar(srv, nome, argumentos, pessoa=None, cliente=None) -> str:
+def _por_foto(srv, a, quem, anexo) -> str:
+    """A foto da conversa vira um item: guarda a foto, lê com a IA daqui se faltar o nome (fora da trava do Store: a
+    leitura demora) e cadastra pelas regras do cadastrar_itens, com a foto no item."""
+    b64 = anexo.get("b64") if isinstance(anexo, dict) and isinstance(anexo.get("b64"), str) else ""
+    b64 = b64.split(",", 1)[1] if b64.startswith("data:") and "," in b64 else b64
+    if not b64:
+        raise ErroFerramenta("Não chegou nenhuma foto. Peça para a pessoa mandar a foto de novo, com o pedido junto.")
+    cons = a.get("duracao_dias") not in (None, 0) or a.get("usado_em") not in (None, "") or srv.fold(str(a.get("comodo") or "")) in ("consumiveis", "consumivel")
+    item = {k: a[k] for k in ("nome", "valor", "categoria", "duracao_dias", "usado_em", "detalhes", "zona") if a.get(k) not in (None, "")}
+    arquivo = srv.save_photo({"full": b64})["file"]
+    if not item.get("nome"):
+        if not srv.ai_enabled():
+            raise ErroFerramenta("A foto chegou, mas a IA do InventarIA está desligada e não dá para ler o que é. Pergunte o nome do item e chame de novo com nome.")
+        try:
+            lidos = srv.ai_identify({"file": arquivo, "mode": "single", "consumivel": cons}).get("items") or []
+        except srv.ApiError as e:
+            raise ErroFerramenta(f"Não consegui ler a foto ({e.msg}) Pergunte o nome do item e chame de novo com nome.") from None
+        if not lidos:
+            raise ErroFerramenta("Não reconheci nada na foto. Pergunte o nome do item e chame de novo com nome.")
+        item["nome"] = lidos[0]["name"]
+        item.setdefault("detalhes", lidos[0].get("details") or "")
+        if lidos[0].get("cat"):
+            item.setdefault("categoria", lidos[0]["cat"])
+    with srv.STORE.lock:
+        try:
+            return _cadastrar(srv, {"comodo": a.get("comodo"), "itens": [item]}, quem, fotos=[arquivo])
+        except ErroFerramenta as e:  # uma categoria que a IA leu e não é deste lado (casa ou consumíveis): fica em Outros
+            if "categoria" in item and "Categoria não encontrada" in str(e) and "categoria" not in a:
+                item.pop("categoria")
+                return _cadastrar(srv, {"comodo": a.get("comodo"), "itens": [item]}, quem, fotos=[arquivo])
+            raise
+
+
+def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
     """Roda a ferramenta (as de gravar mudam o inventário pelo Store, que grava, sobe a rev e faz a versão automática)."""
     a = conferir_argumentos(nome, argumentos)
     quem = _quem(pessoa, cliente)
+    if nome == "cadastrar_por_foto":
+        try:
+            return _por_foto(srv, a, quem, anexo)
+        except srv.ApiError as e:
+            raise ErroFerramenta(e.msg) from None
     try:
         with srv.STORE.lock:
             if nome == "resumo":

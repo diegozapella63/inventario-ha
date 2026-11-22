@@ -88,7 +88,7 @@ class Correria(ServerCase):
         self.assertTrue(esperar_arquivo(app2.path("share", "correria.json")))
         st, _, out = app2.get("api/integracao/ferramentas", headers=self.h(app2))
         self.assertEqual(st, 200)
-        self.assertEqual(len(out["ferramentas"]), 8)
+        self.assertEqual(len(out["ferramentas"]), 9)
 
     # -- a lista
     def test_lista_no_formato_do_contrato(self):
@@ -97,7 +97,7 @@ class Correria(ServerCase):
         self.assertIn("inventario_resumo", out["instrucoes"])
         self.assertRegex(out["versao"], r"^\d+\.\d+\.\d+$")
         nomes = [f["nome"] for f in out["ferramentas"]]
-        self.assertEqual(nomes, ["resumo", "buscar_itens", "ver_item", "cadastrar_itens", "editar_item", "mover_itens", "apagar_item", "novo_comodo"])
+        self.assertEqual(nomes, ["resumo", "buscar_itens", "ver_item", "cadastrar_itens", "editar_item", "mover_itens", "apagar_item", "novo_comodo", "cadastrar_por_foto"])
         for f in out["ferramentas"]:
             self.assertTrue(re.fullmatch(r"[a-z0-9_]{1,40}", f["nome"]))
             self.assertEqual(f["entrada"]["type"], "object")
