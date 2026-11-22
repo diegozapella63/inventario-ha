@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.88.0
+
+- **Consumíveis por cômodo**: em **Mais › Configurações › Opções › Inventário**, embaixo de Usar consumíveis. Ligado, cada consumível pode dizer em que cômodo é usado (o campo **Cômodo onde é usado**, ao editar); a lista e a ficha mostram o cômodo. A Ronda da casa do CorrerIA passa a mostrar, em cada cômodo, os consumíveis de lá.
+- **Editar cômodo no celular**: nas fotos, a Capa, o Subir e o Apagar ficam alinhados, na mesma linha e com a mesma altura; Tirar foto e Escolher fotos dividem a linha.
+
 ## 1.87.0
 
 - **Consumíveis e EconomIA**: quando você toca em **Comprei hoje** no EconomIA (1.49.0), o **Dura até** do consumível volta a contar de hoje, e a duração que você disser lá vira a Duração estimada daqui.

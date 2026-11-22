@@ -221,6 +221,9 @@
   const CONS_NEW = "@consumiveis"; // a área ainda não existe: é criada ao gravar o primeiro consumível
   const itensOn = () => S.settings.itens !== false;
   const consOn = () => S.settings.consumiveis === true;
+  // 1.88.0: Consumíveis por cômodo: cada consumível pode dizer em que cômodo é usado (it.usedIn), para a Ronda da casa do CorrerIA
+  const consComodoOn = () => consOn() && itensOn() && S.settings.cons_comodo === true;
+  const usadoEm = (it) => (consComodoOn() && it && it.usedIn ? S.rooms.find((r) => r.id === it.usedIn && !r.kind) : null) || null;
   const tiposOn = () => [itensOn(), bensOn(), consOn()].filter(Boolean).length;
   // a tela principal de cada tipo: a dos itens da casa é a aba Cômodos; sem eles, a aba vira Bens (ou Consumíveis)
   const mainTab = () => (itensOn() ? "rooms" : bensOn() ? "bens" : "cons");
@@ -918,8 +921,8 @@
     const ph = it.photos && it.photos[0];
     const room = D.roomById.get(it.room);
     let where;
-    if (mode === "room") where = it.details ? hl(snippet(it.details), toks) : "";
-    else if (mode === "cons" || (mode === "bens" && isCons(it.room))) where = esc(CCAT[it.cat] || "Outros");
+    if (mode === "room") where = [usadoEm(it) ? `<b class="usado">${esc(usadoEm(it).name)}</b>` : "", it.details ? hl(snippet(it.details), toks) : ""].filter(Boolean).join(" · "); // 1.88.0: o cômodo onde o consumível é usado
+    else if (mode === "cons" || (mode === "bens" && isCons(it.room))) where = esc([CCAT[it.cat] || "Outros", usadoEm(it) ? usadoEm(it).name : ""].filter(Boolean).join(" · "));
     else if (mode === "bens") where = esc(CAT[it.cat] || "Outros");
     else where = hl([room?.name, zonesOn() ? it.zone : ""].filter(Boolean).join(", "), toks);
     const qty = qtyClean(it.qty);
@@ -2513,7 +2516,9 @@
         ["cons-on", "cons-h", "drop", "Usar consumíveis", "Pasta térmica, creme, pilhas: o que se gasta.", consOn()]]
         // o único ligado fica preso: pelo menos um tipo
         .map(([k, h, i, t, d, on]) => { const so = on && tiposOn() === 1; return `<li><div class="ot"><b id="${h}">${oti(i)}${t}</b><span>${so ? "Pelo menos um fica ligado." : d}</span></div>
-        <div class="oa">${so ? switchHtml(k, on, h).replace("<input ", "<input disabled ") : switchHtml(k, on, h)}</div></li>`; }).join("")}</ul>
+        <div class="oa">${so ? switchHtml(k, on, h).replace("<input ", "<input disabled ") : switchHtml(k, on, h)}</div></li>${k === "cons-on" && on && itensOn() ? `<li class="sub"><div class="sub-box"><ul class="opts"><li>
+          <div class="ot"><b id="consc-h">${oti("rooms")}Consumíveis por cômodo</b><span>Cada consumível diz em que cômodo é usado.</span></div>
+          <div class="oa">${switchHtml("consc-on", S.settings.cons_comodo === true, "consc-h")}</div></li></ul></div></li>` : ""}`; }).join("")}</ul>
     </section>
     ${itensOn() ? `<section class="panel" id="p-zones">
       <h2>${secIc("pin")}Zonas</h2>
@@ -3591,6 +3596,7 @@
           ${zonesOn() && room.kind !== "consumiveis" ? `<dt>Zona</dt><dd>${esc(it.zone || "Sem zona")}</dd>` : ""}
           ${room.kind === "consumiveis"
             ? `<dt>Categoria</dt><dd><span class="rnm">${esc(CCAT[it.cat] || "Outros")}</span></dd>
+          ${consComodoOn() ? `<dt>Usado em</dt><dd data-slot="usado-em">${usadoEm(it) ? `<a href="#/c/${encodeURIComponent(usadoEm(it).id)}"><span class="rnm">${esc(usadoEm(it).name)}</span></a>` : "Nenhum cômodo"}</dd>` : ""}
           ${durAte(it) ? `<dt>Dura até</dt><dd data-slot="dura-ate"${durFim(it) ? ' class="fim"' : ""}>${esc(durAte(it))}${durFim(it) ? " · acabou" : ""}</dd>` : `<dt>Duração estimada</dt><dd>Sem duração</dd>`}`
             : `<dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
           <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>`}
@@ -3691,6 +3697,7 @@
       zone: item ? item.zone || "" : !zonesOn() ? "" : from.zone != null ? from.zone : zone != null ? zone : LS.get("lastZone:" + rid, "") || "",
       cat: from.cat || "", qty: from.qty ? qtyClean(from.qty) : "1", value: from.value ? moneyInput(from.value) : "",
       dur: durNum(from.dur) ? String(durNum(from.dur)) : "", // 1.82.0: só num consumível
+      usedIn: from.usedIn || "", // 1.88.0: o cômodo onde se usa (Consumíveis por cômodo)
       flag: from.flag || "", photos: [...(from.photos || photos || [])], photoSrc: { ...(from.photoSrc || {}) },
       source: item ? item.source || "manual" : dup ? dup.source || "manual" : "manual",
       dirty: !!(dup || (photos && photos.length)), busy: false, uploading: 0, aiBusy: false, hint: "",
@@ -3736,6 +3743,7 @@
             ${bem ? `<div class="field"><span class="lbl" id="f-tipo-l">Tipo</span><div class="seg tipo" role="group" aria-labelledby="f-tipo-l" data-slot="tipo">${tipoBtns()}</div></div>`
               : `${cons ? "" : zonesOn() ? `<div class="row2">${roomField}${zoneField}</div>` : roomField}
             <div class="field"><label for="f-cat">Categoria</label><select id="f-cat" class="select" name="cat"><option value="">Escolha a categoria</option>${(cons ? CCATS : CATS).map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`}
+            ${cons && consComodoOn() ? `<div class="field"><label for="f-usado">Cômodo onde é usado</label><select id="f-usado" class="select" name="usedIn"><option value="">Nenhum</option>${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === F.usedIn ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>` : ""}
             ${cons ? `<div class="field" id="f-dur"><span class="lbl" id="f-dur-l">Duração estimada</span>
               <div class="chips grid durs" role="radiogroup" aria-labelledby="f-dur-l" data-slot="durs">${durChips()}</div>
               <div data-slot="dur-outra">${durOutra()}</div></div>` : ""}
@@ -3914,7 +3922,7 @@
       // sem zonas, a zona escondida só fica se o item continuar no mesmo cômodo
       const zone = cons ? "" : zonesOn() ? F.zone.trim() : item && F.room === item.room ? item.zone || "" : "";
       const body = { name, details: F.details.trim(), room: F.room, zone, cat: F.cat || "outros", qty: F.qty.trim() || "1", value, photos: F.photos, photoSrc: F.photoSrc, flag: F.flag.trim(), source: F.source };
-      if (cons) { delete body.qty; delete body.value; body.cat = CCAT[F.cat] ? F.cat : "c-outros"; body.dur = durNum(F.dur); } // 1.82.0: sem quantidade e sem valor
+      if (cons) { delete body.qty; delete body.value; body.cat = CCAT[F.cat] ? F.cat : "c-outros"; body.dur = durNum(F.dur); if (consComodoOn()) body.usedIn = F.usedIn || ""; } // 1.82.0: sem quantidade e sem valor
       setBusy(true);
       try {
         body.room = F.room = await realRoom(F.room); // o primeiro bem (ou consumível) cria a área
@@ -4842,7 +4850,7 @@
           <button type="button" class="btn sm${R.cover === i ? " primary" : ""}" data-re="cover" data-i="${i}" aria-pressed="${R.cover === i}">${ic("image", "sm")}${R.cover === i ? "Capa" : "Usar como capa"}</button>
           <button type="button" class="btn sm icon" data-re="up" data-i="${i}" aria-label="Subir foto"${i === 0 ? " disabled" : ""}>${ic("up", "sm")}</button>
           <button type="button" class="btn sm icon" data-re="rm" data-i="${i}" aria-label="Apagar foto">${ic("trash", "sm")}</button></li>`).join("")}</ul>
-        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <div class="rph-add" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
           ${R.uploading ? `<span class="muted"><span class="spin sm"></span> Enviando ${R.uploading} foto(s)…</span>` : ""}
           ${CAMERA ? `<button type="button" class="btn sm" data-re="camera">${ic("camera", "sm")}Tirar foto</button>` : ""}
           <button type="button" class="btn sm" data-re="upload">${ic(COARSE ? "image" : "upload", "sm")}Escolher fotos</button></div>`;
@@ -5367,8 +5375,8 @@
       if (t.checked && !newsPara().length && me) patch.news_para = [me.id];
       saveNews(patch, t.checked ? "Aviso no celular ligado" : "Aviso no celular desligado");
     }
-    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on" || k === "bens-on" || k === "itens-on" || k === "cons-on" || k === "correria-on" || k === "deprec-on") {
-      const key = { "ai-on": "ai", "zones-on": "zones", "news-on": "news", "bens-on": "bens", "itens-on": "itens", "cons-on": "consumiveis", "correria-on": "correria", "deprec-on": "deprec" }[k] || "ha_sensors", on = t.checked;
+    else if (k === "ai-on" || k === "zones-on" || k === "sensors-on" || k === "news-on" || k === "bens-on" || k === "itens-on" || k === "cons-on" || k === "consc-on" || k === "correria-on" || k === "deprec-on") {
+      const key = { "ai-on": "ai", "zones-on": "zones", "news-on": "news", "bens-on": "bens", "itens-on": "itens", "cons-on": "consumiveis", "consc-on": "cons_comodo", "correria-on": "correria", "deprec-on": "deprec" }[k] || "ha_sensors", on = t.checked;
       t.disabled = true;
       try {
         await API.put("api/settings", { [key]: on });
@@ -5382,6 +5390,7 @@
           : key === "bens" ? (on ? "Bens ligados" : "Bens desligados: os bens gravados continuam guardados")
           : key === "itens" ? (on ? "Itens da casa ligados" : "Itens da casa desligados: os cômodos e os itens continuam guardados")
           : key === "consumiveis" ? (on ? "Consumíveis ligados" : "Consumíveis desligados: os gravados continuam guardados")
+          : key === "cons_comodo" ? (on ? "Consumíveis por cômodo ligados" : "Consumíveis por cômodo desligados: o cômodo de cada um continua guardado")
           : key === "correria" ? (on ? "CorrerIA ligado" : "CorrerIA desligado")
           : key === "deprec" ? (on ? "Valor de hoje ligado" : "Valor de hoje desligado")
           : on ? "Zonas ligadas" : "Zonas desligadas: as zonas gravadas continuam guardadas");

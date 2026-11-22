@@ -641,8 +641,14 @@ div.croom:hover { background: none; }
 .rph [data-re="up"] { grid-area: up; }
 .rph [data-re="rm"] { grid-area: rm; }
 @media (max-width: 480px) {
-  .opts > li.rph { grid-template-columns: 64px minmax(0, 1fr) auto auto; grid-template-areas: "img lbl lbl lbl" "cov cov up rm"; }
-  .rph [data-re="cover"] { justify-self: start; width: 9.5em; }
+  /* 1.88.0: no celular, a capa ocupa o que sobra da linha (o texto não passa do botão) e os três botões têm a mesma altura */
+  .opts > li.rph { grid-template-columns: 64px minmax(0, 1fr) var(--altura, 50px) var(--altura, 50px); grid-template-areas: "img lbl lbl lbl" "cov cov up rm"; }
+  .rph img { height: var(--altura, 50px); }
+  .rph [data-re="cover"] { justify-self: stretch; width: auto; min-width: 0; }
+  .rph [data-re="cover"], .rph [data-re="up"], .rph [data-re="rm"] { height: var(--altura, 50px); min-height: var(--altura, 50px); }
+  .opts > li.rph .btn.icon[data-re="up"], .opts > li.rph .btn.icon[data-re="rm"] { width: var(--altura, 50px); min-width: var(--altura, 50px); padding: 0; justify-self: end; }
+  .rph-add { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
+  .rph-add .muted { grid-column: 1 / -1; }
 }
 .rhead-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .rhead-actions .lbl-short { display: none; }

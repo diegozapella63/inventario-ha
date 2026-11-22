@@ -59,7 +59,7 @@
     if (ids.has(id)) id += "-" + Math.random().toString(16).slice(2, 6);
     return {
       id, room: r.id, seq, zone: String(b.zone || "").trim(), name, details: String(b.details || "").trim(),
-      ...(r.kind === "consumiveis" ? { cat: consCat(d, b.cat), qty: "1", value: 0, dur: dur(b.dur), ...(dur(b.dur) ? { durAt: restore && b.durAt ? b.durAt : t } : {}) }
+      ...(r.kind === "consumiveis" ? { cat: consCat(d, b.cat), qty: "1", value: 0, dur: dur(b.dur), ...(dur(b.dur) ? { durAt: restore && b.durAt ? b.durAt : t } : {}), ...(d.rooms.some((x) => x.id === b.usedIn && !x.kind) ? { usedIn: b.usedIn } : {}) }
         : { cat: CATS.has(b.cat) ? b.cat : "outros", qty: String(b.qty || "1").trim() || "1", value: money(b.value) }),
       photos: Array.isArray(b.photos) ? [...b.photos] : [], ...(b.photoSrc && Object.keys(b.photoSrc).length ? { photoSrc: { ...b.photoSrc } } : {}),
       checked: !!b.checked, flag: (b.flag || "").trim() || null,
@@ -119,7 +119,7 @@
     if (method === "GET" && path === "api/data") {
       const st = ST.settings;
       return { ...clone(d), rev: ST.rev, version: "%%V%%", user: null, features: { ai: true, share: false },
-        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, ai_chat: st.ai_chat || "", voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false, itens: st.itens !== false, consumiveis: st.consumiveis === true, correria: st.correria === true, accent: st.accent ?? null, accent_daily: st.accent_daily ?? null, news_hora: st.news_hora || "10:00", news_aviso: st.news_aviso === true, news_para: st.news_para || [], news_apps: st.news_apps === true }, correria_uso: null };
+        settings: { ai_entity: st.ai_entity, ai_search: st.ai_search, ai_chat: st.ai_chat || "", voice_stt: st.voice_stt, ai: st.ai !== false, zones: st.zones === true, ha_sensors: st.ha_sensors === true, news: st.news !== false, news_every: st.news_every || 0, news_notify: st.news_notify || "", bens: st.bens !== false, itens: st.itens !== false, consumiveis: st.consumiveis === true, cons_comodo: st.cons_comodo === true, correria: st.correria === true, accent: st.accent ?? null, accent_daily: st.accent_daily ?? null, news_hora: st.news_hora || "10:00", news_aviso: st.news_aviso === true, news_para: st.news_para || [], news_apps: st.news_apps === true }, correria_uso: null };
     }
     if (method === "GET" && path === "api/rev") return { rev: ST.rev, correria_uso: null };
     if (method === "POST" && path === "api/items") {
@@ -165,7 +165,8 @@
         if (body.room && body.room !== it.room) { if (!room(d, body.room)) fail("Escolha um cômodo que exista."); it.room = body.room; it.seq = nextSeq(d, body.room); }
         for (const k of ["zone", "details", "flag", "source"]) if (k in body) it[k] = typeof body[k] === "string" ? body[k].trim() : body[k];
         if ("name" in body) { const n = String(body.name || "").trim(); if (!n) fail("Preencha o campo nome."); it.name = n; }
-        if (isCons(d, it.room)) { it.cat = consCat(d, "cat" in body ? body.cat : it.cat); if ("dur" in body) { if (dur(body.dur) !== dur(it.dur)) it.durAt = now(); it.dur = dur(body.dur); } }
+        if (isCons(d, it.room)) { it.cat = consCat(d, "cat" in body ? body.cat : it.cat); if ("dur" in body) { if (dur(body.dur) !== dur(it.dur)) it.durAt = now(); it.dur = dur(body.dur); }
+          if ("usedIn" in body) { if (d.rooms.some((x) => x.id === body.usedIn && !x.kind)) it.usedIn = body.usedIn; else delete it.usedIn; } }
         else {
           it.cat = CATS.has("cat" in body ? body.cat : it.cat) ? ("cat" in body ? body.cat : it.cat) : "outros";
           if ("qty" in body) it.qty = String(body.qty || "1").trim() || "1";

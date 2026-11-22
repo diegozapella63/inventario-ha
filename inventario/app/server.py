@@ -486,6 +486,11 @@ class Store:
     def room(self, rid):
         return next((r for r in self.data["rooms"] if r["id"] == rid), None)
 
+    def home_room(self, rid):
+        """Um cômodo da casa (não as áreas Bens e Consumíveis) com esse id, ou None."""
+        r = self.room(rid) if isinstance(rid, str) and rid else None
+        return r if r and not r.get("kind") else None
+
     def item(self, iid):
         return next((i for i in self.data["items"] if i["id"] == iid), None)
 
@@ -650,6 +655,8 @@ class Store:
             it["dur"] = clean_dur(body.get("dur"))
             if it["dur"]:
                 it["durAt"] = ts  # 1.83.0: desde quando a duração conta (o Dura até)
+            if self.home_room(body.get("usedIn")):  # 1.88.0: o cômodo onde se usa (Consumíveis por cômodo)
+                it["usedIn"] = body["usedIn"]
             if not restore:
                 it["qty"], it["value"] = "1", 0
         src = clean_photo_src(body.get("photoSrc"), it["photos"])
@@ -723,6 +730,11 @@ class Store:
             if cons:  # 1.82.0: a categoria dos consumíveis e a duração; a quantidade e o valor não mudam por aqui
                 want = body["cat"] if "cat" in body else it.get("cat")
                 new["cat"] = want if want in self.cons_cat_map() else CONS_OUTROS
+                if "usedIn" in body:  # 1.88.0: o cômodo onde se usa; vazio ou desconhecido tira
+                    if self.home_room(body["usedIn"]):
+                        new["usedIn"] = body["usedIn"]
+                    else:
+                        new.pop("usedIn", None)
                 if "dur" in body:
                     new["dur"] = clean_dur(body["dur"])
                     if new["dur"] != clean_dur(it.get("dur")):
@@ -1682,6 +1694,17 @@ def itens_enabled() -> bool:
     """1.78.0: os itens da casa (os cômodos e o que há neles): vem ligado. Desligado, somem os cômodos e os itens deles
     (do app, dos outros apps e da IA), sem apagar: ficam os bens e os consumíveis."""
     return STORE.settings.get("itens") is not False
+
+
+def cons_comodo_enabled() -> bool:
+    """1.88.0: Consumíveis por cômodo: cada consumível pode dizer em que cômodo é usado (para a Ronda da casa do CorrerIA).
+    Desligado de início; só com os consumíveis e os itens da casa (os cômodos) ligados."""
+    return consumiveis_enabled() and itens_enabled() and STORE.settings.get("cons_comodo") is True
+
+
+def used_in(it):
+    """O cômodo onde o consumível é usado (com a opção ligada e o cômodo ainda existindo), ou None."""
+    return STORE.home_room((it or {}).get("usedIn")) if cons_comodo_enabled() else None
 
 
 def consumiveis_enabled() -> bool:
@@ -4862,6 +4885,7 @@ def chat_context(screen: dict) -> str:
         for i in sorted(consumiveis, key=lambda i: i.get("seq") or 0)[:MAX_ITENS_CHAT]:
             lines.append("- " + " | ".join(b for b in (f"{STORE.tag(i)} {i.get('name', '')}", STORE.cat_of(i),
                                                      f"dura {dur_text(i.get('dur'))}" + (f", até {dia_br(dur_until(i))}" if dur_until(i) else "") if clean_dur(i.get("dur")) else "",
+                                                     f"usado em {used_in(i)['name']}" if used_in(i) else "",
                                                      " ".join(str(i.get("details") or "").split())[:200]) if b))
     return "\n".join(lines)
 
@@ -5225,7 +5249,7 @@ def r_data(h, query):
     out.update({"version": VERSION, "user": h.user(),
                 "settings": {"ai_entity": STORE.settings.get("ai_entity") or "", "ai_search": STORE.settings.get("ai_search") or "",
                              "ai_chat": STORE.settings.get("ai_chat") or "",
-                             "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "bens": bens_enabled(), "itens": itens_enabled(), "consumiveis": consumiveis_enabled(), "ha_sensors": sensors_enabled(),
+                             "voice_stt": STORE.settings.get("voice_stt") or "", "ai": ai_enabled(), "zones": zones_enabled(), "bens": bens_enabled(), "itens": itens_enabled(), "consumiveis": consumiveis_enabled(), "cons_comodo": STORE.settings.get("cons_comodo") is True, "ha_sensors": sensors_enabled(),
                              "news": news_enabled(), "news_every": news_every(), "news_notify": news_notify_target(), "correria": correria_enabled(),
                              "news_hora": news_hora(), "news_aviso": news_aviso(), "news_para": news_para_salvo(),
                              "news_apps": STORE.settings.get("news_apps") is True,
@@ -5510,7 +5534,7 @@ def r_settings_put(h, query):
             if e and not re.fullmatch(rx, e):
                 raise ApiError(400, msg)
             upd[key] = e
-    for key in ("ai", "zones", "ha_sensors", "news", "news_apps", "bens", "itens", "consumiveis", "correria", "deprec"):
+    for key in ("ai", "zones", "ha_sensors", "news", "news_apps", "bens", "itens", "consumiveis", "cons_comodo", "correria", "deprec"):
         if key in body:
             if not isinstance(body[key], bool):
                 raise ApiError(400, "Use verdadeiro ou falso nesta opção.")
@@ -5930,7 +5954,8 @@ def r_integracao_consumiveis(h, query):
         items.sort(key=lambda it: (it.get("name") or "").lower())
         # 1.82.0: sem quantidade (um consumível não tem mais); a duração estimada, em dias (0: sem), para o A cada do EconomIA
         out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "categoria": STORE.cat_of(it),
-                "duracao_dias": clean_dur(it.get("dur")), "duracao": dur_text(it.get("dur")), "dura_ate": dur_until(it), "para_que_serve": " ".join(str(it.get("details") or "").split())[:240]} for it in items]
+                "duracao_dias": clean_dur(it.get("dur")), "duracao": dur_text(it.get("dur")), "dura_ate": dur_until(it), "para_que_serve": " ".join(str(it.get("details") or "").split())[:240],
+                **({"comodo": used_in(it)["name"]} if used_in(it) else {})} for it in items]  # 1.88.0: o cômodo onde se usa
     h.send_json({"versao": VERSION, "ligado": consumiveis_enabled(), "consumiveis": out[:500]})
 
 

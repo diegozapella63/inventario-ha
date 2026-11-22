@@ -214,7 +214,7 @@ class Ferramentas(Base):
         self.assertEqual(r["consumiveis"]["itens"], 1)
         self.assertEqual(r["consumiveis"]["lista"][0]["para_que_serve"], "Creme para massagem nas costas, de arnica.")
         self.assertNotIn("CON", [c["codigo"] for c in r["comodos"]])
-        self.assertEqual(r["opcoes"], {"zonas": False, "itens_da_casa": True, "bens": True, "consumiveis": True})
+        self.assertEqual(r["opcoes"], {"zonas": False, "itens_da_casa": True, "bens": True, "consumiveis": True, "consumiveis_por_comodo": False})
         self.store.settings["consumiveis"] = False
         self.assertNotIn("consumiveis", self.json("resumo"))
 
@@ -360,6 +360,59 @@ class CategoriasEDuracao(Base):
         self.assertEqual([i["nome"] for i in b["itens"]], ["Pilhas AA"], "a busca pela categoria dos consumíveis")
         self.assertNotIn("Pilhas AA", [i["nome"] for i in self.json("buscar_itens", {"categoria": "Outros"})["itens"]])
         self.assertIn("Um consumível não tem quantidade nem valor", F.instrucoes(S))
+
+
+class PorComodo(Base):
+    """1.88.0: Consumíveis por cômodo (desligado de início): cada consumível pode dizer em que cômodo é usado."""
+
+    def test_desligado_nao_aparece_e_a_ferramenta_explica(self):
+        it = self.consumivel(usedIn="sala")
+        self.assertEqual(it["usedIn"], "sala", "o Store guarda")
+        self.assertFalse(S.cons_comodo_enabled())
+        self.assertIsNone(S.used_in(it))
+        self.assertNotIn("usado_em", self.json("ver_item", {"id": it["id"]}))
+        self.assertFalse(self.json("resumo")["opcoes"]["consumiveis_por_comodo"])
+        self.erro("buscar_itens", {"usado_em": "sala"}, "Consumíveis por cômodo estão desligados")
+        self.erro("editar_item", {"id": it["id"], "usado_em": "sala"}, "Consumíveis por cômodo estão desligados")
+        self.assertNotIn("usado_em", F.instrucoes(S))
+
+    def test_ligado_cadastra_edita_busca_e_tira(self):
+        self.store.settings["cons_comodo"] = True
+        self.assertTrue(self.json("resumo")["opcoes"]["consumiveis_por_comodo"])
+        self.assertIn("usado_em", F.instrucoes(S))
+        self.chamar("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Detergente", "duracao_dias": 30, "usado_em": "Cozinha"},
+                                                                          {"nome": "Pilhas AA", "usado_em": "sala"}, {"nome": "Fita isolante"}]})
+        r = self.json("buscar_itens", {"usado_em": "cozinha"})
+        self.assertEqual([(i["nome"], i["usado_em"]) for i in r["itens"]], [("Detergente", "Cozinha")])
+        self.assertEqual(self.json("buscar_itens", {"comodo": "Consumíveis", "usado_em": "COZ"})["encontrados"], 1, "pelo código do cômodo também")
+        fita = next(i for i in self.json("buscar_itens", {"comodo": "Consumíveis"})["itens"] if i["nome"] == "Fita isolante")
+        self.assertNotIn("usado_em", fita)
+        self.assertIn("usado em: (nenhum) → Sala de estar", self.chamar("editar_item", {"id": fita["id"], "usado_em": "sala"}))
+        self.assertEqual(self.json("ver_item", {"id": fita["id"]})["usado_em"], "Sala de estar")
+        self.assertEqual(self.json("buscar_itens", {"usado_em": "sala"})["encontrados"], 2)
+        self.assertIn("usado em: Sala de estar → (nenhum)", self.chamar("editar_item", {"id": fita["id"], "usado_em": ""}))
+        self.assertNotIn("usedIn", self.store.item(fita["id"]))
+        self.assertIn("usado em Cozinha", S.chat_context({}))
+
+    def test_so_num_consumivel_e_so_um_comodo_da_casa(self):
+        self.store.settings["cons_comodo"] = True
+        it = self.consumivel()
+        self.erro("editar_item", {"id": it["id"], "usado_em": "Consumíveis"}, "um cômodo da casa")
+        self.erro("editar_item", {"id": "sal-001", "usado_em": "cozinha"}, "usado_em só vale num consumível")
+        self.erro("cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "Vaso", "usado_em": "cozinha"}]}, "usado_em só vale num consumível")
+        self.erro("editar_item", {"id": it["id"], "usado_em": "porão"}, "cômodo")
+        novo = self.store.update_item(it["id"], {"usedIn": "consumiveis"}, "Ana")
+        self.assertNotIn("usedIn", novo, "a área dos consumíveis não é um cômodo")
+
+    def test_comodo_apagado_ou_itens_da_casa_desligados(self):
+        self.store.settings["cons_comodo"] = True
+        it = self.consumivel(usedIn="nao-existe")
+        self.assertNotIn("usedIn", it)
+        it = self.store.update_item(it["id"], {"usedIn": "sala"}, "Ana")
+        self.assertEqual(S.used_in(it)["name"], "Sala de estar")
+        self.store.settings["itens"] = False
+        self.assertFalse(S.cons_comodo_enabled(), "sem os cômodos, não há por cômodo")
+        self.assertIsNone(S.used_in(it))
 
 
 if __name__ == "__main__":
