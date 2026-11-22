@@ -365,6 +365,32 @@ class PerguntaEmTexto(ComHA):
         self.assertEqual(body, {"task_name": "InventarIA: teste", "instructions": S.IA_SO_MATERIAL + "\n\ninstruções"}, "sem escolha, sem entity_id; 1.83.2: a guarda na frente")
         self.assertEqual((S.so_material(S.so_material("x")), S.so_material("")), (S.IA_SO_MATERIAL + "\n\nx", ""), "uma vez só; nada, nada")
 
+    def test_as_lembrancas_da_casa_vao_para_a_ia(self):
+        """1.95.0: o que a casa pediu para lembrar (a Memória da IA do CorrerIA, em share/correria/lembrancas.json) vai logo
+        depois da guarda, em toda instrução, só com a opção CorrerIA ligada aqui."""
+        import json, os, tempfile
+        from unittest import mock
+        arq = os.path.join(tempfile.mkdtemp(), "lembrancas.json")
+        with open(arq, "w", encoding="utf-8") as f:
+            json.dump({"app": "correria", "lembrancas": ["  Creme é   sempre Higiene ", "", None, "x" * 300]}, f)
+        self.addCleanup(lambda: S._LEMBRANCAS.update(em=0.0, texto=""))
+        with mock.patch.object(S, "LEMBRANCAS_ARQ", arq):
+            S._LEMBRANCAS.update(em=0.0, texto="")
+            self.store.settings["correria"] = False
+            self.assertEqual((S.lembrancas_da_casa(), S.so_material("x")), ("", S.IA_SO_MATERIAL + "\n\nx"), "com o CorrerIA desligado, nada")
+            self.store.settings["correria"] = True
+            bloco = S.lembrancas_da_casa(1000.0)
+            self.assertEqual(bloco, S.LEMBRANCAS_TITULO + "\n- Creme é sempre Higiene\n- " + "x" * 240)
+            self.assertEqual(S.so_material("x"), S.IA_SO_MATERIAL + "\n\n" + bloco + "\n\nx")
+            self.assertEqual(S.so_material(S.so_material("x")), S.so_material("x"), "uma vez só")
+            S._LEMBRANCAS["em"] = 1000.0  # as chamadas de cima releram com o relógio de verdade
+            os.remove(arq)
+            self.assertEqual(S.lembrancas_da_casa(1030.0), bloco, "guardado por um minuto")
+            self.assertEqual(S.lembrancas_da_casa(1100.0), "", "sem o arquivo, nada")
+            with open(arq, "w", encoding="utf-8") as f:
+                f.write('{"lembrancas": "não é lista"}')
+            self.assertEqual(S.lembrancas_da_casa(1200.0), "")
+
     def test_tarefa_escolhida_vai_no_pedido(self):
         S.ai_call_text("InventarIA: teste", "x", "ai_task.google_ai_task")
         self.assertEqual(self.ultimo()["body"]["entity_id"], "ai_task.google_ai_task")

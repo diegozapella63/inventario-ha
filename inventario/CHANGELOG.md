@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.95.0
+
+- A **Memória da IA** do CorrerIA (Configurações › Integrações, lá) vale aqui também: o que a casa pediu para a IA lembrar entra na Conversa e na leitura por IA deste app, com a opção CorrerIA ligada.
+
 ## 1.94.0
 
 - Pelo CorrerIA, a foto de vários **consumíveis** (os cremes do banheiro, a prateleira da despensa) é lida só pelos consumíveis: sem os móveis, as toalhas e os aparelhos, com a duração estimada de cada um e dizendo os que já estão cadastrados.

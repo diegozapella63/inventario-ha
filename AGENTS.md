@@ -160,6 +160,8 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 
 1.93.0: mais duas ferramentas com `anexo: ["image/jpeg"]`: `anexar_foto` (a foto da conversa num item que já existe, `_anexar_foto`) e `ler_arquivo` (leitura: o `ai_identify` no modo `multi`, `_ler_arquivo`; devolve o que há na foto, não cadastra e apaga a foto lida). As três que recebem a foto rodam fora da trava do Store (`chamar`).
 
+1.95.0: as lembranças da casa (a Memória da IA do CorrerIA 1.28.0, em `share/correria/lembrancas.json`: `{lembrancas: [frases]}`) vão na frente de toda instrução da IA daqui, logo depois da guarda, só com a opção CorrerIA ligada: `lembrancas_da_casa()` no server.py (relido uma vez por minuto; `INV_LEMBRANCAS` troca o arquivo nos testes), usada no `so_material`.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.

@@ -55,6 +55,7 @@ GRUPOS = [
     ("os celulares de cada pessoa", _lib("phones.js", ("resolvia-ha", "cronologia-ha"))),
     ("a ligação com o CorrerIA e o integracao.json (Node)", _lib("correria.js")),
     ("as fotos e o PDF que vão para a IA (Node)", _lib("anexos.js")),
+    ("as lembranças da casa para a IA (Node)", _lib("lembrancas.js")),
     ("o PDF do relatório (Node)", _lib("pdf.js", ("resolvia-ha", "memoria-ha"))),
     ("o PDF do relatório (Python)", ["gerencia-ha/gerencia/app/pdf.py", "inventario-ha/inventario/app/pdf.py"]),
     ("o Falar e o WebSocket do Home Assistant (Python)", ["gerencia-ha/gerencia/app/voz.py", "economia-ha/economia/app/voz.py"]),
