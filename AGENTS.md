@@ -150,6 +150,8 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 
 1.86.1: na Conversa, no celular (`noCelular()`: `(hover: none) and (pointer: coarse)`, o dedo como jeito principal), o Enter é uma linha nova e o botão envia (`enterkeyhint="enter"`); com teclado de verdade, o Enter envia. Vale em todos os apps da família.
 
+1.90.0: o painel do Home Assistant passa `/comodo/<nome ou id>` e `/consumiveis` (o link de uma ronda do CorrerIA 1.22.0; `haOpen` no fim do app.js, que espera os dados): abre o cômodo (pelo nome sem acento nem maiúsculas) ou os Consumíveis (só ligados). Teste: `tests/e2e/e2e_link_ronda.py` (com `window.INV_TESTE = true`).
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.

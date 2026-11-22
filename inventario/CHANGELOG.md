@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.90.0
+
+- **Abrir pelas Rondas do CorrerIA**: o botão **Abrir no InventarIA** de uma ronda abre direto no cômodo da ronda, ou nos Consumíveis.
+
 ## 1.89.0
 
 - **Selecionar vários consumíveis**: no Buscar, o **Selecionar** agora vale também para os consumíveis. Marque vários e mude de uma vez a **categoria** e o **cômodo onde são usados** (com Consumíveis por cômodo ligado), com o Desfazer. Uma seleção é de um lado só: itens da casa ou consumíveis.

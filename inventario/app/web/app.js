@@ -5525,6 +5525,20 @@
   window.addEventListener("hashchange", () => { onRoute(); });
   // No Home Assistant, o painel do app (/app/<app>/novidades, o link do aviso) passa o resto do endereço por mensagem:
   // o aviso das novidades abre direto nelas. Cada endereço conta uma vez (a mesma mensagem volta quando a largura muda).
+  // 1.90.0: /consumiveis e /comodo/<nome ou id> (o link de uma ronda do CorrerIA): a tela dos consumíveis ou a do cômodo.
+  // Antes de os dados chegarem, espera por eles (até 15 s).
+  function haOpen(p, vez = 0) {
+    if (!S.loaded) { if (vez < 50) setTimeout(() => haOpen(p, vez + 1), 300); return; }
+    const m = /^\/comodo\/(.+)$/.exec(p);
+    if (p === "/consumiveis" && consOn()) nav("#/consumiveis");
+    else if (m) {
+      let alvo = m[1];
+      try { alvo = decodeURIComponent(alvo); } catch { /* fica como veio */ }
+      const r = D.rooms.find((x) => x.id === alvo) || D.rooms.find((x) => norm(x.name).trim() === norm(alvo).trim());
+      if (r) nav(`#/c/${encodeURIComponent(r.id)}`);
+    }
+  }
+  if (window.INV_TESTE === true) window.__haOpen = haOpen; // só nos testes
   if (window.parent !== window && !PREVIEW) {
     let haPath = null;
     window.addEventListener("message", (e) => {
@@ -5533,6 +5547,7 @@
       if (p === haPath) return;
       haPath = p;
       if (p === "/novidades") nav("#/novidades");
+      else haOpen(p);
     });
     try { window.parent.postMessage({ type: "home-assistant/subscribe-properties" }, "*"); } catch { /* fora do Home Assistant */ }
   }
