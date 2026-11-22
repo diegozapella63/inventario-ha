@@ -777,7 +777,7 @@ class Store:
 
     def update_items(self, changes, user) -> list[dict]:
         """Vários itens de uma vez (Buscar › Selecionar: o cômodo, a categoria ou a zona, e o Desfazer): [{id, room?, seq?,
-        zone?, cat?}], cada um com o que muda. Tudo ou nada, gravado uma vez. Em outro cômodo, o item ganha o próximo
+        zone?, cat?, usedIn? (só num consumível)}], cada um com o que muda. Tudo ou nada, gravado uma vez. Em outro cômodo, o item ganha o próximo
         número de lá (ou o seq pedido, no Desfazer, se estiver livre), como no Mover."""
         if not isinstance(changes, list) or not changes:
             raise ApiError(400, "Escolha os itens.")
@@ -806,6 +806,10 @@ class Store:
                     new["cat"] = ch["cat"]
                 if "zone" in ch:
                     new["zone"] = text(ch["zone"], 120, "zona")
+                if "usedIn" in ch and self.is_cons(new.get("room", it["room"])):  # 1.89.0: o cômodo onde o consumível é usado ("" tira)
+                    if ch["usedIn"] not in ("", None) and not self.home_room(ch["usedIn"]):
+                        raise ApiError(400, "Escolha um cômodo que exista.")
+                    new["usedIn"] = ch["usedIn"] or ""
                 plan.append((it, new, ch.get("seq")))
             t, out = now_iso(), []
             for it, new, want in plan:
@@ -817,6 +821,11 @@ class Store:
                 for k in ("cat", "zone"):
                     if k in new:
                         it[k] = new[k]
+                if "usedIn" in new:
+                    if new["usedIn"]:
+                        it["usedIn"] = new["usedIn"]
+                    else:
+                        it.pop("usedIn", None)
                 # 1.82.0: mudou de lado (casa ou consumíveis): a categoria do outro lado não vale; vai para Outros
                 if self.is_cons(it["room"]):
                     if it.get("cat") not in self.cons_cat_map() and "room" in new:

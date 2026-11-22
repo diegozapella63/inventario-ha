@@ -139,7 +139,7 @@
         const it = d.items.find((i) => i.id === ch.id);
         if (!it) fail("Um dos itens não existe mais. Atualize a página.", 404);
         if ("room" in ch && ch.room !== it.room && !room(d, ch.room)) fail("Escolha um cômodo que exista.");
-        if ("cat" in ch && !CATS.has(ch.cat)) fail("Escolha uma categoria que exista.");
+        if ("cat" in ch && !CATS.has(ch.cat) && !ccatsOf(d).some((c) => (c.id || c[0]) === ch.cat)) fail("Escolha uma categoria que exista.");
         return [it, ch];
       });
       if (!plan.length) fail("Escolha os itens.");
@@ -152,6 +152,7 @@
         }
         if ("cat" in ch) it.cat = ch.cat;
         if ("zone" in ch) it.zone = String(ch.zone || "").trim();
+        if ("usedIn" in ch) { if (d.rooms.some((x) => x.id === ch.usedIn && !x.kind)) it.usedIn = ch.usedIn; else delete it.usedIn; }
         it.updatedAt = t;
       }
       return { items: clone(plan.map(([it]) => it)), rev: bump() };

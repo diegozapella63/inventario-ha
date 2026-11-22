@@ -1209,20 +1209,25 @@
         ${filtered ? `<div class="acts"><button class="btn" data-act="search-reset">${ic("close")}Limpar filtros</button></div>` : ""}</div>`;
     }
     const shown = list.slice(0, searchLimit);
-    const pickable = list.filter((i) => !isArea(i.room)); // os bens e os consumíveis não têm cômodo: ficam de fora
-    if (SEL) { const ok = new Set(pickable.map((i) => i.id)); for (const id of [...SEL]) if (!ok.has(id)) SEL.delete(id); } // só o que está na lista
+    // os bens não têm cômodo: ficam de fora. 1.89.0: os consumíveis entram (a categoria e o cômodo onde são usados), mas
+    // uma seleção é de um lado só: marcado um consumível, os itens da casa ficam de fora, e o contrário
+    const podem = list.filter((i) => !isArea(i.room) || isCons(i.room));
+    if (SEL) { const ok = new Set(podem.map((i) => i.id)); for (const id of [...SEL]) if (!ok.has(id)) SEL.delete(id); } // só o que está na lista
+    const lado = SEL && SEL.size ? isCons(D.itemById.get([...SEL][0]).room) : podem.length ? isCons(podem[0].room) : false;
+    const pickable = SEL && (SEL.size || !podem.some((i) => isCons(i.room) !== lado)) ? podem.filter((i) => isCons(i.room) === lado) : podem;
+    const soCons = list.every((i) => isCons(i.room)); // só consumíveis: sem a soma (eles não têm valor)
     const more = list.length > shown.length ? `<div class="more"><button class="btn" data-act="more-results">${ic("down")}Mostrar mais ${int(Math.min(120, list.length - shown.length))}</button></div>` : "";
     if (!SEL) {
-      return `<div class="ssum"><span>${plural(list.length, "item", "itens")}</span>${pickable.length ? `<button type="button" class="btn ghost sm sel-go" data-act="sel-start">${ic("checks", "sm")}Selecionar</button>` : ""}<b>${moneyR(sum)}</b></div>
+      return `<div class="ssum"><span>${plural(list.length, "item", "itens")}</span>${pickable.length ? `<button type="button" class="btn ghost sm sel-go" data-act="sel-start">${ic("checks", "sm")}Selecionar</button>` : ""}${soCons ? "" : `<b>${moneyR(sum)}</b>`}</div>
       <ul class="ilist">${shown.map((it) => itemRow(it, { toks })).join("")}</ul>${more}`;
     }
-    const n = SEL.size, all = n > 0 && n === pickable.length;
+    const n = SEL.size, all = n > 0 && n === podem.filter((i) => isCons(i.room) === lado).length;
     const selSum = pickable.reduce((s, i) => s + (SEL.has(i.id) ? vl(i) : 0), 0);
     return `<div class="ssum sel"><button type="button" class="btn ghost icon sm" data-act="sel-end" aria-label="Cancelar seleção">${ic("close")}</button>
-        <span class="sel-n">${n ? plural(n, "selecionado", "selecionados") : "Selecionar"}</span>${n ? `<b>${moneyR(selSum)}</b>` : ""}
+        <span class="sel-n">${n ? plural(n, "selecionado", "selecionados") : "Selecionar"}</span>${n && !lado ? `<b>${moneyR(selSum)}</b>` : ""}
         <button type="button" class="btn ghost sm" data-act="sel-all">${ic("checks", "sm")}${all ? "Nenhum" : "Todos"}</button></div>
-      <ul class="ilist">${shown.map((it) => itemRow(it, { toks, pick: isArea(it.room) ? "off" : SEL.has(it.id) })).join("")}</ul>${more}
-      <div class="selbar"><button type="button" class="btn primary" data-act="sel-change"${n ? "" : " disabled"}>${ic("edit")}${n ? `Alterar ${plural(n, "item", "itens")}` : "Alterar"}</button></div>`;
+      <ul class="ilist">${shown.map((it) => itemRow(it, { toks, pick: pickable.includes(it) ? SEL.has(it.id) : "off" })).join("")}</ul>${more}
+      <div class="selbar"><button type="button" class="btn primary" data-act="sel-change"${n ? "" : " disabled"}>${ic("edit")}${n ? `Alterar ${lado ? plural(n, "consumível", "consumíveis") : plural(n, "item", "itens")}` : "Alterar"}</button></div>`;
   }
   // Buscar › Selecionar: marcar vários itens e alterar de uma vez o cômodo, a categoria e a zona (com Desfazer), como no
   // ResolvIA. A seleção vale só para o que está na lista (mudou o filtro, sai o que sumiu); o Voltar do celular sai.
@@ -1244,7 +1249,7 @@
     if (!row) return;
     const id = row.dataset.id || decodeURIComponent((row.getAttribute("href") || "").split("/").pop());
     const it = D.itemById.get(id);
-    if (!it || isArea(it.room)) return;
+    if (!it || (isArea(it.room) && !isCons(it.room))) return;
     e.preventDefault();
     try { navigator.vibrate && navigator.vibrate(12); } catch { /* sem vibração */ }
     if (!SEL) selStart(id); // já selecionando, o toque marca e desmarca
@@ -1258,7 +1263,9 @@
   // cômodo, a categoria e a zona juntos. Em outro cômodo, o item ganha um código novo e fica sem zona (ou na zona escolhida).
   const KEEP = "__manter__", OTHER = "__outra__";
   function selEdit() {
-    const its = [...SEL].map((id) => D.itemById.get(id)).filter((i) => i && !isArea(i.room));
+    const todos = [...SEL].map((id) => D.itemById.get(id)).filter(Boolean);
+    if (todos.length && todos.every((i) => isCons(i.room))) return selEditCons(todos); // 1.89.0
+    const its = todos.filter((i) => i && !isArea(i.room));
     if (!its.length) return;
     const n = plural(its.length, "item", "itens"), zOn = zonesOn();
     const chip = (name, value, label, on = false) => `<label class="chip"><input type="radio" name="${name}" value="${esc(value)}"${on ? " checked" : ""}>${label}</label>`;
@@ -1316,6 +1323,53 @@
         if (SEL) SEL = new Set(); // 1.84.0: feita a alteração, os itens ficam desmarcados
         setRev(res.rev); res.items.forEach(upsertItem); derive(); requestClose(entry, { force: true }); refreshAll();
         toast(plural(res.items.length, "item alterado", "itens alterados"), { action: "Desfazer", onAction: async () => {
+          try { const back = await API.post("api/items/bulk", { items: before }); setRev(back.rev); back.items.forEach(upsertItem); derive(); refreshAll(); }
+          catch (er) { fail(er); }
+        } });
+      } catch (e) { fail(e); }
+      finally { busy = false; }
+    };
+    $("[data-bk]", dlg).addEventListener("submit", (e) => { e.preventDefault(); go(); });
+    dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); if (e.target.closest("[data-ok]")) go(); });
+  }
+
+  // 1.89.0: Alterar N consumíveis: a categoria (as dos consumíveis) e, com Consumíveis por cômodo ligado, o cômodo onde são
+  // usados; cada campo começa em Manter, com o Desfazer, como nos itens da casa
+  function selEditCons(its) {
+    const n = plural(its.length, "consumível", "consumíveis"), porComodo = consComodoOn();
+    const chip = (name, value, label, on = false) => `<label class="chip"><input type="radio" name="${name}" value="${esc(value)}"${on ? " checked" : ""}>${label}</label>`;
+    const entry = openDialog({
+      cls: "modal narrow", label: `Alterar ${n}`,
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("edit", `Alterar ${n}`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <form class="dlg-b" data-bk><div class="form">
+          <div class="field" data-f="cat"><span class="lbl" id="bk-l-cat">Categoria</span>
+            <div class="chips" role="radiogroup" aria-labelledby="bk-l-cat">${chip("bk-cat", KEEP, "Manter", true)}${CCATS.map(([k, v]) => chip("bk-cat", k, esc(v))).join("")}</div></div>
+          ${porComodo ? `<div class="field" data-f="usado"><span class="lbl" id="bk-l-usado">Cômodo onde é usado</span>
+            <div class="chips" role="radiogroup" aria-labelledby="bk-l-usado">${chip("bk-usado", KEEP, "Manter", true)}${chip("bk-usado", "", "Nenhum")}${D.rooms.map((r) => chip("bk-usado", r.id, esc(r.name))).join("")}</div></div>` : ""}
+        </div></form>
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok disabled>${ic("check")}Aplicar</button></div></div>`,
+    });
+    const dlg = entry.dlg;
+    const val = (name) => { const r = $(`input[name="${name}"]:checked`, dlg); return r ? r.value : KEEP; };
+    dlg.addEventListener("change", () => { $("[data-ok]", dlg).disabled = val("bk-cat") === KEEP && val("bk-usado") === KEEP; });
+    let busy = false;
+    const go = async () => {
+      if (busy || $("[data-ok]", dlg).disabled) return;
+      busy = true;
+      try {
+        const cat = val("bk-cat"), usado = val("bk-usado"), todo = [];
+        for (const i of its) {
+          const c = {};
+          if (cat !== KEEP && cat !== i.cat) c.cat = cat;
+          if (usado !== KEEP && usado !== (i.usedIn || "")) c.usedIn = usado;
+          if (Object.keys(c).length) todo.push({ id: i.id, ...c });
+        }
+        if (!todo.length) { requestClose(entry, { force: true }); toast("Nada mudou."); return; }
+        const before = todo.map((t) => { const i = D.itemById.get(t.id); return { id: i.id, cat: i.cat, usedIn: i.usedIn || "" }; });
+        const res = await API.post("api/items/bulk", { items: todo });
+        if (SEL) SEL = new Set();
+        setRev(res.rev); res.items.forEach(upsertItem); derive(); requestClose(entry, { force: true }); refreshAll();
+        toast(plural(res.items.length, "consumível alterado", "consumíveis alterados"), { action: "Desfazer", onAction: async () => {
           try { const back = await API.post("api/items/bulk", { items: before }); setRev(back.rev); back.items.forEach(upsertItem); derive(); refreshAll(); }
           catch (er) { fail(er); }
         } });
@@ -5255,7 +5309,9 @@
       case "compra-fazer": compraFazer(b); break;
       case "sel-change": if (SEL && SEL.size) selEdit(); break;
       case "sel-all": if (SEL) { // todos os da lista (os que já apareceram e os que vêm com Mostrar mais), ou nenhum
-        const ids = searchItems(base.q).list.filter((i) => !isArea(i.room)).map((i) => i.id);
+        const pd = searchItems(base.q).list.filter((i) => !isArea(i.room) || isCons(i.room)); // 1.89.0: de um lado só (a casa ou os consumíveis)
+        const ld = SEL.size ? isCons(D.itemById.get([...SEL][0]).room) : pd.length ? isCons(pd[0].room) : false;
+        const ids = pd.filter((i) => isCons(i.room) === ld).map((i) => i.id);
         SEL = new Set(ids.length && ids.every((id) => SEL.has(id)) ? [] : ids); selRender();
       } break;
       case "export": download(b.dataset.kind); break;

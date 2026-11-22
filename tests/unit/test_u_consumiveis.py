@@ -404,6 +404,20 @@ class PorComodo(Base):
         novo = self.store.update_item(it["id"], {"usedIn": "consumiveis"}, "Ana")
         self.assertNotIn("usedIn", novo, "a área dos consumíveis não é um cômodo")
 
+    def test_varios_de_uma_vez(self):
+        """1.89.0: o Alterar em lote (Buscar › Selecionar) leva o cômodo onde é usado; só num consumível."""
+        a, b = self.consumivel(), self.consumivel(name="Sabão em pó")
+        out = self.store.update_items([{"id": a["id"], "usedIn": "sala", "cat": "c-limpeza"}, {"id": b["id"], "usedIn": "cozinha"}], "Ana")
+        self.assertEqual([(i["cat"], i["usedIn"]) for i in out], [("c-limpeza", "sala"), (b["cat"], "cozinha")])
+        self.store.update_items([{"id": a["id"], "usedIn": ""}], "Ana")
+        self.assertNotIn("usedIn", self.store.item(a["id"]))
+        with self.assertRaises(S.ApiError) as e:
+            self.store.update_items([{"id": b["id"], "usedIn": "consumiveis"}], "Ana")
+        self.assertEqual(e.exception.message if hasattr(e.exception, "message") else str(e.exception.args[-1]), "Escolha um cômodo que exista.")
+        self.assertEqual(self.store.item(b["id"])["usedIn"], "cozinha", "tudo ou nada")
+        self.store.update_items([{"id": "sal-001", "usedIn": "cozinha"}], "Ana")
+        self.assertNotIn("usedIn", self.store.item("sal-001"), "num item da casa, não vale")
+
     def test_comodo_apagado_ou_itens_da_casa_desligados(self):
         self.store.settings["cons_comodo"] = True
         it = self.consumivel(usedIn="nao-existe")

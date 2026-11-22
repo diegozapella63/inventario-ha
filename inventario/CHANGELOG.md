@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.89.0
+
+- **Selecionar vários consumíveis**: no Buscar, o **Selecionar** agora vale também para os consumíveis. Marque vários e mude de uma vez a **categoria** e o **cômodo onde são usados** (com Consumíveis por cômodo ligado), com o Desfazer. Uma seleção é de um lado só: itens da casa ou consumíveis.
+- Numa lista só de consumíveis, a soma em reais não aparece mais (eles não têm valor).
+
 ## 1.88.0
 
 - **Consumíveis por cômodo**: em **Mais › Configurações › Opções › Inventário**, embaixo de Usar consumíveis. Ligado, cada consumível pode dizer em que cômodo é usado (o campo **Cômodo onde é usado**, ao editar); a lista e a ficha mostram o cômodo. A Ronda da casa do CorrerIA passa a mostrar, em cada cômodo, os consumíveis de lá.

@@ -58,6 +58,49 @@ async def body(r, p):
     st, _, d = r.app.request("GET", "api/integracao/consumiveis", headers={"Authorization": "Bearer " + chave})
     r.eq([c.get("comodo") for c in d["consumiveis"]], ["Cozinha"], "o /api/integracao/consumiveis leva o comodo")
 
+    # -- 1.89.0: Buscar › Selecionar com consumíveis: vários de uma vez, a categoria e o cômodo onde são usados
+    st, _, n2 = r.app.request("POST", "api/items", {"room": area["id"], "name": "Sabão em pó", "dur": 30})
+    i2 = (n2.get("item") or n2)["id"]
+    await r.open(pg, "#/buscar?tipo=consumiveis", ".ssum")
+    r.eq(await pg.locator(".ssum > b").count(), 0, "só consumíveis: sem a soma em reais")
+    await pg.click('[data-act="sel-start"]')
+    await pg.wait_for_selector(".selbar")
+    r.eq(await pg.locator(".irow.selr:not([disabled])").count(), 2, "os consumíveis entram no Selecionar")
+    await pg.click('[data-act="sel-all"]')
+    r.eq(txt(await pg.text_content(".selbar .btn")), "Alterar 2 consumíveis", "o botão diz consumíveis")
+    await pg.click('.selbar [data-act="sel-change"]')
+    await pg.wait_for_selector("dialog.modal [data-bk]")
+    r.eq(txt(await pg.text_content("dialog.modal h2")), "Alterar 2 consumíveis", "a janela")
+    r.eq([txt(t) for t in await pg.locator("dialog.modal .field > .lbl").all_text_contents()], ["Categoria", "Cômodo onde é usado"], "a categoria e o cômodo onde é usado")
+    r.check(await pg.locator('dialog.modal input[name="bk-cat"][value="c-limpeza"]').count() == 1 and await pg.locator('dialog.modal input[name="bk-cat"][value="moveis"]').count() == 0,
+            "as categorias dos consumíveis, não as da casa")
+    r.check(await pg.is_disabled("dialog.modal [data-ok]"), "tudo em Manter: o Aplicar desligado")
+    await pg.locator("dialog.modal .chip", has=pg.locator('input[name="bk-cat"][value="c-limpeza"]')).click()
+    await pg.locator("dialog.modal .chip", has=pg.locator('input[name="bk-usado"][value="sala"]')).click()
+    r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
+    await r.shot(pg, "alterar-consumiveis")
+    await pg.click("dialog.modal [data-ok]")
+    t = pg.locator(".toast", has_text="2 consumíveis alterados")
+    await t.wait_for(timeout=6000)
+    d = {i["id"]: i for i in r.data()["items"]}
+    r.eq([(d[k]["cat"], d[k].get("usedIn")) for k in (iid, i2)], [("c-limpeza", "sala"), ("c-limpeza", "sala")], "a categoria e o cômodo dos dois")
+    r.eq(await pg.locator('.irow.selr[aria-pressed="true"]').count(), 0, "feita a alteração, ficam desmarcados")
+    await t.locator("button", has_text="Desfazer").click()
+    await pg.wait_for_timeout(600)
+    d = {i["id"]: i for i in r.data()["items"]}
+    r.eq((d[iid].get("usedIn"), d[i2].get("usedIn")), ("cozinha", None), "o Desfazer volta o cômodo de cada um")
+    await pg.click('[data-act="sel-end"]')
+    # numa lista misturada, a seleção é de um lado só
+    await r.open(pg, "#/buscar", ".ssum")
+    await pg.click('[data-act="sel-start"]')
+    await pg.wait_for_selector(".selbar")
+    r.eq(await pg.locator(".irow.selr[disabled]").count(), 0, "sem nada marcado, a casa e os consumíveis podem")
+    await pg.locator(f'.irow.selr[data-id="{iid}"]').scroll_into_view_if_needed()
+    await pg.click(f'.irow.selr[data-id="{iid}"]')
+    r.check(await pg.locator(".irow.selr[disabled]").count() > 0 and await pg.locator(f'.irow.selr[data-id="{i2}"]:not([disabled])').count() == 1,
+            "marcado um consumível, os itens da casa ficam de fora")
+    await pg.click('[data-act="sel-end"]')
+
     # -- as fotos do cômodo no celular: os três botões na mesma linha, com a mesma altura, e o texto dentro do botão
     sala = next(x for x in r.data()["rooms"] if (x.get("photos") or []) and not x.get("kind"))
     await r.open(pg, f"#/c/{sala['id']}", ".rhead")
