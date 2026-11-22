@@ -491,6 +491,16 @@ class Store:
         r = self.room(rid) if isinstance(rid, str) and rid else None
         return r if r and not r.get("kind") else None
 
+    def home_rooms(self, v):
+        """1.91.0: os cômodos onde um consumível é usado: os ids (de um id, o jeito de antes, ou de uma lista) que são
+        cômodos da casa, sem repetir, até 40."""
+        ids = v if isinstance(v, list) else [v]
+        out = []
+        for rid in ids:
+            if self.home_room(rid) and rid not in out:
+                out.append(rid)
+        return out[:40]
+
     def item(self, iid):
         return next((i for i in self.data["items"] if i["id"] == iid), None)
 
@@ -655,8 +665,8 @@ class Store:
             it["dur"] = clean_dur(body.get("dur"))
             if it["dur"]:
                 it["durAt"] = ts  # 1.83.0: desde quando a duração conta (o Dura até)
-            if self.home_room(body.get("usedIn")):  # 1.88.0: o cômodo onde se usa (Consumíveis por cômodo)
-                it["usedIn"] = body["usedIn"]
+            if self.home_rooms(body.get("usedIn")):  # 1.88.0: onde se usa (Consumíveis por cômodo); 1.91.0: um ou vários, numa lista
+                it["usedIn"] = self.home_rooms(body["usedIn"])
             if not restore:
                 it["qty"], it["value"] = "1", 0
         src = clean_photo_src(body.get("photoSrc"), it["photos"])
@@ -731,8 +741,8 @@ class Store:
                 want = body["cat"] if "cat" in body else it.get("cat")
                 new["cat"] = want if want in self.cons_cat_map() else CONS_OUTROS
                 if "usedIn" in body:  # 1.88.0: o cômodo onde se usa; vazio ou desconhecido tira
-                    if self.home_room(body["usedIn"]):
-                        new["usedIn"] = body["usedIn"]
+                    if self.home_rooms(body["usedIn"]):
+                        new["usedIn"] = self.home_rooms(body["usedIn"])
                     else:
                         new.pop("usedIn", None)
                 if "dur" in body:
@@ -807,9 +817,10 @@ class Store:
                 if "zone" in ch:
                     new["zone"] = text(ch["zone"], 120, "zona")
                 if "usedIn" in ch and self.is_cons(new.get("room", it["room"])):  # 1.89.0: o cômodo onde o consumível é usado ("" tira)
-                    if ch["usedIn"] not in ("", None) and not self.home_room(ch["usedIn"]):
+                    quer = [x for x in (ch["usedIn"] if isinstance(ch["usedIn"], list) else [ch["usedIn"]]) if x not in ("", None)]
+                    if len(self.home_rooms(quer)) != len(set(map(str, quer))):
                         raise ApiError(400, "Escolha um cômodo que exista.")
-                    new["usedIn"] = ch["usedIn"] or ""
+                    new["usedIn"] = self.home_rooms(quer)
                 plan.append((it, new, ch.get("seq")))
             t, out = now_iso(), []
             for it, new, want in plan:
@@ -1712,8 +1723,13 @@ def cons_comodo_enabled() -> bool:
 
 
 def used_in(it):
-    """O cômodo onde o consumível é usado (com a opção ligada e o cômodo ainda existindo), ou None."""
-    return STORE.home_room((it or {}).get("usedIn")) if cons_comodo_enabled() else None
+    """Os cômodos onde o consumível é usado (com a opção ligada e os que ainda existem): uma lista, vazia sem nenhum.
+    1.91.0: mais de um; o que foi gravado antes (um id só) vale como uma lista de um."""
+    return [STORE.room(r) for r in STORE.home_rooms((it or {}).get("usedIn"))] if cons_comodo_enabled() else []
+
+
+def used_in_text(it):
+    return ", ".join(r["name"] for r in used_in(it))
 
 
 def consumiveis_enabled() -> bool:
@@ -4894,7 +4910,7 @@ def chat_context(screen: dict) -> str:
         for i in sorted(consumiveis, key=lambda i: i.get("seq") or 0)[:MAX_ITENS_CHAT]:
             lines.append("- " + " | ".join(b for b in (f"{STORE.tag(i)} {i.get('name', '')}", STORE.cat_of(i),
                                                      f"dura {dur_text(i.get('dur'))}" + (f", até {dia_br(dur_until(i))}" if dur_until(i) else "") if clean_dur(i.get("dur")) else "",
-                                                     f"usado em {used_in(i)['name']}" if used_in(i) else "",
+                                                     f"usado em {used_in_text(i)}" if used_in(i) else "",
                                                      " ".join(str(i.get("details") or "").split())[:200]) if b))
     return "\n".join(lines)
 
@@ -5964,7 +5980,7 @@ def r_integracao_consumiveis(h, query):
         # 1.82.0: sem quantidade (um consumível não tem mais); a duração estimada, em dias (0: sem), para o A cada do EconomIA
         out = [{"id": it["id"], "nome": (it.get("name") or "")[:120], "categoria": STORE.cat_of(it),
                 "duracao_dias": clean_dur(it.get("dur")), "duracao": dur_text(it.get("dur")), "dura_ate": dur_until(it), "para_que_serve": " ".join(str(it.get("details") or "").split())[:240],
-                **({"comodo": used_in(it)["name"]} if used_in(it) else {})} for it in items]  # 1.88.0: o cômodo onde se usa
+                **({"comodo": used_in(it)[0]["name"], "comodos": [r["name"] for r in used_in(it)]} if used_in(it) else {})} for it in items]  # 1.88.0: o cômodo onde se usa
     h.send_json({"versao": VERSION, "ligado": consumiveis_enabled(), "consumiveis": out[:500]})
 
 

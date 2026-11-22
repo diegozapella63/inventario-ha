@@ -1,5 +1,11 @@
 # Mudanças
 
+## 1.91.0
+
+- **Consumíveis em mais de um cômodo**: no consumível, **Cômodos onde é usado** agora deixa marcar vários. A lista e a ficha mostram todos.
+- **Consumíveis: agrupar e recolher**. Com Consumíveis por cômodo ligado, **Agrupar por** Categoria ou Cômodo (o de vários cômodos aparece em cada um). Cada grupo fecha e abre num toque no título, e o aparelho lembra.
+- **Pelo CorrerIA**: um consumível dito com duração no meio de uma ronda é cadastrado nos Consumíveis, já com o cômodo da ronda. Antes dava "duracao_dias só vale num consumível".
+
 ## 1.90.0
 
 - **Abrir pelas Rondas do CorrerIA**: o botão **Abrir no InventarIA** de uma ronda abre direto no cômodo da ronda, ou nos Consumíveis.

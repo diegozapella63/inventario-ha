@@ -39,24 +39,48 @@ async def body(r, p):
     r.eq(txt(await pg.text_content('[data-slot="usado-em"]')), "Nenhum cômodo", "ligado e sem cômodo: a ficha diz")
     await pg.click('.btn.primary[data-act="item-edit"]')
     await pg.wait_for_selector("#f-usado", state="attached", timeout=5000)
-    r.eq(txt(await pg.text_content('label[for="f-usado"]')), "Cômodo onde é usado", "o campo no editor")
-    ops = await pg.evaluate("[...document.querySelector('#f-usado').options].map(o => o.textContent)")
-    r.check(ops[0] == "Nenhum" and "Cozinha" in ops and "Consumíveis" not in ops and "Bens" not in ops, f"Nenhum e os cômodos da casa, sem as áreas ({ops})")
-    await pg.evaluate("(s => { s.value = 'cozinha'; s.dispatchEvent(new Event('input', { bubbles: true })); s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#f-usado'))")
+    r.eq(txt(await pg.text_content("#f-usado-l")), "Cômodos onde é usado", "o campo no editor")
+    ops = await pg.locator("#f-usado .chip").all_inner_texts()
+    r.check("Cozinha" in ops and "Consumíveis" not in ops and "Bens" not in ops, f"os cômodos da casa, sem as áreas ({ops})")
+    # 1.91.0: mais de um cômodo, cada um um botão de marcar
+    for rid in ("cozinha", "quarto"):
+        await pg.locator("#f-usado .chip", has=pg.locator(f'input[value="{rid}"]')).click()
+    r.eq(await pg.locator('#f-usado input:checked').count(), 2, "dois marcados")
     await pg.click('[data-ed="save"]')
-    await pg.wait_for_function("document.querySelector('[data-slot=\"usado-em\"]') && document.querySelector('[data-slot=\"usado-em\"]').textContent.includes('Cozinha')", timeout=5000)
-    r.eq(next(i for i in r.data()["items"] if i["id"] == iid).get("usedIn"), "cozinha", "o cômodo fica gravado no consumível")
+    await pg.wait_for_function("document.querySelector('[data-slot=\"usado-em\"]') && document.querySelector('[data-slot=\"usado-em\"]').textContent.includes('Quarto')", timeout=5000)
+    r.eq(txt(await pg.text_content('[data-slot="usado-em"]')), "Cozinha, Quarto", "a ficha diz os dois")
+    r.eq(await pg.locator('[data-slot="usado-em"] a').count(), 2, "cada cômodo é um link")
+    r.eq(next(i for i in r.data()["items"] if i["id"] == iid).get("usedIn"), ["cozinha", "quarto"], "os cômodos ficam gravados no consumível")
     await r.shot(pg, "ficha")
     await r.open(pg, "#/consumiveis", ".irow")
-    r.check("Cozinha" in txt(await pg.text_content(".irow .meta")), "a linha da lista diz o cômodo")
+    r.check("Cozinha, Quarto" in txt(await pg.text_content(".irow .meta")), "a linha da lista diz os cômodos")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
+
+    # -- 1.91.0: Agrupar por Categoria ou Cômodo; cada grupo fecha pelo título e o aparelho lembra
+    r.eq([txt(t) for t in await pg.locator(".agrupar .chip").all_inner_texts()], ["Categoria", "Cômodo"], "Agrupar por")
+    r.eq(await pg.locator(".agrupar .chip svg").count(), 2, "com ícone")
+    r.eq(await pg.get_attribute('.agrupar [data-v="cat"]', "aria-pressed"), "true", "começa por categoria")
+    await pg.click('.agrupar [data-v="comodo"]')
+    await pg.wait_for_selector('.zone[data-zk="r:cozinha"]')
+    r.eq([txt(t) for t in await pg.locator(".zone .zone-h h3").all_inner_texts()], ["Cozinha", "Quarto"], "um grupo por cômodo: o de dois cômodos aparece nos dois")
+    await pg.click('.zone[data-zk="r:cozinha"] .zone-h')
+    r.check(not await pg.locator('.zone[data-zk="r:cozinha"] .ilist').is_visible(), "o grupo fecha pelo título")
+    r.eq(await pg.get_attribute('.zone[data-zk="r:cozinha"] .zone-h', "aria-expanded"), "false", "e diz que está fechado")
+    await pg.reload()
+    await pg.wait_for_selector('.zone[data-zk="r:quarto"] .irow')
+    r.check(await pg.locator('.zone[data-zk="r:cozinha"].fechada').count() == 1 and await pg.get_attribute('.agrupar [data-v="comodo"]', "aria-pressed") == "true", "o aparelho lembra o agrupamento e o grupo fechado")
+    r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
+    await r.shot(pg, "agrupar", full_page=True)
+    await pg.click('.zone[data-zk="r:cozinha"] .zone-h')
+    await pg.click('.agrupar [data-v="cat"]')
+    await pg.wait_for_selector('.zone[data-zk^="c:"] .irow')
 
     # -- os outros apps (o EconomIA) recebem o cômodo
     import json, os
     with open(os.path.join(r.app.path("share"), "integracao.json"), encoding="utf-8") as f:
         chave = json.load(f)["chave"]
     st, _, d = r.app.request("GET", "api/integracao/consumiveis", headers={"Authorization": "Bearer " + chave})
-    r.eq([c.get("comodo") for c in d["consumiveis"]], ["Cozinha"], "o /api/integracao/consumiveis leva o comodo")
+    r.eq([(c.get("comodo"), c.get("comodos")) for c in d["consumiveis"]], [("Cozinha", ["Cozinha", "Quarto"])], "o /api/integracao/consumiveis leva o comodo (o primeiro) e os comodos")
 
     # -- 1.89.0: Buscar › Selecionar com consumíveis: vários de uma vez, a categoria e o cômodo onde são usados
     st, _, n2 = r.app.request("POST", "api/items", {"room": area["id"], "name": "Sabão em pó", "dur": 30})
@@ -83,12 +107,12 @@ async def body(r, p):
     t = pg.locator(".toast", has_text="2 consumíveis alterados")
     await t.wait_for(timeout=6000)
     d = {i["id"]: i for i in r.data()["items"]}
-    r.eq([(d[k]["cat"], d[k].get("usedIn")) for k in (iid, i2)], [("c-limpeza", "sala"), ("c-limpeza", "sala")], "a categoria e o cômodo dos dois")
+    r.eq([(d[k]["cat"], d[k].get("usedIn")) for k in (iid, i2)], [("c-limpeza", ["sala"]), ("c-limpeza", ["sala"])], "a categoria e o cômodo dos dois")
     r.eq(await pg.locator('.irow.selr[aria-pressed="true"]').count(), 0, "feita a alteração, ficam desmarcados")
     await t.locator("button", has_text="Desfazer").click()
     await pg.wait_for_timeout(600)
     d = {i["id"]: i for i in r.data()["items"]}
-    r.eq((d[iid].get("usedIn"), d[i2].get("usedIn")), ("cozinha", None), "o Desfazer volta o cômodo de cada um")
+    r.eq((d[iid].get("usedIn"), d[i2].get("usedIn")), (["cozinha", "quarto"], None), "o Desfazer volta o cômodo de cada um")
     await pg.click('[data-act="sel-end"]')
     # numa lista misturada, a seleção é de um lado só
     await r.open(pg, "#/buscar", ".ssum")

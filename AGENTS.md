@@ -152,6 +152,8 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 
 1.90.0: o painel do Home Assistant passa `/comodo/<nome ou id>` e `/consumiveis` (o link de uma ronda do CorrerIA 1.22.0; `haOpen` no fim do app.js, que espera os dados): abre o cômodo (pelo nome sem acento nem maiúsculas) ou os Consumíveis (só ligados). Teste: `tests/e2e/e2e_link_ronda.py` (com `window.INV_TESTE = true`).
 
+1.91.0: `it.usedIn` é uma lista de ids (`Store.home_rooms`: um id só, o de antes, vale como lista de um; `used_in(it)` devolve a lista dos cômodos e `used_in_text` os nomes); no editor, `#f-usado` são botões de marcar (`input[name="usadoEm"]`); nas ferramentas, `usado_em` aceita vários separados por ponto e vírgula e sai como «A, B»; o `/api/integracao/consumiveis` leva `comodo` (o primeiro) e `comodos`. `viewCons`: **Agrupar por** (`.agrupar`, `cons-agrupar` no aparelho: `cat` ou `comodo`, só com Consumíveis por cômodo) e os grupos que fecham (`.zone.dobra-z`, `data-zk`, `cons-fechados`). `_cadastrar` (ferramentas.py): um lote em que todo item tem `duracao_dias` ou `usado_em`, mandado com um cômodo da casa, vai para os Consumíveis e o cômodo vira o `usado_em` (a IA manda o cômodo da ronda).
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.

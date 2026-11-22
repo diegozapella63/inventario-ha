@@ -223,7 +223,10 @@
   const consOn = () => S.settings.consumiveis === true;
   // 1.88.0: Consumíveis por cômodo: cada consumível pode dizer em que cômodo é usado (it.usedIn), para a Ronda da casa do CorrerIA
   const consComodoOn = () => consOn() && itensOn() && S.settings.cons_comodo === true;
-  const usadoEm = (it) => (consComodoOn() && it && it.usedIn ? S.rooms.find((r) => r.id === it.usedIn && !r.kind) : null) || null;
+  // 1.91.0: mais de um cômodo (uma lista de ids; o gravado antes, um id só, vale como uma lista de um). usadoEm: os cômodos, na ordem da casa
+  const usadoIds = (it) => (it && it.usedIn ? [].concat(it.usedIn) : []);
+  const usadoEm = (it) => (consComodoOn() && usadoIds(it).length ? S.rooms.filter((r) => !r.kind && usadoIds(it).includes(r.id)) : []);
+  const usadoNomes = (it) => usadoEm(it).map((r) => r.name).join(", ");
   const tiposOn = () => [itensOn(), bensOn(), consOn()].filter(Boolean).length;
   // a tela principal de cada tipo: a dos itens da casa é a aba Cômodos; sem eles, a aba vira Bens (ou Consumíveis)
   const mainTab = () => (itensOn() ? "rooms" : bensOn() ? "bens" : "cons");
@@ -921,8 +924,8 @@
     const ph = it.photos && it.photos[0];
     const room = D.roomById.get(it.room);
     let where;
-    if (mode === "room") where = [usadoEm(it) ? `<b class="usado">${esc(usadoEm(it).name)}</b>` : "", it.details ? hl(snippet(it.details), toks) : ""].filter(Boolean).join(" · "); // 1.88.0: o cômodo onde o consumível é usado
-    else if (mode === "cons" || (mode === "bens" && isCons(it.room))) where = esc([CCAT[it.cat] || "Outros", usadoEm(it) ? usadoEm(it).name : ""].filter(Boolean).join(" · "));
+    if (mode === "room") where = [usadoEm(it).length ? `<b class="usado">${esc(usadoNomes(it))}</b>` : "", it.details ? hl(snippet(it.details), toks) : ""].filter(Boolean).join(" · "); // 1.88.0: o cômodo onde o consumível é usado
+    else if (mode === "cons" || (mode === "bens" && isCons(it.room))) where = esc([CCAT[it.cat] || "Outros", usadoNomes(it)].filter(Boolean).join(" · "));
     else if (mode === "bens") where = esc(CAT[it.cat] || "Outros");
     else where = hl([room?.name, zonesOn() ? it.zone : ""].filter(Boolean).join(", "), toks);
     const qty = qtyClean(it.qty);
@@ -1124,12 +1127,22 @@
         <p>Pasta térmica, creme de massagem, pilhas: o que se gasta e se compra de novo.</p>
         <div class="acts"><button type="button" class="btn primary" data-act="item-new" data-room="${esc(consId())}">${ic("plus")}Adicionar consumível</button></div></div></div>`;
     }
-    const groups = CCATS.map(([k, name]) => [name, D.consItems.filter((it) => (CCAT[it.cat] ? it.cat : "c-outros") === k).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))])
-      .filter(([, its]) => its.length);
+    // 1.91.0 (o dono: "agrupamento por cômodo e categoria e opção de retrair"): Agrupar por Categoria ou, com Consumíveis por
+    // cômodo, por Cômodo (o de vários cômodos aparece em cada um; os sem cômodo, no fim); cada grupo fecha pelo título e o aparelho lembra.
+    const porNome = (a, b) => a.name.localeCompare(b.name, "pt-BR");
+    const como = consComodoOn() && LS.get("cons-agrupar", "cat") === "comodo" ? "comodo" : "cat";
+    const groups = (como === "comodo"
+      ? [...D.rooms.map((r) => [`r:${r.id}`, r.name, "rooms", D.consItems.filter((it) => usadoEm(it).some((x) => x.id === r.id))]),
+        ["r:", "Sem cômodo", "drop", D.consItems.filter((it) => !usadoEm(it).length)]]
+      : CCATS.map(([k, name]) => [`c:${k}`, name, "drop", D.consItems.filter((it) => (CCAT[it.cat] ? it.cat : "c-outros") === k)])
+    ).filter((g) => g[3].length);
+    const shut = new Set(LS.get("cons-fechados", []));
     return `<div class="mscreen cons">
-      ${groups.map(([name, its]) => `<section class="zone">
-        <div class="zone-h"><h3><span class="zone-ic" aria-hidden="true">${ic("drop")}</span>${esc(name)}</h3><span class="zs">${plural(its.length, "consumível", "consumíveis")}</span></div>
-        <ul class="ilist">${its.map((it) => itemRow(it, { mode: "room" })).join("")}</ul></section>`).join("")}
+      ${consComodoOn() ? `<div class="agrupar" role="group" aria-label="Agrupar por"><span>${ic("layers", "sm")}Agrupar por</span>
+        ${[["cat", "Categoria", "grid"], ["comodo", "Cômodo", "rooms"]].map(([k, v, i]) => `<button type="button" class="chip" data-act="cons-agrupar" data-v="${k}" aria-pressed="${como === k}">${ic(i, "sm")}${v}</button>`).join("")}</div>` : ""}
+      ${groups.map(([key, name, icone, its]) => `<section class="zone dobra-z${shut.has(key) ? " fechada" : ""}" data-zk="${esc(key)}">
+        <button type="button" class="zone-h" data-act="cons-dobra" aria-expanded="${!shut.has(key)}"><h3><span class="zone-ic" aria-hidden="true">${ic(icone)}</span>${esc(name)}</h3><span class="zs">${plural(its.length, "consumível", "consumíveis")}</span>${ic("chev", "sm seta")}</button>
+        <ul class="ilist">${its.sort(porNome).map((it) => itemRow(it, { mode: como === "comodo" ? "cons" : "room" })).join("")}</ul></section>`).join("")}
     </div>`;
   }
   function matches(it, toks) {
@@ -1361,11 +1374,11 @@
         for (const i of its) {
           const c = {};
           if (cat !== KEEP && cat !== i.cat) c.cat = cat;
-          if (usado !== KEEP && usado !== (i.usedIn || "")) c.usedIn = usado;
+          if (usado !== KEEP && usadoIds(i).join("|") !== usado) c.usedIn = usado ? [usado] : [];
           if (Object.keys(c).length) todo.push({ id: i.id, ...c });
         }
         if (!todo.length) { requestClose(entry, { force: true }); toast("Nada mudou."); return; }
-        const before = todo.map((t) => { const i = D.itemById.get(t.id); return { id: i.id, cat: i.cat, usedIn: i.usedIn || "" }; });
+        const before = todo.map((t) => { const i = D.itemById.get(t.id); return { id: i.id, cat: i.cat, usedIn: usadoIds(i) }; });
         const res = await API.post("api/items/bulk", { items: todo });
         if (SEL) SEL = new Set();
         setRev(res.rev); res.items.forEach(upsertItem); derive(); requestClose(entry, { force: true }); refreshAll();
@@ -3650,7 +3663,7 @@
           ${zonesOn() && room.kind !== "consumiveis" ? `<dt>Zona</dt><dd>${esc(it.zone || "Sem zona")}</dd>` : ""}
           ${room.kind === "consumiveis"
             ? `<dt>Categoria</dt><dd><span class="rnm">${esc(CCAT[it.cat] || "Outros")}</span></dd>
-          ${consComodoOn() ? `<dt>Usado em</dt><dd data-slot="usado-em">${usadoEm(it) ? `<a href="#/c/${encodeURIComponent(usadoEm(it).id)}"><span class="rnm">${esc(usadoEm(it).name)}</span></a>` : "Nenhum cômodo"}</dd>` : ""}
+          ${consComodoOn() ? `<dt>Usado em</dt><dd data-slot="usado-em">${usadoEm(it).length ? usadoEm(it).map((r) => `<a href="#/c/${encodeURIComponent(r.id)}"><span class="rnm">${esc(r.name)}</span></a>`).join(", ") : "Nenhum cômodo"}</dd>` : ""}
           ${durAte(it) ? `<dt>Dura até</dt><dd data-slot="dura-ate"${durFim(it) ? ' class="fim"' : ""}>${esc(durAte(it))}${durFim(it) ? " · acabou" : ""}</dd>` : `<dt>Duração estimada</dt><dd>Sem duração</dd>`}`
             : `<dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
           <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>`}
@@ -3751,7 +3764,7 @@
       zone: item ? item.zone || "" : !zonesOn() ? "" : from.zone != null ? from.zone : zone != null ? zone : LS.get("lastZone:" + rid, "") || "",
       cat: from.cat || "", qty: from.qty ? qtyClean(from.qty) : "1", value: from.value ? moneyInput(from.value) : "",
       dur: durNum(from.dur) ? String(durNum(from.dur)) : "", // 1.82.0: só num consumível
-      usedIn: from.usedIn || "", // 1.88.0: o cômodo onde se usa (Consumíveis por cômodo)
+      usedIn: usadoIds(from), // 1.88.0: onde se usa (Consumíveis por cômodo); 1.91.0: um ou vários
       flag: from.flag || "", photos: [...(from.photos || photos || [])], photoSrc: { ...(from.photoSrc || {}) },
       source: item ? item.source || "manual" : dup ? dup.source || "manual" : "manual",
       dirty: !!(dup || (photos && photos.length)), busy: false, uploading: 0, aiBusy: false, hint: "",
@@ -3797,7 +3810,7 @@
             ${bem ? `<div class="field"><span class="lbl" id="f-tipo-l">Tipo</span><div class="seg tipo" role="group" aria-labelledby="f-tipo-l" data-slot="tipo">${tipoBtns()}</div></div>`
               : `${cons ? "" : zonesOn() ? `<div class="row2">${roomField}${zoneField}</div>` : roomField}
             <div class="field"><label for="f-cat">Categoria</label><select id="f-cat" class="select" name="cat"><option value="">Escolha a categoria</option>${(cons ? CCATS : CATS).map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`}
-            ${cons && consComodoOn() ? `<div class="field"><label for="f-usado">Cômodo onde é usado</label><select id="f-usado" class="select" name="usedIn"><option value="">Nenhum</option>${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === F.usedIn ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>` : ""}
+            ${cons && consComodoOn() ? `<div class="field"><span class="lbl" id="f-usado-l">Cômodos onde é usado</span><div class="chips grid" id="f-usado" role="group" aria-labelledby="f-usado-l">${D.rooms.map((r) => `<label class="chip"><input type="checkbox" name="usadoEm" value="${esc(r.id)}"${F.usedIn.includes(r.id) ? " checked" : ""}>${esc(r.name)}</label>`).join("")}</div></div>` : ""}
             ${cons ? `<div class="field" id="f-dur"><span class="lbl" id="f-dur-l">Duração estimada</span>
               <div class="chips grid durs" role="radiogroup" aria-labelledby="f-dur-l" data-slot="durs">${durChips()}</div>
               <div data-slot="dur-outra">${durOutra()}</div></div>` : ""}
@@ -3905,6 +3918,7 @@
       if (t.name === "value") fieldErr("value", "");
     });
     form.addEventListener("change", (e) => {
+      if (e.target.name === "usadoEm") { F.usedIn = $$('input[name="usadoEm"]:checked', form).map((i) => i.value); F.dirty = true; return; } // 1.91.0: um ou vários
       if (e.target.name === "room") {
         F.room = e.target.value;
         if (form.zone && !item) { F.zone = LS.get("lastZone:" + F.room, "") || ""; form.zone.value = F.zone; } // a zona lembrada é a deste cômodo
@@ -3976,7 +3990,7 @@
       // sem zonas, a zona escondida só fica se o item continuar no mesmo cômodo
       const zone = cons ? "" : zonesOn() ? F.zone.trim() : item && F.room === item.room ? item.zone || "" : "";
       const body = { name, details: F.details.trim(), room: F.room, zone, cat: F.cat || "outros", qty: F.qty.trim() || "1", value, photos: F.photos, photoSrc: F.photoSrc, flag: F.flag.trim(), source: F.source };
-      if (cons) { delete body.qty; delete body.value; body.cat = CCAT[F.cat] ? F.cat : "c-outros"; body.dur = durNum(F.dur); if (consComodoOn()) body.usedIn = F.usedIn || ""; } // 1.82.0: sem quantidade e sem valor
+      if (cons) { delete body.qty; delete body.value; body.cat = CCAT[F.cat] ? F.cat : "c-outros"; body.dur = durNum(F.dur); if (consComodoOn()) body.usedIn = F.usedIn || []; } // 1.82.0: sem quantidade e sem valor
       setBusy(true);
       try {
         body.room = F.room = await realRoom(F.room); // o primeiro bem (ou consumível) cria a área
@@ -5298,6 +5312,16 @@
         LS.set("busca-filtros-fechado", shut);
         b.setAttribute("aria-expanded", String(!shut));
         const f = $("#view .sfilters"); if (f) f.hidden = shut;
+        break;
+      }
+      case "cons-agrupar": LS.set("cons-agrupar", b.dataset.v); renderView(false); break;
+      case "cons-dobra": { // 1.91.0: o grupo dos Consumíveis fecha e abre pelo título (o aparelho lembra)
+        const sec = b.closest(".zone"), shut = new Set(LS.get("cons-fechados", []));
+        const fechar = !sec.classList.contains("fechada");
+        if (fechar) shut.add(sec.dataset.zk); else shut.delete(sec.dataset.zk);
+        LS.set("cons-fechados", [...shut]);
+        sec.classList.toggle("fechada", fechar);
+        b.setAttribute("aria-expanded", String(!fechar));
         break;
       }
       case "search-clear": { const inp = $('#view [data-input="search-q"]'); if (inp) { inp.value = ""; inp.focus(); } updateSearch({ q: "" }); break; }

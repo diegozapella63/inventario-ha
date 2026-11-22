@@ -40,7 +40,7 @@ _ZONA = {"type": "string", "description": "Parte do cômodo, como Estante ou Rac
 _DETALHES = {"type": "string", "description": "Marca, modelo, cor, tamanho e estado."}
 _OBS = {"type": "string", "description": "Algo para lembrar sobre o item (até 200 caracteres)."}
 _USADO = {"type": "string", "description": "Só num consumível, com Consumíveis por cômodo ligado (opcoes.consumiveis_por_comodo no resumo): "
-                                           "o id ou o nome do cômodo onde é usado. Vazio tira."}
+                                           "o id ou o nome do cômodo onde é usado; mais de um, separados por ponto e vírgula (Cozinha; Lavanderia). Vazio tira."}
 
 FERRAMENTAS = [
     {"nome": "resumo", "titulo": "Resumo do inventário", "grava": False,
@@ -299,7 +299,7 @@ def _linha(srv, it, cats=None, taxas=None) -> dict:
         out["categoria"] = srv.STORE.cat_of(it)
         out["tipo"] = "consumível"
         if srv.used_in(it):  # 1.88.0: Consumíveis por cômodo
-            out["usado_em"] = srv.used_in(it)["name"]
+            out["usado_em"] = srv.used_in_text(it)
         if srv.clean_dur(it.get("dur")):
             out["duracao"], out["duracao_dias"] = srv.dur_text(it.get("dur")), srv.clean_dur(it.get("dur"))
             if srv.dur_until(it):  # 1.83.0: até quando dura
@@ -401,15 +401,21 @@ def _resumo(srv) -> str:
 
 
 def _usado_em(srv, v):
-    """1.88.0: o id do cômodo onde o consumível é usado ("" tira). Só com Consumíveis por cômodo ligado."""
+    """1.88.0: os ids dos cômodos onde o consumível é usado ([] tira). Só com Consumíveis por cômodo ligado.
+    1.91.0: mais de um, separados por ponto e vírgula («Cozinha; Lavanderia») ou numa lista."""
     if not srv.cons_comodo_enabled():
         raise ErroFerramenta("usado_em: os Consumíveis por cômodo estão desligados no InventarIA (Mais › Configurações › Opções). Mande sem usado_em.")
-    if v in (None, ""):
-        return ""
-    room = _achar_comodo(srv, v)
-    if isinstance(room, str) or _area(room):
-        raise ErroFerramenta("usado_em: um cômodo da casa (não Bens nem Consumíveis).")
-    return room["id"]
+    nomes = v if isinstance(v, list) else str(v or "").split(";")
+    ids = []
+    for nome in (str(x).strip() for x in nomes):
+        if not nome:
+            continue
+        room = _achar_comodo(srv, nome)
+        if isinstance(room, str) or _area(room):
+            raise ErroFerramenta("usado_em: um cômodo da casa (não Bens nem Consumíveis).")
+        if room["id"] not in ids:
+            ids.append(room["id"])
+    return ids
 
 
 def _buscar(srv, a) -> str:
@@ -435,7 +441,7 @@ def _buscar(srv, a) -> str:
     if zona is not None and not zonas:
         raise ErroFerramenta("As zonas estão desligadas no InventarIA. Busque sem a zona.")
     palavras = [srv.fold(w) for w in str(a.get("texto") or "").split()][:12]
-    usado = _usado_em(srv, a["usado_em"]) if a.get("usado_em") not in (None, "") else None
+    usado = (_usado_em(srv, a["usado_em"]) or None) if a.get("usado_em") not in (None, "") else None
     ordem = a.get("ordem") or "codigo"
     if ordem not in ("codigo", "valor", "nome", "recentes"):
         raise ErroFerramenta("ordem: codigo, valor, nome ou recentes.")
@@ -447,7 +453,7 @@ def _buscar(srv, a) -> str:
     for it in items:
         if room and it.get("room") != room["id"]:
             continue
-        if usado and not (_eh_cons(srv, it) and it.get("usedIn") == usado):
+        if usado and not (_eh_cons(srv, it) and set(usado) & set(srv.STORE.home_rooms(it.get("usedIn")))):
             continue
         if cat and (cat.startswith("c-") != _eh_cons(srv, it) or
                     ((it.get("cat") if it.get("cat") in srv.STORE.cons_cat_map() else srv.CONS_OUTROS) if _eh_cons(srv, it)
@@ -501,7 +507,7 @@ def _ver(srv, a) -> str:
         out["categoria"] = {"id": cid, "nome": ccats.get(cid, "Outros")}
         out["duracao_dias"], out["duracao"] = srv.clean_dur(it.get("dur")), srv.dur_text(it.get("dur")) or "sem duração"
         if srv.used_in(it):  # 1.88.0
-            out["usado_em"] = srv.used_in(it)["name"]
+            out["usado_em"] = srv.used_in_text(it)
         if srv.dur_until(it):
             out["dura_ate"] = srv.dur_until(it)
     else:
@@ -536,6 +542,14 @@ def _cadastrar(srv, a, quem) -> str:
     if len(lote) > MAX_LOTE:
         raise ErroFerramenta(f"No máximo {MAX_LOTE} itens de cada vez.")
     room = _achar_comodo(srv, a.get("comodo"), criar_bens=True)
+    # 1.91.0 (o dono, numa ronda: "Não deu: duracao_dias só vale num consumível". "Entendi nada"): itens com duracao_dias ou
+    # usado_em são consumíveis, mesmo com o comodo de um cômodo da casa (a IA manda o cômodo da ronda): vão para os
+    # Consumíveis e, com Consumíveis por cômodo, esse cômodo vira o usado_em de quem não disse outro.
+    de_cons = lambda x: isinstance(x, dict) and (x.get("duracao_dias") not in (None, 0) or x.get("usado_em") not in (None, ""))
+    if not _area(room) and srv.consumiveis_enabled() and all(de_cons(x) for x in lote):
+        if srv.cons_comodo_enabled():
+            lote = [dict(x, usado_em=x.get("usado_em") or room.get("name")) for x in lote]
+        room = _achar_comodo(srv, "Consumíveis", criar_bens=True)
     bem = bool(_area(room))
     cons = _area(room) == "consumiveis"
     zona_geral = _texto(srv, a.get("zona"), 120, "zona") if a.get("zona") not in (None, "") else ""
@@ -551,9 +565,9 @@ def _cadastrar(srv, a, quem) -> str:
             if cons:
                 _sem_valor(x)
             elif x.get("duracao_dias") not in (None, 0):
-                raise ErroFerramenta("duracao_dias só vale num consumível (comodo Consumíveis).")
+                raise ErroFerramenta("A duração só vale num consumível: mande comodo \"Consumíveis\" (com Usar consumíveis ligado no InventarIA).")
             if x.get("usado_em") not in (None, "") and not cons:
-                raise ErroFerramenta("usado_em só vale num consumível (comodo Consumíveis).")
+                raise ErroFerramenta("O cômodo onde é usado só vale num consumível: mande comodo \"Consumíveis\" (com Usar consumíveis ligado no InventarIA).")
             zona = _texto(srv, x.get("zona"), 120, "zona") if x.get("zona") not in (None, "") else zona_geral
             _zona_ok(srv, room, x.get("zona") not in (None, ""))
             corpos.append({"name": _texto(srv, x.get("nome"), 200, "nome", obrig=True), "value": _valor(srv, x.get("valor")),
@@ -632,7 +646,7 @@ def _editar(srv, a, quem) -> str:
         if k == "dur":
             return srv.dur_text(v) or "(sem)"
         if k == "usedIn":
-            return (srv.STORE.home_room(v) or {}).get("name") or "(nenhum)"
+            return ", ".join(srv.STORE.room(r)["name"] for r in srv.STORE.home_rooms(v)) or "(nenhum)"
         if k == "details":
             v = " ".join(str(v or "").split())
             return f"\"{v[:80]}{'…' if len(v) > 80 else ''}\"" if v else "(vazio)"

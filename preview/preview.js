@@ -14,6 +14,8 @@
     ["c-outros", "Outros"]].map(([id, name]) => ({ id, name }));
   const ccatsOf = (d) => { if (!Array.isArray(d.consCats) || !d.consCats.length) d.consCats = clone(DEF_CCATS); return d.consCats; };
   const isCons = (d, rid) => (d.rooms.find((r) => r.id === rid) || {}).kind === "consumiveis";
+  // 1.91.0: os cômodos onde um consumível é usado: um id (o jeito de antes) ou uma lista; só os cômodos da casa
+  const usados = (d, v) => [...new Set([].concat(v || []))].filter((id) => d.rooms.some((x) => x.id === id && !x.kind)).slice(0, 40);
   const consCat = (d, k) => (ccatsOf(d).some((c) => c.id === k) ? k : "c-outros");
   const dur = (v) => { const n = Math.trunc(+v); return n > 0 && n <= 3650 ? n : 0; };
   const foldName = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -59,7 +61,7 @@
     if (ids.has(id)) id += "-" + Math.random().toString(16).slice(2, 6);
     return {
       id, room: r.id, seq, zone: String(b.zone || "").trim(), name, details: String(b.details || "").trim(),
-      ...(r.kind === "consumiveis" ? { cat: consCat(d, b.cat), qty: "1", value: 0, dur: dur(b.dur), ...(dur(b.dur) ? { durAt: restore && b.durAt ? b.durAt : t } : {}), ...(d.rooms.some((x) => x.id === b.usedIn && !x.kind) ? { usedIn: b.usedIn } : {}) }
+      ...(r.kind === "consumiveis" ? { cat: consCat(d, b.cat), qty: "1", value: 0, dur: dur(b.dur), ...(dur(b.dur) ? { durAt: restore && b.durAt ? b.durAt : t } : {}), ...(usados(d, b.usedIn).length ? { usedIn: usados(d, b.usedIn) } : {}) }
         : { cat: CATS.has(b.cat) ? b.cat : "outros", qty: String(b.qty || "1").trim() || "1", value: money(b.value) }),
       photos: Array.isArray(b.photos) ? [...b.photos] : [], ...(b.photoSrc && Object.keys(b.photoSrc).length ? { photoSrc: { ...b.photoSrc } } : {}),
       checked: !!b.checked, flag: (b.flag || "").trim() || null,
@@ -152,7 +154,7 @@
         }
         if ("cat" in ch) it.cat = ch.cat;
         if ("zone" in ch) it.zone = String(ch.zone || "").trim();
-        if ("usedIn" in ch) { if (d.rooms.some((x) => x.id === ch.usedIn && !x.kind)) it.usedIn = ch.usedIn; else delete it.usedIn; }
+        if ("usedIn" in ch) { if (usados(d, ch.usedIn).length) it.usedIn = usados(d, ch.usedIn); else delete it.usedIn; }
         it.updatedAt = t;
       }
       return { items: clone(plan.map(([it]) => it)), rev: bump() };
@@ -167,7 +169,7 @@
         for (const k of ["zone", "details", "flag", "source"]) if (k in body) it[k] = typeof body[k] === "string" ? body[k].trim() : body[k];
         if ("name" in body) { const n = String(body.name || "").trim(); if (!n) fail("Preencha o campo nome."); it.name = n; }
         if (isCons(d, it.room)) { it.cat = consCat(d, "cat" in body ? body.cat : it.cat); if ("dur" in body) { if (dur(body.dur) !== dur(it.dur)) it.durAt = now(); it.dur = dur(body.dur); }
-          if ("usedIn" in body) { if (d.rooms.some((x) => x.id === body.usedIn && !x.kind)) it.usedIn = body.usedIn; else delete it.usedIn; } }
+          if ("usedIn" in body) { if (usados(d, body.usedIn).length) it.usedIn = usados(d, body.usedIn); else delete it.usedIn; } }
         else {
           it.cat = CATS.has("cat" in body ? body.cat : it.cat) ? ("cat" in body ? body.cat : it.cat) : "outros";
           if ("qty" in body) it.qty = String(body.qty || "1").trim() || "1";

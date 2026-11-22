@@ -339,7 +339,7 @@ class CategoriasEDuracao(Base):
         self.erro("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas", "quantidade": "4"}]}, "Um consumível não tem valor nem quantidade")
         self.erro("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas", "categoria": "Móveis"}]}, "As categorias dos consumíveis: Limpeza (c-limpeza)")
         self.erro("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas", "duracao_dias": 1.5}]}, "duracao_dias: um número inteiro de dias")
-        self.erro("cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "Vaso", "duracao_dias": 30}]}, "duracao_dias só vale num consumível")
+        self.erro("cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "Vaso", "duracao_dias": 30}, {"nome": "Mesa", "valor": 10}]}, "Item 1: A duração só vale num consumível: mande comodo \"Consumíveis\"")
         self.chamar("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Pilhas AA", "categoria": "pilhas", "duracao_dias": 180}]})
         v = self.json("ver_item", {"id": "CON-001"})
         self.assertEqual((v["categoria"], v["duracao_dias"], v["duracao"]), ({"id": "c-eletronicos", "nome": "Pilhas e eletrônicos"}, 180, "6 meses"))
@@ -367,9 +367,9 @@ class PorComodo(Base):
 
     def test_desligado_nao_aparece_e_a_ferramenta_explica(self):
         it = self.consumivel(usedIn="sala")
-        self.assertEqual(it["usedIn"], "sala", "o Store guarda")
+        self.assertEqual(it["usedIn"], ["sala"], "o Store guarda")
         self.assertFalse(S.cons_comodo_enabled())
-        self.assertIsNone(S.used_in(it))
+        self.assertEqual(S.used_in(it), [])
         self.assertNotIn("usado_em", self.json("ver_item", {"id": it["id"]}))
         self.assertFalse(self.json("resumo")["opcoes"]["consumiveis_por_comodo"])
         self.erro("buscar_itens", {"usado_em": "sala"}, "Consumíveis por cômodo estão desligados")
@@ -399,7 +399,7 @@ class PorComodo(Base):
         it = self.consumivel()
         self.erro("editar_item", {"id": it["id"], "usado_em": "Consumíveis"}, "um cômodo da casa")
         self.erro("editar_item", {"id": "sal-001", "usado_em": "cozinha"}, "usado_em só vale num consumível")
-        self.erro("cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "Vaso", "usado_em": "cozinha"}]}, "usado_em só vale num consumível")
+        self.erro("cadastrar_itens", {"comodo": "sala", "itens": [{"nome": "Vaso", "usado_em": "cozinha"}, {"nome": "Mesa"}]}, "O cômodo onde é usado só vale num consumível")
         self.erro("editar_item", {"id": it["id"], "usado_em": "porão"}, "cômodo")
         novo = self.store.update_item(it["id"], {"usedIn": "consumiveis"}, "Ana")
         self.assertNotIn("usedIn", novo, "a área dos consumíveis não é um cômodo")
@@ -408,13 +408,13 @@ class PorComodo(Base):
         """1.89.0: o Alterar em lote (Buscar › Selecionar) leva o cômodo onde é usado; só num consumível."""
         a, b = self.consumivel(), self.consumivel(name="Sabão em pó")
         out = self.store.update_items([{"id": a["id"], "usedIn": "sala", "cat": "c-limpeza"}, {"id": b["id"], "usedIn": "cozinha"}], "Ana")
-        self.assertEqual([(i["cat"], i["usedIn"]) for i in out], [("c-limpeza", "sala"), (b["cat"], "cozinha")])
+        self.assertEqual([(i["cat"], i["usedIn"]) for i in out], [("c-limpeza", ["sala"]), (b["cat"], ["cozinha"])])
         self.store.update_items([{"id": a["id"], "usedIn": ""}], "Ana")
         self.assertNotIn("usedIn", self.store.item(a["id"]))
         with self.assertRaises(S.ApiError) as e:
             self.store.update_items([{"id": b["id"], "usedIn": "consumiveis"}], "Ana")
         self.assertEqual(e.exception.message if hasattr(e.exception, "message") else str(e.exception.args[-1]), "Escolha um cômodo que exista.")
-        self.assertEqual(self.store.item(b["id"])["usedIn"], "cozinha", "tudo ou nada")
+        self.assertEqual(self.store.item(b["id"])["usedIn"], ["cozinha"], "tudo ou nada")
         self.store.update_items([{"id": "sal-001", "usedIn": "cozinha"}], "Ana")
         self.assertNotIn("usedIn", self.store.item("sal-001"), "num item da casa, não vale")
 
@@ -423,10 +423,55 @@ class PorComodo(Base):
         it = self.consumivel(usedIn="nao-existe")
         self.assertNotIn("usedIn", it)
         it = self.store.update_item(it["id"], {"usedIn": "sala"}, "Ana")
-        self.assertEqual(S.used_in(it)["name"], "Sala de estar")
+        self.assertEqual([r["name"] for r in S.used_in(it)], ["Sala de estar"])
         self.store.settings["itens"] = False
         self.assertFalse(S.cons_comodo_enabled(), "sem os cômodos, não há por cômodo")
-        self.assertIsNone(S.used_in(it))
+        self.assertEqual(S.used_in(it), [])
+
+
+class VariosComodosENaRonda(Base):
+    """1.91.0: um consumível usado em mais de um cômodo; e o cadastro que a IA manda no meio de uma ronda, com o cômodo da
+    ronda no lugar de Consumíveis (o dono viu "Não deu: duracao_dias só vale num consumível")."""
+
+    def setUp(self):
+        super().setUp()
+        self.store.settings["cons_comodo"] = True
+
+    def test_mais_de_um_comodo(self):
+        it = self.consumivel(usedIn=["sala", "cozinha", "sala", "nao-existe", "consumiveis"])
+        self.assertEqual(it["usedIn"], ["sala", "cozinha"], "sem repetir, só os cômodos da casa")
+        self.assertEqual(S.used_in_text(it), "Sala de estar, Cozinha")
+        self.assertEqual(self.json("ver_item", {"id": it["id"]})["usado_em"], "Sala de estar, Cozinha")
+        for onde in ("sala", "cozinha"):
+            self.assertEqual(self.json("buscar_itens", {"usado_em": onde})["encontrados"], 1, onde)
+        self.chamar("editar_item", {"id": it["id"], "usado_em": "Cozinha; Quarto"})
+        self.assertEqual(self.store.item(it["id"])["usedIn"], ["cozinha", "quarto"])
+        self.chamar("editar_item", {"id": it["id"], "usado_em": ""})
+        self.assertNotIn("usedIn", self.store.item(it["id"]))
+        self.store.update_items([{"id": it["id"], "usedIn": ["sala", "quarto"]}], "Ana")
+        self.assertEqual(self.store.item(it["id"])["usedIn"], ["sala", "quarto"])
+
+    def test_o_de_antes_com_um_id_so_continua_valendo(self):
+        it = self.consumivel()
+        self.store.item(it["id"])["usedIn"] = "sala"  # como a 1.88.0 gravava
+        self.assertEqual(S.used_in_text(self.store.item(it["id"])), "Sala de estar")
+        self.assertEqual(self.json("buscar_itens", {"usado_em": "sala"})["encontrados"], 1)
+
+    def test_com_duracao_e_o_comodo_da_ronda_vai_para_os_consumiveis(self):
+        txt = self.chamar("cadastrar_itens", {"comodo": "Cozinha", "itens": [{"nome": "Detergente", "duracao_dias": 30, "categoria": "Limpeza"}]})
+        self.assertIn("Cadastrado em Consumíveis", txt)
+        it = next(i for i in self.store.data["items"] if i["name"] == "Detergente")
+        self.assertTrue(self.store.is_cons(it["room"]))
+        self.assertEqual((it["dur"], it["usedIn"]), (30, ["cozinha"]), "o cômodo mandado vira o usado em")
+        self.chamar("cadastrar_itens", {"comodo": "Cozinha", "itens": [{"nome": "Sabão", "duracao_dias": 15, "usado_em": "Quarto"}]})
+        self.assertEqual(next(i for i in self.store.data["items"] if i["name"] == "Sabão")["usedIn"], ["quarto"], "o usado_em dito vale")
+        self.store.settings["cons_comodo"] = False
+        self.chamar("cadastrar_itens", {"comodo": "Cozinha", "itens": [{"nome": "Esponja", "duracao_dias": 7}]})
+        it = next(i for i in self.store.data["items"] if i["name"] == "Esponja")
+        self.assertTrue(self.store.is_cons(it["room"]))
+        self.assertNotIn("usedIn", it, "sem Consumíveis por cômodo, sem o cômodo")
+        self.store.settings["consumiveis"] = False
+        self.erro("cadastrar_itens", {"comodo": "Cozinha", "itens": [{"nome": "Pano", "duracao_dias": 7}]}, "A duração só vale num consumível")
 
 
 if __name__ == "__main__":

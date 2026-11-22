@@ -698,6 +698,16 @@ div.croom:hover { background: none; }
 .zone-ic { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 9px; background: var(--tag-soft); color: var(--tag-text); }
 .zone-ic .ic { width: 17px; height: 17px; stroke-width: 1.9; }
 .zone-h { align-items: center; }
+/* 1.91.0: os grupos dos Consumíveis fecham pelo título; Agrupar por (Categoria ou Cômodo) */
+button.zone-h { width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+button.zone-h h3 { flex: 1; }
+button.zone-h .seta { color: var(--muted); flex: none; transition: transform .2s; transform: rotate(90deg); }
+.dobra-z.fechada > .zone-h .seta { transform: none; }
+.dobra-z.fechada > .ilist { display: none; }
+.agrupar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+.agrupar > span { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; margin-right: 4px; }
+.agrupar .chip { gap: 6px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--tag-soft); border-color: var(--tag-edge); color: var(--ink); font-weight: 600; }
 .zone-h .zs { color: var(--muted); font-size: 14px; white-space: nowrap; }
 .zone-h .zs b { color: var(--ink); font: 600 17px/1 var(--font-c); margin-left: 10px; }
 
