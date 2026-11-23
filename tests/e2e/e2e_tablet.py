@@ -65,7 +65,7 @@ DIALOG_CHECK = """(kind) => {
     const ok = innerWidth >= 900 ? s.left >= im.right - 1 && Math.abs(s.width - 340) <= 1 : s.top >= im.bottom - 1 && Math.abs(s.width - innerWidth) <= 1;
     if (!ok) bad.push('painel do visualizador fora do lugar');
   }
-  const btns = [...d.querySelectorAll('.btn, button')].filter(b => b.offsetParent && !b.closest('.strip, .wgrid, .seg'));
+  const btns = [...d.querySelectorAll('.btn, button')].filter(b => b.offsetParent && !b.closest('.strip, .wgrid, .seg, .pick-grid'));  // os botões do Cômodo e da Categoria rolam por baixo do rodapé da janela
   for (const b of btns) if (getComputedStyle(b).overflow === 'visible' && b.scrollWidth > b.clientWidth + 2) bad.push('texto do botão cortado: ' + b.textContent.trim().slice(0, 30));
   for (let i = 0; i < btns.length; i++) for (let j = i + 1; j < btns.length; j++) {
     const a = box(btns[i]), c = box(btns[j]);

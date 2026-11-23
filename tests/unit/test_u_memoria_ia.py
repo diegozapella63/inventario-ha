@@ -27,7 +27,8 @@ class TestMemoria(unittest.TestCase):
         self.assertRegex(lista[0]["em"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d{4}$")
         self.assertEqual(len(M.lembrar("creme é sempre higiene", "ResolvIA", arquivo=self.arq)), 1, "a mesma frase não entra duas vezes")
         M.lembrar("A feira é no sábado", "ResolvIA", arquivo=self.arq)
-        gravado = json.load(open(self.arq, encoding="utf-8"))
+        with open(self.arq, encoding="utf-8") as f:
+            gravado = json.load(f)
         self.assertEqual((gravado["versao"], [x["app"] for x in gravado["lista"]], "quem" in gravado["lista"][1]), (1, ["InventarIA", "ResolvIA"], False))
         self.assertEqual(oct(os.stat(self.arq).st_mode & 0o777), "0o600")
         self.assertEqual(M.para_a_ia(self.arq), M.TITULO + "\n- Creme é sempre Higiene\n- A feira é no sábado")

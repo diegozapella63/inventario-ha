@@ -3832,7 +3832,7 @@
       return `<button type="button" class="pk${on ? " on" : ""}" data-escolha="${qual}" data-v="${esc(o.value)}" aria-pressed="${on}">${ic(icone, "sm")}<span>${esc(o.textContent)}</span></button>`;
     }).join("");
     const pintaEscolhas = () => { for (const q of ["room", "cat"]) { const g = $(`#f-${q}-g`, form); if (g && form[q]) g.innerHTML = escolhas(form[q], q); } };
-    const roomField = `<div class="field"><span class="lbl" id="f-room-l">Cômodo</span><select id="f-room" class="select fora" name="room" tabindex="-1" aria-hidden="true">${roomOptions(F.room)}</select><div class="pick-grid" id="f-room-g" role="group" aria-labelledby="f-room-l"></div></div>`;
+    const roomField = `<div class="field"><span class="lbl" id="f-room-l">Cômodo</span><select id="f-room" class="select fora" name="room" tabindex="-1" aria-hidden="true" aria-label="Cômodo">${roomOptions(F.room)}</select><div class="pick-grid" id="f-room-g" role="group" aria-labelledby="f-room-l"></div></div>`;
     const zoneField = `<div class="field"><label for="f-zone">Zona</label><input id="f-zone" class="input" name="zone" data-sug="f-zones" maxlength="120" autocomplete="off" value="${esc(F.zone)}" placeholder="Ex.: Estante, Bancada"><datalist id="f-zones"></datalist></div>`;
     const entry = openDialog({
       cls: "modal", label: title,
@@ -3848,7 +3848,7 @@
             <div class="field"><label for="f-details">${cons ? "O que é e para que serve" : "Detalhes"}</label><textarea id="f-details" class="textarea" name="details" rows="3" maxlength="4000" placeholder="${bem ? "Endereço, modelo, ano e estado" : cons ? "Ex.: Pasta para o processador, ao trocar o cooler" : "Marca, modelo, cor, tamanho e estado"}">${esc(F.details)}</textarea></div>
             ${bem ? `<div class="field"><span class="lbl" id="f-tipo-l">Tipo</span><div class="seg tipo" role="group" aria-labelledby="f-tipo-l" data-slot="tipo">${tipoBtns()}</div></div>`
               : `${cons ? "" : zonesOn() ? `${roomField}${zoneField}` : roomField}
-            <div class="field"><span class="lbl" id="f-cat-l">Categoria</span><select id="f-cat" class="select fora" name="cat" tabindex="-1" aria-hidden="true"><option value="">Escolha a categoria</option>${(cons ? CCATS : CATS).map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select><div class="pick-grid" id="f-cat-g" role="group" aria-labelledby="f-cat-l"></div></div>`}
+            <div class="field"><span class="lbl" id="f-cat-l">Categoria</span><select id="f-cat" class="select fora" name="cat" tabindex="-1" aria-hidden="true" aria-label="Categoria"><option value="">Escolha a categoria</option>${(cons ? CCATS : CATS).map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select><div class="pick-grid" id="f-cat-g" role="group" aria-labelledby="f-cat-l"></div></div>`}
             ${cons && consComodoOn() ? `<div class="field"><span class="lbl" id="f-usado-l">Cômodos onde é usado</span><div class="pick-grid" id="f-usado" role="group" aria-labelledby="f-usado-l">${usadoBotoes()}</div></div>` : ""}
             ${cons ? `<div class="field" id="f-dur"><span class="lbl" id="f-dur-l">Duração estimada</span>
               <div class="chips grid durs" role="radiogroup" aria-labelledby="f-dur-l" data-slot="durs">${durChips()}</div>

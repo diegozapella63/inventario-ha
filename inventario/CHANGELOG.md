@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.97.1
+
+- No item, o Cômodo e a Categoria continuam com nome para o leitor de tela.
+
 ## 1.97.0
 
 - No **Novo item** e no **Editar item**, o **Cômodo** e a **Categoria** ficam direto na tela, um botão por opção, como nos outros apps: um toque escolhe, sem abrir a lista. Os dois fecham pelo título.
