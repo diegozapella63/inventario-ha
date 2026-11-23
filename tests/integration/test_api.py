@@ -132,6 +132,10 @@ class Comodos(ServerCase):
         self.assertEqual(self.app.delete(f"api/rooms/{rid}")[0], 200)
         self.assertEqual(self.app.put(f"api/rooms/{rid}", {"name": "x"})[0], 404)
         self.app.ok("POST", "api/rooms/order", {"ids": ids})
+        # 1.97.2: a ordem que não é uma lista não muda nada (um número era um erro 500); o que não é id dentro dela é ignorado
+        antes = [r["id"] for r in self.app.ok("GET", "api/data")["rooms"]]
+        self.assertEqual([r["id"] for r in self.app.ok("POST", "api/rooms/order", {"ids": 5})["rooms"]], antes)
+        self.assertEqual([r["id"] for r in self.app.ok("POST", "api/rooms/order", {"ids": [None, {}, 7] + ids})["rooms"]], [i for i in ids if i != rid])
 
 
 class Categorias(ServerCase):

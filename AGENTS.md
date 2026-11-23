@@ -166,6 +166,8 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 
 1.97.0 (o dono: "faz as opções de cômodo e categoria igual os outros apps, direto na tela"): na janela do item, o Cômodo e a Categoria são um `.pick-grid` de `.pk` (`#f-room-g`, `#f-cat-g`, `data-escolha` e `data-v`; `escolhas(sel, qual)` e `pintaEscolhas()`), como o Cômodos onde é usado. A caixa de seleção continua no formulário e é quem guarda o valor (`#f-room`, `#f-cat`, com a classe `fora`: 1 px, sem toque nem foco), e o botão muda o valor e avisa com `input` e `change`, para o resto do editor (as zonas, o conflito, o preencher pela IA) seguir igual. Com zonas, a Zona vem embaixo do Cômodo (saiu o `row2`). Os campos com `.pick-grid` fecham pelo título (`iconesCampos`). O Mover e o Catalogar continuam com a caixa de seleção. Testes: `tests/e2e/e2e_selecao_janela.py`.
 
+1.97.2: a vez de gravar a Memória da IA entre os apps (`memoria_ia.py: `_vez``: uma pasta `memoria_ia.json.trava` ao lado do arquivo, criada num passo só; espera até 3 s, tira a que ficou de um app que caiu, há mais de 10 s, e sem a vez grava assim mesmo; o arquivo temporário leva um sufixo ao acaso). Antes, dois apps gravando no mesmo instante liam a mesma lista e um apagava a frase do outro (num teste com 40 gravações simultâneas, uma se perdia). Um caminho que não é uma pasta não prende o app (espera só o prazo). O `POST /api/rooms/order` com `ids` que não é uma lista não muda a ordem (um número ali era um erro 500).
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.

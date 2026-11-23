@@ -71,6 +71,50 @@ class TestMemoria(unittest.TestCase):
         self.assertEqual(M.juntar([], "CorrerIA", self.arq), 0)
         self.assertEqual(M.juntar(None, "CorrerIA", self.arq), 0)
 
+    def test_a_pasta_que_nao_existe_nao_prende_o_app(self):
+        """O caminho da memória dentro de um arquivo (uma pasta share estragada): diz que não gravou, sem ficar esperando a vez
+        para sempre."""
+        import time
+        os.makedirs(self.dir, exist_ok=True)
+        preso = os.path.join(self.dir, "arquivo.txt")
+        with open(preso, "w") as f:
+            f.write("x")
+        t0 = time.monotonic()
+        with mock.patch.object(M, "ESPERA_SEG", 0.2), self.assertRaisesRegex(M.ErroMemoria, "Não consegui gravar a memória na pasta share"):
+            M.lembrar("não tem onde gravar", "CorrerIA", arquivo=os.path.join(preso, "familia", "memoria_ia.json"))
+        self.assertLess(time.monotonic() - t0, 3)
+
+    def test_a_vez_de_gravar_entre_os_apps(self):
+        """Dois apps gravando no mesmo instante: cada um espera a vez (a pasta .trava ao lado do arquivo) e nenhuma frase se
+        perde. Uma trava que ficou de um app que caiu sai sozinha; sem conseguir a vez, grava assim mesmo."""
+        import subprocess
+        import sys
+        import time
+        codigo = ("import sys; sys.path.insert(0, sys.argv[1]); import memoria_ia as M\n"
+                  "for i in range(15): M.lembrar(f'frase {sys.argv[3]} número {i}', 'App' + sys.argv[3], arquivo=sys.argv[2])\n")
+        pasta = os.path.dirname(os.path.abspath(M.__file__))
+        ps = [subprocess.Popen([sys.executable, "-c", codigo, pasta, self.arq, str(n)]) for n in range(4)]
+        self.assertEqual([p.wait(60) for p in ps], [0, 0, 0, 0])
+        self.assertEqual(len(M.ler(self.arq, fresco=True)), 60, "as 60 frases dos quatro, nenhuma perdida")
+        self.assertEqual(sorted(os.listdir(os.path.dirname(self.arq))), ["memoria_ia.json"], "sem trava nem arquivo temporário para trás")
+        M.esquecer(M.ler(self.arq, fresco=True)[0]["id"], self.arq)
+        # a trava de um app que caiu (velha) sai; a de agora é esperada e, sem a vez, grava assim mesmo
+        trava = self.arq + ".trava"
+        os.mkdir(trava)
+        os.utime(trava, (time.time() - 60, time.time() - 60))
+        self.assertEqual(len(M.lembrar("depois da trava velha", "CorrerIA", arquivo=self.arq)), 60)
+        self.assertFalse(os.path.exists(trava))
+        M.esquecer(M.ler(self.arq, fresco=True)[0]["id"], self.arq)
+        os.mkdir(trava)
+        with mock.patch.object(M, "ESPERA_SEG", 0.05):
+            self.assertEqual(len(M.lembrar("sem a vez, grava assim mesmo", "CorrerIA", arquivo=self.arq)), 60)
+        self.assertTrue(os.path.isdir(trava), "a trava de outro app não é tirada por quem não a pôs")
+        os.rmdir(trava)
+        # a pasta share que não deixa criar a trava: grava do mesmo jeito
+        M.esquecer(M.ler(self.arq, fresco=True)[0]["id"], self.arq)
+        with mock.patch.object(M.os, "mkdir", side_effect=PermissionError("não pode")):
+            self.assertEqual(len(M.lembrar("sem poder criar a trava", "CorrerIA", arquivo=self.arq)), 60)
+
 
 if __name__ == "__main__":
     unittest.main()

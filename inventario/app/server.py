@@ -5395,7 +5395,9 @@ def r_cat_delete(h, cid, query):
 
 
 def r_rooms_order(h, query):
-    rooms = STORE.reorder_rooms(h.read_body().get("ids") or [])
+    ids = h.read_body().get("ids") or []
+    # 1.97.2: o que não é uma lista não muda a ordem (um número ali era um erro 500); dentro dela, só os ids
+    rooms = STORE.reorder_rooms([i for i in ids if isinstance(i, str)] if isinstance(ids, list) else [])
     h.send_json({"rooms": rooms, "rev": STORE.data["rev"]})
 
 

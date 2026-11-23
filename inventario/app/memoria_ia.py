@@ -7,6 +7,7 @@ Arquivo igual nos apps em Python (tools/iguais.py); nos apps em Node, lib/memori
 
 O arquivo: {versao: 1, gravado_em, lista: [{id, texto, em, app, quem?}]} (até 60 frases de 240 letras; só do dono).
 """
+import contextlib
 import json
 import os
 import secrets
@@ -23,6 +24,41 @@ _GUARDADO = {}  # arquivo -> (quando, lista)
 
 class ErroMemoria(ValueError):
     """O que dizer à pessoa."""
+
+
+ESPERA_SEG, VELHA_SEG = 3.0, 10.0   # quanto esperar a vez de gravar; uma trava mais velha que isto ficou de um app que caiu
+
+
+@contextlib.contextmanager
+def _vez(arquivo):
+    """A vez de gravar entre os apps: uma pasta ao lado do arquivo (criar a pasta é um passo só, também entre os apps que
+    dividem a pasta share). Sem ela, dois apps gravando no mesmo instante liam a mesma lista e um apagava a frase do outro.
+    Se a vez não vem (a pasta share não deixa criar, ou outro app demora), grava assim mesmo: melhor que não guardar."""
+    trava, tenho, fim = arquivo + ".trava", False, time.monotonic() + ESPERA_SEG
+    while True:
+        try:
+            os.makedirs(os.path.dirname(arquivo), exist_ok=True)
+            os.mkdir(trava)
+            tenho = True
+            break
+        except FileExistsError:
+            try:
+                if time.time() - os.stat(trava).st_mtime > VELHA_SEG:
+                    os.rmdir(trava)
+                    continue
+            except OSError:
+                pass   # sumiu agora, ou o caminho não é uma pasta: tenta de novo, até o prazo
+        except OSError:
+            break
+        if time.monotonic() >= fim:
+            break
+        time.sleep(0.01 + secrets.randbelow(20) / 1000)
+    try:
+        yield
+    finally:
+        if tenho:
+            with contextlib.suppress(OSError):
+                os.rmdir(trava)
 
 
 def _agora_iso():
@@ -63,7 +99,7 @@ def ler(arquivo=None, agora=None, fresco=False):
 def _gravar(arquivo, lista):
     try:
         os.makedirs(os.path.dirname(arquivo), exist_ok=True)
-        tmp = f"{arquivo}.{os.getpid()}.tmp"
+        tmp = f"{arquivo}.{os.getpid()}.{secrets.token_hex(3)}.tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump({"versao": 1, "gravado_em": _agora_iso(), "lista": lista}, f, ensure_ascii=False)
             f.flush()
@@ -81,7 +117,7 @@ def lembrar(texto, app, quem="", arquivo=None):
     t = " ".join(str(texto or "").split())[:MAX_LETRAS]
     if len(t) < 3:
         raise ErroMemoria("Escreva o que é para lembrar.")
-    with _TRAVA:
+    with _TRAVA, _vez(arquivo):
         lista = ler(arquivo, fresco=True)   # lê de novo: outro app pode ter escrito
         if not any(x["texto"].lower() == t.lower() for x in lista):
             if len(lista) >= MAX_FRASES:
@@ -94,7 +130,7 @@ def lembrar(texto, app, quem="", arquivo=None):
 def esquecer(fid, arquivo=None):
     """Tira uma frase pelo id. Devolve a lista."""
     arquivo = arquivo or ARQUIVO
-    with _TRAVA:
+    with _TRAVA, _vez(arquivo):
         lista = ler(arquivo, fresco=True)
         fica = [x for x in lista if x["id"] != str(fid or "")]
         if len(fica) != len(lista):
@@ -105,7 +141,7 @@ def esquecer(fid, arquivo=None):
 def juntar(textos, app, arquivo=None):
     """Põe várias frases de uma vez (as que um app guardava antes de a memória ser de todos). Devolve quantas entraram."""
     arquivo = arquivo or ARQUIVO
-    with _TRAVA:
+    with _TRAVA, _vez(arquivo):
         lista = ler(arquivo, fresco=True)
         antes = len(lista)
         junta = _limpa(lista + [{"texto": t.get("texto") if isinstance(t, dict) else t, "em": (t.get("em") if isinstance(t, dict) else "") or _agora_iso(),

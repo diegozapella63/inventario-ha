@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.97.2
+
+- **Memória da IA**: dois apps gravando uma frase no mesmo instante não apagam mais a frase um do outro (cada um espera a sua vez).
+
 ## 1.97.1
 
 - No item, o Cômodo e a Categoria continuam com nome para o leitor de tela.
