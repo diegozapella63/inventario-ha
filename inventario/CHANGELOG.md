@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.96.0
+
+- **Memória da IA** (Mais › Configurações › Integrações, depois do IA): agora o cartão existe aqui. É uma memória só, da casa, compartilhada por todos os apps: o que você escreve aqui a IA lembra em toda conversa, em qualquer um deles, e o que foi escrito nos outros aparece aqui, com o nome do app.
+- Funciona sem o CorrerIA: a memória fica na pasta share do Home Assistant, e não mais dentro dele.
+
 ## 1.95.0
 
 - A **Memória da IA** do CorrerIA (Configurações › Integrações, lá) vale aqui também: o que a casa pediu para a IA lembrar entra na Conversa e na leitura por IA deste app, com a opção CorrerIA ligada.

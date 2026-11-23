@@ -1394,6 +1394,10 @@ dialog .toasts { bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 50; 
 /* Configurações › Dados: os botões no padrão da família (o modelo é o GerencIA): na largura do cartão no celular (250 px a
    partir de 1000 px), da mesma altura, com o ícone ao lado do texto; Criar backup cheio, os outros com borda, Apagar tudo vermelho */
 .sec-acao { display: flex; margin: 4px 0 12px; }
+/* 1.96.0: a Memória da IA: o campo de uma linha (aumenta puxando o canto) e a lista das frases */
+.mem-campo { margin-bottom: 10px; }
+#mem-texto { height: 50px; min-height: 50px; resize: vertical; padding-top: 13px; }
+.mem-lista .ot b { font-weight: 500; overflow-wrap: anywhere; }
 .sec-acao > .btn, #p-export .opts .oa > .btn:not(.icon) { width: 100%; height: 50px; justify-content: center; font-size: 15px; }
 #p-export .opts .oa { flex: 1 1 100%; }
 @media (min-width: 1000px) { .sec-acao > .btn, #p-export .opts .oa > .btn:not(.icon) { width: 250px; } #p-export .opts .oa { flex: none; } }

@@ -321,6 +321,19 @@
         agents: [{ id: "conversation.exemplo", name: "Assistente de exemplo" }], selected: ST.settings.ai_entity || "", chat: ST.settings.ai_chat || "", search: ST.settings.ai_search || "" };
     }
     const aiOff = () => { if (ST.settings.ai === false) fail("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações.", 409); };
+    // a Memória da IA (uma lista só, de todos os apps): na prévia, fica na memória da página
+    if (path === "api/memoria-ia") {
+      ST.memoriaIa = ST.memoriaIa || [{ id: "m1", texto: "Creme é sempre da categoria Higiene", em: "2026-11-02T09:30:00-03:00", app: "InventarIA", quem: "Ana" }];
+      if (method === "POST") {
+        if (body && body.acao === "apagar") ST.memoriaIa = ST.memoriaIa.filter((x) => x.id !== body.id);
+        else {
+          const t = String((body && body.texto) || "").replace(/\s+/g, " ").trim().slice(0, 240);
+          if (t.length < 3) fail("Escreva o que é para lembrar.", 400);
+          if (!ST.memoriaIa.some((x) => x.texto.toLowerCase() === t.toLowerCase())) ST.memoriaIa.push({ id: "m" + Date.now(), texto: t, em: new Date().toISOString(), app: "InventarIA", quem: "Ana" });
+        }
+      }
+      return { lista: clone(ST.memoriaIa), max: 60 };
+    }
     if (method === "GET" && path.startsWith("api/voice/status")) {
       const sel = STT.find((e) => e.id === ST.settings.voice_stt);
       return { ready: true, engine: (sel || STT[0]).id, language: "pt-BR", name: (sel || STT[0]).name, assistant: sel ? "" : "Assistente de exemplo",

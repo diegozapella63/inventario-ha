@@ -2131,6 +2131,11 @@
         <div class="oa">${switchHtml("ai-on", on, "ai-on-h")}</div></li></ul>
       ${on ? `<div class="sub-op"><div class="sub-box" data-slot="ai-panel"><p class="muted">Verificando…</p></div></div>` : ""}
     </section>
+    ${on ? `<section class="panel" id="p-memoria">
+      <h2>${secIc("spark")}Memória da IA</h2>
+      <p class="lead">Uma memória só, da casa, compartilhada por todos os apps: o que você escreve aqui a IA lembra em toda conversa, em qualquer um deles.</p>
+      <div data-slot="memoria-ia"><p class="muted">Carregando…</p></div>
+    </section>` : ""}
     ${on ? `<section class="panel" id="p-voice">
       <h2>${secIc("mic")}Falar</h2>
       <p class="lead">Quem transforma a fala em texto. Não muda o assistente de voz do Home Assistant.</p>
@@ -2711,8 +2716,29 @@
     else if (r > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = r - bar.clientWidth + 8;
   }
 
+  // 1.96.0: a Memória da IA (Integrações, depois do IA): uma lista só, de todos os apps da casa, na pasta share
+  function renderMemoria(slot, r) {
+    const lista = (r && r.lista) || [];
+    slot.innerHTML = `<label class="field mem-campo"><span class="lbl">${oti("edit")}O que lembrar</span>
+        <textarea class="input" id="mem-texto" rows="1" maxlength="240" placeholder="Creme é sempre da categoria Higiene"></textarea></label>
+      <div class="sec-acao"><button class="btn primary" data-act="mem-add">${ic("check")}Salvar</button></div>
+      ${lista.length ? `<ul class="opts mem-lista">${lista.map((x) => `<li><div class="ot"><b>${esc(x.texto)}</b><span>${esc([shortDateTime(x.em), x.app, x.quem].filter(Boolean).join(" · "))}</span></div>
+        <div class="oa"><button class="btn icon" data-act="mem-del" data-mid="${esc(x.id)}" aria-label="Apagar">${ic("trash")}</button></div></li>`).join("")}</ul>` : ""}`;
+  }
+  async function memoriaAcao(corpo, ok) {
+    const slot = $('#view [data-slot="memoria-ia"]');
+    try {
+      const r = await API.post("api/memoria-ia", corpo);
+      if (slot && document.contains(slot)) renderMemoria(slot, r);
+      toast(ok);
+    } catch (err) { toast(err.message || "Não consegui salvar."); }
+  }
+
   async function loadDataPanels() {
     const tab = moreTab(base.tab);
+    const mslot = tab === "integracoes" ? $('#view [data-slot="memoria-ia"]') : null;
+    if (mslot) API.get("api/memoria-ia").then((r) => { if (document.contains(mslot)) renderMemoria(mslot, r); })
+      .catch(() => { if (document.contains(mslot)) mslot.innerHTML = '<p class="help">Não consegui ler a memória.</p>'; });
     if (tab === "opcoes") { loadNewsTargets(); loadAppsDet(); }
     const bslot = tab === "dados" ? $('#view [data-slot="backups"]') : null;
     const aslot = tab === "integracoes" ? $('#view [data-slot="ai-panel"]') : null;
@@ -5283,6 +5309,8 @@
     const item = b.dataset.id ? D.itemById.get(b.dataset.id) : null;
     switch (act) {
       case "add-menu": openAddMenu(); break;
+      case "mem-add": memoriaAcao({ acao: "nova", texto: ($("#mem-texto") || {}).value || "" }, "A IA vai lembrar"); break;
+      case "mem-del": memoriaAcao({ acao: "apagar", id: b.dataset.mid }, "Apagado da memória"); break;
       case "item-new": openEditor({ room: b.dataset.room || (base.name === "room" ? base.id : base.name === "bens" ? bensId() : base.name === "cons" ? consId() : null) }); break;
       case "catalog": openCatalog({ room: b.dataset.room || (base.name === "room" ? base.id : null) }); break;
       case "room-new": openRoomNew(); break;

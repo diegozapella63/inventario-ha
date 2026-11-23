@@ -236,6 +236,12 @@ Fotos, backups e configurações não passam pelo CorrerIA. O item cadastrado as
 
 **Cadastrar pela foto** (1.92.0, com o CorrerIA 1.23.0): mande a foto de um item ou de um consumível na conversa do CorrerIA e peça para cadastrar. A IA do InventarIA lê a foto (o nome, o que é, a categoria) e a foto fica no item; com a IA desligada aqui, diga o nome junto.
 
+## Memória da IA
+
+Em **Mais › Configurações › Integrações › Memória da IA** (com o Usar IA ligado) você escreve o que a IA deve lembrar em toda conversa: "o café é sempre o da marca azul", "a feira é no sábado". É **uma memória só, da casa, compartilhada por todos os apps** da família: o que você escreve aqui vale na Conversa e na leitura por IA dos outros apps, e o que foi escrito neles aparece aqui, com o nome do app. Cada frase tem o **Apagar**. São até 60 frases de 240 letras.
+
+A memória fica na pasta share do Home Assistant (`share/familia/memoria_ia.json`), fora dos apps: funciona com um app só instalado, e não precisa do CorrerIA. Ela não entra no Exportar nem no Começar do zero de um app (é de todos); apague as frases pelo cartão.
+
 ## Atualizar o app
 
 Quando sai uma versão nova, o Home Assistant mostra **Atualizar** na página do app e em **Configurações > Atualizações**. Para procurar na hora, abra **Configurações > Aplicativos > Loja de aplicativos**, toque no menu **⋮** e escolha **Verificar atualizações**. Os dados não são apagados.
