@@ -75,7 +75,7 @@ async def body(r, p):
     r.eq(durs, ["Sem duração", "1 semana", "15 dias", "1 mês", "3 meses", "6 meses", "1 ano", "Outra"], "a Duração estimada com os atalhos e a Outra (1.83.0)")
     r.eq(txt(await pg.text_content("#f-dur > .lbl")), "Duração estimada", "o título do campo")
     # 1.83.0: os campos da janela fecham e abrem pelo título, como nos outros apps (o texto longo e a Categoria também)
-    for alvo, campo in (('label[for="f-details"]', "#f-details"), ('label[for="f-cat"]', "#f-cat")):
+    for alvo, campo in (('label[for="f-details"]', "#f-details"), ("#f-cat-l", "#f-cat-g")):
         await pg.click(alvo)
         r.check(not await pg.locator(campo).is_visible() and await pg.get_attribute(alvo, "aria-expanded") == "false", f"{campo} fecha pelo título")
         await pg.click(alvo)

@@ -416,7 +416,7 @@
     // os campos de escolhas (as fotos, as listas, o prazo) fecham pelo título
     for (const f of root.querySelectorAll(".field")) {
       const l = f.querySelector(":scope > .lbl");
-      if (l && f.querySelector(":scope > .phs, :scope > .chips, :scope > [data-slot='rphotos']")) f.classList.add("dobravel");
+      if (l && f.querySelector(":scope > .phs, :scope > .chips, :scope > .pick-grid, :scope > [data-slot='rphotos']")) f.classList.add("dobravel");
     }
     // 1.83.0 (como nos outros apps): na janela do item, o texto longo e as caixas de seleção também fecham pelo título
     for (const f of root.querySelectorAll("form[data-ed-form] .form > .field, form[data-ed-form] .form > .row2 > .field")) {
@@ -3824,7 +3824,15 @@
         <p class="err" data-err="dur" hidden></p></div>`;
     };
     const durConta = () => { const n = Math.trunc(+String(F.durN ?? "").replace(",", ".")), un = +(F.durU ?? 30); F.dur = n > 0 ? String(n * un) : ""; };
-    const roomField = `<div class="field"><label for="f-room">Cômodo</label><select id="f-room" class="select" name="room">${roomOptions(F.room)}</select></div>`;
+    // 1.97.0 (o dono: "faz as opções de cômodo e categoria igual os outros apps, direto na tela"): um botão por opção, em duas
+    // colunas, como o Cômodos onde é usado. A caixa de seleção continua no formulário (quem guarda o valor é ela), fora da vista.
+    const escolhas = (sel, qual) => [...sel.options].filter((o) => o.value).map((o) => {
+      const icone = qual === "cat" ? "grid" : o.value === BENS_NEW || (D.bens && o.value === D.bens.id) ? "gem" : o.value === CONS_NEW || (D.cons && o.value === D.cons.id) ? "drop" : "rooms";
+      const on = o.value === sel.value;
+      return `<button type="button" class="pk${on ? " on" : ""}" data-escolha="${qual}" data-v="${esc(o.value)}" aria-pressed="${on}">${ic(icone, "sm")}<span>${esc(o.textContent)}</span></button>`;
+    }).join("");
+    const pintaEscolhas = () => { for (const q of ["room", "cat"]) { const g = $(`#f-${q}-g`, form); if (g && form[q]) g.innerHTML = escolhas(form[q], q); } };
+    const roomField = `<div class="field"><span class="lbl" id="f-room-l">Cômodo</span><select id="f-room" class="select fora" name="room" tabindex="-1" aria-hidden="true">${roomOptions(F.room)}</select><div class="pick-grid" id="f-room-g" role="group" aria-labelledby="f-room-l"></div></div>`;
     const zoneField = `<div class="field"><label for="f-zone">Zona</label><input id="f-zone" class="input" name="zone" data-sug="f-zones" maxlength="120" autocomplete="off" value="${esc(F.zone)}" placeholder="Ex.: Estante, Bancada"><datalist id="f-zones"></datalist></div>`;
     const entry = openDialog({
       cls: "modal", label: title,
@@ -3839,8 +3847,8 @@
               <p class="err" data-err="name" hidden></p></div>
             <div class="field"><label for="f-details">${cons ? "O que é e para que serve" : "Detalhes"}</label><textarea id="f-details" class="textarea" name="details" rows="3" maxlength="4000" placeholder="${bem ? "Endereço, modelo, ano e estado" : cons ? "Ex.: Pasta para o processador, ao trocar o cooler" : "Marca, modelo, cor, tamanho e estado"}">${esc(F.details)}</textarea></div>
             ${bem ? `<div class="field"><span class="lbl" id="f-tipo-l">Tipo</span><div class="seg tipo" role="group" aria-labelledby="f-tipo-l" data-slot="tipo">${tipoBtns()}</div></div>`
-              : `${cons ? "" : zonesOn() ? `<div class="row2">${roomField}${zoneField}</div>` : roomField}
-            <div class="field"><label for="f-cat">Categoria</label><select id="f-cat" class="select" name="cat"><option value="">Escolha a categoria</option>${(cons ? CCATS : CATS).map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`}
+              : `${cons ? "" : zonesOn() ? `${roomField}${zoneField}` : roomField}
+            <div class="field"><span class="lbl" id="f-cat-l">Categoria</span><select id="f-cat" class="select fora" name="cat" tabindex="-1" aria-hidden="true"><option value="">Escolha a categoria</option>${(cons ? CCATS : CATS).map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select><div class="pick-grid" id="f-cat-g" role="group" aria-labelledby="f-cat-l"></div></div>`}
             ${cons && consComodoOn() ? `<div class="field"><span class="lbl" id="f-usado-l">Cômodos onde é usado</span><div class="pick-grid" id="f-usado" role="group" aria-labelledby="f-usado-l">${usadoBotoes()}</div></div>` : ""}
             ${cons ? `<div class="field" id="f-dur"><span class="lbl" id="f-dur-l">Duração estimada</span>
               <div class="chips grid durs" role="radiogroup" aria-labelledby="f-dur-l" data-slot="durs">${durChips()}</div>
@@ -3925,7 +3933,7 @@
       b.innerHTML = on ? `<span class="spin"></span>Salvando` : saveLbl;
     };
 
-    renderZones(); renderPhotos(); renderUnit();
+    renderZones(); renderPhotos(); renderUnit(); pintaEscolhas();
     setTimeout(() => { if (!COARSE && !F.photos.length) form.name.focus(); }, 60);
 
     form.addEventListener("input", (e) => {
@@ -3950,6 +3958,12 @@
     });
     // 1.91.1 (o dono: "no mesmo padrão de seleção do resto dos apps"): Nenhum e Todos em cima, depois um botão por cômodo, em duas colunas
     form.addEventListener("click", (e) => {
+      const p = e.target.closest("[data-escolha]");
+      if (p) { // Cômodo e Categoria: o botão muda a caixa de seleção (e avisa, como se ela tivesse mudado)
+        const sel = form[p.dataset.escolha];
+        if (sel.value !== p.dataset.v) { sel.value = p.dataset.v; for (const ev of ["input", "change"]) sel.dispatchEvent(new Event(ev, { bubbles: true })); }
+        return;
+      }
       const b = e.target.closest("[data-usado]");
       if (!b) return;
       const v = b.dataset.usado, todos = D.rooms.map((r) => r.id);
@@ -3960,6 +3974,7 @@
       $("#f-usado", form).innerHTML = usadoBotoes();
     });
     form.addEventListener("change", (e) => {
+      if (e.target.name === "room" || e.target.name === "cat") pintaEscolhas();
       if (e.target.name === "room") {
         F.room = e.target.value;
         if (form.zone && !item) { F.zone = LS.get("lastZone:" + F.room, "") || ""; form.zone.value = F.zone; } // a zona lembrada é a deste cômodo
@@ -4007,6 +4022,7 @@
     function fill() {
       form.name.value = F.name; form.details.value = F.details;
       if (form.cat) form.cat.value = (cons ? CCAT : CAT)[F.cat] ? F.cat : "";
+      pintaEscolhas();
       if (bem) slot("tipo").innerHTML = tipoBtns();
       if (cons) { F.durOutra = undefined; F.durN = F.durU = undefined; slot("durs").innerHTML = durChips(); slot("dur-outra").innerHTML = durOutra(); iconesCampos(dlg); }
       form.qty.value = F.qty; form.value.value = F.value; form.flag.value = F.flag;
@@ -4103,7 +4119,8 @@
       else if (act === "theirs" && entry.conflict) {
         const c = entry.conflict;
         Object.assign(F, { base: c.updatedAt, name: c.name, details: c.details || "", room: c.room, zone: c.zone || "", cat: c.cat, qty: qtyClean(c.qty), value: moneyInput(c.value), flag: c.flag || "", photos: [...(c.photos || [])], dirty: false });
-        form.room.value = F.room; fill(); renderPhotos(); renderZones(); showErr("");
+        if (form.room) form.room.value = F.room;
+        fill(); renderPhotos(); renderZones(); showErr("");
       } else if (act === "mine" && entry.conflict) { F.base = entry.conflict.updatedAt; showErr(""); save(false); }
     });
   }

@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.97.0
+
+- No **Novo item** e no **Editar item**, o **Cômodo** e a **Categoria** ficam direto na tela, um botão por opção, como nos outros apps: um toque escolhe, sem abrir a lista. Os dois fecham pelo título.
+
 ## 1.96.0
 
 - **Memória da IA** (Mais › Configurações › Integrações, depois do IA): agora o cartão existe aqui. É uma memória só, da casa, compartilhada por todos os apps: o que você escreve aqui a IA lembra em toda conversa, em qualquer um deles, e o que foi escrito nos outros aparece aqui, com o nome do app.

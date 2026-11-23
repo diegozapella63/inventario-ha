@@ -14,7 +14,7 @@ CLOSED = """() => { const bad = [], muted = getComputedStyle(document.documentEl
   const inp = document.createElement('input'); inp.className = 'input'; document.body.append(inp); const rad = getComputedStyle(inp).borderRadius; inp.remove();
   const c = document.createElement('canvas').getContext('2d'); let n = 0;
   for (const s of document.querySelectorAll('select')) {
-    if (!s.offsetParent) continue; n++;
+    if (!s.offsetParent || s.classList.contains('fora')) continue; n++;  // 1.97.0: o Cômodo e a Categoria do item são botões; a caixa fica fora da vista
     const cs = getComputedStyle(s), r = s.getBoundingClientRect(), name = s.getAttribute('aria-label') || s.id || s.dataset.input;
     const want = s.closest('.found') ? 38 : 50;
     if (Math.round(r.height) !== want) bad.push(name + ': altura ' + r.height);
@@ -145,7 +145,7 @@ async def body(r, p):
                 await pg.wait_for_timeout(500)
                 bad = await pg.evaluate(CLOSED)
                 r.check(not bad, f"[{size} {scheme}] {h}: as caixas fechadas iguais aos campos" + (f": {bad[:3]}" if bad else ""))
-            for h, opener, wait in (("#/i/sal-001", 'dialog.sheet [data-act="item-edit"].primary', "#f-cat"), ("#/i/sal-002", 'dialog.sheet [data-act="item-move"]', "#mv-room"),
+            for h, opener, wait in (("#/i/sal-002", 'dialog.sheet [data-act="item-move"]', "#mv-room"),
                                     ("#/c/quarto", '.rhead-actions [data-act="catalog"]', "#c-room")):
                 await r.open(pg, h, "dialog.sheet h1, .rhead")
                 await pg.click(opener)
@@ -153,7 +153,7 @@ async def body(r, p):
                 await pg.wait_for_timeout(400)
                 bad = await pg.evaluate(CLOSED)
                 r.check(not bad, f"[{size} {scheme}] {wait}: as caixas fechadas iguais aos campos" + (f": {bad[:3]}" if bad else ""))
-                if wait == "#f-cat" and size == "cel":
+                if wait == "#mv-room" and size == "cel":
                     await r.shot(pg, f"fechada-{scheme}")
             await ctx.close()
     await b.close()

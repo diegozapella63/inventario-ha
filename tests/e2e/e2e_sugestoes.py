@@ -82,8 +82,7 @@ async def body(r, p):
         r.check(await pg.locator(".sug-box").count() == 0 and await pg.evaluate("document.activeElement && document.activeElement.id") == "f-zone",
                 f"{tag}: e a lista fecha, com o foco no campo")
         # trocar o cômodo troca as sugestões
-        await tap(pg, "#f-room")
-        await pg.locator(".ss-wrap.in .ss-opt", has_text="Cozinha").click()
+        await pg.locator("#f-room-g .pk", has_text="Cozinha").click()
         await pg.wait_for_timeout(450)
         await pg.fill("#f-zone", "")
         await tap(pg, "#f-zone")
@@ -94,8 +93,7 @@ async def body(r, p):
         r.eq(await pg.locator(".sug-box").count(), 0, f"{tag}: sair do campo fecha a lista")
         if size == "cel" and scheme == "dark":
             # salvar grava a zona escolhida pela sugestão (no cômodo de antes)
-            await tap(pg, "#f-room")
-            await pg.locator(".ss-wrap.in .ss-opt", has_text="Sala").first.click()
+            await pg.locator("#f-room-g .pk", has_text="Sala").first.click()
             await pg.wait_for_timeout(450)
             await pg.fill("#f-zone", "")
             await tap(pg, "#f-zone")

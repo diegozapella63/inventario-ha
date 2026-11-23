@@ -706,6 +706,9 @@ button.zone-h .seta { color: var(--muted); flex: none; transition: transform .2s
 .dobra-z.fechada > .ilist { display: none; }
 /* 1.91.1: a escolha dos cômodos como nos outros apps: duas colunas, Nenhum e Todos em cima */
 .pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* 1.97.0: o Cômodo e a Categoria do item são botões na tela; a caixa de seleção que guarda o valor fica fora da vista */
+.field { position: relative; }
+.field > select.fora { position: absolute; left: 0; top: 0; width: 1px; height: 1px; min-height: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
 .pick-grid .pk { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; min-width: 0; padding: 6px 10px; border: 1px solid var(--line-2); border-radius: 14px;
   background: var(--surface); color: var(--ink-2); font: inherit; font-size: 15px; line-height: 1.2; text-align: center; cursor: pointer; overflow-wrap: anywhere; }
 .pick-grid .pk svg { flex: none; }
