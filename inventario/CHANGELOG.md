@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.99.1
+
+- **Mais › Sobre**: o **OdisseIA** (os filmes e as séries da casa) entra na lista dos apps.
+
 ## 1.99.0
 
 - **CorrerIA**: a IA do CorrerIA consegue achar os itens que ainda não têm foto (para a etapa **Itens: Sem foto** das rondas).

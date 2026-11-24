@@ -1,5 +1,5 @@
 """Mais > Sobre, a última linha do menu (a mesma página do CronologIA 1.51.0): CorrerIA Code (desenvolvimento de softwares),
-por que esse nome, os sete apps da família, cada um com uma linha e o link para o GitHub (o InventarIA marcado com a
+por que esse nome, os oito apps da família, cada um com uma linha e o link para o GitHub (o InventarIA marcado com a
 versão), e Meu GitHub. Voltar do celular e o "‹ Mais" voltam ao menu. De 320 px ao computador, claro e escuro."""
 import os
 import re
@@ -16,6 +16,7 @@ APPS = [
     ("InventarIA", "inventario-ha", "Inventário da casa: cômodos, itens e valores."),
     ("EconomIA", "economia-ha", "Lista de compras com o melhor preço perto de casa."),
     ("MemorIA", "memoria-ha", "Cadernos de anotação que abrem na hora certa."),
+    ("OdisseIA", "odisseia", "Os filmes e as séries da casa: o que ver e onde."),
     ("CorrerIA", "correria-ha", "Pergunte e peça a qualquer app, no chat ou no WhatsApp."),
 ]
 WHY = ("Porque eu sou um programador sem tempo: vivo na correria. Então eu uso a IA para rodar tudo isso aqui. "
@@ -83,7 +84,7 @@ async def body(r, p):
 
         # os apps: cada um com o seu GitHub, o nome com o IA em destaque e uma linha
         rows = pg.locator(".about-apps .ab-row")
-        r.eq(await rows.count(), 7, f"{tag} os sete apps")
+        r.eq(await rows.count(), 8, f"{tag} os oito apps")
         r.eq([await rows.nth(i).get_attribute("href") for i in range(await rows.count())], [f"{GH}/{repo}" for _, repo, _ in APPS], f"{tag} na ordem, cada um para o seu GitHub")
         wms = await pg.evaluate("[...document.querySelectorAll('.about-apps .ab-wm')].map(w => [w.textContent, w.querySelector('span').textContent, getComputedStyle(w.querySelector('span')).color !== getComputedStyle(w).color])")
         r.eq([w[0] for w in wms], [n for n, _, _ in APPS], f"{tag} os nomes, sem espaço no meio")
@@ -99,7 +100,7 @@ async def body(r, p):
 
         # os links abrem fora do app
         links = await pg.evaluate("[...document.querySelectorAll('.about a')].map(a => [a.getAttribute('target'), a.getAttribute('rel')])")
-        r.check(len(links) == 8 and all(x == ["_blank", "noopener"] for x in links), f"{tag} os 8 links abrem fora (target=_blank, rel=noopener) ({len(links)})")
+        r.check(len(links) == 9 and all(x == ["_blank", "noopener"] for x in links), f"{tag} os 9 links abrem fora (target=_blank, rel=noopener) ({len(links)})")
         gh = pg.locator(".about a.ab-github")
         r.eq([await gh.get_attribute("href"), (await gh.text_content()).strip()], [GH, "Meu GitHub"], f"{tag} o botão Meu GitHub")
         # 1.60.0: a lista fica num cartão; o Meu GitHub, embaixo, da largura do cartão (como no CorrerIA)
