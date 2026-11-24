@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.98.0
+
+- **CorrerIA**: a IA do CorrerIA (na Conversa, no WhatsApp e nas rondas) agora lê as **Novidades** dos equipamentos que o app já conferiu: o item, o que é, a data e a fonte. Ela só lê o que está guardado, sem procurar na internet. Com as Novidades desligadas, nada vai.
+
 ## 1.97.3
 
 - **Memória da IA**: o campo **O que lembrar** cresce com o texto, sem a barra de rolagem dentro dele.

@@ -216,7 +216,7 @@ class Ferramentas(Base):
         self.assertEqual(r["consumiveis"]["itens"], 1)
         self.assertEqual(r["consumiveis"]["lista"][0]["para_que_serve"], "Creme para massagem nas costas, de arnica.")
         self.assertNotIn("CON", [c["codigo"] for c in r["comodos"]])
-        self.assertEqual(r["opcoes"], {"zonas": False, "itens_da_casa": True, "bens": True, "consumiveis": True, "consumiveis_por_comodo": False})
+        self.assertEqual(r["opcoes"], {"zonas": False, "itens_da_casa": True, "bens": True, "consumiveis": True, "consumiveis_por_comodo": False, "novidades": True})
         self.store.settings["consumiveis"] = False
         self.assertNotIn("consumiveis", self.json("resumo"))
 

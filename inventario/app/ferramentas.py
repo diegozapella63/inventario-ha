@@ -64,6 +64,16 @@ FERRAMENTAS = [
                       "ordem": {"type": "string", "enum": ["codigo", "valor", "nome", "recentes"],
                                 "description": "codigo: na ordem dos cômodos (padrão); valor: do maior para o menor; recentes: os últimos cadastrados primeiro."},
                       "limite": {"type": "integer", "minimum": 1, "maximum": MAX_LISTA, "description": f"Padrão: {PADRAO_LISTA}."}})},
+    # 1.98.0 (o dono: "pode criar ferramenta… o que precisar para melhorarmos o processo"; a Ronda da casa do CorrerIA 1.33.0
+    # pergunta pelas novidades): só lê o que o app já conferiu e guardou; não procura na internet nem chama a IA
+    {"nome": "novidades", "titulo": "Novidades dos equipamentos", "grava": False,
+     "descricao": "As novidades já conferidas dos equipamentos da casa (atualização, lançamento, modelo novo, recall, fim de suporte), "
+                  "cada uma com o item, o cômodo, o título, o resumo, a data e a fonte. Só lê o que o app já conferiu e guardou: não "
+                  "procura na internet. Filtros: comodo e so_novas (as que apareceram na última conferência). conferido_em diz de "
+                  "quando são. Só com as Novidades ligadas (opcoes.novidades no resumo).",
+     "entrada": _obj({"comodo": _COMODO,
+                      "so_novas": {"type": "boolean", "description": "true: só as que apareceram na última conferência."},
+                      "limite": {"type": "integer", "minimum": 1, "maximum": 30, "description": "Quantas no máximo (padrão 12)."}})},
     {"nome": "ver_item", "titulo": "Ver item", "grava": False,
      "descricao": "Tudo de um item: nome, código, cômodo, zona, categoria, quantidade, valor (e o de cada unidade), detalhes, "
                   "observação, quantas fotos tem, de onde veio, quando e por quem foi cadastrado e alterado, e desde quando vale "
@@ -428,7 +438,7 @@ def _resumo(srv) -> str:
                                                                  "com a duração estimada (duracao_dias). Cadastre com comodo Consumíveis.",
                               "lista": [_linha(srv, i, cats, taxas) for i in sorted(consumiveis, key=lambda i: i.get("seq") or 0)[:MAX_RESUMO * 3]]}
     out["opcoes"] = {"zonas": zonas, "itens_da_casa": srv.itens_enabled(), "bens": srv.bens_enabled(), "consumiveis": srv.consumiveis_enabled(),
-                     "consumiveis_por_comodo": srv.cons_comodo_enabled()}
+                     "consumiveis_por_comodo": srv.cons_comodo_enabled(), "novidades": srv.news_enabled()}
     return _json(out)
 
 
@@ -519,6 +529,55 @@ def _buscar(srv, a) -> str:
 
 ORIGENS = {"foto": "catalogado por foto", "informado": "valor informado", "ia": "leitura por IA", "voz": "cadastro por voz",
            "manual": "cadastro manual", "correria": "pelo CorrerIA"}
+
+
+NOVIDADE_TIPO = {"atualizacao": "atualização", "lancamento": "lançamento", "sucessor": "modelo novo", "recall": "recall",
+                 "suporte": "fim de suporte", "outro": "outro"}
+
+
+def _novidades(srv, a) -> str:
+    """1.98.0: as novidades guardadas (o que a tela Novidades mostra), sem as que a pessoa apagou nem as de um item que não
+    aparece (um tipo desligado). Não confere nada: lê o arquivo."""
+    if not srv.news_enabled():
+        raise ErroFerramenta("As Novidades estão desligadas no InventarIA (Mais › Configurações › Opções › Novidades).")
+    rooms, items = srv.visible_data(consumiveis=False)
+    room = _achar_comodo(srv, a["comodo"]) if a.get("comodo") not in (None, "") else None
+    if isinstance(room, str):
+        room = {"id": None}
+    limite = a.get("limite")
+    if limite in (None, ""):
+        limite = 12
+    if not isinstance(limite, int) or isinstance(limite, bool) or not 1 <= limite <= 30:
+        raise ErroFerramenta("limite vai de 1 a 30.")
+    so_novas = a.get("so_novas")
+    if so_novas not in (None, "", True, False):
+        raise ErroFerramenta("so_novas é true ou false.")
+    d = srv.news_read()
+    nomes = {r["id"]: r["name"] for r in rooms}
+    saida, conferidos, quando = [], 0, ""
+    for it in items:
+        if room and it.get("room") != room["id"]:
+            continue
+        v = d["itens"].get(it["id"])
+        news = v.get("news") if isinstance(v, dict) else None
+        if not isinstance(news, dict):
+            continue
+        conferidos += 1
+        quando = max(quando, str(v.get("at") or ""))
+        fora = srv.news_fora(srv.news_group_ids(it["id"]))
+        for n in news.get("novidades") or []:
+            if not isinstance(n, dict) or fora.intersection(srv.news_keys(n)) or (so_novas and not n.get("nova")):
+                continue
+            saida.append({"item": it["name"], "id": it["id"], "comodo": nomes.get(it.get("room"), ""), "tipo": NOVIDADE_TIPO.get(n.get("tipo"), "outro"),
+                          "titulo": n.get("titulo") or "", "resumo": n.get("resumo") or "", "data": n.get("data") or "", "fonte": n.get("fonte") or "",
+                          **({"boato": True} if n.get("boato") else {}), **({"nova": True} if n.get("nova") else {})})
+    saida.sort(key=lambda x: (not x.get("nova"), -int("".join(c for c in (x["data"] + "0000-00-00")[:10] if c.isdigit()) or 0), x["item"]))
+    out = {"total": len(saida), "itens_conferidos": conferidos, "novidades": saida[:limite]}
+    if quando:
+        out["conferido_em"] = quando[:10]
+    if not conferidos:
+        out["aviso"] = "Nenhum equipamento teve as novidades conferidas ainda (na tela: Mais › Novidades › Conferir)."
+    return _json(out)
 
 
 def _ver(srv, a) -> str:
@@ -906,6 +965,8 @@ def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
                 return _buscar(srv, a)
             if nome == "ver_item":
                 return _ver(srv, a)
+            if nome == "novidades":
+                return _novidades(srv, a)
             faz = {"cadastrar_itens": _cadastrar, "editar_item": _editar, "mover_itens": _mover, "apagar_item": _apagar,
                    "novo_comodo": _novo_comodo}[nome]
             return faz(srv, a, quem)

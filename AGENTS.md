@@ -170,6 +170,8 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 
 1.97.3 (o dono: "esses campos com scroll quebram as pernas"): o campo da Memória da IA cresce com o texto (`field-sizing: content`, até 40vh), sem rolagem dentro dele; uma linha continua com 50 px e o tamanho puxado pelo canto continua guardado.
 
+1.98.0 (o dono: "pode criar ferramenta… o que precisar para melhorarmos o processo" da ronda): a ferramenta `novidades` do CorrerIA (leitura; `_novidades` no ferramentas.py): só lê o `novidades.json` (o que a tela Novidades mostra), sem chamar a IA nem a internet; por item que aparece (`visible_data(consumiveis=False)`), sem as apagadas (`news_fora` do grupo), com `comodo`, `so_novas` e `limite` (1 a 30, 12 de início); devolve `{total, itens_conferidos, conferido_em, novidades: [{item, id, comodo, tipo, titulo, resumo, data, fonte, boato?, nova?}]}`; desligadas, o erro diz onde ligar. O `resumo` leva `opcoes.novidades` (a etapa Novidades das rondas do CorrerIA 1.33.0 só existe com ela). Testes: `Novidades` no `tests/unit/test_u_ferramentas.py`.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.

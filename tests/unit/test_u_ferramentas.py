@@ -33,6 +33,55 @@ class Base(UnitBase):
         return self.store.data["rev"]
 
 
+class Novidades(Base):
+    """1.98.0: inventario_novidades só lê o que o app já conferiu e guardou (não chama a IA nem a internet)."""
+    TV = "sal-007"
+
+    def guardar(self, **mais):
+        S.write_json_atomic(S.NEWS_FILE, {"itens": {self.TV: {"at": "2026-11-01T10:00:00-03:00", "news": {"produto": "TV", "novidades": [
+            {"tipo": "atualizacao", "titulo": "Firmware novo", "resumo": "Corrige a conexão.", "data": "2026-10-20", "fonte": "https://f.exemplo/a", "nova": True},
+            {"tipo": "sucessor", "titulo": "Modelo do ano", "resumo": "", "data": "2026-09", "fonte": "https://f.exemplo/b", "boato": True}]}}}, "triagem": {}, **mais})
+
+    def test_le_o_que_esta_guardado(self):
+        self.assertEqual(self.json("novidades"), {"total": 0, "itens_conferidos": 0, "novidades": [],
+                                                  "aviso": "Nenhum equipamento teve as novidades conferidas ainda (na tela: Mais › Novidades › Conferir)."})
+        self.guardar()
+        rev = self.rev()
+        with mock.patch.object(S, "ai_find_news", side_effect=AssertionError("não chama a IA")):
+            r = self.json("novidades")
+        item = self.store.item(self.TV)
+        sala = next(x["name"] for x in self.store.data["rooms"] if x["id"] == item["room"])
+        self.assertEqual((r["total"], r["itens_conferidos"], r["conferido_em"]), (2, 1, "2026-11-01"))
+        self.assertEqual(r["novidades"][0], {"item": item["name"], "id": self.TV, "comodo": sala, "tipo": "atualização", "titulo": "Firmware novo",
+                                             "resumo": "Corrige a conexão.", "data": "2026-10-20", "fonte": "https://f.exemplo/a", "nova": True})
+        self.assertEqual((r["novidades"][1]["tipo"], r["novidades"][1]["boato"], "nova" in r["novidades"][1]), ("modelo novo", True, False))
+        self.assertEqual(self.rev(), rev, "é leitura: nada muda")
+        self.assertEqual([n["titulo"] for n in self.json("novidades", {"so_novas": True})["novidades"]], ["Firmware novo"])
+        self.assertEqual(len(self.json("novidades", {"limite": 1})["novidades"]), 1)
+        self.assertEqual(self.json("novidades", {"comodo": sala})["total"], 2)
+        outro = next(x["name"] for x in self.store.data["rooms"] if x["id"] != item["room"] and not x.get("kind"))
+        self.assertEqual(self.json("novidades", {"comodo": outro})["total"], 0)
+
+    def test_valor_max_zero_acha_os_sem_valor(self):
+        """A etapa Itens: Sem valor da ronda do CorrerIA 1.33.0 pede inventario_buscar_itens com valor_max 0."""
+        it = self.store.data["items"][0]
+        it["value"] = 0
+        r = self.json("buscar_itens", {"valor_max": 0})
+        self.assertIn(it["id"], [x["id"] for x in r["itens"]])
+        self.assertTrue(all(not x.get("valor") for x in r["itens"]))
+
+    def test_as_apagadas_nao_voltam_e_os_erros_dizem_o_que_vale(self):
+        self.guardar(apagadas={self.TV: ["https://f.exemplo/a"]})
+        self.assertEqual([n["titulo"] for n in self.json("novidades")["novidades"]], ["Modelo do ano"])
+        self.erro("novidades", {"limite": 99}, "limite vai de 1 a 30")
+        self.erro("novidades", {"so_novas": "sim"}, "so_novas é true ou false")
+        self.erro("novidades", {"comodo": "Não existe"})
+        self.assertIs(self.json("resumo")["opcoes"]["novidades"], True)
+        self.store.settings["news"] = False
+        self.erro("novidades", {}, "As Novidades estão desligadas")
+        self.assertIs(self.json("resumo")["opcoes"]["novidades"], False)
+
+
 class Lista(Base):
     def test_formato_do_contrato(self):
         fs = F.lista()
@@ -57,7 +106,7 @@ class Lista(Base):
         grava = [f["grava"] for f in fs]
         self.assertEqual(grava, sorted(grava), "primeiro as leituras, depois as gravações")
         self.assertEqual([f["nome"] for f in fs if f["apaga"]], ["apagar_item"])
-        self.assertEqual([f["nome"] for f in fs if not f["grava"]], ["resumo", "buscar_itens", "ver_item", "ler_arquivo"])
+        self.assertEqual([f["nome"] for f in fs if not f["grava"]], ["resumo", "buscar_itens", "novidades", "ver_item", "ler_arquivo"])
 
     def test_nada_de_fotos_backups_ou_configuracoes(self):
         texto = json.dumps(F.lista(), ensure_ascii=False).lower()
@@ -112,7 +161,7 @@ class Resumo(Base):
         self.assertEqual(r["mais_valiosos"][0]["codigo"], "ESC-001")
         self.assertEqual(len(r["mais_valiosos"]), 10)
         self.assertEqual(len(r["ultimos_cadastrados"]), 10)
-        self.assertEqual(r["opcoes"], {"zonas": False, "itens_da_casa": True, "bens": True, "consumiveis": False, "consumiveis_por_comodo": False})
+        self.assertEqual(r["opcoes"], {"zonas": False, "itens_da_casa": True, "bens": True, "consumiveis": False, "consumiveis_por_comodo": False, "novidades": True})
         self.assertNotIn("zonas", r["comodos"][0])
         self.assertEqual(r["bens"]["itens"], 0)
 
