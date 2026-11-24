@@ -61,6 +61,7 @@ FERRAMENTAS = [
                       "comodo": _COMODO, "zona": {"type": "string"}, "categoria": {"type": "string", "description": "O id ou o nome da categoria."},
                       "usado_em": {"type": "string", "description": "Só os consumíveis usados neste cômodo (o id ou o nome; com Consumíveis por cômodo ligado)."},
                       "valor_min": {"type": "number", "minimum": 0}, "valor_max": {"type": "number", "minimum": 0},
+                      "sem_foto": {"type": "boolean", "description": "true: só os itens que ainda não têm foto (1.99.0)."},
                       "ordem": {"type": "string", "enum": ["codigo", "valor", "nome", "recentes"],
                                 "description": "codigo: na ordem dos cômodos (padrão); valor: do maior para o menor; recentes: os últimos cadastrados primeiro."},
                       "limite": {"type": "integer", "minimum": 1, "maximum": MAX_LISTA, "description": f"Padrão: {PADRAO_LISTA}."}})},
@@ -476,6 +477,9 @@ def _buscar(srv, a) -> str:
             cat = _achar_categoria(srv, a["categoria"], cons=True)  # 1.82.0: uma categoria dos consumíveis
     vmin = _valor(srv, a["valor_min"]) if a.get("valor_min") not in (None, "") else None
     vmax = _valor(srv, a["valor_max"]) if a.get("valor_max") not in (None, "") else None
+    sem_foto = a.get("sem_foto")
+    if sem_foto not in (None, "", True, False):
+        raise ErroFerramenta("sem_foto é true ou false.")
     if vmin is not None and vmax is not None and vmax < vmin:
         raise ErroFerramenta("valor_max é menor que valor_min.")
     zonas = srv.zones_enabled()
@@ -503,6 +507,8 @@ def _buscar(srv, a) -> str:
             continue
         v = _v(srv, it, taxas)
         if (vmin is not None and v < vmin) or (vmax is not None and v > vmax):
+            continue
+        if sem_foto and (it.get("photos") or []):
             continue
         if zona is not None and zona not in srv.fold(it.get("zone") or ""):
             continue

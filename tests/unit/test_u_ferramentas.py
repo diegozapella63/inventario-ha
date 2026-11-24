@@ -70,6 +70,16 @@ class Novidades(Base):
         self.assertIn(it["id"], [x["id"] for x in r["itens"]])
         self.assertTrue(all(not x.get("valor") for x in r["itens"]))
 
+    def test_sem_foto_acha_os_itens_sem_foto(self):
+        """1.99.0: a etapa Itens: Sem foto das rondas do CorrerIA 1.35.0 pede inventario_buscar_itens com sem_foto."""
+        com, sem = self.store.data["items"][0], self.store.data["items"][1]
+        com["photos"], sem["photos"] = ["a1b2c3d4e5f60718.jpg"], []
+        ids = [x["id"] for x in self.json("buscar_itens", {"sem_foto": True, "limite": 200})["itens"]]
+        self.assertIn(sem["id"], ids)
+        self.assertNotIn(com["id"], ids)
+        self.assertIn(com["id"], [x["id"] for x in self.json("buscar_itens", {"sem_foto": False, "limite": 200})["itens"]])
+        self.erro("buscar_itens", {"sem_foto": "sim"}, "sem_foto é true ou false")
+
     def test_as_apagadas_nao_voltam_e_os_erros_dizem_o_que_vale(self):
         self.guardar(apagadas={self.TV: ["https://f.exemplo/a"]})
         self.assertEqual([n["titulo"] for n in self.json("novidades")["novidades"]], ["Modelo do ano"])

@@ -172,6 +172,8 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 
 1.98.0 (o dono: "pode criar ferramenta… o que precisar para melhorarmos o processo" da ronda): a ferramenta `novidades` do CorrerIA (leitura; `_novidades` no ferramentas.py): só lê o `novidades.json` (o que a tela Novidades mostra), sem chamar a IA nem a internet; por item que aparece (`visible_data(consumiveis=False)`), sem as apagadas (`news_fora` do grupo), com `comodo`, `so_novas` e `limite` (1 a 30, 12 de início); devolve `{total, itens_conferidos, conferido_em, novidades: [{item, id, comodo, tipo, titulo, resumo, data, fonte, boato?, nova?}]}`; desligadas, o erro diz onde ligar. O `resumo` leva `opcoes.novidades` (a etapa Novidades das rondas do CorrerIA 1.33.0 só existe com ela). Testes: `Novidades` no `tests/unit/test_u_ferramentas.py`.
 
+1.99.0 (o dono: "pode criar" as ferramentas que faltavam para as rondas): o `buscar_itens` do CorrerIA aceita `sem_foto: true` (só os itens sem `photos`), para a etapa Itens: Sem foto do CorrerIA 1.35.0. Teste: `test_sem_foto_acha_os_itens_sem_foto`.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.
