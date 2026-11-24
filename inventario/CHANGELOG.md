@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.97.3
+
+- **Memória da IA**: o campo **O que lembrar** cresce com o texto, sem a barra de rolagem dentro dele.
+
 ## 1.97.2
 
 - **Memória da IA**: dois apps gravando uma frase no mesmo instante não apagam mais a frase um do outro (cada um espera a sua vez).

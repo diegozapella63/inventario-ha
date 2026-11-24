@@ -38,6 +38,8 @@ async def body(r, p):
         await card.scroll_into_view_if_needed()
         await r.shot(pg, f"memoria-{tam}-{tema}")
         if tam == "cel390":
+            await pg.fill("#mem-texto", "A feira da casa é sempre no sábado de manhã, e o pão é o da padaria da esquina, nunca o do mercado")
+            r.check(await pg.evaluate("(() => { const t = document.querySelector('#mem-texto'); return t.scrollHeight <= t.clientHeight + 1 && t.offsetHeight > 60; })()"), "o campo cresce com o texto, sem rolagem dentro dele")
             await pg.fill("#mem-texto", "Creme é sempre da categoria Higiene")
             await pg.click('[data-act="mem-add"]')
             await pg.locator(".toast", has_text="A IA vai lembrar").wait_for(timeout=8000)

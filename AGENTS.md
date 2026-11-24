@@ -168,6 +168,8 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 
 1.97.2: a vez de gravar a Memória da IA entre os apps (`memoria_ia.py: `_vez``: uma pasta `memoria_ia.json.trava` ao lado do arquivo, criada num passo só; espera até 3 s, tira a que ficou de um app que caiu, há mais de 10 s, e sem a vez grava assim mesmo; o arquivo temporário leva um sufixo ao acaso). Antes, dois apps gravando no mesmo instante liam a mesma lista e um apagava a frase do outro (num teste com 40 gravações simultâneas, uma se perdia). Um caminho que não é uma pasta não prende o app (espera só o prazo). O `POST /api/rooms/order` com `ids` que não é uma lista não muda a ordem (um número ali era um erro 500).
 
+1.97.3 (o dono: "esses campos com scroll quebram as pernas"): o campo da Memória da IA cresce com o texto (`field-sizing: content`, até 40vh), sem rolagem dentro dele; uma linha continua com 50 px e o tamanho puxado pelo canto continua guardado.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.
