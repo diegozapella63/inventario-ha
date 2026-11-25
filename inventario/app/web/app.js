@@ -45,8 +45,28 @@
   function applyCats(list, clist) {
     CATS = Array.isArray(list) && list.length ? list.map((c) => [c.id, c.name]) : DEFAULT_CATS;
     CAT = Object.fromEntries(CATS);
-    if (clist !== undefined) { CCATS = Array.isArray(clist) && clist.length ? clist.map((c) => [c.id, c.name]) : DEFAULT_CCATS; CCAT = Object.fromEntries(CCATS); }
+    CORES_CAT.casa = coresDe(CATS, Array.isArray(list) ? list : []);
+    if (clist !== undefined) {
+      CCATS = Array.isArray(clist) && clist.length ? clist.map((c) => [c.id, c.name]) : DEFAULT_CCATS; CCAT = Object.fromEntries(CCATS);
+      CORES_CAT.cons = coresDe(CCATS, Array.isArray(clist) ? clist : []);
+    }
   }
+  // 1.100.0: cada categoria tem uma cor da paleta (a de Outros, Grafite). A que veio sem (a lista padrão) ganha a primeira que
+  // nenhuma outra usa, na ordem: a mesma conta do com_cores do server.py
+  const CORES_CAT = { casa: {}, cons: {} };
+  function coresDe(pares, lista) {
+    const cores = ACCENTS.map(([k]) => k), dada = Object.fromEntries(lista.filter((c) => cores.includes(c.cor)).map((c) => [c.id, c.cor]));
+    const livres = cores.slice(0, -1).filter((k) => !Object.values(dada).includes(k));
+    let volta = 0;
+    return Object.fromEntries(pares.map(([k]) => [k, dada[k] || (k === "outros" || k === "c-outros" ? "grafite" : livres.shift() || cores[volta++ % (cores.length - 1)])]));
+  }
+  const corCat = (k) => CORES_CAT.casa[k] || CORES_CAT.cons[k] || "grafite";
+  // a cor de uma categoria nova: a menos usada (a primeira, no empate), sem o Grafite
+  const corLivre = (cons) => {
+    const usadas = Object.values(cons ? CORES_CAT.cons : CORES_CAT.casa), n = (k) => usadas.filter((u) => u === k).length;
+    return ACCENTS.map(([k]) => k).slice(0, -1).reduce((a, k) => (n(k) < n(a) ? k : a));
+  };
+  const pontoCat = (k) => `<span class="cat-dot" data-accent="${esc(corCat(k))}" aria-hidden="true"></span>`;
   const SOURCES = { foto: "Catalogado por foto", informado: "Valor informado", ia: "Leitura por IA", voz: "Cadastro por voz", manual: "Cadastro manual", correria: "Pelo CorrerIA" };
   const ORDERS = [["rel", "Mais relevantes"], ["val", "Maior valor"], ["valasc", "Menor valor"], ["az", "Nome, de A a Z"], ["new", "Mais recentes"], ["code", "Código"]];
   const PREVIEW = !!window.INV_PREVIEW;
@@ -430,13 +450,23 @@
       const l = f.querySelector(":scope > .lbl, :scope > label");
       if (!l) continue;
       const k = l.textContent.trim();
-      f.classList.toggle("shut", shut.has(k));
+      // 1.100.0: a Observação (data-lembra="nao") começa fechada quando vazia e aberta com texto, sem guardar no aparelho
+      if (f.dataset.lembra !== "nao") f.classList.toggle("shut", shut.has(k));
+      else if (f.dataset.lembraFeito) continue;
+      else f.dataset.lembraFeito = "1";
       l.setAttribute("role", "button");
       l.tabIndex = 0;
-      l.setAttribute("aria-expanded", shut.has(k) ? "false" : "true");
+      l.setAttribute("aria-expanded", f.classList.contains("shut") ? "false" : "true");
     }
   }
   function alternarCampo(l) {
+    const f = l.closest(".field");
+    if (f && f.dataset.lembra === "nao") {
+      f.classList.toggle("shut");
+      l.setAttribute("aria-expanded", f.classList.contains("shut") ? "false" : "true");
+      if (!f.classList.contains("shut")) $("textarea, input", f)?.focus();
+      return;
+    }
     const k = l.textContent.trim(), shut = camposFechados();
     if (shut.has(k)) shut.delete(k); else shut.add(k);
     LS.set("campos", [...shut]);
@@ -1294,7 +1324,7 @@
             <div class="chips" role="radiogroup" aria-labelledby="bk-l-room">${chip("bk-room", KEEP, "Manter", true)}${D.rooms.map((r) => chip("bk-room", r.id, esc(r.name))).join("")}</div>
             <p class="help" id="bk-help" hidden>Em outro cômodo, o item ganha um código novo${zOn ? " e fica sem zona, se não escolher uma" : ""}.</p></div>
           <div class="field" data-f="cat"><span class="lbl" id="bk-l-cat">Categoria</span>
-            <div class="chips" role="radiogroup" aria-labelledby="bk-l-cat">${chip("bk-cat", KEEP, "Manter", true)}${CATS.map(([k, v]) => chip("bk-cat", k, esc(v))).join("")}</div></div>
+            <div class="chips" role="radiogroup" aria-labelledby="bk-l-cat">${chip("bk-cat", KEEP, "Manter", true)}${CATS.map(([k, v]) => chip("bk-cat", k, pontoCat(k) + esc(v))).join("")}</div></div>
           ${zOn ? `<div class="field" data-f="zone"><span class="lbl" id="bk-l-zone">Zona</span>
             <div class="chips" id="bk-zones" role="radiogroup" aria-labelledby="bk-l-zone">${zoneChips("")}</div>
             <input id="bk-zone-new" class="input" placeholder="Nome da zona" maxlength="120" autocomplete="off" aria-label="Nome da zona" hidden></div>` : ""}
@@ -1356,7 +1386,7 @@
       html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("edit", `Alterar ${n}`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-bk><div class="form">
           <div class="field" data-f="cat"><span class="lbl" id="bk-l-cat">Categoria</span>
-            <div class="chips" role="radiogroup" aria-labelledby="bk-l-cat">${chip("bk-cat", KEEP, "Manter", true)}${CCATS.map(([k, v]) => chip("bk-cat", k, esc(v))).join("")}</div></div>
+            <div class="chips" role="radiogroup" aria-labelledby="bk-l-cat">${chip("bk-cat", KEEP, "Manter", true)}${CCATS.map(([k, v]) => chip("bk-cat", k, pontoCat(k) + esc(v))).join("")}</div></div>
           ${porComodo ? `<div class="field" data-f="usado"><span class="lbl" id="bk-l-usado">Cômodo onde é usado</span>
             <div class="chips" role="radiogroup" aria-labelledby="bk-l-usado">${chip("bk-usado", KEEP, "Manter", true)}${chip("bk-usado", "", "Nenhum")}${D.rooms.map((r) => chip("bk-usado", r.id, esc(r.name))).join("")}</div></div>` : ""}
         </div></form>
@@ -1518,7 +1548,7 @@
       consOn() && mainTab() !== "cons" && ["#/consumiveis", "drop", "Consumíveis", "Pasta térmica, creme, pilhas: o que se gasta."],
       ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
       newsOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
-      ["#/categorias", "grid", "Categorias", "Criar, renomear e apagar."],
+      ["#/categorias", "grid", "Categorias", "O nome e a cor de cada uma."],
       ["#/relatorio", "report", "Relatório do inventário", `Por cômodo, com ${LS.get("reportPhotos", true) ? "fotos e " : ""}gráficos. Baixa em PDF.`], // sem Mostrar fotos, não promete fotos
       ["#/config", "gear", "Configurações", "Integrações, dados e backup, aparência e opções."],
       ["#/sobre", "info", "Sobre", "CorrerIA Code, os apps e o GitHub."],
@@ -1537,7 +1567,7 @@
     ["InventarIA", "inventario-ha", "package", "Inventário da casa: cômodos, itens e valores."],
     ["EconomIA", "economia-ha", "receipt", "Lista de compras com o melhor preço perto de casa."],
     ["MemorIA", "memoria-ha", "book", "Cadernos de anotação que abrem na hora certa."],
-    ["OdisseIA", "odisseia", "clapperboard", "Os filmes e as séries da casa: o que ver e onde."],
+    ["OdisseIA", "odisseia", "clapperboard", "Os filmes, as séries e os jogos da casa: o que ver, jogar e onde."],
     ["CorrerIA", "correria-ha", "chat", "Pergunte e peça a qualquer app, no chat ou no WhatsApp."],
   ];
   const wordmark = (n) => `<span class="ab-wm">${esc(n.slice(0, -2))}<span>${esc(n.slice(-2))}</span></span>`; // o "IA" na cor do app, sem quebrar o nome
@@ -2624,64 +2654,61 @@
       toast("Copiado");
     } catch { toast("Toque e segure no texto para copiar"); }
   }
-  // -- Categorias: uma tela própria, no menu Mais
+  // -- Categorias: uma tela própria, no menu Mais. 1.100.0 (o dono: "colocar cores nas categorias" e "padronizar as categorias
+  // igual os outros, o do OdisseIA ficou bom"): uma linha por categoria, com o ícone na cor dela e quantos itens; o toque abre a
+  // janela com o nome e a cor; no fim, Nova categoria
   function viewCats() {
+    const linhas = (pares, cons) => pares.map(([k, v]) => {
+      const n = D.catTotals.get(k)?.count || 0;
+      return `<button type="button" class="catrow" data-act="cat-open" data-cat="${esc(k)}"><span class="cat-tile" data-accent="${esc(corCat(k))}">${ic("tag")}</span>
+        <span class="mb"><b>${esc(v)}</b><span>${n ? plural(n, cons ? "consumível" : "item", cons ? "consumíveis" : "itens") : cons ? "Nenhum consumível" : "Nenhum item"}</span></span>${ic("chev", "sm")}</button>`;
+    }).join("") + `<button type="button" class="catrow nova" data-act="cat-new"${cons ? ' data-kind="consumiveis"' : ""}><span class="cat-tile">${ic("plus")}</span><span class="mb"><b>Nova categoria</b></span></button>`;
     return `
     <section class="panel" id="p-cats">
-      <h2>${secIc("tag")}Categorias de itens</h2>
-      <ul class="opts cats">
-        <li><div class="ot"><b>${plural(CATS.length, "categoria", "categorias")}</b></div>
-          <div class="oa"><button type="button" class="btn" data-act="cat-new">${ic("plus")}Nova categoria</button></div></li>
-        ${CATS.map(([k, v]) => {
-          const n = D.catTotals.get(k)?.count || 0;
-          // as fixas (sem Renomear nem Apagar): Eletrônicos (as novidades) e, desde a 1.54.0, Utilidades e Veículos (os Recursos)
-          if (FIXED_CATS.includes(k)) return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}</span></div></li>`;
-          return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "item", "itens")}</span></div>
-            <div class="oa"><button type="button" class="btn icon" data-act="cat-edit" data-cat="${esc(k)}" aria-label="Renomear ${esc(v)}">${ic("edit")}</button>
-              ${k === "outros" ? `<span class="cat-keep" aria-hidden="true"></span>` : `<button type="button" class="btn icon danger" data-act="cat-del" data-cat="${esc(k)}" aria-label="Apagar ${esc(v)}">${ic("trash")}</button>`}</div></li>`;
-        }).join("")}
-      </ul>
+      <h2>${secIc("tag")}Categorias de itens <span class="cnt">${CATS.length}</span></h2>
+      <div class="catlist">${linhas(CATS, false)}</div>
     </section>
     ${consOn() ? `<section class="panel" id="p-cats-cons">
-      <h2>${secIc("drop")}Categorias dos consumíveis</h2>
-      <ul class="opts cats">
-        <li><div class="ot"><b>${plural(CCATS.length, "categoria", "categorias")}</b></div>
-          <div class="oa"><button type="button" class="btn" data-act="cat-new" data-kind="consumiveis">${ic("plus")}Nova categoria</button></div></li>
-        ${CCATS.map(([k, v]) => {
-          const n = D.catTotals.get(k)?.count || 0;
-          return `<li><div class="ot"><b>${esc(v)}</b><span>${plural(n, "consumível", "consumíveis")}</span></div>
-            <div class="oa"><button type="button" class="btn icon" data-act="cat-edit" data-cat="${esc(k)}" aria-label="Renomear ${esc(v)}">${ic("edit")}</button>
-              ${k === "c-outros" ? `<span class="cat-keep" aria-hidden="true"></span>` : `<button type="button" class="btn icon danger" data-act="cat-del" data-cat="${esc(k)}" aria-label="Apagar ${esc(v)}">${ic("trash")}</button>`}</div></li>`;
-        }).join("")}
-      </ul>
+      <h2>${secIc("drop")}Categorias dos consumíveis <span class="cnt">${CCATS.length}</span></h2>
+      <div class="catlist">${linhas(CCATS, true)}</div>
     </section>` : ""}`;
   }
-  // criar ou renomear uma categoria (kind "consumiveis": uma dos consumíveis)
+  // a janela de uma categoria (nova, ou a que foi tocada): o nome e a cor; Apagar fica embaixo, à esquerda. As fixas (Eletrônicos,
+  // Utilidades e Veículos: as novidades e os recursos) mudam só a cor; Outros não se apaga. kind "consumiveis": uma dos consumíveis
   function openCatName(id = null, kind = "") {
-    const old = id ? CAT[id] || CCAT[id] : "";
+    const cons = kind === "consumiveis" || !!(id && CCAT[id]);
+    const old = id ? CAT[id] || CCAT[id] : "", fixa = !!id && FIXED_CATS.includes(id), outros = id === "outros" || id === "c-outros";
+    const cor0 = id ? corCat(id) : corLivre(cons);
     const entry = openDialog({
-      cls: "modal narrow", label: id ? "Renomear categoria" : "Nova categoria",
-      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("tag", `${id ? "Renomear categoria" : "Nova categoria"}`)}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+      cls: "modal narrow", label: id ? "Categoria" : "Nova categoria",
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("tag", id ? "Categoria" : "Nova categoria")}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <form class="dlg-b" data-cn><div class="form">
-          <div class="field"><label for="cn-name">Nome</label><textarea id="cn-name" class="input grow" rows="1" name="name" maxlength="60" placeholder="${kind === "consumiveis" || (id && CCAT[id]) ? "Ex.: Piscina" : "Ex.: Ferramentas"}" autocomplete="off">${esc(old)}</textarea></div>
+          <div class="field"><label for="cn-name">Nome</label><textarea id="cn-name" class="input grow" rows="1" name="name" maxlength="60" placeholder="${cons ? "Ex.: Piscina" : "Ex.: Ferramentas"}" autocomplete="off"${fixa ? " disabled" : ""}>${esc(old)}</textarea>
+            ${fixa ? `<p class="help">As novidades e os recursos usam esta categoria: o nome não muda.</p>` : ""}</div>
+          <div class="field"><span class="lbl" id="cn-cor-l">Cor</span><div class="swatches cn-cores" role="radiogroup" aria-labelledby="cn-cor-l">${ACCENTS.map(([k, v]) => `<label class="sw" data-accent="${k}"><input type="radio" name="cor" value="${k}"${k === cor0 ? " checked" : ""}>${SWATCH}<span>${v}</span></label>`).join("")}</div></div>
           <div class="formerr" data-err hidden></div>
         </div></form>
-        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok>${ic(id ? "check" : "plus")}${id ? "Salvar" : "Criar categoria"}</button></div></div>`,
+        <div class="dlg-f"><span class="grow"></span>${id && !fixa && !outros ? `<button class="btn ghost danger" data-del>${ic("trash")}Apagar</button>` : `<button class="btn ghost" data-x>${ic("close")}Cancelar</button>`}<button class="btn primary" data-ok>${ic(id ? "check" : "plus")}${id ? "Salvar" : "Criar categoria"}</button></div></div>`,
     });
     const form = $("[data-cn]", entry.dlg), err = $("[data-err]", entry.dlg);
-    setTimeout(() => { form.name.focus(); form.name.select(); }, 50);
+    if (!fixa) setTimeout(() => { form.name.focus(); if (!id) form.name.select(); }, 50);
     const go = async () => {
-      const name = form.name.value.trim();
+      const name = form.name.value.trim(), cor = (form.querySelector("input[name=cor]:checked") || {}).value || cor0;
       if (!name) { err.hidden = false; err.textContent = "Dê um nome à categoria."; form.name.focus(); return; }
-      if (id && name === old) { requestClose(entry, { force: true }); return; }
+      if (id && name === old && cor === cor0) { requestClose(entry, { force: true }); return; }
       try {
-        const res = id ? await API.put(`api/cats/${encodeURIComponent(id)}`, { name }) : await API.post("api/cats", { name, ...(kind ? { kind } : {}) });
+        const corpo = fixa ? { cor } : { name, cor };
+        const res = id ? await API.put(`api/cats/${encodeURIComponent(id)}`, corpo) : await API.post("api/cats", { ...corpo, ...(kind ? { kind } : {}) });
         setRev(res.rev); applyCats(res.cats, res.consCats || null); derive();
-        finalizeThen(entry, () => { refreshAll(); toast(id ? "Categoria renomeada" : `${res.cat.name} criada`); });
+        finalizeThen(entry, () => { refreshAll(); toast(!id ? `${res.cat.name} criada` : name !== old ? "Categoria renomeada" : "Categoria salva"); });
       } catch (e) { err.hidden = false; err.textContent = e.message; }
     };
     form.addEventListener("submit", (e) => { e.preventDefault(); go(); });
-    entry.dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); if (e.target.closest("[data-ok]")) go(); });
+    entry.dlg.addEventListener("click", (e) => {
+      if (e.target.closest("[data-x]")) requestClose(entry, { force: true });
+      if (e.target.closest("[data-ok]")) go();
+      if (e.target.closest("[data-del]")) finalizeThen(entry, () => deleteCat(id));
+    });
   }
   async function deleteCat(id) {
     const name = CAT[id] || CCAT[id], n = D.catTotals.get(id)?.count || 0;
@@ -3828,9 +3855,9 @@
     // 1.97.0 (o dono: "faz as opções de cômodo e categoria igual os outros apps, direto na tela"): um botão por opção, em duas
     // colunas, como o Cômodos onde é usado. A caixa de seleção continua no formulário (quem guarda o valor é ela), fora da vista.
     const escolhas = (sel, qual) => [...sel.options].filter((o) => o.value).map((o) => {
-      const icone = qual === "cat" ? "grid" : o.value === BENS_NEW || (D.bens && o.value === D.bens.id) ? "gem" : o.value === CONS_NEW || (D.cons && o.value === D.cons.id) ? "drop" : "rooms";
+      const icone = qual === "cat" ? "" : o.value === BENS_NEW || (D.bens && o.value === D.bens.id) ? "gem" : o.value === CONS_NEW || (D.cons && o.value === D.cons.id) ? "drop" : "rooms";
       const on = o.value === sel.value;
-      return `<button type="button" class="pk${on ? " on" : ""}" data-escolha="${qual}" data-v="${esc(o.value)}" aria-pressed="${on}">${ic(icone, "sm")}<span>${esc(o.textContent)}</span></button>`;
+      return `<button type="button" class="pk${on ? " on" : ""}" data-escolha="${qual}" data-v="${esc(o.value)}" aria-pressed="${on}">${icone ? ic(icone, "sm") : pontoCat(o.value)}<span>${esc(o.textContent)}</span></button>`;
     }).join("");
     const pintaEscolhas = () => { for (const q of ["room", "cat"]) { const g = $(`#f-${q}-g`, form); if (g && form[q]) g.innerHTML = escolhas(form[q], q); } };
     const roomField = `<div class="field"><span class="lbl" id="f-room-l">Cômodo</span><select id="f-room" class="select fora" name="room" tabindex="-1" aria-hidden="true" aria-label="Cômodo">${roomOptions(F.room)}</select><div class="pick-grid" id="f-room-g" role="group" aria-labelledby="f-room-l"></div></div>`;
@@ -3859,8 +3886,7 @@
               <div class="field"><label for="f-value">Valor total</label><div class="money"><input id="f-value" class="input" name="value" inputmode="decimal" value="${esc(F.value)}" placeholder="0"></div>
                 <p class="unit-hint" data-slot="unit"></p><p class="err" data-err="value" hidden></p></div>
             </div>
-            <details class="more-fields"${F.flag ? " open" : ""}><summary>${ic("chev", "sm")}${oti("edit")}Observação</summary>
-              <div class="form"><div class="field"><label for="f-flag" class="sr">Observação</label><textarea id="f-flag" class="input grow" rows="1" name="flag" maxlength="200" placeholder="Algo para lembrar sobre este item">${esc(F.flag)}</textarea></div></div></details>
+            <div class="field dobravel${F.flag ? "" : " shut"}" data-lembra="nao" data-f="flag"><span class="lbl" id="f-flag-l">Observação</span><textarea id="f-flag" class="input grow" rows="1" name="flag" maxlength="200" aria-labelledby="f-flag-l" placeholder="Algo para lembrar sobre este item">${esc(F.flag)}</textarea></div>
             <div class="formerr" data-slot="formerr" hidden></div>
           </div>
         </form>
@@ -5333,7 +5359,7 @@
       case "catalog": openCatalog({ room: b.dataset.room || (base.name === "room" ? base.id : null) }); break;
       case "room-new": openRoomNew(); break;
       case "cat-new": openCatName(null, b.dataset.kind || ""); break;
-      case "cat-edit": openCatName(b.dataset.cat); break;
+      case "cat-open": case "cat-edit": openCatName(b.dataset.cat); break;
       case "cat-del": deleteCat(b.dataset.cat); break;
       case "room-edit": openRoomEdit(b.dataset.room); break;
       case "room-up": moveRoom(b.dataset.room, -1); break;

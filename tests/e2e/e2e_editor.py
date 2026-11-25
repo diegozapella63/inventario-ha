@@ -134,7 +134,9 @@ async def body(r, p):
     await pg.fill("#f-details", longo)
     r.eq(len(await pg.input_value("#f-details")), 4000, "detalhes aceitam até 4000 letras (o resto fica de fora)")
     r.check(not await pg.is_visible("#f-flag"), "Observação começa recolhida")
-    await pg.click("details.more-fields summary")
+    r.eq(await pg.evaluate("getComputedStyle(document.querySelector('#f-flag-l')).fontSize"), await pg.evaluate("getComputedStyle(document.querySelector('#f-cat-l')).fontSize"),
+         "1.100.0: o título da Observação do tamanho dos outros campos")
+    await pg.click("#f-flag-l")
     await pg.fill("#f-flag", "Emprestada para o vizinho")
     await save_and_wait(pg)
     itl = r.item_named("Furadeira com maleta")

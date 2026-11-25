@@ -47,10 +47,13 @@ async def body(r, p):
     await pg.wait_for_timeout(300)
     # Categorias: Utilidades e Veículos fixas
     await r.open(pg, "#/categorias", "#p-cats")
-    for nome in ("Eletrônicos", "Utilidades", "Veículos"):
-        li = pg.locator("#p-cats li", has=pg.locator("b", has_text=nome))
-        if await li.count():
-            r.eq(await li.locator("button").count(), 0, f"{nome}: fixa, sem Renomear nem Apagar")
+    for cid in ("eletronicos", "utilidades", "veiculos"):
+        if await pg.locator(f'#p-cats .catrow[data-cat="{cid}"]').count():
+            await pg.click(f'#p-cats .catrow[data-cat="{cid}"]')
+            await pg.wait_for_selector("dialog[open] #cn-name")
+            r.check(await pg.is_disabled("#cn-name") and await pg.locator("dialog[open] [data-del]").count() == 0, f"{cid}: fixa, sem mudar o nome nem apagar")
+            await pg.click("dialog[open] [data-x]")
+            await pg.wait_for_timeout(250)
     # 1.65.0: Novidades › Eletrônicos: cada eletrônico com os recursos (ou Ainda não buscado), entre Apps do celular e Conferir
     await r.open(pg, "#/novidades", "#p-news-rec")
     await pg.wait_for_selector("#p-news-rec .nlist .nrow", timeout=8000)

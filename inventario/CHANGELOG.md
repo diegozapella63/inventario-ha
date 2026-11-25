@@ -1,5 +1,12 @@
 # Mudanças
 
+## 1.100.0
+
+- **Categorias com cor**: cada categoria ganha uma cor da paleta (Outros fica em Grafite). A cor aparece em Mais › Categorias e na escolha da categoria do item, num pontinho ao lado do nome.
+- **Mais › Categorias igual aos outros apps** (como no OdisseIA): uma linha por categoria, com o ícone na cor dela e quantos itens tem. Um toque abre a categoria, com o **Nome**, a **Cor** e o **Apagar**; no fim da lista, **Nova categoria**. Eletrônicos, Utilidades e Veículos (das novidades e dos recursos) mudam só a cor.
+- **Observação** do item: agora é um campo como os outros, com o título do mesmo tamanho e a seta no canto. Começa fechada quando está vazia.
+- **Mais › Sobre**: o OdisseIA agora fala também dos jogos.
+
 ## 1.99.1
 
 - **Mais › Sobre**: o **OdisseIA** (os filmes e as séries da casa) entra na lista dos apps.

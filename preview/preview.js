@@ -6,13 +6,22 @@
   const DEF_CATS = [["eletronicos", "Eletrônicos"], ["moveis", "Móveis"], ["decoracao", "Decoração e arte"], ["colecao", "Colecionáveis"], ["cozinha", "Cozinha e bar"],
     ["texteis", "Tapetes e têxteis"], ["plantas", "Plantas"], ["livros", "Livros e jogos"], ["pets", "Pets"], ["saude", "Saúde"], ["vestuario", "Roupas e calçados"],
     ["utilidades", "Utilidades"], ["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["outros", "Outros"]].map(([id, name]) => ({ id, name }));
-  const catsOf = (d) => { if (!Array.isArray(d.cats) || !d.cats.length) d.cats = clone(DEF_CATS); return d.cats; };
+  // 1.100.0: cada categoria com uma cor da paleta (o com_cores do server.py)
+  const CORES = ["vermelho", "coral", "laranja", "ouro", "verde", "menta", "turquesa", "azul", "indigo", "lilas", "rosa", "grafite"];
+  const comCores = (cats) => {
+    const livres = CORES.slice(0, -1).filter((k) => !cats.some((c) => c.cor === k));
+    let volta = 0;
+    for (const c of cats) if (!CORES.includes(c.cor)) c.cor = c.id === "outros" || c.id === "c-outros" ? "grafite" : livres.shift() || CORES[volta++ % 11];
+    return cats;
+  };
+  const corDe = (body) => { if (body.cor == null || body.cor === "") return null; if (!CORES.includes(body.cor)) fail("Escolha uma cor da paleta."); return body.cor; };
+  const catsOf = (d) => { if (!Array.isArray(d.cats) || !d.cats.length) d.cats = clone(DEF_CATS); return comCores(d.cats); };
   const CATS = { has: (k) => ST.data && catsOf(ST.data).some((c) => c.id === k) };
   // 1.82.0: as categorias dos consumíveis (à parte) e a duração estimada, como no server.py
   const DEF_CCATS = [["c-limpeza", "Limpeza"], ["c-higiene", "Higiene e cuidados"], ["c-despensa", "Cozinha e despensa"], ["c-farmacia", "Farmácia"], ["c-pets", "Pets"],
     ["c-papelaria", "Escritório e papelaria"], ["c-manutencao", "Manutenção e reparos"], ["c-eletronicos", "Pilhas e eletrônicos"], ["c-carro", "Carro"], ["c-jardim", "Jardim"],
     ["c-outros", "Outros"]].map(([id, name]) => ({ id, name }));
-  const ccatsOf = (d) => { if (!Array.isArray(d.consCats) || !d.consCats.length) d.consCats = clone(DEF_CCATS); return d.consCats; };
+  const ccatsOf = (d) => { if (!Array.isArray(d.consCats) || !d.consCats.length) d.consCats = clone(DEF_CCATS); return comCores(d.consCats); };
   const isCons = (d, rid) => (d.rooms.find((r) => r.id === rid) || {}).kind === "consumiveis";
   // 1.91.0: os cômodos onde um consumível é usado: um id (o jeito de antes) ou uma lista; só os cômodos da casa
   const usados = (d, v) => [...new Set([].concat(v || []))].filter((id) => d.rooms.some((x) => x.id === id && !x.kind)).slice(0, 40);
@@ -191,19 +200,23 @@
       const base = "c-" + (foldName(name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 34) || "categoria");
       let id = base, n = 2;
       while (cats.some((c) => c.id === id)) id = `${base}-${n++}`;
-      const cat = { id, name };
+      const cat = { id, name, ...(corDe(body) ? { cor: corDe(body) } : {}) };
       const at = cats.findIndex((c) => c.id === "c-outros");
       cats.splice(at < 0 ? cats.length : at, 0, cat);
-      return { cat: clone(cat), cats: clone(catsOf(d)), consCats: clone(cats), rev: bump() };
+      return { cat: clone(cat), cats: clone(catsOf(d)), consCats: clone(comCores(cats)), rev: bump() };
     }
     if ((m = path.match(/^api\/cats\/(c-[a-z0-9_-]+)$/)) && ccatsOf(d).some((c) => c.id === m[1])) {
       const cats = ccatsOf(d), cat = cats.find((c) => c.id === m[1]);
       if (method === "PUT") {
-        const name = String(body.name || "").trim().replace(/\s+/g, " ");
-        if (!name) fail("Preencha o campo nome da categoria.");
-        if (cats.some((c) => c.id !== cat.id && foldName(c.name) === foldName(name))) fail(`Já existe a categoria ${name}.`);
-        cat.name = name;
-        return { cat: clone(cat), cats: clone(catsOf(d)), consCats: clone(cats), rev: bump() };
+        const cor = corDe(body);
+        if ("name" in body || !cor) {
+          const name = String(body.name || "").trim().replace(/\s+/g, " ");
+          if (!name) fail("Preencha o campo nome da categoria.");
+          if (cats.some((c) => c.id !== cat.id && foldName(c.name) === foldName(name))) fail(`Já existe a categoria ${name}.`);
+          cat.name = name;
+        }
+        if (cor) cat.cor = cor;
+        return { cat: clone(cat), cats: clone(catsOf(d)), consCats: clone(comCores(cats)), rev: bump() };
       }
       if (method === "DELETE") {
         if (cat.id === "c-outros") fail("A categoria Outros não pode ser apagada.");
@@ -220,21 +233,27 @@
       const base = foldName(name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 36) || "categoria";
       let id = base, n = 2;
       while (cats.some((c) => c.id === id)) id = `${base}-${n++}`;
-      const cat = { id, name };
+      const cat = { id, name, ...(corDe(body) ? { cor: corDe(body) } : {}) };
       const at = cats.findIndex((c) => c.id === "outros");
       cats.splice(at < 0 ? cats.length : at, 0, cat);
-      return { cat: clone(cat), cats: clone(cats), rev: bump() };
+      return { cat: clone(cat), cats: clone(comCores(cats)), rev: bump() };
     }
     if ((m = path.match(/^api\/cats\/([a-z0-9_-]+)$/))) {
       const cats = catsOf(d), cat = cats.find((c) => c.id === m[1]);
       if (!cat) fail("Esta categoria não existe mais.", 404);
-      if (["eletronicos", "utilidades", "veiculos"].includes(cat.id)) fail(`${cat.name} é uma categoria fixa (as novidades e os recursos): não dá para ${method === "PUT" ? "renomear" : "apagar"}.`);
+      const fixa = ["eletronicos", "utilidades", "veiculos"].includes(cat.id);
+      if (fixa && method !== "PUT") fail(`${cat.name} é uma categoria fixa (as novidades e os recursos): não dá para apagar.`);
       if (method === "PUT") {
-        const name = String(body.name || "").trim().replace(/\s+/g, " ");
-        if (!name) fail("Preencha o campo nome da categoria.");
-        if (cats.some((c) => c.id !== cat.id && foldName(c.name) === foldName(name))) fail(`Já existe a categoria ${name}.`);
-        cat.name = name;
-        return { cat: clone(cat), cats: clone(cats), rev: bump() };
+        const cor = corDe(body);
+        if ("name" in body || !cor) {
+          const name = String(body.name || "").trim().replace(/\s+/g, " ");
+          if (!name) fail("Preencha o campo nome da categoria.");
+          if (cats.some((c) => c.id !== cat.id && foldName(c.name) === foldName(name))) fail(`Já existe a categoria ${name}.`);
+          if (fixa && name !== cat.name) fail(`${cat.name} é uma categoria fixa (as novidades e os recursos): não dá para renomear.`);
+          cat.name = name;
+        }
+        if (cor) cat.cor = cor;
+        return { cat: clone(cat), cats: clone(comCores(cats)), rev: bump() };
       }
       if (method === "DELETE") {
         if (cat.id === "outros") fail("A categoria Outros não pode ser apagada.");

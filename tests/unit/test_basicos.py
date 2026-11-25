@@ -72,14 +72,14 @@ class Categorias(UnitBase):
     def test_lista_padrao(self):
         cats = S.default_cats()
         self.assertEqual(len(cats), 15)
-        self.assertEqual(cats[-1], {"id": "outros", "name": "Outros"})
+        self.assertEqual(cats[-1], {"id": "outros", "name": "Outros", "cor": "grafite"})
         self.assertEqual(self.store.cats(), cats, "sem categorias gravadas, vale a lista padrão")
 
     def test_limpa_categorias_gravadas(self):
         raw = [{"id": "ferramentas", "name": "  Ferramentas   e  oficina "}, {"id": "Com Espaço", "name": "x"}, {"id": "moveis", "name": ""},
                {"id": "ferramentas", "name": "repetida"}, "texto", {"id": "-ruim", "name": "x"}, {"id": "a" * 42, "name": "longo"}]
         out = S.clean_cats(raw)
-        self.assertEqual(out, [{"id": "ferramentas", "name": "Ferramentas e oficina"}, {"id": "outros", "name": "Outros"}])
+        self.assertEqual(out, [{"id": "ferramentas", "name": "Ferramentas e oficina", "cor": "vermelho"}, {"id": "outros", "name": "Outros", "cor": "grafite"}])
         self.assertIsNone(S.clean_cats([]))
         self.assertIsNone(S.clean_cats("nada"))
         self.assertIsNone(S.clean_cats([{"id": "", "name": ""}]))
@@ -88,7 +88,7 @@ class Categorias(UnitBase):
     def test_criar_renomear_excluir(self):
         rev = self.store.data["rev"]
         c = self.store.create_cat({"name": "  Ferramentas  "})
-        self.assertEqual(c, {"id": "ferramentas", "name": "Ferramentas"})
+        self.assertEqual(c, {"id": "ferramentas", "name": "Ferramentas", "cor": "vermelho"})
         ids = [x["id"] for x in self.store.cats()]
         self.assertEqual(ids[-2:], ["ferramentas", "outros"], "a nova entra antes de Outros")
         self.assertGreater(self.store.data["rev"], rev)
@@ -128,7 +128,7 @@ class Categorias(UnitBase):
     def test_categorias_vao_junto_no_inventario(self):
         self.store.create_cat({"name": "Oficina"})
         salvo = S.read_json(S.DATA_FILE)
-        self.assertIn({"id": "oficina", "name": "Oficina"}, salvo["cats"])
+        self.assertIn({"id": "oficina", "name": "Oficina", "cor": "vermelho"}, salvo["cats"])
         self.assertIn("cats", self.store.public())
         sem = S.Store.check_inventory({"rooms": [], "items": [], "cats": "ruim"})
         self.assertNotIn("cats", sem)

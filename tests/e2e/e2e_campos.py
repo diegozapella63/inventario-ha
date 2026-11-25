@@ -56,8 +56,8 @@ async def body(r, p):
     # Mais › Categorias e Novidades: os botões na largura do cartão; o Limpar no fim
     await r.open(pg, "#/categorias", "#p-cats")
     nova = await pg.evaluate(LARG, '[data-act="cat-new"]')
-    card = await pg.evaluate(LARG, "#p-cats .opts > li")
-    r.check(nova and card and abs(nova[0] - (card[0] - 8)) <= 12, f"Nova categoria na largura do cartão ({nova}, {card})")
+    linha = await pg.evaluate(LARG, '#p-cats .catrow[data-act="cat-open"]')
+    r.check(nova and linha and nova[0] == linha[0], f"1.100.0: Nova categoria é uma linha da lista, da largura das outras ({nova}, {linha[:1]})")
     await r.open(pg, "#/novidades", "#p-news")
     ids = await pg.evaluate("[...document.querySelectorAll('#view section.panel')].map(s => s.id)")
     r.eq(ids[-1], "p-news-clear", "Limpar novidades no fim da tela")
@@ -70,7 +70,8 @@ async def body(r, p):
     # no computador, como antes: 280 px
     ctx, pg = await r.page(b, "pc", "light")
     await r.open(pg, "#/categorias", "#p-cats")
-    r.eq(await pg.evaluate(LARG, '[data-act="cat-new"]'), [280], "no computador, 280 px")
+    nova, linha = await pg.evaluate(LARG, '[data-act="cat-new"]'), await pg.evaluate(LARG, '#p-cats .catrow[data-act="cat-open"]')
+    r.check(nova and linha and nova[0] == linha[0], f"no computador, também uma linha da lista ({nova}, {linha[:1]})")
     await ctx.close()
     await b.close()
 

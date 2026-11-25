@@ -46,7 +46,7 @@ class Consumiveis(ServerCase):
         self.assertEqual((it["room"], it["qty"], it["value"], it["cat"], it["dur"]), ("consumiveis", "1", 0, "c-manutencao", 365), "1.82.0: sem quantidade e sem valor")
         # 1.82.0: as categorias dos consumíveis, à parte: criar, e os dados da tela
         st, _, out = self.app.post("api/cats", {"name": "Piscina", "kind": "consumiveis"})
-        self.assertEqual((st, out["cat"]), (201, {"id": "c-piscina", "name": "Piscina"}))
+        self.assertEqual((st, out["cat"]), (201, {"id": "c-piscina", "name": "Piscina", "cor": "rosa"}))
         self.assertEqual(out["consCats"], self.app.data()["consCats"])
         self.assertNotIn("c-piscina", [c["id"] for c in self.app.data()["cats"]])
         self.assertEqual(self.app.ok("DELETE", "api/cats/c-piscina")["moved"], 0)

@@ -48,7 +48,7 @@ class Limpar(Base):
         self.assertEqual([c["id"] for c in out], ["outros", "a"])
 
     def test_nome_proprio_de_outros_e_mantido(self):
-        self.assertIn({"id": "outros", "name": "Diversos"}, S.clean_cats([{"id": "outros", "name": "Diversos"}]))
+        self.assertIn({"id": "outros", "name": "Diversos", "cor": "grafite"}, S.clean_cats([{"id": "outros", "name": "Diversos"}]))
 
     def test_id_com_maiuscula_descartado(self):
         self.assertIsNone(S.clean_cats([{"id": "Moveis", "name": "Móveis"}]))
@@ -70,7 +70,7 @@ class Limpar(Base):
         self.assertEqual(S.clean_cats([{"id": "x", "name": "Ferramentas\nde\tjardim"}])[0]["name"], "Ferramentas de jardim")
 
     def test_so_outros_continua_valido(self):
-        self.assertEqual(S.clean_cats([{"id": "outros", "name": "Outros"}]), [{"id": "outros", "name": "Outros"}])
+        self.assertEqual(S.clean_cats([{"id": "outros", "name": "Outros"}]), [{"id": "outros", "name": "Outros", "cor": "grafite"}])
 
 
 class Lista(Base):
@@ -149,7 +149,7 @@ class Renomear(Base):
 
     def test_fica_no_arquivo(self):
         self.store.update_cat("moveis", {"name": "Mobília"})
-        self.assertIn({"id": "moveis", "name": "Mobília"}, S.read_json(S.DATA_FILE)["cats"])
+        self.assertIn({"id": "moveis", "name": "Mobília", "cor": "coral"}, S.read_json(S.DATA_FILE)["cats"])
 
     def test_nome_vazio_nao_muda_o_nome(self):
         self.assertApiError(400, self.store.update_cat, "moveis", {"name": "  "})
@@ -202,7 +202,7 @@ class Excluir(Base):
 class Efeitos(Base):
     def test_public_traz_o_nome_novo(self):
         self.store.update_cat("moveis", {"name": "Mobília"})
-        self.assertIn({"id": "moveis", "name": "Mobília"}, self.store.public()["cats"])
+        self.assertIn({"id": "moveis", "name": "Mobília", "cor": "coral"}, self.store.public()["cats"])
 
     def test_public_sem_categorias_gravadas_traz_o_padrao(self):
         self.assertEqual(self.store.public()["cats"], S.default_cats())
@@ -273,3 +273,34 @@ class EletronicosFicaSempre(UnitBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Cores(Base):
+    """1.100.0 (o dono: "colocar cores nas categorias"): cada categoria tem uma cor da paleta da família."""
+
+    def test_padrao_na_ordem_da_paleta_e_outros_em_grafite(self):
+        cs = S.default_cats()
+        self.assertEqual([c["cor"] for c in cs[:11]], list(S.CORES[:-1]))
+        self.assertEqual([c["cor"] for c in cs[11:]], ["vermelho", "coral", "laranja", "grafite"], "acabadas, a paleta recomeça; Outros é Grafite")
+        self.assertEqual({c["cor"] for c in self.store.cons_cats()} - set(S.CORES), set())
+
+    def test_a_guardada_fica_e_a_sem_cor_ganha_a_primeira_livre(self):
+        cs = S.clean_cats([{"id": "a", "name": "A", "cor": "rosa"}, {"id": "b", "name": "B"}, {"id": "c", "name": "C", "cor": "roxo"}])
+        self.assertEqual([(c["id"], c["cor"]) for c in cs], [("a", "rosa"), ("b", "vermelho"), ("c", "coral"), ("outros", "grafite")], "uma cor de fora da paleta é trocada")
+
+    def test_criar_e_mudar_so_a_cor(self):
+        c = self.store.create_cat({"name": "Ferramentas", "cor": "turquesa"})
+        self.assertEqual(c["cor"], "turquesa")
+        self.assertApiError(400, self.store.create_cat, {"name": "Outra", "cor": "roxo"})
+        c = self.store.update_cat(c["id"], {"cor": "menta"})
+        self.assertEqual((c["name"], c["cor"]), ("Ferramentas", "menta"), "só a cor: o nome fica")
+        self.assertIn({"id": c["id"], "name": "Ferramentas", "cor": "menta"}, S.read_json(S.DATA_FILE)["cats"])
+        c = self.store.update_cat(c["id"], {"name": "Oficina", "cor": "azul"})
+        self.assertEqual((c["name"], c["cor"]), ("Oficina", "azul"))
+
+    def test_fixa_muda_a_cor_mas_nao_o_nome(self):
+        self.assertEqual(self.store.update_cat("eletronicos", {"cor": "indigo"})["cor"], "indigo")
+        self.assertEqual(self.store.update_cat("eletronicos", {"name": "Eletrônicos", "cor": "azul"})["cor"], "azul", "o mesmo nome junto vale")
+        self.assertApiError(400, self.store.update_cat, "eletronicos", {"name": "Aparelhos"})
+        self.assertApiError(404, self.store.update_cat, "nao-existe", {"cor": "azul"})
+        self.assertEqual(self.store.update_cat("c-limpeza", {"cor": "verde"})["cor"], "verde", "e as dos consumíveis")

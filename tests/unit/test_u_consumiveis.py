@@ -268,7 +268,7 @@ class CategoriasEDuracao(Base):
     def test_criar_renomear_e_apagar(self):
         casa = list(self.store.cats())
         c = self.store.create_cat({"name": "Piscina", "kind": "consumiveis"})
-        self.assertEqual(c, {"id": "c-piscina", "name": "Piscina"})
+        self.assertEqual(c, {"id": "c-piscina", "name": "Piscina", "cor": "rosa"})
         self.assertEqual([x["id"] for x in self.store.cons_cats()][-2:], ["c-piscina", "c-outros"], "Outros fica no fim")
         self.assertEqual(self.store.cats(), casa, "a lista da casa não muda")
         with self.assertRaises(S.ApiError):

@@ -114,6 +114,8 @@ CONS_CATS = {
     "c-carro": "Carro", "c-jardim": "Jardim", "c-outros": "Outros",
 }
 CONS_OUTROS = "c-outros"
+# 1.100.0: a paleta da família (as 12 cores, a mesma ordem da tela); cada categoria tem uma (cor)
+CORES = ("vermelho", "coral", "laranja", "ouro", "verde", "menta", "turquesa", "azul", "indigo", "lilas", "rosa", "grafite")
 # a duração estimada de um consumível, em dias: os atalhos da tela (qualquer número de 1 a 3650 vale)
 DURACOES = ((7, "1 semana"), (15, "15 dias"), (30, "1 mês"), (90, "3 meses"), (180, "6 meses"), (365, "1 ano"))
 AREAS = ("bens", "consumiveis")  # as áreas do sistema, fora da lista de cômodos e sempre depois deles, nesta ordem
@@ -203,7 +205,25 @@ def write_json_atomic(path: str, obj) -> None:
 
 
 def default_cats() -> list[dict]:
-    return [{"id": k, "name": v} for k, v in CATS.items()]
+    return com_cores([{"id": k, "name": v} for k, v in CATS.items()])
+
+
+def com_cores(cats: list[dict]) -> list[dict]:
+    """1.100.0: toda categoria tem uma cor da paleta. A que não tem ganha a primeira que nenhuma outra usa, na ordem (sem
+    o Grafite, que é o de Outros); acabadas, a paleta recomeça. A conta é sempre a mesma para a mesma lista."""
+    usadas = {c.get("cor") for c in cats if c.get("cor") in CORES}
+    livres = [k for k in CORES[:-1] if k not in usadas]
+    volta = 0
+    for c in cats:
+        if c.get("cor") in CORES:
+            continue
+        if c["id"] in ("outros", CONS_OUTROS):
+            c["cor"] = "grafite"
+        elif livres:
+            c["cor"] = livres.pop(0)
+        else:
+            c["cor"], volta = CORES[volta % (len(CORES) - 1)], volta + 1
+    return cats
 
 
 def clean_cats(raw) -> list[dict] | None:
@@ -213,13 +233,13 @@ def clean_cats(raw) -> list[dict] | None:
         if isinstance(c, dict):
             cid, name = str(c.get("id") or ""), " ".join(str(c.get("name") or "").split())[:60]
             if SAFE_CAT.fullmatch(cid) and name and cid not in seen:
-                out.append({"id": cid, "name": name})
+                out.append({"id": cid, "name": name, **({"cor": c["cor"]} if c.get("cor") in CORES else {})})
                 seen.add(cid)
     if not out:
         return None
     if "outros" not in seen:
         out.append({"id": "outros", "name": "Outros"})
-    return out
+    return com_cores(out)
 
 
 def clean_cons_cats(raw) -> list[dict] | None:
@@ -229,13 +249,13 @@ def clean_cons_cats(raw) -> list[dict] | None:
         if isinstance(c, dict):
             cid, name = str(c.get("id") or ""), " ".join(str(c.get("name") or "").split())[:60]
             if cid.startswith("c-") and SAFE_CAT.fullmatch(cid) and name and cid not in seen:
-                out.append({"id": cid, "name": name})
+                out.append({"id": cid, "name": name, **({"cor": c["cor"]} if c.get("cor") in CORES else {})})
                 seen.add(cid)
     if not out:
         return None
     if CONS_OUTROS not in seen:
         out.append({"id": CONS_OUTROS, "name": "Outros"})
-    return out
+    return com_cores(out)
 
 
 def clean_dur(v) -> int:
@@ -537,14 +557,14 @@ class Store:
         # 1.54.0: Utilidades também sempre existe (os Recursos dos equipamentos), antes de Outros
         if not any(c["id"] == "utilidades" for c in cs):
             cs.insert(next((i for i, c in enumerate(cs) if c["id"] in ("imoveis", "veiculos", "outros")), len(cs)), {"id": "utilidades", "name": CATS["utilidades"]})
-        return cs
+        return com_cores(cs)
 
     def cat_map(self) -> dict:
         return {c["id"]: c["name"] for c in self.cats()}
 
     # -- 1.82.0: as categorias dos consumíveis, à parte (a lista padrão até alguém editar)
     def cons_cats(self) -> list[dict]:
-        return clean_cons_cats(self.data.get("consCats")) or [{"id": k, "name": v} for k, v in CONS_CATS.items()]
+        return clean_cons_cats(self.data.get("consCats")) or com_cores([{"id": k, "name": v} for k, v in CONS_CATS.items()])
 
     def cons_cat_map(self) -> dict:
         return {c["id"]: c["name"] for c in self.cons_cats()}
@@ -567,7 +587,17 @@ class Store:
             raise ApiError(400, f"Já existe a categoria {name}.")
         return name
 
+    @staticmethod
+    def _cor(body: dict) -> str | None:
+        """A cor pedida (uma das 12 da paleta), ou None sem cor no pedido."""
+        if body.get("cor") in (None, ""):
+            return None
+        if body["cor"] not in CORES:
+            raise ApiError(400, "Escolha uma cor da paleta.")
+        return body["cor"]
+
     def create_cat(self, body: dict) -> dict:
+        cor = self._cor(body)
         with self.lock:
             if body.get("kind") == "consumiveis":
                 name = self._cat_name(body, cons=True)
@@ -576,9 +606,9 @@ class Store:
                 cid, n = base, 2
                 while any(c["id"] == cid for c in cats):
                     cid, n = f"{base}-{n}", n + 1
-                cat = {"id": cid, "name": name}
+                cat = {"id": cid, "name": name, **({"cor": cor} if cor else {})}
                 cats.insert(next((i for i, c in enumerate(cats) if c["id"] == CONS_OUTROS), len(cats)), cat)
-                self.data["consCats"] = cats
+                self.data["consCats"] = com_cores(cats)
                 self.save()
                 return cat
             name = self._cat_name(body)
@@ -587,29 +617,29 @@ class Store:
             cid, n = base, 2
             while any(c["id"] == cid for c in cats):
                 cid, n = f"{base}-{n}", n + 1
-            cat = {"id": cid, "name": name}
+            cat = {"id": cid, "name": name, **({"cor": cor} if cor else {})}
             cats.insert(next((i for i, c in enumerate(cats) if c["id"] == "outros"), len(cats)), cat)  # Outros fica no fim
-            self.data["cats"] = cats
+            self.data["cats"] = com_cores(cats)
             self.save()
             return cat
 
     def update_cat(self, cid: str, body: dict) -> dict:
+        """Muda o nome (name) e/ou a cor (cor, 1.100.0). A cor muda também numa categoria fixa; o nome, não."""
+        cor = self._cor(body)
         with self.lock:
-            if cid.startswith("c-") and cid in self.cons_cat_map():
-                cats = self.cons_cats()
-                cat = next(c for c in cats if c["id"] == cid)
-                cat["name"] = self._cat_name(body, skip=cid, cons=True)
-                self.data["consCats"] = cats
-                self.save()
-                return cat
-            if cid in FIXED_CATS:
-                raise ApiError(400, f"{CATS[cid]} é uma categoria fixa (as novidades e os recursos): não dá para renomear.")
-            cats = self.cats()
+            cons = cid.startswith("c-") and cid in self.cons_cat_map()
+            cats = self.cons_cats() if cons else self.cats()
             cat = next((c for c in cats if c["id"] == cid), None)
             if not cat:
                 raise ApiError(404, "Esta categoria não existe mais.")
-            cat["name"] = self._cat_name(body, skip=cid)
-            self.data["cats"] = cats
+            if "name" in body or not cor:
+                name = self._cat_name(body, skip=cid, cons=cons)
+                if name != cat["name"] and cid in FIXED_CATS:
+                    raise ApiError(400, f"{CATS[cid]} é uma categoria fixa (as novidades e os recursos): não dá para renomear.")
+                cat["name"] = name
+            if cor:
+                cat["cor"] = cor
+            self.data["consCats" if cons else "cats"] = cats
             self.save()
             return cat
 
@@ -5282,7 +5312,7 @@ class Handler(BaseHTTPRequestHandler):
 
 # Aparência > Cor do app: vale para a casa toda. A paleta da família (as mesmas 12 cores em todos os apps, na ordem); None
 # enquanto ninguém escolheu (a tela adota a do aparelho na primeira vez). Uma cor de antes da paleta vira a mais próxima.
-ACCENTS = ("vermelho", "coral", "laranja", "ouro", "verde", "menta", "turquesa", "azul", "indigo", "lilas", "rosa", "grafite")
+ACCENTS = CORES
 OLD_ACCENTS = {"amarelo": "ouro", "kraft": "coral", "cinza": "grafite"}
 
 

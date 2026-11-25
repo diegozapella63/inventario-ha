@@ -173,7 +173,7 @@ class Todos(ServerCase):
         self.assertEqual((st, body["error"]), (400, "Eletrônicos é uma categoria fixa (as novidades e os recursos): não dá para apagar."))
         st, _, body = app.request("PUT", "api/cats/eletronicos", {"name": "Aparelhos"})
         self.assertEqual((st, body["error"]), (400, "Eletrônicos é uma categoria fixa (as novidades e os recursos): não dá para renomear."))
-        self.assertEqual(app.data()["cats"][0], {"id": "eletronicos", "name": "Eletrônicos"})
+        self.assertEqual(app.data()["cats"][0], {"id": "eletronicos", "name": "Eletrônicos", "cor": "vermelho"})
         self.assertEqual(app.ok("POST", "api/news/all", {})["id"] != "", True, "e as novidades continuam")
 
     def test_escolher_categorias_nao_vale_mais(self):

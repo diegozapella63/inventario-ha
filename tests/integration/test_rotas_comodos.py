@@ -366,7 +366,7 @@ class Categorias(ComodosCase):
         st, _, out = self.app.post("api/cats", {"name": "Bicicletas"})
         self.addCleanup(self.app.delete, "api/cats/bicicletas")
         self.assertEqual((st, set(out), out["rev"]), (201, {"cat", "cats", "consCats", "rev"}, r0 + 1))
-        self.assertEqual(out["cat"], {"id": "bicicletas", "name": "Bicicletas"})
+        self.assertEqual(out["cat"], {"id": "bicicletas", "name": "Bicicletas", "cor": "vermelho"}, "1.100.0: com a cor (acabadas as livres, a paleta recomeça)")
         self.assertEqual(out["cats"], self.app.data()["cats"])
 
     def test_id_sem_acento_e_com_hifen(self):
@@ -406,7 +406,7 @@ class Categorias(ComodosCase):
         self.assertIn("brinquedos", [c["id"] for c in app.ok("GET", "api/export.json")["cats"]])
 
     def test_renomear_para_o_proprio_nome_aceito(self):
-        self.assertEqual(self.app.ok("PUT", "api/cats/moveis", {"name": "Móveis"})["cat"], {"id": "moveis", "name": "Móveis"})
+        self.assertEqual(self.app.ok("PUT", "api/cats/moveis", {"name": "Móveis"})["cat"], {"id": "moveis", "name": "Móveis", "cor": "coral"})
 
     def test_renomear_para_o_nome_de_outra_recusado(self):
         self.erro("PUT", "api/cats/moveis", {"name": "plantas"}, 400, "Já existe a categoria plantas.")
