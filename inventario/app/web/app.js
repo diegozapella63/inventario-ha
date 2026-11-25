@@ -1193,8 +1193,8 @@
     const shut = new Set(LS.get("cons-fechados", []));
     const opcoes = [["cat", "Categoria", "grid"], ["vence", "Vencimento", "clock"], ...(consComodoOn() ? [["comodo", "Cômodo", "rooms"]] : [])];
     return `<div class="mscreen cons">
-      <div class="agrupar" role="group" aria-label="Agrupar por"><span>${ic("layers", "sm")}Agrupar por</span>
-        ${opcoes.map(([k, v, i]) => `<button type="button" class="chip" data-act="cons-agrupar" data-v="${k}" aria-pressed="${como === k}">${ic(i, "sm")}${v}</button>`).join("")}</div>
+      <div class="agrupar"><span class="agrupar-l" id="cons-agrupar-l">${ic("layers", "sm")}Agrupar por</span>
+        <div class="seg agrupar-seg" role="group" aria-labelledby="cons-agrupar-l" style="--n:${opcoes.length}">${opcoes.map(([k, v, i]) => `<button type="button" data-act="cons-agrupar" data-v="${k}" aria-pressed="${como === k}">${ic(i, "sm")}<span>${v}</span></button>`).join("")}</div></div>
       ${groups.map(([key, name, icone, its]) => `<section class="zone dobra-z${shut.has(key) ? " fechada" : ""}${key === "v:acabou" ? " acabou" : ""}" data-zk="${esc(key)}">
         <button type="button" class="zone-h" data-act="cons-dobra" aria-expanded="${!shut.has(key)}"><h3><span class="zone-ic" aria-hidden="true">${ic(icone)}</span>${esc(name)}</h3><span class="zs">${plural(its.length, "consumível", "consumíveis")}</span>${ic("chev", "sm seta")}</button>
         <ul class="ilist">${its.sort(como === "vence" ? porData : porNome).map((it) => itemRow(it, { mode: como === "comodo" ? "cons" : "room" })).join("")}</ul></section>`).join("")}

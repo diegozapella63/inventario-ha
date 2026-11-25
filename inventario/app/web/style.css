@@ -714,9 +714,16 @@ button.zone-h .seta { color: var(--muted); flex: none; transition: transform .2s
 .pick-grid .pk svg { flex: none; }
 .pick-grid .pk.on { background: var(--tag); border-color: var(--tag-edge); color: var(--tag-ink); font-weight: 600; }
 .pick-grid .pk:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.agrupar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
-.agrupar > span { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; margin-right: 4px; }
-.agrupar .chip { gap: 6px; cursor: pointer; }
+/* 1.102.1 (o dono: "Agrupar por ficou ridículo, cria nos mesmos padrões dos apps"): o título pequeno com o ícone e, embaixo,
+   as escolhas lado a lado, do mesmo tamanho, num controle só (como o Agrupar por do ResolvIA e do OdisseIA) */
+.agrupar { display: grid; gap: 8px; margin: 0 0 18px; }
+.agrupar-l { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
+.seg.agrupar-seg { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); width: min(100%, 520px); }
+.seg.agrupar-seg button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; min-height: 40px; padding: 0 6px; min-width: 0; font-size: 14.5px; cursor: pointer; }
+.seg.agrupar-seg button > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seg.agrupar-seg button[aria-pressed="true"] { font-weight: 600; }
+.seg.agrupar-seg button[aria-pressed="true"] .ic { color: var(--tag-text); }
+@media (max-width: 380px) { .seg.agrupar-seg button .ic { display: none; } }
 .chip[aria-pressed="true"] { background: var(--tag-soft); border-color: var(--tag-edge); color: var(--ink); font-weight: 600; }
 .zone-h .zs { color: var(--muted); font-size: 14px; white-space: nowrap; }
 .zone-h .zs b { color: var(--ink); font: 600 17px/1 var(--font-c); margin-left: 10px; }

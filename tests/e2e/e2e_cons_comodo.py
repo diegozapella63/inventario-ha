@@ -69,8 +69,14 @@ async def body(r, p):
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
 
     # -- 1.91.0: Agrupar por Categoria ou Cômodo; cada grupo fecha pelo título e o aparelho lembra
-    r.eq([txt(t) for t in await pg.locator(".agrupar .chip").all_inner_texts()], ["Categoria", "Vencimento", "Cômodo"], "Agrupar por (1.102.0: também Vencimento)")
-    r.eq(await pg.locator(".agrupar .chip svg").count(), 3, "com ícone")
+    r.eq([txt(t) for t in await pg.locator(".agrupar .seg button").all_inner_texts()], ["Categoria", "Vencimento", "Cômodo"], "Agrupar por (1.102.0: também Vencimento)")
+    r.eq(await pg.locator(".agrupar .seg button svg").count(), 3, "com ícone")
+    # 1.102.1 (o dono: "Agrupar por ficou ridículo"): o título em cima e as três escolhas numa linha só, do mesmo tamanho
+    caixas = [await x.bounding_box() for x in await pg.locator(".agrupar .seg button").all()]
+    r.check(len({round(c["y"]) for c in caixas}) == 1, f"as três na mesma linha {[round(c['y']) for c in caixas]}")
+    r.check(max(c["width"] for c in caixas) - min(c["width"] for c in caixas) < 2, "do mesmo tamanho")
+    tit = await pg.locator(".agrupar-l").bounding_box()
+    r.check(tit["y"] + tit["height"] <= caixas[0]["y"] + 1, "o título Agrupar por em cima")
     r.eq(await pg.get_attribute('.agrupar [data-v="cat"]', "aria-pressed"), "true", "começa por categoria")
     await pg.click('.agrupar [data-v="comodo"]')
     await pg.wait_for_selector('.zone[data-zk="r:cozinha"]')

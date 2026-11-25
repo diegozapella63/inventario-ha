@@ -38,7 +38,7 @@ async def body(r, p):
     b = await r.browser(p)
     ctx, pg = await r.page(b, "cel", "dark")
     await r.open(pg, "#/consumiveis", ".irow")
-    r.eq([txt(t) for t in await pg.locator(".agrupar .chip").all_inner_texts()], ["Categoria", "Vencimento"], "sem os Consumíveis por cômodo: Categoria e Vencimento")
+    r.eq([txt(t) for t in await pg.locator(".agrupar .seg button").all_inner_texts()], ["Categoria", "Vencimento"], "sem os Consumíveis por cômodo: Categoria e Vencimento")
     await pg.click('.agrupar [data-v="vence"]')
     await pg.wait_for_selector('.zone[data-zk^="v:"]')
     ordem = ["Já acabou", "Esta semana", "Este mês", "Mês que vem", "Depois", "Sem duração"]
@@ -57,6 +57,16 @@ async def body(r, p):
     r.eq(await pg.get_attribute('.agrupar [data-v="vence"]', "aria-pressed"), "true", "o aparelho lembra o agrupamento")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "vencimento", full_page=True)
+    await ctx.close()
+    # 1.102.1: em 320 px as escolhas cabem numa linha, sem nada cortado
+    ctx, pg = await r.page(b, "estreito", "light")
+    await r.open(pg, "#/consumiveis", ".irow")
+    caixas = [await x.bounding_box() for x in await pg.locator(".agrupar .seg button").all()]
+    r.check(len({round(c["y"]) for c in caixas}) == 1, "320 px: numa linha")
+    cortado = await pg.evaluate("() => [...document.querySelectorAll('.agrupar .seg button > span')].filter(s => s.scrollWidth > s.clientWidth + 1).map(s => s.textContent)")
+    r.check(not cortado, f"320 px: nenhum nome cortado {cortado}")
+    r.check(await pg.evaluate(OVERFLOW), "320 px: sem rolagem para o lado")
+    await r.shot(pg, "vencimento-320")
     await ctx.close()
     await b.close()
 

@@ -183,3 +183,5 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.
+
+1.102.1 (o dono: "Agrupar por ficou ridículo, cria nos mesmos padrões dos apps"): o Agrupar por dos Consumíveis é o título `.agrupar-l` (o ícone pequeno) e o `.seg.agrupar-seg` (as escolhas do mesmo tamanho numa linha, `--n` colunas; em 380 px ou menos, sem os ícones), como o do ResolvIA e do OdisseIA. Testes: `e2e_cons_vence` (também em 320 px) e `e2e_cons_comodo`.
