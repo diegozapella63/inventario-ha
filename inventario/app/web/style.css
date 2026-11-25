@@ -853,6 +853,8 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .form .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .form .row3 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (min-width: 560px) { .form .row3 { grid-template-columns: 110px 1fr; } }
+/* 1.105.0: Quantidade e Valor total fecham pelo título; com um deles fechado, um embaixo do outro, cada um na largura toda */
+.form .row3:has(> .field.dobravel.shut) { grid-template-columns: 1fr; }
 @media (max-width: 480px) { .form .row2 { grid-template-columns: 1fr; } }
 .phs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
 .phs .ph { position: relative; aspect-ratio: 1; border-radius: var(--r); overflow: hidden; background: var(--line); }

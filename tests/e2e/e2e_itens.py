@@ -55,14 +55,17 @@ async def body(r, p):
     r.eq(unit, "R$ 617,25 cada", "valor por unidade")
     # 1.104.0: fechado, o escolhido ao lado do título (Cômodo · Escritório, Fotos · 1 foto)
     campo = lambda t: pg.locator("dialog .field.dobravel > .lbl", has_text=t)
-    for t in ("Fotos", "Cômodo", "Categoria"):
+    CAMPOS = ("Fotos", "Cômodo", "Categoria", "Quantidade", "Valor total")
+    for t in CAMPOS:
         await campo(t).click(); await pg.wait_for_timeout(120)
-    vals = [await campo(t).get_attribute("data-val") for t in ("Fotos", "Cômodo", "Categoria")]
-    r.eq(vals, ["1 foto", "Escritório", "Decoração e arte"], "fechados, o escolhido ao lado do título")
+    vals = [await campo(t).get_attribute("data-val") for t in CAMPOS]
+    r.eq(vals, ["1 foto", "Escritório", "Decoração e arte", "2", "R$ 1.234,50"], "fechados, o escolhido ao lado do título (1.105.0: a Quantidade e o Valor total também)")
+    larg = await pg.evaluate("() => [...document.querySelectorAll('dialog .row3 > .field')].map((f) => Math.round(f.getBoundingClientRect().width))")
+    r.check(len(larg) == 2 and larg[0] == larg[1] and larg[0] > 300, f"Quantidade e Valor total fechados: um embaixo do outro, na largura toda ({larg})")
     antes = await pg.evaluate("() => getComputedStyle(document.querySelector('dialog .field.shut > .lbl[data-val]'), '::before').content")
     r.check(antes.startswith('"· '), f"desenhado depois do título ({antes})")
     await r.shot(pg, "editor-campos-fechados")
-    for t in ("Fotos", "Cômodo", "Categoria"):
+    for t in CAMPOS:
         await campo(t).click(); await pg.wait_for_timeout(120)
     await r.shot(pg, "editor-novo")
     await pg.click('[data-ed="save"]')

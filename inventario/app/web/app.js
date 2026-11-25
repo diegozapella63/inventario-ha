@@ -454,12 +454,18 @@
     // os campos de escolhas (as fotos, as listas, o prazo) fecham pelo título
     for (const f of root.querySelectorAll(".field")) {
       const l = f.querySelector(":scope > .lbl");
-      if (l && f.querySelector(":scope > .phs, :scope > .chips, :scope > .pick-grid, :scope > [data-slot='rphotos']")) f.classList.add("dobravel");
+      // 1.105.0: e as opções lado a lado (o Tipo de um bem: Imóvel, Veículo, Outro)
+      if (l && f.querySelector(":scope > .phs, :scope > .chips, :scope > .pick-grid, :scope > .seg, :scope > [data-slot='rphotos']")) f.classList.add("dobravel");
     }
     // 1.83.0 (como nos outros apps): na janela do item, o texto longo e as caixas de seleção também fecham pelo título
     for (const f of root.querySelectorAll("form[data-ed-form] .form > .field, form[data-ed-form] .form > .row2 > .field")) {
       const l = f.querySelector(":scope > label:not(.sr)");
       if (l && f.querySelector(":scope > textarea.textarea, :scope > select")) { l.classList.add("lbl"); f.classList.add("dobravel"); }
+    }
+    // 1.105.0 (o dono: "retrair quantidade e valor total também"): fechado um dos dois, a linha vira uma coluna (o CSS)
+    for (const f of root.querySelectorAll("form[data-ed-form] .form > .row3 > .field")) {
+      const l = f.querySelector(":scope > label:not(.sr)");
+      if (l && f.querySelector(":scope > input.input, :scope > .money")) { l.classList.add("lbl"); f.classList.add("dobravel"); }
     }
   }
   function dobrarCampos(root) {
@@ -488,13 +494,22 @@
     const marcados = [...f.querySelectorAll(".on, .sel, [aria-pressed='true'], [aria-checked='true']")]
       .filter((b) => meu(b) && b.matches("button, .chip, .pk, [role='radio'], [role='checkbox']"))
       .map((b) => textoBotao(b) || b.getAttribute("title") || b.getAttribute("aria-label") || "").filter(Boolean);
-    if (marcados.length) return [...new Set(marcados)].join(", ");
+    // 1.105.0: as escolhas que são um rádio dentro do chip (a Duração estimada); a Outra diz o número e a unidade
+    const outra = () => [...f.querySelectorAll(".sub-box input, .sub-box select")]
+      .map((c) => (c.tagName === "SELECT" ? (c.selectedOptions[0] || {}).textContent || "" : c.value || "").trim()).filter(Boolean).join(" ");
+    for (const c of f.querySelectorAll("input[type='radio']:checked, input[type='checkbox']:checked")) {
+      if (!meu(c) || !c.closest("label")) continue;
+      marcados.push(c.value === "outra" && outra() ? outra() : textoBotao(c.closest("label")));
+    }
+    if (marcados.length) return [...new Set(marcados.filter(Boolean))].join(", ");
     const fotos = [...f.querySelectorAll(".phs img, [data-slot='rphotos'] img")].filter(meu).length;
     if (fotos) return fotos === 1 ? "1 foto" : `${fotos} fotos`;
-    return [...f.querySelectorAll("textarea, input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']), select")]
+    const escrito = [...f.querySelectorAll("textarea, input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']), select")]
       .filter(meu)
       .map((c) => (c.tagName === "SELECT" ? (c.value ? (c.selectedOptions[0] || {}).textContent || "" : "") : (c.value || "").split("\n")[0]).replace(/\s+/g, " ").trim())
       .filter(Boolean).join(" ");
+    // o valor em reais diz que é em reais
+    return escrito && f.querySelector(".money") ? `R$ ${escrito}` : escrito;
   }
   function valoresCampos(root) {
     for (const f of root.querySelectorAll(".field.dobravel")) {

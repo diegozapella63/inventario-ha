@@ -1,5 +1,13 @@
 # Mudanças
 
+## 1.105.0
+
+- No item e no bem, **Quantidade**, **Valor total** e o **Tipo** (Imóvel, Veículo, Outro) também retraem pelo título,
+  como nos outros apps. Retraídos, mostram o que está escrito ou escolhido (**Quantidade · 2**, **Valor total · R$
+  1.234,50**, **Tipo · Imóvel**), e a quantidade e o valor ficam um embaixo do outro.
+- A **Duração estimada** de um consumível, retraída, mostra a escolhida ao lado do título (**Duração estimada · 3
+  meses**; na Outra, o número e a unidade, como **2 anos**).
+
 ## 1.104.0
 
 - No **Adicionar item** (e nas outras janelas), um campo fechado mostra ao lado do título o que está escolhido ou

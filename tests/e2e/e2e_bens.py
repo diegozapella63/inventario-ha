@@ -45,6 +45,11 @@ async def body(r, p):
     await pg.fill("#f-name", "Apartamento na praia")
     await pg.click('.seg.tipo [data-v="imoveis"]')
     r.eq(await pg.get_attribute('.seg.tipo [data-v="imoveis"]', "aria-pressed"), "true", "Imóvel marcado")
+    # 1.105.0: o Tipo fecha pelo título, como nos outros apps; fechado, Tipo · Imóvel
+    tipo = pg.locator("dialog .field.dobravel:has(> .seg.tipo) > .lbl")
+    await tipo.click(); await pg.wait_for_timeout(200)
+    r.check(not await pg.locator(".seg.tipo").is_visible() and await tipo.get_attribute("data-val") == "Imóvel", "o Tipo fechado: · Imóvel")
+    await tipo.click(); await pg.wait_for_timeout(200)
     await pg.fill("#f-value", "450.000")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "novo-bem")
