@@ -1,5 +1,11 @@
 # Mudanças
 
+## 1.104.0
+
+- No **Adicionar item** (e nas outras janelas), um campo fechado mostra ao lado do título o que está escolhido ou
+  escrito: **Cômodo · Escritório**, **Categoria · Decoração e arte**, **Fotos · 2 fotos**, como nos outros apps.
+- Em **Mais › Sobre**, a linha do OdisseIA ficou mais curta.
+
 ## 1.103.0
 
 - **Avaliar com IA** na ficha de um consumível: a seção **Parecer da IA** pesquisa as avaliações na internet e traz a nota

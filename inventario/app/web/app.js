@@ -476,6 +476,35 @@
       l.tabIndex = 0;
       l.setAttribute("aria-expanded", f.classList.contains("shut") ? "false" : "true");
     }
+    valoresCampos(root);
+  }
+  // 1.104.0 (o dono: "esse adicionar com essas opçõezinhas de retrair tem que mostrar o que foi selecionado do ladinho"):
+  // fechado, o escolhido ou o escrito vem ao lado do título (o data-val do título, que o CSS desenha), como nos outros apps
+  const SUB_CAMPO = "small, .sub, .badge, .count, .ajuda";
+  const textoBotao = (b) => [...b.childNodes].filter((n) => n.nodeType === 3 || (n.nodeType === 1 && !n.matches(SUB_CAMPO) && n.tagName !== "svg"))
+    .map((n) => n.textContent).join(" ").replace(/\s+/g, " ").trim();
+  function valorCampo(f) {
+    const meu = (el) => el.closest(".field") === f && !el.closest(".lbl");
+    const marcados = [...f.querySelectorAll(".on, .sel, [aria-pressed='true'], [aria-checked='true']")]
+      .filter((b) => meu(b) && b.matches("button, .chip, .pk, [role='radio'], [role='checkbox']"))
+      .map((b) => textoBotao(b) || b.getAttribute("title") || b.getAttribute("aria-label") || "").filter(Boolean);
+    if (marcados.length) return [...new Set(marcados)].join(", ");
+    const fotos = [...f.querySelectorAll(".phs img, [data-slot='rphotos'] img")].filter(meu).length;
+    if (fotos) return fotos === 1 ? "1 foto" : `${fotos} fotos`;
+    return [...f.querySelectorAll("textarea, input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']), select")]
+      .filter(meu)
+      .map((c) => (c.tagName === "SELECT" ? (c.value ? (c.selectedOptions[0] || {}).textContent || "" : "") : (c.value || "").split("\n")[0]).replace(/\s+/g, " ").trim())
+      .filter(Boolean).join(" ");
+  }
+  function valoresCampos(root) {
+    for (const f of root.querySelectorAll(".field.dobravel")) {
+      const l = f.querySelector(":scope > .lbl");
+      if (!l) continue;
+      let v = valorCampo(f);
+      if (v.length > 48) v = v.slice(0, 47) + "…";
+      if (v) { if (l.getAttribute("data-val") !== v) l.setAttribute("data-val", v); }
+      else l.removeAttribute("data-val");
+    }
   }
   function alternarCampo(l) {
     const f = l.closest(".field");
@@ -483,6 +512,7 @@
       f.classList.toggle("shut");
       l.setAttribute("aria-expanded", f.classList.contains("shut") ? "false" : "true");
       if (!f.classList.contains("shut")) $("textarea, input", f)?.focus();
+      valoresCampos(f);
       return;
     }
     const k = l.textContent.trim(), shut = camposFechados();
@@ -499,6 +529,11 @@
     dobrarCampos(dlg);
     dlg.addEventListener("click", (e) => { const l = e.target.closest(".field.dobravel > .lbl"); if (l) { if (l.tagName === "LABEL") e.preventDefault(); alternarCampo(l); } });
     dlg.addEventListener("keydown", (e) => { const l = (e.key === "Enter" || e.key === " ") && e.target.closest(".field.dobravel > .lbl"); if (l) { e.preventDefault(); alternarCampo(l); } });
+    // what a closed field shows follows what is chosen or written (also by the AI filling the form)
+    let vez = 0;
+    const seguir = () => { if (!vez) vez = requestAnimationFrame(() => { vez = 0; valoresCampos(dlg); }); };
+    for (const ev of ["click", "input"]) dlg.addEventListener(ev, seguir);
+    dlg.addEventListener("change", seguir);
     document.body.append(dlg);
     const entry = { dlg, routed, guard, onClose, closing: false, awaitingPop: false };
     stack.push(entry);
@@ -1592,7 +1627,7 @@
     ["InventarIA", "inventario-ha", "package", "Inventário da casa: cômodos, itens e valores."],
     ["EconomIA", "economia-ha", "receipt", "Lista de compras com o melhor preço perto de casa."],
     ["MemorIA", "memoria-ha", "book", "Cadernos de anotação que abrem na hora certa."],
-    ["OdisseIA", "odisseia", "clapperboard", "Os filmes, as séries e os jogos da casa: o que ver, jogar e onde."],
+    ["OdisseIA", "odisseia", "clapperboard", "Filmes, séries e jogos: o que ver, jogar e onde."],
     ["CorrerIA", "correria-ha", "chat", "Pergunte e peça a qualquer app, no chat ou no WhatsApp."],
   ];
   const wordmark = (n) => `<span class="ab-wm">${esc(n.slice(0, -2))}<span>${esc(n.slice(-2))}</span></span>`; // o "IA" na cor do app, sem quebrar o nome

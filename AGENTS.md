@@ -180,6 +180,8 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 
 1.102.0 (o dono: "agrupar por vencimento, onde mostra o que está vencendo essa semana, esse mês, mês que vem"): em `viewCons`, o Agrupar por sempre à vista, com `vence` (`cons-agrupar`): `VENCE` e `venceGrupo(it, hoje)` pelo `durData` (o dia em que acaba; o `durAte` usa ele): Já acabou, Esta semana (até o domingo), Este mês, Mês que vem, Depois, Sem duração; ordenado pela data (`porData`); o grupo Já acabou com o ícone em vermelho (`.zone.acabou`). Teste: `tests/e2e/e2e_cons_vence.py`.
 
+1.104.0 (o dono: "esse adicionar com essas opçõezinhas de retrair tem que mostrar o que foi selecionado do ladinho, quando eu retraio"; vale em todos os apps): `valoresCampos` (no fim do `dobrarCampos`, no `alternarCampo` e a cada `click`, `input` e `change` da janela, num `requestAnimationFrame`): o `data-val` do `.lbl` de cada `.field.dobravel` (`valorCampo`: os botões marcados, sem o que vem embaixo do nome; senão quantas fotos; senão o texto ou a caixa de seleção, sem a opção vazia), que o CSS desenha depois do título com o campo fechado (`::before`, `order: 1`). O título continua sendo a chave do que fica fechado (o `data-val` não entra no texto). Teste: `tests/e2e/e2e_itens.py`.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.

@@ -57,6 +57,7 @@ GRUPOS = [
     ("as fotos e o PDF que vão para a IA (Node)", _lib("anexos.js")),
     ("a Memória da IA, de todos os apps (Node)", _lib("memoria-ia.js")),
     ("a Memória da IA (o cartão, Lit)", _src("memoria-ia.js")),
+    ("o escolhido ao lado do título do campo fechado (Lit)", _src("campovalor.js")),
     ("a Memória da IA, de todos os apps (Python)", ["correria-ha/correria/app/memoria_ia.py", "inventario-ha/inventario/app/memoria_ia.py",
                                                     "gerencia-ha/gerencia/app/memoria_ia.py", "economia-ha/economia/app/memoria_ia.py"]),
     ("o PDF do relatório (Node)", _lib("pdf.js", ("resolvia-ha", "memoria-ha"))),

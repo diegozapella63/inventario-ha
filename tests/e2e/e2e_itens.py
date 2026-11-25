@@ -53,6 +53,17 @@ async def body(r, p):
     await pg.fill("#f-value", "1.234,50")
     unit = (await pg.text_content('[data-slot="unit"]')).replace("\xa0", " ")
     r.eq(unit, "R$ 617,25 cada", "valor por unidade")
+    # 1.104.0: fechado, o escolhido ao lado do título (Cômodo · Escritório, Fotos · 1 foto)
+    campo = lambda t: pg.locator("dialog .field.dobravel > .lbl", has_text=t)
+    for t in ("Fotos", "Cômodo", "Categoria"):
+        await campo(t).click(); await pg.wait_for_timeout(120)
+    vals = [await campo(t).get_attribute("data-val") for t in ("Fotos", "Cômodo", "Categoria")]
+    r.eq(vals, ["1 foto", "Escritório", "Decoração e arte"], "fechados, o escolhido ao lado do título")
+    antes = await pg.evaluate("() => getComputedStyle(document.querySelector('dialog .field.shut > .lbl[data-val]'), '::before').content")
+    r.check(antes.startswith('"· '), f"desenhado depois do título ({antes})")
+    await r.shot(pg, "editor-campos-fechados")
+    for t in ("Fotos", "Cômodo", "Categoria"):
+        await campo(t).click(); await pg.wait_for_timeout(120)
     await r.shot(pg, "editor-novo")
     await pg.click('[data-ed="save"]')
     await pg.wait_for_selector("dialog.modal", state="detached", timeout=8000)
