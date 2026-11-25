@@ -1,5 +1,12 @@
 # Mudanças
 
+## 1.103.0
+
+- **Avaliar com IA** na ficha de um consumível: a seção **Parecer da IA** pesquisa as avaliações na internet e traz a nota
+  (em estrelas, de 1 a 5), se vale a pena, o preço de hoje, os pontos fortes e fracos, dicas para render mais e outras opções,
+  com as fontes. O parecer fica guardado na ficha até o consumível mudar de nome ou de detalhes; **Avaliar de novo** pergunta outra vez.
+- Pela CorrerIA, a IA também pede o parecer de um consumível.
+
 ## 1.102.1
 
 - **Consumíveis › Agrupar por** no padrão dos outros apps: o título em cima e, embaixo, Categoria, Vencimento e Cômodo

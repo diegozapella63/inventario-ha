@@ -984,6 +984,23 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .rec-list b { font-weight: 600; }
 .rec-list span { color: var(--muted); font-size: 14.5px; line-height: 1.4; }
 .rec-src { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+/* 1.103.0: o Parecer da IA de um consumível */
+.par { display: grid; gap: 10px; margin: 10px 0 12px; }
+.par-nota { display: inline-flex; align-items: center; gap: 2px; color: color-mix(in srgb, var(--muted) 55%, transparent); }
+.par-nota > span { display: inline-grid; }
+.par-nota .ic { width: 20px; height: 20px; }
+.par-nota .on, .par-nota .meia { color: #f5a524; }
+.par-nota .on .ic { fill: currentColor; }
+.par-nota .meia .ic { fill: color-mix(in srgb, currentColor 45%, transparent); }
+.par-nota b { margin-left: 8px; font: 700 18px/1 var(--font-c, inherit); color: var(--ink); }
+.par-resumo { margin: 0; font-size: 15.5px; line-height: 1.5; }
+.par-preco { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--muted); font-size: 14.5px; }
+.par-preco b { color: var(--ink); }
+.par-bloco { display: grid; gap: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
+.par-bloco > b { display: flex; align-items: center; gap: 6px; font-size: 14.5px; font-weight: 600; }
+.par-bloco ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; color: var(--ink-2, var(--ink)); font-size: 14.5px; line-height: 1.45; }
+.par-alt { font-weight: 600; }
+.par-em { margin: 0; font-size: 13px; color: var(--muted); }
 .itasks > [data-slot] > .muted { margin: 8px 0 0; }
 .inews > .muted { margin: 8px 0 0; } /* Recursos e Novidades ainda não procurados: o que vem ali */
 .tlist { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }

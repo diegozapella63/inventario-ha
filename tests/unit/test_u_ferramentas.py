@@ -116,7 +116,7 @@ class Lista(Base):
         grava = [f["grava"] for f in fs]
         self.assertEqual(grava, sorted(grava), "primeiro as leituras, depois as gravações")
         self.assertEqual([f["nome"] for f in fs if f["apaga"]], ["apagar_item", "editar_comodo", "categoria"])
-        self.assertEqual([f["nome"] for f in fs if not f["grava"]], ["resumo", "buscar_itens", "novidades", "ver_item", "ler_arquivo"])
+        self.assertEqual([f["nome"] for f in fs if not f["grava"]], ["resumo", "buscar_itens", "novidades", "ver_item", "ler_arquivo", "avaliar"])
 
     def test_nada_de_fotos_backups_ou_configuracoes(self):
         texto = json.dumps(F.lista(), ensure_ascii=False).lower()

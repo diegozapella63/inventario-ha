@@ -590,6 +590,29 @@
       if ((body.anexos || []).length) return { reply: `Exemplo da prévia: no Home Assistant, a IA olha ${body.anexos.length > 1 ? `os ${body.anexos.length} arquivos` : "o arquivo"} e responde de verdade.`, entity: "ai_task.exemplo" };
       return { reply: `Exemplo da prévia: no Home Assistant, a IA responde de verdade, com os dados desta tela.\n- Você perguntou: “${String(last ? last.text : "").slice(0, 120)}”`, entity: "ai_task.exemplo" };
     }
+    // Avaliar com IA (1.103.0): o parecer de um consumível (aqui, um exemplo)
+    if (method === "GET" && path.startsWith("api/parecer?item=")) {
+      aiOff();
+      return (ST.par || {})[decodeURIComponent(path.slice("api/parecer?item=".length))] || {};
+    }
+    if (method === "POST" && path === "api/parecer") {
+      aiOff();
+      const it = d.items.find((i) => i.id === body.item);
+      if (!it) fail("Item não encontrado.", 404);
+      const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");
+      ST.jobs.set(id, { at: Date.now(), item: it.id });
+      return { id };
+    }
+    if ((m = path.match(/^api\/parecer\/([a-f0-9]+)$/))) {
+      const j = ST.jobs.get(m[1]);
+      if (method === "DELETE") { ST.jobs.delete(m[1]); return { ok: true }; }
+      if (!j) fail("Esta avaliação terminou. Avalie de novo.", 404);
+      if (Date.now() - j.at < 1200) return { stage: "busy", msg: "Avaliando…" };
+      const parecer = { nota: 4, resumo: "Exemplo da prévia: no Home Assistant, a IA pesquisa as avaliações deste produto e diz se vale a pena.",
+        fortes: ["Rende bastante"], fracos: ["A embalagem vaza se ficar deitada"], dicas: ["Guarde em pé."], alternativas: [], preco: "R$ 20 a R$ 30", fontes: [], at: new Date().toISOString() };
+      ST.par = { ...(ST.par || {}), [j.item]: parecer };
+      return { stage: "done", msg: "", parecer };
+    }
     // Recursos (1.54.0): o que o equipamento tem, ditos pela IA (aqui, um exemplo)
     if (method === "GET" && path.startsWith("api/recursos?item=")) {
       aiOff();

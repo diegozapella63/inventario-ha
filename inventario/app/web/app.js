@@ -2225,7 +2225,7 @@
 
   // -- uso da IA (igual ao do EconomIA): hoje, 7 dias e o mês, gráfico por dia e as últimas chamadas
   let usageData = null, usageSel = null;
-  const USAGE_KIND = { foto: "Digitalizar com IA", catalogo: "Catalogar itens", busca: "Buscar foto na internet", fala: "Falar", novidades: "Novidades", triagem: "Escolher equipamentos", chat: "Conversar", recursos: "Recursos", apps: "Encontrar apps" };
+  const USAGE_KIND = { foto: "Digitalizar com IA", catalogo: "Catalogar itens", busca: "Buscar foto na internet", parecer: "Avaliar com IA", fala: "Falar", novidades: "Novidades", triagem: "Escolher equipamentos", chat: "Conversar", recursos: "Recursos", apps: "Encontrar apps" };
   const USAGE_RES = { ok: "", cota: "cota excedida", formato: "fora do formato", sem_busca: "sem busca na web", erro: "erro" };
   const WEEKDAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -3301,6 +3301,70 @@
     };
     poll();
   }
+  // 1.103.0 (o dono: "criar botão para avaliar com a IA, para que a IA traga um parecer do consumível, qualidade, etc."):
+  // Avaliar com IA, na ficha de um consumível: a nota, se vale a pena, os pontos fortes e fracos, como render mais, outras
+  // opções e o preço de hoje, pela busca na web; fica guardado até o item mudar, como os Recursos
+  const parOn = (it) => aiOn() && isCons(it.room);
+  const IPAR = { id: null, st: null, gen: 0, timer: null };
+  const estrelas = (n) => `<span class="par-nota" aria-label="Nota ${String(n).replace(".", ",")} de 5">${[1, 2, 3, 4, 5].map((k) => `<span class="${n >= k ? "on" : n >= k - 0.5 ? "meia" : ""}">${ic("star", "sm")}</span>`).join("")}<b>${String(n).replace(".", ",")}</b></span>`;
+  function itemParHtml(it) {
+    const st = IPAR.id === it.id ? IPAR.st : null;
+    const btn = (icon, label) => `<button type="button" class="btn" data-act="item-par" data-id="${esc(it.id)}">${ic(icon)}${label}</button>`;
+    const head = `<h3 class="inews-h">${ic("star")}Parecer da IA</h3>`;
+    if (!st) return `${head}<p class="muted">Qualidade, pontos fortes e fracos, dicas e outras opções, pelas avaliações na internet.</p>${btn("spark", "Avaliar com IA")}`;
+    if (st.busy) return `${head}<div class="wbusy"><span class="spin"></span><p><b>Avaliando…</b><span>Pode levar até um minuto.</span></p></div>`;
+    if (st.error) return `${head}<p class="formerr">${esc(st.error)}</p>${btn("refresh", "Avaliar de novo")}`;
+    const p = st.p || {};
+    const lista = (icon, titulo, xs) => xs && xs.length ? `<div class="par-bloco"><b>${ic(icon, "sm")}${titulo}</b><ul>${xs.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "";
+    const alts = (p.alternativas || []).length ? `<div class="par-bloco"><b>${ic("layers", "sm")}Outras opções</b><ul>${p.alternativas.map((a) => `<li><span class="par-alt">${esc(a.nome)}</span>${a.porque ? ` · ${esc(a.porque)}` : ""}</li>`).join("")}</ul></div>` : "";
+    const fontes = (p.fontes || []).length ? `<p class="rec-src">Fontes: ${p.fontes.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.site || f.url)}</a>`).join(", ")}</p>` : "";
+    return `${head}<div class="par">
+        ${p.nota ? estrelas(p.nota) : ""}
+        ${p.resumo ? `<p class="par-resumo">${esc(p.resumo)}</p>` : ""}
+        ${p.preco ? `<p class="par-preco">${ic("receipt", "sm")}<span>Preço hoje: <b>${esc(p.preco)}</b></span></p>` : ""}
+        ${lista("check", "Pontos fortes", p.fortes)}${lista("alert", "Pontos fracos", p.fracos)}${lista("info", "Dicas", p.dicas)}${alts}${fontes}
+        ${p.at ? `<p class="par-em">Avaliado em ${esc(dataCurta(p.at.slice(0, 10)))}</p>` : ""}</div>${btn("refresh", "Avaliar de novo")}`;
+  }
+  function paintItemPar() {
+    const slot = sheet && sheet.itemId === IPAR.id && $('[data-slot="item-par"]', sheet.dlg);
+    const it = IPAR.id && D.itemById.get(IPAR.id);
+    if (slot && it) slot.innerHTML = itemParHtml(it);
+  }
+  function stopItemPar() { IPAR.gen++; clearTimeout(IPAR.timer); }
+  function loadItemPar(it) {
+    if (IPAR.id === it.id) { paintItemPar(); return; } // a ficha foi redesenhada: fica como estava
+    stopItemPar();
+    const my = IPAR.gen;
+    Object.assign(IPAR, { id: it.id, st: null });
+    paintItemPar();
+    API.get(`api/parecer?item=${encodeURIComponent(it.id)}`).then((r) => {
+      if (my !== IPAR.gen) return;
+      IPAR.st = r && (r.resumo || (r.fortes || []).length) ? { p: r } : null;
+      paintItemPar();
+    }).catch(() => {});
+  }
+  async function avaliarItem(it) {
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return; }
+    stopItemPar();
+    const my = IPAR.gen;
+    Object.assign(IPAR, { id: it.id, st: { busy: true } });
+    paintItemPar();
+    const done = (st) => { if (my === IPAR.gen) { IPAR.st = st; paintItemPar(); } };
+    let id;
+    try { id = (await API.post("api/parecer", { item: it.id })).id; }
+    catch (e) { done({ error: e.message }); return; }
+    const poll = async () => {
+      if (my !== IPAR.gen) return;
+      let st;
+      try { st = await API.get(`api/parecer/${id}`); }
+      catch (e) { done({ error: e.message }); return; }
+      if (st.stage === "busy") { if (my === IPAR.gen) IPAR.timer = setTimeout(poll, 1200); return; }
+      API.del(`api/parecer/${id}`).catch(() => {});
+      if (st.stage === "error") { done({ error: st.msg }); return; }
+      done({ p: st.parecer });
+    };
+    poll();
+  }
   const INEWS = { id: null, st: null, gen: 0, timer: null };
   function itemNewsHtml(it) {
     const st = INEWS.id === it.id ? INEWS.st : null;
@@ -3542,9 +3606,10 @@
       sheet = openDialog({ cls: "sheet", html, routed: true, label: it.name });
       sheet.itemId = it.id;
       sheet.onRouteClose = leaveItem;
-      sheet.onClose = () => { sheet = null; stopItemNews(); INEWS.id = null; stopItemRec(); IREC.id = null; };
+      sheet.onClose = () => { sheet = null; stopItemNews(); INEWS.id = null; stopItemRec(); IREC.id = null; stopItemPar(); IPAR.id = null; };
     }
     if (recOn(it)) loadItemRec(it);
+    if (parOn(it)) loadItemPar(it);
     if (newsOn() && it.cat === "eletronicos") loadItemNews(it); // as novidades são só dos eletrônicos
     if (S.resolvia) loadTarefas(it);
     if (S.economia && isCons(it.room)) loadCompras(it);
@@ -3757,6 +3822,7 @@
         ${S.economia && room.kind === "consumiveis" ? `<div class="inews itasks icompras" data-slot="item-compras">
           <h3 class="inews-h">${ic("receipt")}Compras no EconomIA</h3>
           <div data-slot="compras-lista" aria-live="polite">${comprasHtml(it)}</div></div>` : ""}
+        ${parOn(it) ? `<div class="inews ipar" data-slot="item-par" aria-live="polite">${itemParHtml(it)}</div>` : ""}
         ${recOn(it) ? `<div class="inews irec" data-slot="item-rec" aria-live="polite">${itemRecHtml(it)}</div>` : ""}
         ${newsOn() && it.cat === "eletronicos" ? `<div class="inews" data-slot="item-news" aria-live="polite">${itemNewsHtml(it)}</div>` : ""}
       </div>
@@ -5413,6 +5479,7 @@
       case "item-news": if (item) searchItemNews(item); break;
       case "item-news-del": if (item) dismissNews(item); break;
       case "item-rec": if (item) searchItemRec(item); break;
+      case "item-par": if (item) avaliarItem(item); break;
       case "item-dup": if (item) openEditor({ dup: item }); break;
       case "tarefa-nova": if (item) openTarefaNova(item); break;
       case "copy-field": copyField(b.dataset.target); break;

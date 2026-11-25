@@ -89,6 +89,7 @@ DATA_FILE = os.path.join(DATA_DIR, "inventario.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 USAGE_FILE = os.path.join(DATA_DIR, "uso_ia.json")
 NEWS_FILE = os.path.join(DATA_DIR, "novidades.json")  # novidades conferidas e a escolha da IA (não entra no inventário)
+PAR_FILE = os.path.join(DATA_DIR, "pareceres.json")  # 1.103.0: o parecer da IA de cada consumível (não entra no inventário)
 REC_FILE = os.path.join(DATA_DIR, "recursos.json")  # os recursos de cada equipamento, ditos pela IA (não entra no inventário)
 APPS_FILE = os.path.join(DATA_DIR, "apps.json")  # os apps usados nos celulares, pelo sensor Último app usado (não entra no inventário)
 PHOTOS_DIR = os.path.join(DATA_DIR, "photos")
@@ -3728,6 +3729,158 @@ def rec_job_start(body: dict) -> dict:
     return {"id": jid}
 
 
+# ---------- Avaliar com IA (1.103.0, o dono: "criar botão para avaliar com a IA, para que a IA traga um parecer do
+# consumível, qualidade, etc."): na ficha de um consumível, a IA pesquisa na web as avaliações e diz se vale a pena (a nota,
+# os pontos fortes e fracos, como render mais, outras opções e o preço de hoje). Só com a IA ligada; o parecer fica guardado
+# até o item mudar (nome ou detalhes), como os Recursos.
+PAR_LOCK = threading.Lock()
+MOCK_PAR = {"produto": "Produto de exemplo", "nota": 4, "resumo": "Bem avaliado pelos compradores; rende bem e o preço é justo.",
+            "fortes": ["Rende bastante", "Fácil de achar"], "fracos": ["A embalagem vaza se ficar deitada"],
+            "dicas": ["Guarde em pé, longe do sol."], "alternativas": [{"nome": "Outra marca de exemplo", "porque": "Mais barata, rende um pouco menos."}],
+            "preco": "R$ 20 a R$ 30", "fontes": [{"url": "https://www.exemplo.com.br/avaliacoes", "titulo": "Avaliações"}]}
+
+
+def par_prompt(it: dict) -> str:
+    details = " ".join(str(it.get("details") or "").split())[:400]
+    cat = STORE.cons_cat_map().get(it.get("cat")) or ""
+    return "\n".join(filter(None, [
+        "Você avalia produtos de uso diário (consumíveis: o que se gasta e se compra de novo) para uma casa no Brasil.",
+        f"Produto: {it.get('name') or ''}",
+        f"Detalhes: {details}" if details else "",
+        f"Categoria: {cat}" if cat and cat != "Outros" else "",
+        f"Hoje é {news_today().isoformat()}.",
+        "",
+        "Use a busca na web agora: as avaliações de quem comprou (Mercado Livre, Amazon, Magazine Luiza, Reclame Aqui), testes e "
+        "comparativos e a página do fabricante deste produto, como estão hoje. Não use só o que você lembra.",
+        "Dê um parecer honesto, em português do Brasil, para quem vai comprar de novo:",
+        '- "nota": de 1 a 5, a qualidade pelo que os compradores e os testes dizem (pode ter meio ponto).',
+        '- "resumo": 2 ou 3 frases: vale a pena? Para quem é bom e para quem não é.',
+        '- "fortes" e "fracos": até 4 cada, frases curtas.',
+        '- "dicas": até 3, como usar, guardar ou render mais.',
+        '- "alternativas": até 3 produtos parecidos à venda no Brasil, cada um com "nome" e "porque" (uma frase: melhor, mais barato…).',
+        '- "preco": a faixa de preço de hoje no Brasil (ex.: "R$ 20 a R$ 35").',
+        '- "fontes": até 4 páginas usadas, cada uma com "url" e "titulo".',
+        "Sem saber o produto exato, avalie a linha mais comum dele e diga isso no resumo. Não invente notas, preços nem páginas.",
+        "Responda somente com um objeto JSON, sem texto antes ou depois:",
+        '{"produto": "o produto que você avaliou", "nota": 0, "resumo": "", "fortes": [], "fracos": [], "dicas": [], '
+        '"alternativas": [{"nome": "", "porque": ""}], "preco": "", "fontes": [{"url": "", "titulo": ""}]}',
+        'Se não conseguir usar a busca na web, responda apenas {"erro": "sem_busca"}.',
+    ]))
+
+
+def par_clean(data) -> dict:
+    if not isinstance(data, dict):
+        data = {}
+    linha = lambda v, n: " ".join(str(v or "").split())[:n]  # noqa: E731
+    lista = lambda v, n, m: [x for x in (linha(s, m) for s in (v if isinstance(v, list) else [])) if x][:n]  # noqa: E731
+    try:
+        nota = round(float(str(data.get("nota")).replace(",", ".")) * 2) / 2
+        nota = nota if 1 <= nota <= 5 else None
+    except (TypeError, ValueError):
+        nota = None
+    alts = []
+    for a in data.get("alternativas") if isinstance(data.get("alternativas"), list) else []:
+        a = {"nome": a} if isinstance(a, str) else a
+        if isinstance(a, dict) and linha(a.get("nome"), 120):
+            alts.append({"nome": linha(a.get("nome"), 120), "porque": linha(a.get("porque") or a.get("motivo"), 200)})
+    fontes = []
+    for f in data.get("fontes") if isinstance(data.get("fontes"), list) else []:
+        u = _fix_url(f.get("url") if isinstance(f, dict) else f)
+        if u and u not in [x["url"] for x in fontes]:
+            fontes.append({"url": u, "site": site_of(u), "titulo": linha(f.get("titulo") if isinstance(f, dict) else "", 120)})
+    return {"produto": linha(data.get("produto"), 200), "nota": nota, "resumo": str(data.get("resumo") or "").strip()[:700],
+            "fortes": lista(data.get("fortes") or data.get("pontos_fortes"), 4, 200), "fracos": lista(data.get("fracos") or data.get("pontos_fracos"), 4, 200),
+            "dicas": lista(data.get("dicas"), 3, 220), "alternativas": alts[:3], "preco": linha(data.get("preco"), 80), "fontes": fontes[:4]}
+
+
+def ai_find_par(it: dict, entity: str) -> dict:
+    prompt = par_prompt(it)
+    with AiCall("parecer", "ai_task.simulado" if AI_MOCK else entity, prompt) as call:
+        if AI_MOCK:
+            time.sleep(0.3)
+            data = MOCK_PAR
+            call.answer(data)
+        else:
+            raw = ai_call_text("InventarIA: avaliar", prompt, entity)
+            call.answer(str(raw or "") if not isinstance(raw, dict) else raw)
+            try:
+                data = raw if isinstance(raw, dict) else extract_json(raw)
+            except ApiError:
+                call.result = "formato"
+                log.info("parecer: resposta da IA fora do formato: %s", " ".join(str(raw or "").split())[:400])
+                raise ApiError(502, "A IA respondeu fora do formato. Tente de novo.") from None
+            if isinstance(data, dict) and data.get("erro"):
+                call.result = "sem_busca"
+                raise ApiError(502, "A IA não usou a busca na web. " + SEARCH_HOWTO)
+    found = par_clean(data)
+    if not found["resumo"] and not found["fortes"] and not found["fracos"]:
+        raise ApiError(502, "A IA não achou avaliações deste produto. Ponha a marca no nome ou nos detalhes e tente de novo.")
+    return found
+
+
+def par_of(iid: str) -> dict:
+    """O parecer guardado de um item (vazio quando o item mudou depois)."""
+    it = STORE.item(iid)
+    d = read_json(PAR_FILE, None)
+    p = d.get(iid) if isinstance(d, dict) else None
+    if not it or not isinstance(p, dict) or p.get("sig") != item_sig(it):
+        return {}
+    return {k: v for k, v in p.items() if k != "sig"}
+
+
+def par_save(iid: str, found: dict) -> dict:
+    with PAR_LOCK:
+        d = read_json(PAR_FILE, None)
+        d = {k: v for k, v in (d if isinstance(d, dict) else {}).items() if STORE.item(k)}  # os que saíram do inventário saem daqui
+        it = STORE.item(iid)
+        d[iid] = {"at": now_iso(), "sig": item_sig(it) if it else "", **found}
+        write_json_atomic(PAR_FILE, d)
+        return {k: v for k, v in d[iid].items() if k != "sig"}
+
+
+def par_item(iid: str) -> dict:
+    need_ai_on()
+    it = STORE.item(str(iid or ""))
+    if not it:
+        raise ApiError(404, "Item não encontrado.")
+    if not STORE.is_cons(it["room"]):
+        raise ApiError(400, "O Avaliar com IA é dos consumíveis.")
+    return it
+
+
+def avaliar(iid: str) -> dict:
+    """O parecer novo de um consumível, guardado (o CorrerIA espera; a tela usa o par_job_start)."""
+    it = par_item(iid)
+    if not SUPERVISOR_TOKEN and not AI_MOCK:
+        raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
+    return par_save(it["id"], ai_find_par(it, search_entity()))
+
+
+def _par_job_run(jid: str, iid: str):
+    job = WEB_JOBS[jid]
+    try:
+        found = avaliar(iid)
+        if not job.get("cancelled"):
+            job.update(stage="done", msg="", parecer=found)
+    except ApiError as e:
+        job.update(stage="error", msg=e.msg)
+    except Exception:  # noqa: BLE001
+        log.exception("parecer")
+        job.update(stage="error", msg="Não deu para avaliar agora. Tente de novo em instantes.")
+
+
+def par_job_start(body: dict) -> dict:
+    it = par_item(body.get("item"))
+    if not SUPERVISOR_TOKEN and not AI_MOCK:
+        raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
+    web_jobs_cleanup()
+    jid = secrets.token_hex(8)
+    with WEB_LOCK:
+        WEB_JOBS[jid] = {"stage": "busy", "msg": "Avaliando…", "results": [], "at": time.time(), "kind": "parecer"}
+    threading.Thread(target=_par_job_run, args=(jid, it["id"]), daemon=True).start()
+    return {"id": jid}
+
+
 # ---------- Novidades › Eletrônicos (1.65.0): os recursos de todos os eletrônicos. Conferir novidades › Só eletrônicos
 # (1.68.0, na conferência das novidades) busca os que ainda não têm (ou que mudaram depois); o mesmo equipamento em
 # vários cômodos é uma busca só, guardada em todos.
@@ -5577,6 +5730,19 @@ def r_rec_status(h, jid, query):
     h.send_json({"stage": job["stage"], "msg": job["msg"], "rec": job.get("rec"), "progress": job.get("progress"), "summary": job.get("summary")})
 
 
+def r_par_get(h, query):
+    h.send_json(par_of(par_item((query.get("item") or [""])[0])["id"]))
+
+
+def r_par_start(h, query):
+    h.send_json(par_job_start(h.read_body()), 202)
+
+
+def r_par_status(h, jid, query):
+    job = web_job(jid)
+    h.send_json({"stage": job["stage"], "msg": job["msg"], "parecer": job.get("parecer")})
+
+
 def r_rec_all_get(h, query):
     h.send_json(rec_overview())
 
@@ -6141,6 +6307,10 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/news/apps/adicionar", r_news_apps_add),
     ("GET", r"/api/news/people", r_news_people),
     ("POST", r"/api/news/notify-test", r_news_notify_test),
+    ("GET", r"/api/parecer", r_par_get),  # 1.103.0: Avaliar com IA (os consumíveis)
+    ("POST", r"/api/parecer", r_par_start),
+    ("GET", r"/api/parecer/([a-f0-9]{16})", r_par_status),
+    ("DELETE", r"/api/parecer/([a-f0-9]{16})", r_news_cancel),
     ("GET", r"/api/recursos", r_rec_get),
     ("GET", r"/api/recursos/todos", r_rec_all_get),  # 1.65.0: Novidades › Eletrônicos
     ("POST", r"/api/recursos", r_rec_start),

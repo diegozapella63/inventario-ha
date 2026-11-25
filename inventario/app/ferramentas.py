@@ -90,6 +90,12 @@ FERRAMENTAS = [
                       "consumiveis": {"type": "boolean", "description": "true quando a foto é de consumíveis (cremes, produtos de limpeza, "
                                       "comida: o que se gasta e se compra de novo): a leitura traz só eles, com a duração estimada, e diz os que já estão cadastrados."},
                       "dica": {"type": "string", "description": "O que a pessoa disse sobre a foto, se disse."}})},
+    # 1.103.0 (o dono: "botão para avaliar com a IA… um parecer do consumível, qualidade, etc."): o Avaliar com IA da ficha
+    {"nome": "avaliar", "titulo": "Avaliar consumível com IA", "grava": False,
+     "descricao": "O parecer da IA do InventarIA sobre um consumível, pelas avaliações na web: a nota de 1 a 5, se vale a pena, os "
+                  "pontos fortes e fracos, dicas para render mais, outras opções e o preço de hoje. Devolve o parecer guardado; sem "
+                  "ele (ou com nova), avalia agora (demora até um minuto).",
+     "entrada": _obj({"id": _ID, "nova": {"type": "boolean", "description": "Avaliar de novo, mesmo com um parecer guardado."}}, ["id"])},
     {"nome": "cadastrar_itens", "titulo": "Cadastrar itens", "grava": True,
      "descricao": "Cadastra um ou mais itens num cômodo (ou em Bens: casa, terreno, carro; ou em Consumíveis: o que se gasta "
                   "e se compra de novo, como pasta térmica e creme de massagem). Cada item ganha o próximo código "
@@ -624,6 +630,9 @@ def _ver(srv, a) -> str:
             out["usado_em"] = srv.used_in_text(it)
         if srv.dur_until(it):
             out["dura_ate"] = srv.dur_until(it)
+        p = srv.par_of(it["id"])
+        if p:  # 1.103.0: o parecer guardado do Avaliar com IA
+            out["parecer"] = {"nota": p.get("nota"), "resumo": p.get("resumo"), "em": (p.get("at") or "")[:10]}
     else:
         cid = it.get("cat") if it.get("cat") in cats else "outros"
         out["categoria"] = {"id": cid, "nome": cats.get(cid, "Outros")}
@@ -857,6 +866,25 @@ def _novo_comodo(srv, a, quem) -> str:
 
 # ---------------------------------------------------------------- comprei, cômodos e categorias (1.101.0)
 
+def _avaliar(srv, a) -> str:
+    """1.103.0: o parecer da IA sobre um consumível (o guardado, ou um novo pela busca na web), fora da trava do Store."""
+    with srv.STORE.lock:
+        it = _achar_item(srv, a.get("id"))
+    if not _eh_cons(srv, it):
+        raise ErroFerramenta(f"{it.get('name')} não é um consumível: o Avaliar com IA é dos consumíveis.")
+    if not srv.ai_enabled():
+        raise ErroFerramenta("A IA do InventarIA está desligada (Mais › Configurações › Integrações › Usar IA). Diga isso à pessoa.")
+    p = {} if a.get("nova") is True else srv.par_of(it["id"])
+    novo = not p
+    if novo:
+        p = srv.avaliar(it["id"])
+    out = {"item": it.get("name"), "id": it["id"], "avaliado_em": (p.get("at") or "")[:10], "novo": novo,
+           **{k: p.get(k) for k in ("produto", "nota", "resumo", "fortes", "fracos", "dicas", "alternativas", "preco") if p.get(k) not in (None, "", [])}}
+    if p.get("fontes"):
+        out["fontes"] = [f["url"] for f in p["fontes"]]
+    return json.dumps(out, ensure_ascii=False)
+
+
 def _comprei(srv, a, quem) -> str:
     it = _achar_item(srv, a.get("id"))
     if not _eh_cons(srv, it):
@@ -1042,6 +1070,11 @@ def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
     """Roda a ferramenta (as de gravar mudam o inventário pelo Store, que grava, sobe a rev e faz a versão automática)."""
     a = conferir_argumentos(nome, argumentos)
     quem = _quem(pessoa, cliente)
+    if nome == "avaliar":  # 1.103.0: a IA pesquisa na web, fora da trava do Store
+        try:
+            return _avaliar(srv, a)
+        except srv.ApiError as e:
+            raise ErroFerramenta(e.msg) from None
     if nome in ("cadastrar_por_foto", "anexar_foto", "ler_arquivo"):  # as que recebem a foto (a leitura por IA fica fora da trava do Store)
         try:
             return _por_foto(srv, a, quem, anexo) if nome == "cadastrar_por_foto" else _anexar_foto(srv, a, quem, anexo) if nome == "anexar_foto" else _ler_arquivo(srv, a, anexo)
