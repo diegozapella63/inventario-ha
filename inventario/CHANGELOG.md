@@ -1,5 +1,13 @@
 # Mudanças
 
+## 1.101.0
+
+- **Pelo CorrerIA**, a IA agora também:
+  - anota o **Comprei** de um consumível (o Dura até volta a contar de hoje; dá para mudar a duração junto);
+  - **renomeia** um cômodo, muda o **código** dele ou **apaga** um cômodo vazio;
+  - **cria, muda (nome e cor) e apaga categorias**, da casa e dos consumíveis.
+- Como toda mudança pelo CorrerIA, só depois do seu sim.
+
 ## 1.100.0
 
 - **Categorias com cor**: cada categoria ganha uma cor da paleta (Outros fica em Grafite). A cor aparece em Mais › Categorias e na escolha da categoria do item, num pontinho ao lado do nome.

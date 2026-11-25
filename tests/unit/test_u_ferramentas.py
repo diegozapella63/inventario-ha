@@ -95,7 +95,7 @@ class Novidades(Base):
 class Lista(Base):
     def test_formato_do_contrato(self):
         fs = F.lista()
-        self.assertTrue(5 <= len(fs) <= 12)
+        self.assertTrue(5 <= len(fs) <= 20)
         nomes = [f["nome"] for f in fs]
         self.assertEqual(len(set(nomes)), len(nomes))
         for f in fs:
@@ -115,7 +115,7 @@ class Lista(Base):
         fs = F.lista()
         grava = [f["grava"] for f in fs]
         self.assertEqual(grava, sorted(grava), "primeiro as leituras, depois as gravações")
-        self.assertEqual([f["nome"] for f in fs if f["apaga"]], ["apagar_item"])
+        self.assertEqual([f["nome"] for f in fs if f["apaga"]], ["apagar_item", "editar_comodo", "categoria"])
         self.assertEqual([f["nome"] for f in fs if not f["grava"]], ["resumo", "buscar_itens", "novidades", "ver_item", "ler_arquivo"])
 
     def test_nada_de_fotos_backups_ou_configuracoes(self):
@@ -628,3 +628,45 @@ class ValorDeHoje(Base):
         self.assertNotIn("valor_gravado", v)
         self.assertNotIn("valores", self.json("resumo"))
         self.assertNotIn("valor_gravado", F.instrucoes(S))
+
+
+class Novas1101(Base):
+    """1.101.0 (o dono: "todas"): o Comprei de um consumível, renomear e apagar um cômodo e as categorias (com a cor)."""
+
+    def test_comprei_recomeca_o_dura_ate(self):
+        self.store.settings["consumiveis"] = True
+        self.chamar("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Filtro de água", "duracao_dias": 180}, {"nome": "Pilhas"}]})
+        it = next(i for i in self.store.data["items"] if i["name"] == "Filtro de água")
+        it["durAt"] = "2026-01-01T10:00:00-03:00"
+        txt = self.chamar("comprei", {"id": it["id"]})
+        self.assertTrue(txt.startswith("Comprei anotado: Filtro de água dura 6 meses, até "), txt)
+        self.assertNotEqual(self.store.item(it["id"])["durAt"], "2026-01-01T10:00:00-03:00", "conta de hoje")
+        self.assertIn("1 ano", self.chamar("comprei", {"id": it["id"], "duracao_dias": 365}))
+        pilhas = next(i for i in self.store.data["items"] if i["name"] == "Pilhas")
+        self.erro("comprei", {"id": pilhas["id"]}, "não tem duração estimada")
+        casa = next(i for i in self.store.data["items"] if not (self.store.room(i["room"]) or {}).get("kind"))
+        self.erro("comprei", {"id": casa["id"]}, "não é um consumível")
+
+    def test_renomear_mudar_o_codigo_e_apagar_comodo(self):
+        self.assertEqual(self.chamar("editar_comodo", {"comodo": "Cozinha", "nome": "Cozinha americana"}), "Cômodo mudado: nome Cozinha → Cozinha americana.")
+        txt = self.chamar("editar_comodo", {"comodo": "cozinha americana", "codigo": "CA"})
+        self.assertIn("código COZ → CA (os itens viram CA-001…)", txt)
+        self.erro("editar_comodo", {"comodo": "CA"}, "Diga o que muda")
+        self.erro("editar_comodo", {"comodo": "CA", "nome": "sala de estar"}, "Já existe o cômodo sala de estar")
+        self.erro("editar_comodo", {"comodo": "CA", "apagar": True}, "mova (inventario_mover_itens) ou apague antes")
+        self.chamar("novo_comodo", {"nome": "Sótão"})
+        self.assertEqual(self.chamar("editar_comodo", {"comodo": "Sótão", "apagar": True}), "Cômodo apagado: Sótão.")
+        self.assertIsNone(self.store.room("sotao"))
+
+    def test_categorias_com_cor(self):
+        txt = self.chamar("categoria", {"acao": "nova", "nome": "Ferramentas", "cor": "turquesa"})
+        self.assertTrue(txt.startswith("Categoria criada: Ferramentas (turquesa)."), txt)
+        self.assertEqual(self.chamar("categoria", {"acao": "mudar", "nome": "ferramentas", "novo_nome": "Oficina", "cor": "azul"}), "Categoria mudada: Ferramentas → Oficina (azul).")
+        self.assertEqual(self.chamar("categoria", {"acao": "mudar", "nome": "Eletrônicos", "cor": "indigo"}), "Categoria mudada: Eletrônicos (indigo).", "a fixa muda a cor")
+        self.erro("categoria", {"acao": "mudar", "nome": "Eletrônicos", "novo_nome": "Aparelhos"}, "não dá para renomear")
+        self.erro("categoria", {"acao": "mudar", "nome": "Oficina"}, "novo_nome e/ou cor")
+        self.erro("categoria", {"acao": "apagar", "nome": "Outros"}, "não pode ser apagada")
+        self.assertEqual(self.chamar("categoria", {"acao": "apagar", "nome": "Oficina"}), "Categoria apagada: Oficina.")
+        self.erro("categoria", {"acao": "nova", "nome": "Piscina", "consumiveis": True}, "consumíveis estão desligados")
+        self.store.settings["consumiveis"] = True
+        self.assertIn("Categoria dos consumíveis criada: Piscina", self.chamar("categoria", {"acao": "nova", "nome": "Piscina", "consumiveis": True}))

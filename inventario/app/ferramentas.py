@@ -121,6 +121,23 @@ FERRAMENTAS = [
      "descricao": "Cria um cômodo, no fim da lista. codigo: de 1 a 4 letras ou números, o começo do código dos itens (ex.: GAR, "
                   "para GAR-001); sem ele, as 3 primeiras letras do nome.",
      "entrada": _obj({"nome": {"type": "string"}, "codigo": {"type": "string"}}, ["nome"])},
+    # 1.101.0 (o dono, à lista do que a IA não fazia: "todas")
+    {"nome": "comprei", "titulo": "Comprei (consumível)", "grava": True,
+     "descricao": "Anota que um consumível foi comprado de novo (ou reposto): o Dura até volta a contar de hoje. Com duracao_dias, "
+                  "a duração estimada muda também.",
+     "entrada": _obj({"id": _ID, "duracao_dias": _DURACAO}, ["id"])},
+    {"nome": "editar_comodo", "titulo": "Renomear ou apagar cômodo", "grava": True, "apaga": True,
+     "descricao": "Muda o nome ou o código de um cômodo (o código novo muda o código dos itens dele), ou apaga um cômodo vazio "
+                  "(com itens, mova ou apague os itens antes). Bens e Consumíveis não mudam por aqui.",
+     "entrada": _obj({"comodo": _COMODO, "nome": {"type": "string"}, "codigo": {"type": "string", "description": "De 1 a 4 letras ou números."},
+                      "apagar": {"type": "boolean"}}, ["comodo"])},
+    {"nome": "categoria", "titulo": "Criar, mudar ou apagar categoria", "grava": True, "apaga": True,
+     "descricao": "As categorias da casa (ou, com consumiveis, as dos consumíveis), como em Mais › Categorias: nova (nome e, se "
+                  "quiser, cor), mudar (o nome com novo_nome e/ou a cor) ou apagar (os itens dela vão para Outros). Eletrônicos, "
+                  "Utilidades e Veículos mudam só a cor; Outros não se apaga.",
+     "entrada": _obj({"acao": {"type": "string", "enum": ["nova", "mudar", "apagar"]}, "nome": {"type": "string", "description": "O nome (ou o id) da categoria."},
+                      "novo_nome": {"type": "string"}, "cor": {"type": "string", "enum": ["vermelho", "coral", "laranja", "ouro", "verde", "menta", "turquesa", "azul", "indigo", "lilas", "rosa", "grafite"]},
+                      "consumiveis": {"type": "boolean"}}, ["acao", "nome"])},
     # 1.92.0 (o dono, numa ronda: mandou a foto de um consumível com "coloca 6 meses" e a foto foi para o GerencIA): a foto que a
     # pessoa mandou na conversa vira um item. `anexo` diz ao CorrerIA que esta ferramenta recebe o arquivo (ele manda em
     # `anexo`, fora dos argumentos). Sem o nome, a IA daqui lê a foto, como o Digitalizar com IA da tela.
@@ -838,6 +855,73 @@ def _novo_comodo(srv, a, quem) -> str:
     return f"Cômodo criado: {r['name']}, código {r['code']}{aviso}. Os itens vão ser {r['code']}-001, {r['code']}-002… id {r['id']}"
 
 
+# ---------------------------------------------------------------- comprei, cômodos e categorias (1.101.0)
+
+def _comprei(srv, a, quem) -> str:
+    it = _achar_item(srv, a.get("id"))
+    if not _eh_cons(srv, it):
+        raise ErroFerramenta(f"{it.get('name')} não é um consumível: o Comprei é dos consumíveis.")
+    mud = {"_comprado": True}
+    if a.get("duracao_dias") is not None:
+        dias = _duracao(srv, a["duracao_dias"])
+        if not dias:
+            raise ErroFerramenta("duracao_dias: de 1 a 3650 dias.")
+        mud["dur"] = dias
+    elif not srv.clean_dur(it.get("dur")):
+        raise ErroFerramenta(f"{it.get('name')} não tem duração estimada: mande duracao_dias (quanto costuma durar).")
+    novo = srv.STORE.update_item(it["id"], mud, quem)
+    return (f"Comprei anotado: {novo.get('name')} dura {srv.dur_text(novo.get('dur'))}, até {srv.dur_until(novo)}"
+            if srv.dur_until(novo) else f"Comprei anotado: {novo.get('name')}") + "."
+
+
+def _editar_comodo(srv, a, quem) -> str:
+    room = _achar_comodo(srv, a.get("comodo"))
+    if room.get("kind"):
+        raise ErroFerramenta(f"{room.get('name')} é uma área do app: não se renomeia nem se apaga.")
+    if a.get("apagar") is True:
+        n = sum(1 for i in srv.STORE.data["items"] if i.get("room") == room["id"])
+        if n:
+            raise ErroFerramenta(f"{room['name']} tem {n} {'item' if n == 1 else 'itens'}: mova (inventario_mover_itens) ou apague antes.")
+        srv.STORE.delete_room(room["id"])
+        return f"Cômodo apagado: {room['name']}."
+    mud = {}
+    if a.get("nome") not in (None, ""):
+        nome = _texto(srv, a.get("nome"), 60, "nome do cômodo", obrig=True)
+        if any(srv.fold(r.get("name") or "") == srv.fold(nome) and r["id"] != room["id"] for r in srv.STORE.data["rooms"]):
+            raise ErroFerramenta(f"Já existe o cômodo {nome}.")
+        mud["name"] = nome
+    if a.get("codigo") not in (None, ""):
+        mud["code"] = _texto(srv, a.get("codigo"), 4, "código")
+    if not mud:
+        raise ErroFerramenta("Diga o que muda: nome ou codigo (ou apagar).")
+    antes = dict(room)
+    r = srv.STORE.update_room(room["id"], mud)
+    partes = ([f"nome {antes['name']} → {r['name']}"] if r["name"] != antes["name"] else []) + \
+             ([f"código {antes['code']} → {r['code']} (os itens viram {r['code']}-001…)"] if r["code"] != antes["code"] else [])
+    return "Cômodo mudado: " + ("; ".join(partes) or "nada mudou") + "."
+
+
+def _categoria(srv, a, quem) -> str:
+    cons = a.get("consumiveis") is True
+    if cons and not srv.consumiveis_enabled():
+        raise ErroFerramenta("Os consumíveis estão desligados no InventarIA (Mais › Configurações › Opções › Usar consumíveis).")
+    acao, de = a.get("acao"), " dos consumíveis" if cons else ""
+    if acao == "nova":
+        corpo = {"name": a.get("nome"), **({"kind": "consumiveis"} if cons else {}), **({"cor": a["cor"]} if a.get("cor") else {})}
+        c = srv.STORE.create_cat(corpo)
+        return f"Categoria{de} criada: {c['name']} ({c.get('cor')}). id {c['id']}"
+    cid = _achar_categoria(srv, a.get("nome"), cons)
+    velho = (srv.STORE.cons_cat_map() if cons else srv.STORE.cat_map()).get(cid, cid)
+    if acao == "apagar":
+        n = srv.STORE.delete_cat(cid)
+        return f"Categoria apagada: {velho}." + (f" {n} {'item foi' if n == 1 else 'itens foram'} para Outros." if n else "")
+    corpo = {**({"name": a["novo_nome"]} if str(a.get("novo_nome") or "").strip() else {}), **({"cor": a["cor"]} if a.get("cor") else {})}
+    if not corpo:
+        raise ErroFerramenta("Diga o que muda: novo_nome e/ou cor.")
+    c = srv.STORE.update_cat(cid, corpo)
+    return f"Categoria mudada: {velho}" + (f" → {c['name']}" if c["name"] != velho else "") + f" ({c.get('cor')})."
+
+
 # ---------------------------------------------------------------- chamar
 
 def conferir_argumentos(nome, argumentos) -> dict:
@@ -974,7 +1058,7 @@ def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
             if nome == "novidades":
                 return _novidades(srv, a)
             faz = {"cadastrar_itens": _cadastrar, "editar_item": _editar, "mover_itens": _mover, "apagar_item": _apagar,
-                   "novo_comodo": _novo_comodo}[nome]
+                   "novo_comodo": _novo_comodo, "comprei": _comprei, "editar_comodo": _editar_comodo, "categoria": _categoria}[nome]
             return faz(srv, a, quem)
     except srv.ApiError as e:  # as regras do Store (nome obrigatório, valor, cômodo que não existe…) viram 400 para a IA
         raise ErroFerramenta(e.msg) from None
