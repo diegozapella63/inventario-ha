@@ -455,18 +455,15 @@
     for (const f of root.querySelectorAll(".field")) {
       const l = f.querySelector(":scope > .lbl");
       // 1.105.0: e as opções lado a lado (o Tipo de um bem: Imóvel, Veículo, Outro)
-      if (l && f.querySelector(":scope > .phs, :scope > .chips, :scope > .pick-grid, :scope > .seg, :scope > [data-slot='rphotos']")) f.classList.add("dobravel");
+      // 1.105.1 (o dono: "quantidade e valor deve ficar em um retrair só"): e o bloco da Quantidade e do Valor total
+      if (l && f.querySelector(":scope > .phs, :scope > .chips, :scope > .pick-grid, :scope > .seg, :scope > .row3, :scope > [data-slot='rphotos']")) f.classList.add("dobravel");
     }
     // 1.83.0 (como nos outros apps): na janela do item, o texto longo e as caixas de seleção também fecham pelo título
     for (const f of root.querySelectorAll("form[data-ed-form] .form > .field, form[data-ed-form] .form > .row2 > .field")) {
       const l = f.querySelector(":scope > label:not(.sr)");
       if (l && f.querySelector(":scope > textarea.textarea, :scope > select")) { l.classList.add("lbl"); f.classList.add("dobravel"); }
     }
-    // 1.105.0 (o dono: "retrair quantidade e valor total também"): fechado um dos dois, a linha vira uma coluna (o CSS)
-    for (const f of root.querySelectorAll("form[data-ed-form] .form > .row3 > .field")) {
-      const l = f.querySelector(":scope > label:not(.sr)");
-      if (l && f.querySelector(":scope > input.input, :scope > .money")) { l.classList.add("lbl"); f.classList.add("dobravel"); }
-    }
+
   }
   function dobrarCampos(root) {
     const shut = camposFechados();
@@ -490,6 +487,9 @@
   const textoBotao = (b) => [...b.childNodes].filter((n) => n.nodeType === 3 || (n.nodeType === 1 && !n.matches(SUB_CAMPO) && n.tagName !== "svg"))
     .map((n) => n.textContent).join(" ").replace(/\s+/g, " ").trim();
   function valorCampo(f) {
+    // o bloco com dois campos lado a lado (Quantidade e valor): o de cada um, separados
+    const lado = [...f.querySelectorAll(":scope > .row3 > .field")];
+    if (lado.length) return lado.map(valorCampo).filter(Boolean).join(" · ");
     const meu = (el) => el.closest(".field") === f && !el.closest(".lbl");
     const marcados = [...f.querySelectorAll(".on, .sel, [aria-pressed='true'], [aria-checked='true']")]
       .filter((b) => meu(b) && b.matches("button, .chip, .pk, [role='radio'], [role='checkbox']"))
@@ -4022,10 +4022,12 @@
             ${cons ? `<div class="field" id="f-dur"><span class="lbl" id="f-dur-l">Duração estimada</span>
               <div class="chips grid durs" role="radiogroup" aria-labelledby="f-dur-l" data-slot="durs">${durChips()}</div>
               <div data-slot="dur-outra">${durOutra()}</div></div>` : ""}
-            <div class="row3"${cons ? " hidden" : ""}>
-              <div class="field"><label for="f-qty">Quantidade</label><input id="f-qty" class="input" name="qty" maxlength="30" value="${esc(F.qty)}" inputmode="text"></div>
-              <div class="field"><label for="f-value">Valor total</label><div class="money"><input id="f-value" class="input" name="value" inputmode="decimal" value="${esc(F.value)}" placeholder="0"></div>
-                <p class="unit-hint" data-slot="unit"></p><p class="err" data-err="value" hidden></p></div>
+            <div class="field" id="f-qv"${cons ? " hidden" : ""}><span class="lbl" id="f-qv-l">Quantidade e valor</span>
+              <div class="row3">
+                <div class="field"><label for="f-qty">Quantidade</label><input id="f-qty" class="input" name="qty" maxlength="30" value="${esc(F.qty)}" inputmode="text"></div>
+                <div class="field"><label for="f-value">Valor total</label><div class="money"><input id="f-value" class="input" name="value" inputmode="decimal" value="${esc(F.value)}" placeholder="0"></div>
+                  <p class="unit-hint" data-slot="unit"></p><p class="err" data-err="value" hidden></p></div>
+              </div>
             </div>
             <div class="field dobravel${F.flag ? "" : " shut"}" data-lembra="nao" data-f="flag"><span class="lbl" id="f-flag-l">Observação</span><textarea id="f-flag" class="input grow" rows="1" name="flag" maxlength="200" aria-labelledby="f-flag-l" placeholder="Algo para lembrar sobre este item">${esc(F.flag)}</textarea></div>
             <div class="formerr" data-slot="formerr" hidden></div>
@@ -4092,6 +4094,9 @@
       const p = $(`[data-err="${name}"]`, dlg), inp = form[name];
       if (!p) return;
       p.hidden = !msg; p.textContent = msg || "";
+      // um erro num campo fechado abre o campo, para se ver
+      const fechado = msg && p.closest(".field.dobravel.shut");
+      if (fechado) alternarCampo(fechado.querySelector(":scope > .lbl"));
       if (inp && inp.setAttribute) inp.setAttribute("aria-invalid", msg ? "true" : "false");
     };
     const setBusy = (on) => {

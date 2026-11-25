@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.105.1
+
+- **Quantidade** e **Valor total** retraem juntos, num bloco só: **Quantidade e valor** (fechado: **Quantidade e valor ·
+  2 · R$ 1.234,50**). Um erro no valor com o bloco fechado abre o bloco.
+
 ## 1.105.0
 
 - No item e no bem, **Quantidade**, **Valor total** e o **Tipo** (Imóvel, Veículo, Outro) também retraem pelo título,
