@@ -69,8 +69,8 @@ async def body(r, p):
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
 
     # -- 1.91.0: Agrupar por Categoria ou Cômodo; cada grupo fecha pelo título e o aparelho lembra
-    r.eq([txt(t) for t in await pg.locator(".agrupar .chip").all_inner_texts()], ["Categoria", "Cômodo"], "Agrupar por")
-    r.eq(await pg.locator(".agrupar .chip svg").count(), 2, "com ícone")
+    r.eq([txt(t) for t in await pg.locator(".agrupar .chip").all_inner_texts()], ["Categoria", "Vencimento", "Cômodo"], "Agrupar por (1.102.0: também Vencimento)")
+    r.eq(await pg.locator(".agrupar .chip svg").count(), 3, "com ícone")
     r.eq(await pg.get_attribute('.agrupar [data-v="cat"]', "aria-pressed"), "true", "começa por categoria")
     await pg.click('.agrupar [data-v="comodo"]')
     await pg.wait_for_selector('.zone[data-zk="r:cozinha"]')

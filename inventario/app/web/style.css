@@ -1591,3 +1591,6 @@ h2 > .cnt { margin-left: 6px; color: var(--muted); font-weight: 500; font-size: 
 .cn-cores { margin: 2px -4px 0; }
 :root[data-theme="dark"] .cat-tile, :root[data-theme="dark"] .catrow.nova b { color: var(--a); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cat-tile, :root:not([data-theme="light"]) .catrow.nova b { color: var(--a); } }
+/* 1.102.0: Consumíveis › Agrupar por Vencimento: o que já acabou, em vermelho */
+.zone.acabou .zone-ic { background: var(--danger-soft); color: var(--danger); }
+:root[data-theme="dark"] .zone.acabou .zone-ic { background: color-mix(in srgb, var(--danger) 18%, transparent); }

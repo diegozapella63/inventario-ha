@@ -36,12 +36,30 @@
   // a duração em número e unidade, para o Outra do formulário (730 → [2, 365])
   const durPartes = (d) => { const n = durNum(d); if (!n) return ["", 30]; const [tam] = DUR_UN.find(([t]) => n % t === 0); return [n / tam, tam]; };
   // até quando dura: a duração contada do dia em que foi informada (durAt; num de antes, o do cadastro); "21/11/2027"
-  const durAte = (it) => {
+  // o dia em que o consumível acaba (a duração contada de quando foi informada), ou null sem duração
+  const durData = (it) => {
     const n = durNum(it && it.dur), m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String((it && (it.durAt || it.createdAt)) || ""));
-    if (!n || !m) return "";
-    const d = new Date(+m[1], +m[2] - 1, +m[3] + n), p = (x) => String(x).padStart(2, "0");
-    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+    return n && m ? new Date(+m[1], +m[2] - 1, +m[3] + n) : null;
   };
+  const durAte = (it) => {
+    const d = durData(it), p = (x) => String(x).padStart(2, "0");
+    return d ? `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}` : "";
+  };
+  // 1.102.0 (o dono: "agrupar por vencimento, onde mostra o que está vencendo essa semana, esse mês, mês que vem"): o grupo
+  // do Dura até, pelo dia de hoje (a semana vai até o domingo)
+  const VENCE = [["acabou", "Já acabou"], ["semana", "Esta semana"], ["mes", "Este mês"], ["proximo", "Mês que vem"], ["depois", "Depois"], ["sem", "Sem duração"]];
+  function venceGrupo(it, hoje = new Date()) {
+    const d = durData(it);
+    if (!d) return "sem";
+    const h = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+    if (d < h) return "acabou";
+    const domingo = new Date(h.getFullYear(), h.getMonth(), h.getDate() + ((7 - h.getDay()) % 7));
+    if (d <= domingo) return "semana";
+    if (d.getFullYear() === h.getFullYear() && d.getMonth() === h.getMonth()) return "mes";
+    const prox = new Date(h.getFullYear(), h.getMonth() + 1, 1);
+    if (d.getFullYear() === prox.getFullYear() && d.getMonth() === prox.getMonth()) return "proximo";
+    return "depois";
+  }
   function applyCats(list, clist) {
     CATS = Array.isArray(list) && list.length ? list.map((c) => [c.id, c.name]) : DEFAULT_CATS;
     CAT = Object.fromEntries(CATS);
@@ -1160,19 +1178,26 @@
     // 1.91.0 (o dono: "agrupamento por cômodo e categoria e opção de retrair"): Agrupar por Categoria ou, com Consumíveis por
     // cômodo, por Cômodo (o de vários cômodos aparece em cada um; os sem cômodo, no fim); cada grupo fecha pelo título e o aparelho lembra.
     const porNome = (a, b) => a.name.localeCompare(b.name, "pt-BR");
-    const como = consComodoOn() && LS.get("cons-agrupar", "cat") === "comodo" ? "comodo" : "cat";
+    // 1.102.0: e por Vencimento (o Dura até), o que acaba primeiro no alto de cada grupo
+    const pedido = LS.get("cons-agrupar", "cat");
+    const como = pedido === "comodo" && consComodoOn() ? "comodo" : pedido === "vence" ? "vence" : "cat";
+    const porData = (a, b) => (durData(a) || 0) - (durData(b) || 0) || porNome(a, b);
+    const hoje = new Date();
     const groups = (como === "comodo"
       ? [...D.rooms.map((r) => [`r:${r.id}`, r.name, "rooms", D.consItems.filter((it) => usadoEm(it).some((x) => x.id === r.id))]),
         ["r:", "Sem cômodo", "drop", D.consItems.filter((it) => !usadoEm(it).length)]]
-      : CCATS.map(([k, name]) => [`c:${k}`, name, "drop", D.consItems.filter((it) => (CCAT[it.cat] ? it.cat : "c-outros") === k)])
+      : como === "vence"
+        ? VENCE.map(([k, name]) => [`v:${k}`, name, k === "sem" ? "drop" : "clock", D.consItems.filter((it) => venceGrupo(it, hoje) === k)])
+        : CCATS.map(([k, name]) => [`c:${k}`, name, "drop", D.consItems.filter((it) => (CCAT[it.cat] ? it.cat : "c-outros") === k)])
     ).filter((g) => g[3].length);
     const shut = new Set(LS.get("cons-fechados", []));
+    const opcoes = [["cat", "Categoria", "grid"], ["vence", "Vencimento", "clock"], ...(consComodoOn() ? [["comodo", "Cômodo", "rooms"]] : [])];
     return `<div class="mscreen cons">
-      ${consComodoOn() ? `<div class="agrupar" role="group" aria-label="Agrupar por"><span>${ic("layers", "sm")}Agrupar por</span>
-        ${[["cat", "Categoria", "grid"], ["comodo", "Cômodo", "rooms"]].map(([k, v, i]) => `<button type="button" class="chip" data-act="cons-agrupar" data-v="${k}" aria-pressed="${como === k}">${ic(i, "sm")}${v}</button>`).join("")}</div>` : ""}
-      ${groups.map(([key, name, icone, its]) => `<section class="zone dobra-z${shut.has(key) ? " fechada" : ""}" data-zk="${esc(key)}">
+      <div class="agrupar" role="group" aria-label="Agrupar por"><span>${ic("layers", "sm")}Agrupar por</span>
+        ${opcoes.map(([k, v, i]) => `<button type="button" class="chip" data-act="cons-agrupar" data-v="${k}" aria-pressed="${como === k}">${ic(i, "sm")}${v}</button>`).join("")}</div>
+      ${groups.map(([key, name, icone, its]) => `<section class="zone dobra-z${shut.has(key) ? " fechada" : ""}${key === "v:acabou" ? " acabou" : ""}" data-zk="${esc(key)}">
         <button type="button" class="zone-h" data-act="cons-dobra" aria-expanded="${!shut.has(key)}"><h3><span class="zone-ic" aria-hidden="true">${ic(icone)}</span>${esc(name)}</h3><span class="zs">${plural(its.length, "consumível", "consumíveis")}</span>${ic("chev", "sm seta")}</button>
-        <ul class="ilist">${its.sort(porNome).map((it) => itemRow(it, { mode: como === "comodo" ? "cons" : "room" })).join("")}</ul></section>`).join("")}
+        <ul class="ilist">${its.sort(como === "vence" ? porData : porNome).map((it) => itemRow(it, { mode: como === "comodo" ? "cons" : "room" })).join("")}</ul></section>`).join("")}
     </div>`;
   }
   function matches(it, toks) {

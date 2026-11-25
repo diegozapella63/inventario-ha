@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.102.0
+
+- **Consumíveis › Agrupar por Vencimento**: cada consumível no grupo de quando acaba (pelo Dura até): **Já acabou** (em vermelho), **Esta semana** (até o domingo), **Este mês**, **Mês que vem**, **Depois** e **Sem duração**. Em cada grupo, o que acaba primeiro vem no alto. O Agrupar por agora aparece sempre (Categoria e Vencimento; Cômodo, com os Consumíveis por cômodo ligados), e o aparelho lembra a escolha.
+
 ## 1.101.0
 
 - **Pelo CorrerIA**, a IA agora também:

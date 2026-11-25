@@ -178,6 +178,8 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 
 1.101.0 (o dono, à lista do que a IA não fazia: "todas"): as ferramentas `comprei` (o `_comprado` do `update_item`, o mesmo do Comprei hoje do EconomIA; com `duracao_dias`, a duração muda), `editar_comodo` (`nome`, `codigo` pelo `update_room`, ou `apagar` pelo `delete_room`, só vazio; as áreas não) e `categoria` (`acao` nova, mudar ou apagar; `consumiveis`; a `cor` da paleta; pelo `create_cat`, `update_cat` e `delete_cat`). Testes: `Novas1101` no `tests/unit/test_u_ferramentas.py`.
 
+1.102.0 (o dono: "agrupar por vencimento, onde mostra o que está vencendo essa semana, esse mês, mês que vem"): em `viewCons`, o Agrupar por sempre à vista, com `vence` (`cons-agrupar`): `VENCE` e `venceGrupo(it, hoje)` pelo `durData` (o dia em que acaba; o `durAte` usa ele): Já acabou, Esta semana (até o domingo), Este mês, Mês que vem, Depois, Sem duração; ordenado pela data (`porData`); o grupo Já acabou com o ícone em vermelho (`.zone.acabou`). Teste: `tests/e2e/e2e_cons_vence.py`.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.
