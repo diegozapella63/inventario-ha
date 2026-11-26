@@ -1,5 +1,7 @@
 # Instruções para quem for mexer neste repositório (pessoas ou IAs)
 
+> Leia também o `PADROES.md`: os padrões da família, iguais em todos os apps. Este arquivo diz o que é só deste app e como cada padrão é feito aqui.
+
 InventarIA é um app (add-on) do Home Assistant para o inventário da casa: cômodos (com zonas), itens com fotos, valores e categorias, relatório em PDF, leitura de fotos por IA, fotos da internet, novidades dos produtos, Conversar (chat com a IA) e Falar. Faz parte de uma família de apps do mesmo dono, que conversam entre si pelo Home Assistant:
 
 | App | Repositório | O que é |
@@ -80,14 +82,7 @@ Este repositório é público e tem **só código**. O inventário real (itens, 
 
 ## Arquivos iguais em todos os apps
 
-A lista dos arquivos que são iguais nos apps da família fica em `tools/iguais.py` (ele também é igual em todos):
-`python3 tools/iguais.py` confere os daqui com os dos apps ao lado (`../resolvia-ha`, ...), e o GitHub confere a cada
-push (job **Arquivos iguais aos dos outros apps**, que baixa os outros apps). Mudou um arquivo da lista? Copie para os
-outros apps do grupo e publique todos. Um arquivo que passa a ser igual entra em `GRUPOS`, aqui e nas cópias.
-
-`share/<app>/integracao.json` começa igual em todos os apps: `app` (o id, como no `correria.json`), `nome`, `versao` e
-`gravado_em` (ISO 8601 com o fuso), depois os campos de cada app. O ResolvIA e o CronologIA ainda gravam o nome em
-`app` (as versões de antes conferem por ele) e quem lê aceita os dois; o id entra numa próxima versão.
+A lista fica em `tools/iguais.py` e as regras, em **Arquivos iguais** e **Os apps conversam** do `PADROES.md`.
 
 ## Como os apps conversam
 
@@ -128,23 +123,9 @@ outros apps do grupo e publique todos. Um arquivo que passa a ser igual entra em
 - **Caixas de seleção no visual do app**: nenhuma janela nativa do celular. Toda caixa de seleção abre pelo selectsheet.js; sugestões de texto (no lugar do `<datalist>`) e horários (sem AM/PM) também no visual do app; a caixa fechada igual aos outros campos (altura, cantos, seta), no claro e no escuro. Aqui: `data-sug="<id do datalist>"` no campo (a lista `.sug-box` logo abaixo dele, como no GerencIA), nunca `list=`; a caixa fechada é `.select` (44 px, os cantos do `.input`, a seta `--sel-arrow` na cor do `--muted` de cada tema).
 - Exemplos e capturas sempre de uma casa inventada: nunca itens, fotos ou valores reais do dono.
 
-**Padrão da família (igual em todos os apps)**
-- Barra de baixo: a primeira aba é **Agora** (onde o app abre, com o ícone do relógio; nada de Início); o botão do meio é **Adicionar** (no EconomIA, a ação principal dele), só com o ícone, sem o texto embaixo (o nome fica no `aria-label`); **Buscar**, quando houver, é a 2ª aba; **Mais** é a última, com o ícone de três pontos.
-- **Ícones**: toda seção (cartão) começa com o cabeçalho, o ícone e o título; o título de cada tela, de cada grupo (como Imóveis e Veículos) e de cada janela (Novo cômodo, Nova despesa… e a lista de uma caixa de seleção) também tem o ícone; dentro de uma seção, toda linha com título (uma chave, uma escolha, um campo, um recolhido como **Últimas chamadas**) tem um ícone pequeno antes do título; e todo botão com texto tem ícone (Cancelar, Salvar, Voltar, Hoje…). Assim dá para ver onde cada parte começa.
-- **Seções**: cada seção principal é um cartão (o fundo, a borda e os cantos arredondados, como no GerencIA), sem linha no fim; entre as linhas de opções de uma seção não há linha (o ícone de cada uma marca onde começa); as listas de dados (itens, backups, versões, novidades) têm a linha fina entre as entradas, sem a do fim.
-- **Abas**: quando as abas não cabem na largura, a ponta de onde há mais some aos poucos, com uma seta.
-- **Contrair e expandir**: toda seção (cartão) fecha e abre num toque no cabeçalho, com a seta no canto; o aparelho lembra as que ficaram fechadas. Aqui: `foldPanels`/`toggleFold` (a chave é o id da seção, `fechadas` no localStorage).
-- **Sub-opções**: o que só vale com uma chave ligada (o Horário e o A cada do Conferir sozinho, o Quem recebe e o Testar do Avisar no celular, uma lista como Apps detectados) fica num quadro recuado logo abaixo dela, para ver de qual opção é.
-- Nada de avisos que só incham a tela: o que a própria tela já mostra, o que a pessoa confere de qualquer jeito ou um limite do app do celular ("a galeria manda uma foto por vez", "Você confere antes de criar", "a IA encontra…") fica de fora (a aba Documentação pode explicar).
-- Botões de ação (Novo…, Verificar de novo, Salvar e testar…) na largura do cartão no celular, dois lado a lado dividindo a linha; no computador, com a largura fixa do app (250 ou 280 px). Campos de texto livre que podem ficar longos (o que foi, títulos, descrições, nomes de tarefas, de cômodos, de blocos, de categorias) são caixas de texto que mostram tudo e aumentam puxando o canto (`textareas.js`), nunca uma linha que corta o texto; o Enter salva quando o campo é de uma linha só.
-- **Mais** é um menu: as funções do app, depois **Configurações** e por último **Sobre**. Os relatórios se chamam **Relatório de/do …**.
-- **Configurações** em 4 abas, nesta ordem: **Integrações › Dados › Aparência › Opções**; abre em Integrações. Nenhuma função do app vira aba.
-- **Integrações**, nesta ordem: os outros apps da família › CorrerIA › **IA** (o Usar IA e a IA de cada uso: **Para conversar**, **Para ler fotos e PDFs** e, onde há busca na web, **Para pesquisar na internet**; cada uma é uma tarefa de IA do Home Assistant, e a de fotos ou de pesquisa vazia é igual à de conversar) › Falar › Uso da IA › Sensores. Aqui: `settings.ai_chat` (`chat_entity`: a Conversa sem arquivo, o Falar e as triagens; vazia, a preferida do Home Assistant), `settings.ai_entity` (`photo_entity`: fotos, catalogar, apps e a Conversa com arquivo) e `settings.ai_search` (`search_entity`: fotos da internet e novidades; pode ser um assistente de conversa); as duas vazias são a `chat_entity()`.
-- IA: as entradas se chamam **Colar mensagem**, **Escolher fotos** (ou **Escolher fotos ou PDF**, onde PDF vale) e **Digitalizar com IA**; a conversa recomeça em **Nova conversa**; o Voltar do celular fecha a Conversa.
-- Palavras: **Apagar** (nunca Excluir); **Testar no meu celular**; **Home Assistant Cloud** (não Nabu Casa); recolhidos como **Nome (n)**; o CHANGELOG começa com "# Mudanças".
-- Avisos no celular (todos chegam como Home Assistant): o título começa pelo nome do app, uma vez só ("ResolvIA · 📅 Vence hoje"), e o ícone pequeno é o do app (`notification_icon`); o canal e o grupo de cada aviso ficam como estão (o canal guarda o som e a importância que a pessoa escolheu no Android).
-- **Dados**: Exportar › Backup na pasta share › Importar › Versões anteriores › Onde ficam os dados › Começar do zero.
-- **Aparência**: o tema vale no aparelho (começa em Sistema); o fundo e os cartões são os do tema do Home Assistant (`hatema.js`, igual em todos os apps: publica `--ha-bg-light`, `--ha-card-light`, `--ha-bg-dark` e `--ha-card-dark`, as do modo de agora lidas do Home Assistant e as do outro, do tema padrão dele; os cinzas, como linhas e campos, saem do cartão misturado com o texto, `color-mix`, nunca uma cor fixa puxada para a cor do app); a cor do app vale para a casa toda; uma paleta só, de 12 cores (Vermelho, Coral, Laranja, Ouro, Verde, Menta, Turquesa, Azul, Índigo, Lilás, Rosa, Grafite); a Cor do dia é a mesma em todos os apps (as 11 sem o Grafite, pelo número do dia).
+**Padrão da família**: as regras de todos os apps estão no `PADROES.md` (igual nos 8 repositórios; leia antes de mexer). Como cada uma é feita aqui:
+- Contrair e expandir: `foldPanels`/`toggleFold` (a chave é o id da seção, `fechadas` no localStorage).
+- Integrações: `settings.ai_chat` (`chat_entity`: a Conversa sem arquivo, o Falar e as triagens; vazia, a preferida do Home Assistant), `settings.ai_entity` (`photo_entity`: fotos, catalogar, apps e a Conversa com arquivo) e `settings.ai_search` (`search_entity`: fotos da internet e novidades; pode ser um assistente de conversa); as duas vazias são a `chat_entity()`.
 
 Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoicePanel`: Pronto para ouvir · Transcreve com…, a Fala para texto com **Automático: nome**, Verificar de novo e, sem fala para texto, **Como configurar**; só aqui, sem uma IA que responda, a linha diz que o app separa os itens pelas vírgulas), o **Uso da IA** ("As chamadas do app para a IA. Os tokens são estimados.", as Últimas chamadas (n) e uma linha por IA em uso) e o **CorrerIA**; no Buscar, o título **Filtros** (`.filtros-h`, `search-filtros`, `inv:busca-filtros-fechado`) fecha e abre os filtros; as perguntas prontas da Conversa ficam no meio, uma por linha (`.chat-ideas`). Aqui: Configurações em `ALL_TABS` (o `#/config` é Integrações; os Dados em `#/config/dados`); a cor do app em `settings.accent` e `settings.accent_daily` no servidor (`ACCENTS` no app.js e no server.py; o aparelho guarda só a cópia que o index.html pinta antes de carregar; uma cor de antes da paleta vira a mais próxima, `nearestAccent`); **Começar do zero** é `POST /api/erase {confirm: true}` (uma versão antes, "antes de apagar tudo"; as categorias, as opções e as fotos no disco ficam); o Testar no meu celular manda `{who: "eu"}` (a pessoa cujo `user_id` é o `X-Remote-User-Id` do Ingress). O InventarIA não tem Colar mensagem nem integração a ligar com os outros apps (a do ResolvIA e do GerencIA é automática).
 

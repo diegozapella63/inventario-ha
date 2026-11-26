@@ -13,8 +13,8 @@ import os
 import sys
 
 # a pasta de cada repositório (o nome no GitHub é o mesmo, menos o do CorrerIA)
-REPOS = ["gerencia-ha", "inventario-ha", "economia-ha", "correria-ha", "resolvia-ha", "cronologia-ha", "memoria-ha"]
-GITHUB = {r: "diegozapella63/" + ("CorrerIA-ha" if r == "correria-ha" else r) for r in REPOS}
+REPOS = ["gerencia-ha", "inventario-ha", "economia-ha", "correria-ha", "resolvia-ha", "cronologia-ha", "memoria-ha", "odisseia"]
+GITHUB = {r: "diegozapella63/" + {"correria-ha": "CorrerIA-ha", "odisseia": "OdisseIA"}.get(r, r) for r in REPOS}
 LIT = ("resolvia-ha", "cronologia-ha", "memoria-ha")  # os apps em Lit (frontend/src) com servidor em Node (lib/)
 LIB = {"resolvia-ha": "resolvia/rootfs/app/lib", "cronologia-ha": "cronologia/rootfs/app/lib", "memoria-ha": "memoria/rootfs/app/lib"}
 
@@ -29,15 +29,16 @@ def _lib(nome, apps=LIT):
 
 # cada grupo: (o que é, [repositório/caminho de cada cópia])
 GRUPOS = [
+    ("os padrões da família (PADROES.md)", [f"{r}/PADROES.md" for r in REPOS]),
     ("as caixas de seleção no visual do app", [
         "gerencia-ha/gerencia/app/www/selectsheet.js", "inventario-ha/inventario/app/web/selectsheet.js",
-        "economia-ha/economia/pagina/selectsheet.js", "correria-ha/correria/app/www/selectsheet.js", *_src("selectsheet.js")]),
+        "economia-ha/economia/pagina/selectsheet.js", "correria-ha/correria/app/www/selectsheet.js", "odisseia/odisseia/app/www/selectsheet.js", *_src("selectsheet.js")]),
     ("os campos de texto que a pessoa aumenta (o tamanho guardado)", [
         "gerencia-ha/gerencia/app/www/textareas.js", "inventario-ha/inventario/app/web/textareas.js",
-        "economia-ha/economia/pagina/textareas.js", "correria-ha/correria/app/www/textareas.js", *_src("textareas.js")]),
+        "economia-ha/economia/pagina/textareas.js", "correria-ha/correria/app/www/textareas.js", "odisseia/odisseia/app/www/textareas.js", *_src("textareas.js")]),
     ("o fundo e os cartões do tema do Home Assistant", [
         "gerencia-ha/gerencia/app/www/hatema.js", "inventario-ha/inventario/app/web/hatema.js",
-        "economia-ha/economia/pagina/hatema.js", "correria-ha/correria/app/www/hatema.js", *_src("hatema.js")]),
+        "economia-ha/economia/pagina/hatema.js", "correria-ha/correria/app/www/hatema.js", "odisseia/odisseia/app/www/hatema.js", *_src("hatema.js")]),
     ("Mais › Sobre", _src("about.js")),
     ("a janela da Conversa", _src("chat.js")),
     ("o Falar (microfone)", _src("voice.js")),
@@ -59,9 +60,12 @@ GRUPOS = [
     ("a Memória da IA (o cartão, Lit)", _src("memoria-ia.js")),
     ("o escolhido ao lado do título do campo fechado (Lit)", _src("campovalor.js")),
     ("a Memória da IA, de todos os apps (Python)", ["correria-ha/correria/app/memoria_ia.py", "inventario-ha/inventario/app/memoria_ia.py",
-                                                    "gerencia-ha/gerencia/app/memoria_ia.py", "economia-ha/economia/app/memoria_ia.py"]),
+                                                    "gerencia-ha/gerencia/app/memoria_ia.py", "economia-ha/economia/app/memoria_ia.py",
+                                                    "odisseia/odisseia/app/memoria_ia.py"]),
     ("o PDF do relatório (Node)", _lib("pdf.js", ("resolvia-ha", "memoria-ha"))),
     ("o PDF do relatório (Python)", ["gerencia-ha/gerencia/app/pdf.py", "inventario-ha/inventario/app/pdf.py"]),
+    ("a fala para texto do Home Assistant (Python, a do CorrerIA)", ["correria-ha/correria/app/fala.py", "odisseia/odisseia/app/fala.py"]),
+    ("o Uso da IA (Python, o do CorrerIA)", ["correria-ha/correria/app/uso.py", "odisseia/odisseia/app/uso.py"]),
     ("o Falar e o WebSocket do Home Assistant (Python)", ["gerencia-ha/gerencia/app/voz.py", "economia-ha/economia/app/voz.py"]),
     ("esta conferência", [f"{r}/tools/iguais.py" for r in REPOS]),
 ]
