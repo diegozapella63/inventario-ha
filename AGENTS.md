@@ -182,6 +182,8 @@ Aqui (1.80.0, os mesmos textos dos outros apps): o cartão **Falar** (`renderVoi
 
 1.104.0 (o dono: "esse adicionar com essas opçõezinhas de retrair tem que mostrar o que foi selecionado do ladinho, quando eu retraio"; vale em todos os apps): `valoresCampos` (no fim do `dobrarCampos`, no `alternarCampo` e a cada `click`, `input` e `change` da janela, num `requestAnimationFrame`): o `data-val` do `.lbl` de cada `.field.dobravel` (`valorCampo`: os botões marcados, sem o que vem embaixo do nome; senão quantas fotos; senão o texto ou a caixa de seleção, sem a opção vazia), que o CSS desenha depois do título com o campo fechado (`::before`, `order: 1`). O título continua sendo a chave do que fica fechado (o `data-val` não entra no texto). Teste: `tests/e2e/e2e_itens.py`.
 
+1.105.2 (o dono: "revisar as 20 perguntas padrões da IA, tem algumas muito específicas"): as **perguntas prontas** da Conversa (as 6 à vista e as 20 do Mais perguntas) são gerais e valem em qualquer casa: nada de itens, valores, compromissos, cômodos ou nomes inventados («Adiciona leite na lista», «Marca dentista sexta às 15h», «Onde está o liquidificador?»); o pedido com o detalhe é o que a pessoa escreve. Vale em todos os apps da família.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado, e o caminho para atualizar no Home Assistant: **Configurações > Aplicativos > Loja de aplicativos > ⋮ > Verificar atualizações > InventarIA > Atualizar**.

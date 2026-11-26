@@ -4479,14 +4479,15 @@
   function chatPool() {
     const q = (t, ok = true) => (ok ? [t] : []);
     return [
-      "Quais cômodos valem mais?", "Quantos eletrônicos eu tenho?", "O que eu devia pôr no seguro?", "Quanto vale a casa toda?",
-      "Quais são os 10 itens mais caros?", "Onde está o liquidificador?", "Quanto vale cada categoria?", "Quais itens estão sem valor?",
+      // 1.105.2 (o dono: "tem algumas muito específicas"): só perguntas que valem em qualquer casa, sem cômodos ou itens inventados
+      "Quais cômodos valem mais?", "Quantos itens tem cada categoria?", "O que eu devia pôr no seguro?", "Quanto vale a casa toda?",
+      "Quais são os 10 itens mais caros?", "Quanto vale cada cômodo?", "Quanto vale cada categoria?", "Quais itens estão sem valor?",
       "Quais itens estão sem foto?", "O que eu cadastrei por último?", "Quantos itens tem cada cômodo?", "Qual categoria vale mais?",
-      ...q("Quanto valem os bens?", bensOn()), ...q("Quais imóveis e veículos eu tenho?", bensOn()), ...q("Quais zonas tem a cozinha?", zonesOn()),
-      ...q("Quais consumíveis nós temos?", consOn()),
-      ...q("Alguma novidade importante nos eletrônicos?", newsOn()), "Quais eletrodomésticos eu tenho?", "Quais móveis valem mais?",
-      "Tem algum item repetido?", "Quanto valem os itens do escritório?", "Quais itens têm mais de uma unidade?", "O que tem no quarto?",
-      "Quanto valem os eletrônicos?", "Quais itens têm observação?", "Quais aparelhos de cozinha eu tenho?", "Qual é o item mais antigo?",
+      ...q("Quanto valem os bens?", bensOn()), ...q("Quais imóveis e veículos eu tenho?", bensOn()), ...q("Quais zonas tem cada cômodo?", zonesOn()),
+      ...q("Quais consumíveis nós temos?", consOn()), ...q("Quais consumíveis estão acabando?", consOn()),
+      ...q("Alguma novidade importante nos meus itens?", newsOn()), "Quais eletrodomésticos eu tenho?", "Qual é o item mais caro de cada cômodo?",
+      "Tem algum item repetido?", "Quais cômodos têm menos itens cadastrados?", "Quais itens têm mais de uma unidade?", "O que eu cadastrei este mês?",
+      "Quais itens têm observação?", "Qual é o item mais antigo?", "Faz um resumo do inventário", "Qual cômodo eu devia revisar primeiro?",
       "Faz uma lista do que levar numa mudança", "Quais itens eu devia fotografar para o seguro?", "Separa os itens por categoria", "Quantos itens eu tenho ao todo?",
     ];
   }

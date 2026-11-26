@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.105.2
+
+- As **perguntas prontas** da Conversa (e as **Mais perguntas** do **Editar perguntas**) ficaram gerais, para valer em qualquer casa: saíram as que citavam itens, valores, compromissos ou cômodos inventados, como «Onde está o liquidificador?» e «O que tem no quarto?». As perguntas que você já editou continuam como estão.
+
 ## 1.105.1
 
 - **Quantidade** e **Valor total** retraem juntos, num bloco só: **Quantidade e valor** (fechado: **Quantidade e valor ·
