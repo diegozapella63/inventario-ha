@@ -112,8 +112,7 @@ do app vira aba (o CorrerIA tem também WhatsApp e MCP).
   `list=`. A caixa fechada é igual aos outros campos (altura, cantos, seta), no claro e no escuro.
 - Com o foco num campo, ou quando o teclado muda a altura da tela, as páginas em volta do app (a do Home Assistant)
   voltam para o começo (`tecladoCalmo`).
-- **Agrupar por**: um bloco dele, fora dos Filtros, que fecha e abre pelo título (fechado, o escolhido ao lado); as
-  escolhas do mesmo tamanho numa linha; cada grupo fecha pelo nome.
+- **Agrupar por**: um bloco dele, fora dos Filtros (veja **O alto das listas**).
 - **Fotos**: o **Tirar foto** é a câmera do próprio app (`getUserMedia`, a do Digitalizar com IA), porque o app do Home
   Assistant no Android ignora o `capture` e abre a galeria; o seletor de arquivos é feito na hora no documento (fora do
   Shadow DOM) e, no app do Android, sem `multiple` (escolhendo várias, ele não entrega nenhuma: uma de cada vez lá).
@@ -123,6 +122,22 @@ do app vira aba (o CorrerIA tem também WhatsApp e MCP).
 - **Categorias com cor** (o modelo é o do OdisseIA): a lista com o ícone na cor de cada uma; a janela com o Nome e a Cor,
   da paleta de 12 (a mesma da Aparência); a nova vem com a cor menos usada; uma cor de antes, fora da paleta, aparece
   marcada na mais próxima.
+
+**O alto das listas** (o Buscar e toda tela com uma lista; o dono: "documenta nos padrões.md e aplica ele em todos os apps")
+- Embaixo da busca, um embaixo do outro e sem vão entre eles, o **Filtros** e o **Agrupar por**: cada um é uma linha que
+  fecha e abre num toque, com o ícone pequeno (18 px) na cor do app, o nome em 15 px, peso 500, na cor do texto e, no fim,
+  a seta. Fechado, «· o escolhido» ao lado do nome, em cinza, numa linha só: o que não cabe termina em «…». Aberto, o conteúdo logo abaixo, e 8 px até a linha seguinte.
+  O aparelho lembra.
+- **Agrupar por**: fora dos Filtros; as escolhas numa barra só, do mesmo tamanho (com o ícone; sem ele onde não cabe); de
+  início, a escolha que mais ajuda naquela tela (um **Nenhum**, onde houver, fica por último).
+- A linha da contagem, logo antes da lista: à esquerda a contagem (e a soma, onde há valor), em 15 px, cinza; à direita o
+  **Selecionar**, na cor do app, com o ícone.
+- Cada grupo: o ícone num quadrado de 36 px (na cor da lista ou da categoria; senão, na do app), o nome em 20 px
+  condensado, quantos (14 px, cinza) e a seta, à direita; fecha num toque no nome. O toque não pinta faixa nenhuma (no
+  Android, `-webkit-tap-highlight-color: transparent`).
+- A lista inteira de uma vez: nada de **Mostrar mais**.
+- **Setas** de tudo o que fecha e abre (seções, campos, grupos, Filtros, Agrupar por): a mesma seta (chevron), cinza;
+  aberto, aponta para baixo; fechado, para o lado (direita); nunca para cima.
 
 **Textos**
 - Tudo em português do Brasil, sem palavras em inglês na tela.

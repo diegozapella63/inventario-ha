@@ -4060,6 +4060,20 @@ def rec_pending() -> list[list[dict]]:
     return todo
 
 
+def rec_escolhidos(ids) -> list[list[dict]]:
+    """1.110.0 (o dono, em Recursos: "igual do Pareceres, ter aquele Escolher quais"): os eletrônicos escolhidos, por grupo
+    (o mesmo equipamento em vários cômodos é uma busca só, e o grupo inteiro recebe o resultado); também os que já têm os
+    recursos, que são buscados de novo."""
+    ids = set(ids)
+    itens = [it for it in STORE.sorted_items() if it.get("cat") == REC_LOTE_CAT]
+    chaves = {news_group_key(it) for it in itens if it["id"] in ids}
+    groups = {}
+    for it in itens:
+        if news_group_key(it) in chaves:
+            groups.setdefault(news_group_key(it), []).append(it)
+    return list(groups.values())
+
+
 def news_overview() -> dict:
     """O que a aba Novidades mostra: as categorias, quem a IA escolheu, o que já foi conferido e a conferência em andamento."""
     d = news_read()
@@ -4194,7 +4208,9 @@ def _news_batch_run(jid: str):
             sel_apps = apps_selected(d, apps)
             app_at = lambda p: _ts((d["apps"].get(p) or {}).get("at"))  # noqa: E731
             apps_todo = sorted((p for p in sel_apps if app_at(p) < fresh), key=app_at)
-        rec_todo = rec_pending() if so == "recursos" or (so == "" and not job.get("auto")) else []
+        escolhidos = job.get("itens")
+        rec_todo = (rec_escolhidos(escolhidos) if escolhidos is not None else rec_pending()) if so == "recursos" \
+            else rec_pending() if so == "" and not job.get("auto") else []
         total = len(todo) + len(apps_todo) + len(rec_todo)
         job["progress"] = {"feitos": 0, "total": total, "atual": ""}
         entity = search_entity()
@@ -4229,7 +4245,7 @@ def _news_batch_run(jid: str):
                 if job.get("cancelled"):
                     break
                 for m in alvo:
-                    if not rec_of(m["id"]):
+                    if escolhidos is not None or not rec_of(m["id"]):  # os escolhidos: de novo, também os que já tinham
                         rec_save(m["id"], res)
                 rec_done += 1
                 continue
@@ -5070,8 +5086,9 @@ def news_auto_loop():
             log.exception("novidades sozinho")
 
 
-def news_batch_start(auto: bool = False, so: str = "") -> dict:
-    """A conferência de todos (so ""), só dos equipamentos ("itens") ou só dos apps do celular ("apps")."""
+def news_batch_start(auto: bool = False, so: str = "", itens=None) -> dict:
+    """A conferência de todos (so ""), só dos equipamentos ("itens") ou só dos apps do celular ("apps"); em Recursos
+    ("recursos"), os que faltam ou, com `itens` (ids), os escolhidos."""
     if so == "recursos":  # 1.107.0: Pesquisas da IA › Recursos, também com as Novidades desligadas
         need_ai_on()
     else:
@@ -5080,6 +5097,15 @@ def news_batch_start(auto: bool = False, so: str = "") -> dict:
         raise ApiError(400, "Escolha o que conferir: todas as novidades, só os equipamentos, só os apps ou só os eletrônicos.")
     if so == "apps" and not apps_enabled():
         raise ApiError(409, "Ligue Apps do celular em Mais > Configurações > Opções.")
+    if itens is not None:
+        if so != "recursos":
+            raise ApiError(400, "Escolher quais vale só para os recursos.")
+        if not isinstance(itens, list) or not all(isinstance(i, str) for i in itens) or len(itens) > 2000:
+            raise ApiError(400, "Mande os ids dos eletrônicos numa lista.")
+        eletr = {it["id"] for it in STORE.data["items"] if it.get("cat") == REC_LOTE_CAT}
+        itens = [i for i in dict.fromkeys(itens) if i in eletr]
+        if not itens:
+            raise ApiError(400, "Escolha pelo menos um eletrônico.")
     if not SUPERVISOR_TOKEN and not AI_MOCK:
         raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
     with WEB_LOCK:
@@ -5090,7 +5116,7 @@ def news_batch_start(auto: bool = False, so: str = "") -> dict:
     jid = secrets.token_hex(8)
     with WEB_LOCK:
         WEB_JOBS[jid] = {"stage": "busy", "msg": "Começando…", "results": [], "at": time.time(), "kind": "lote", "auto": auto, "so": so,
-                         "progress": {"feitos": 0, "total": 0, "atual": ""}}
+                         "progress": {"feitos": 0, "total": 0, "atual": ""}, **({"itens": itens} if itens is not None else {})}
     threading.Thread(target=_news_batch_run, args=(jid,), daemon=True).start()
     return {"id": jid}
 
@@ -5848,7 +5874,7 @@ def r_news_clear(h, query):
 
 def r_news_all(h, query):
     body = h.read_body()
-    h.send_json(news_batch_start(so=str(body.get("so") or "")), 202)
+    h.send_json(news_batch_start(so=str(body.get("so") or ""), itens=body.get("itens")), 202)
 
 
 def r_news_people(h, query):

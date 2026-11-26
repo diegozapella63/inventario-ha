@@ -1,5 +1,11 @@
 # Mudanças
 
+## 1.110.0
+
+- **Buscar › Filtros**: fechado, mostra ao lado o que está escolhido (o tipo, também o «Todos os tipos», o cômodo e a categoria), numa linha só, como nos outros apps.
+- **Pesquisas da IA › Recursos › Escolher quais**, como nos Pareceres: os eletrônicos com uma caixa de marcar (vêm marcados os que ainda não têm os recursos) e a busca só dos marcados, também dos que já tinham.
+- **Buscar › Agrupar por**: o **Nenhum** (a lista sem grupos, de início) fica por último, como nos outros apps.
+
 ## 1.109.0
 
 - **Cômodo › Agrupar por**: **Zona** (com as zonas ligadas), **Categoria** ou **Nenhum**. Cada grupo mostra quantos itens e o valor, e fecha num toque no nome; o aparelho lembra.

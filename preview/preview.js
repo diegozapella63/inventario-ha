@@ -435,7 +435,7 @@
       const n = Math.min(j.todo.length, Math.floor((Date.now() - j.at) / 700));
       for (const it of j.todo.slice(j.saved, n)) {
         if (it.rec) { // 1.68.0: Só eletrônicos (e Todas): os recursos dos que ainda não têm
-          for (const x of sameGroup(it)) if (!(ST.rec || {})[x.id]) ST.rec = { ...(ST.rec || {}), [x.id]: { recursos: [{ nome: "Wi-Fi", detalhe: "Exemplo da prévia: no Home Assistant, a IA diz os recursos deste modelo." }, { nome: "Timer", detalhe: "Programa a hora de ligar e desligar." }], fonte: "", at: new Date().toISOString() } };
+          for (const x of sameGroup(it)) if (it.de_novo || !(ST.rec || {})[x.id]) ST.rec = { ...(ST.rec || {}), [x.id]: { recursos: [{ nome: "Wi-Fi", detalhe: "Exemplo da prévia: no Home Assistant, a IA diz os recursos deste modelo." }, { nome: "Timer", detalhe: "Programa a hora de ligar e desligar." }], fonte: "", at: new Date().toISOString() } };
           j.recs = (j.recs || 0) + 1;
           continue;
         }
@@ -569,7 +569,8 @@
         for (const i of d.items.filter((x) => x.cat === "eletronicos")) {
           if (vistos.has(groupKey(i))) continue;
           vistos.add(groupKey(i));
-          if (!sameGroup(i).some((x) => (ST.rec || {})[x.id])) todo.push({ rec: true, id: i.id, name: i.name });
+          const escolhido = so === "recursos" && Array.isArray(body.itens) ? sameGroup(i).some((x) => body.itens.includes(x.id)) : null; // Escolher quais
+          if (escolhido === null ? !sameGroup(i).some((x) => (ST.rec || {})[x.id]) : escolhido) todo.push({ rec: true, id: i.id, name: i.name, de_novo: escolhido === true });
         }
       }
       ST.jobs.set(id, { lote: true, so, at: Date.now(), todo, saved: 0, done: false });

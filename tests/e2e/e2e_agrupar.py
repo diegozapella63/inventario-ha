@@ -24,7 +24,7 @@ async def body(r, p):
     ctx, pg = await r.page(b, "cel", "light")
     await r.open(pg, "#/buscar", ".sbar")
     await pg.wait_for_selector("#results .irow", timeout=8000)
-    r.eq(await pg.evaluate(OPCOES), [["Nenhum", "true"], ["Cômodo", "false"], ["Tipo", "false"]], "Todos os tipos: Nenhum, Cômodo e Tipo (sem Categoria)")
+    r.eq(await pg.evaluate(OPCOES), [["Cômodo", "false"], ["Tipo", "false"], ["Nenhum", "true"]], "Todos os tipos: Cômodo, Tipo e Nenhum (de início, por último; sem Categoria)")
     r.check(await pg.evaluate("() => { const a = document.querySelector('.agrupar'), f = document.querySelector('.sfilters'); return !f.contains(a) && f.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING; }"),
             "um bloco dele, depois dos Filtros")
     r.eq(await pg.locator("#results .zone").count(), 0, "Nenhum: a lista de sempre")
@@ -54,7 +54,7 @@ async def body(r, p):
     # um tipo com categorias: Nenhum, Cômodo e Categoria; o Tipo de antes vira Nenhum
     await pg.select_option('[data-input="search-tipo"]', "casa")
     await pg.wait_for_function("document.querySelectorAll('.agrupar .seg button').length === 3 && [...document.querySelectorAll('.agrupar .seg button')].some(b => b.dataset.v === 'cat')", timeout=6000)
-    r.eq(await pg.evaluate(OPCOES), [["Nenhum", "true"], ["Cômodo", "false"], ["Categoria", "false"]], "Itens da casa: Nenhum, Cômodo e Categoria; o Tipo de antes vira Nenhum")
+    r.eq(await pg.evaluate(OPCOES), [["Cômodo", "false"], ["Categoria", "false"], ["Nenhum", "true"]], "Itens da casa: Cômodo, Categoria e Nenhum; o Tipo de antes vira Nenhum")
     await pg.click('.agrupar [data-v="cat"]')
     await pg.wait_for_selector("#results .zone .zone-h", timeout=6000)
     nomes = [x[0] for x in await pg.evaluate(GRUPOS)]

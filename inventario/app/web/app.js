@@ -1238,7 +1238,7 @@
   // numa linha; e cada grupo com o ícone, o nome, a contagem e a seta, que fecha pelo título (o aparelho lembra).
   function agruparHtml(key, opcoes, atual, act) {
     const shut = LS.get(`${key}-fechado`, false) === true;
-    const nome = (opcoes.find(([k]) => k === atual) || opcoes[0])[1];
+    const nome = (opcoes.find(([k]) => k === atual) || opcoes.find(([k]) => k === "") || opcoes[0])[1];
     return `<div class="agrupar${shut ? " fechado" : ""}">
       <button type="button" class="agrupar-l" id="${key}-l" data-act="agrupar-dobra" data-k="${key}" aria-expanded="${!shut}">${ic("layers", "sm")}<span>Agrupar por</span>${shut ? `<span class="agrupar-val">· ${esc(nome)}</span>` : ""}${ic("chev", "sm seta")}</button>
       <div class="seg agrupar-seg" role="group" aria-labelledby="${key}-l" style="--n:${opcoes.length}"${shut ? " hidden" : ""}>${opcoes.map(([k, v, i]) => `<button type="button" data-act="${act}" data-v="${k}" aria-pressed="${atual === k}">${ic(i, "sm")}<span>${v}</span></button>`).join("")}</div></div>`;
@@ -1317,8 +1317,9 @@
   // em Todos os tipos, Tipo. As escolhas seguem os filtros do tipo; a de antes que não vale mais vira Nenhum.
   function buscaOpcoes(q) {
     const tipo = tipoDaBusca(q), F = filtrosDe(tipo);
-    return [["", "Nenhum", "sort"], ...(F.room ? [["comodo", "Cômodo", "rooms"]] : []), ...(F.cats.length ? [["cat", "Categoria", "grid"]] : []),
-      ...(tipo === "" && tipos().length ? [["tipo", "Tipo", "layers"]] : [])];
+    // 1.110.0 (PADROES.md, "O alto das listas"): o Nenhum (de início) por último
+    return [...(F.room ? [["comodo", "Cômodo", "rooms"]] : []), ...(F.cats.length ? [["cat", "Categoria", "grid"]] : []),
+      ...(tipo === "" && tipos().length ? [["tipo", "Tipo", "layers"]] : []), ["", "Nenhum", "sort"]];
   }
   const buscaComo = (q) => { const k = LS.get("busca-agrupar", ""); return buscaOpcoes(q).some(([o]) => o === k) ? k : ""; };
   const buscaAgrupar = (q) => (buscaOpcoes(q).length > 1 ? agruparHtml("busca-agrupar", buscaOpcoes(q), buscaComo(q), "busca-agrupar") : "");
@@ -1350,7 +1351,7 @@
         <input class="input" type="search" name="q" data-input="search-q" value="${esc(q.q || "")}" placeholder="${zonesOn() ? "Nome, marca, detalhe ou zona" : "Nome, marca ou detalhe"}" aria-label="Buscar itens" autocomplete="off" enterkeyhint="search">
         <button type="button" class="btn ghost icon sm clear" data-act="search-clear" aria-label="Limpar busca"${q.q ? "" : " hidden"}>${ic("close", "sm")}</button>
       </form>
-      <button type="button" class="filtros-h" id="filtros-h" data-act="search-filtros" aria-expanded="${!filtrosShut}">${ic("sliders", "sm")}<span>Filtros</span>${ic("chev", "sm seta")}</button>
+      <button type="button" class="filtros-h" id="filtros-h" data-act="search-filtros" aria-expanded="${!filtrosShut}">${ic("sliders", "sm")}<span>Filtros${filtrosShut ? filtrosVal(q, TIPOS, tipo, F) : ""}</span>${ic("chev", "sm seta")}</button>
       <div class="sfilters n${n}" role="group" aria-labelledby="filtros-h"${filtrosShut ? " hidden" : ""}>
         ${TIPOS.length ? `<select class="select" data-input="search-tipo" aria-label="Tipo">
           ${TIPOS.map(([k, v]) => `<option value="${k}"${k === tipo ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>` : ""}
@@ -1364,6 +1365,16 @@
       ${buscaAgrupar(q)}
     </section>
     <div id="results">${resultsHtml(q)}</div>`;
+  }
+  /** 1.110.0 (PADROES.md): o Filtros fechado diz o que está escolhido (o tipo, o cômodo e a categoria; a ordem não). */
+  function filtrosVal(q, TIPOS, tipo, F) {
+    const v = [];
+    // o tipo sempre (também o «Todos os tipos» do começo); o cômodo e a categoria quando escolhidos
+    if (TIPOS.length) v.push((TIPOS.find(([k]) => k === tipo) || TIPOS[0])[1]);
+    if (F.room && q.room) v.push((D.rooms.find((r) => r.id === q.room) || {}).name || "");
+    if (F.cats.length && q.cat) v.push((F.cats.find(([k]) => k === q.cat) || [, ""])[1]);
+    const t = v.filter(Boolean);
+    return `<span class="filtros-val"> · ${esc(t.length ? t.join(", ") : "Todos os itens")}</span>`;
   }
   function searchItems(q) {
     const toks = tokens(q.q || "");
@@ -2028,7 +2039,8 @@
       <h2>${secIc("spark")}Buscar recursos</h2>
       <p class="lead">Funções, modos e conexões de cada eletrônico, pela página do fabricante.</p>
       <ul class="opts"><li><div class="ot"><b>${oti("checks")}Os que faltam</b><span>O mesmo equipamento em vários cômodos é uma busca só.</span></div>
-        <div class="oa"><button type="button" class="btn primary" data-act="news-all" data-so="recursos">${ic("spark")}Buscar os que faltam</button></div></li></ul>
+        <div class="oa news-tres"><button type="button" class="btn primary" data-act="news-all" data-so="recursos">${ic("spark")}Buscar os que faltam</button>
+          <button type="button" class="btn" data-act="rec-escolher">${ic("checks")}Escolher quais</button></div></li></ul>
       <div data-slot="news-job"></div>
     </section>
     ${limparHtml("p-rec-clear", "Os recursos de todos os eletrônicos.", "rec-clear", "Limpar recursos")}`;
@@ -2227,7 +2239,7 @@
   function renderNewsJob(st) {
     const js = $('#view [data-slot="news-job"]');
     if (!js) return;
-    for (const btn of $$('#view [data-act="news-all"]')) btn.disabled = !!(st && st.stage === "busy");
+    for (const btn of $$('#view [data-act="news-all"], #view [data-act="rec-escolher"]')) btn.disabled = !!(st && st.stage === "busy");
     if (st && st.stage === "busy") {
       const p = st.progress || {}, pct = p.total ? Math.round((p.feitos / p.total) * 100) : 0;
       js.innerHTML = `<div class="njob" aria-live="polite"><p><span class="spin"></span><span>${esc(st.msg || "Conferindo…")}</span></p>
@@ -2242,9 +2254,9 @@
     js.innerHTML = u ? `<p class="muted njob">Conferido ${esc(whenShort(u.at))}: ${c && c.conferidos ? `${int(c.com)} de ${int(c.conferidos)} com novidades novas` : "nada para conferir agora"}.</p>` : "";
   }
   let newsSo = "";
-  async function startNewsAll(so = "") {
+  async function startNewsAll(so = "", itens = null) {
     newsSo = so;
-    try { const r = await API.post("api/news/all", { so }); newsJob = r.id; renderNewsJob({ stage: "busy", msg: "Começando…" }); pollNewsAll(); }
+    try { const r = await API.post("api/news/all", itens ? { so, itens } : { so }); newsJob = r.id; renderNewsJob({ stage: "busy", msg: "Começando…" }); pollNewsAll(); }
     catch (e) { fail(e); }
   }
   async function pollNewsAll() {
@@ -2305,6 +2317,30 @@
         ${r ? `<span class="pill">${int(r.n)}</span>` : ""}${ic("chev", "sm")}</button></li>`;
     }).join("")}</ul>` : `<p class="muted">Nenhum item em Eletrônicos.</p>`;
     depoisDaBusca("rec-list", ativo);
+  }
+  // 1.110.0 (o dono, em Recursos: "igual do Pareceres, ter aquele Escolher quais"): os eletrônicos (um por equipamento, como
+  // na lista) com uma caixa de marcar; vêm marcados os que ainda não têm os recursos; os marcados são buscados de novo
+  function escolherRecursos() {
+    const gs = recOv ? recGroups().sort((a, b) => a.it.name.localeCompare(b.it.name, "pt-BR")) : [];
+    if (!gs.length) { toast("Nenhum item em Eletrônicos."); return; }
+    const entry = openDialog({
+      cls: "modal", label: "Escolher eletrônicos",
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("checks", "Escolher eletrônicos")}</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <div class="dlg-b"><div class="par-atalhos"><button type="button" class="btn" data-todos>${ic("checks")}Todos</button><button type="button" class="btn" data-faltam>${ic("sliders")}Sem recursos</button></div>
+          <ul class="nlist par-esc">${gs.map(({ it, r, open }) => `<li><label class="nrow"><input type="checkbox" class="fcheck" value="${esc(open.id)}"${r ? "" : " checked"} data-tem="${r ? 1 : ""}">
+            <span class="nb"><b>${esc(it.name)}</b><span class="nm">${esc(r ? `${plural(r.n, "recurso", "recursos")} · ${whenShort(r.at)}` : "Ainda não buscado")}</span></span></label></li>`).join("")}</ul></div>
+        <div class="dlg-f"><button type="button" class="btn" data-x>${ic("close")}Cancelar</button><span class="grow"></span><button type="button" class="btn primary" data-ok>${ic("spark")}<span>Buscar</span></button></div></div>`,
+    });
+    const dlg = entry.dlg, ok = $("[data-ok]", dlg), caixas = () => $$(".fcheck", dlg);
+    const conta = () => { const n = caixas().filter((c) => c.checked).length; ok.disabled = !n; $("span", ok).textContent = n ? `Buscar ${n}` : "Buscar"; };
+    dlg.addEventListener("change", conta);
+    dlg.addEventListener("click", (e) => {
+      if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
+      if (e.target.closest("[data-todos]")) { const on = caixas().some((c) => !c.checked); caixas().forEach((c) => { c.checked = on; }); conta(); }
+      else if (e.target.closest("[data-faltam]")) { caixas().forEach((c) => { c.checked = !c.dataset.tem; }); conta(); }
+      else if (e.target.closest("[data-ok]")) { const ids = caixas().filter((c) => c.checked).map((c) => c.value); finalizeThen(entry, () => startNewsAll("recursos", ids)); }
+    });
+    conta();
   }
   // a janela dos recursos de um eletrônico: o guardado, sem chamar a IA; sem nada guardado, busca
   function openRec(it) {
@@ -5885,6 +5921,9 @@
         LS.set("busca-filtros-fechado", shut);
         b.setAttribute("aria-expanded", String(!shut));
         const f = $("#view .sfilters"); if (f) f.hidden = shut;
+        // 1.110.0: fechado, o que está escolhido ao lado do nome
+        const q = (base && base.q) || {}, TIPOS = tipos(), tipo = tipoDaBusca(q), sp = $("span", b);
+        if (sp) sp.innerHTML = `Filtros${shut ? filtrosVal(q, TIPOS, tipo, filtrosDe(tipo)) : ""}`;
         break;
       }
       case "cons-agrupar": LS.set("cons-agrupar", b.dataset.v); renderView(false); break;
@@ -5932,6 +5971,7 @@
       case "par-open": { const it = D.itemById.get(b.dataset.id); if (it) openPar(it); break; }
       case "par-faltam": startParLote(null); break;
       case "par-escolher": escolherPareceres(); break;
+      case "rec-escolher": escolherRecursos(); break;
       case "rec-clear": clearPesquisa("recursos"); break;
       case "par-clear": clearPesquisa("pareceres"); break;
       case "par-cancel": cancelParLote(); break;

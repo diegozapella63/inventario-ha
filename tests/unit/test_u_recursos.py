@@ -116,3 +116,44 @@ class Todos(UnitBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Escolher(UnitBase):
+    """1.110.0 (o dono, em Recursos: "igual do Pareceres, ter aquele Escolher quais"): só os eletrônicos escolhidos, um por
+    equipamento, e também os que já têm (buscados de novo); o que não é eletrônico ou não existe fica de fora."""
+    REC = {"produto": "X", "recursos": [{"nome": "Bluetooth", "detalhe": ""}], "fonte": "", "site": ""}
+
+    def test_so_os_escolhidos_e_de_novo(self):
+        eletr = [it for it in S.STORE.data["items"] if it.get("cat") == S.REC_LOTE_CAT]
+        self.assertGreater(len(eletr), 1, "a casa de teste tem eletrônicos")
+        um = eletr[0]
+        S.rec_save(um["id"], {"recursos": [{"nome": "Velho", "detalhe": ""}], "fonte": "", "site": ""})
+        calls = []
+
+        def fake(name, details, entity):
+            calls.append(name)
+            return self.REC
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S, "ai_find_rec", fake), mock.patch.object(S.time, "sleep", lambda s: None):
+            jid = S.news_batch_start(so="recursos", itens=[um["id"], "nao-existe"])["id"]
+            job = S.WEB_JOBS[jid]
+            t0 = time.time()
+            while job["stage"] == "busy" and time.time() - t0 < 10:
+                time.sleep(0.02)
+        self.assertEqual((job["stage"], len(calls)), ("done", 1), job)
+        grupo = [it for it in eletr if S.news_group_key(it) == S.news_group_key(um)]
+        for it in grupo:
+            self.assertEqual([r["nome"] for r in S.rec_of(it["id"])["recursos"]], ["Bluetooth"], "o grupo inteiro, também o que já tinha")
+        outros = [it for it in eletr if S.news_group_key(it) != S.news_group_key(um)]
+        self.assertTrue(all(not S.rec_of(it["id"]) for it in outros), "os não escolhidos ficam como estão")
+
+    def test_o_que_vale(self):
+        with self.assertRaises(S.ApiError) as e:
+            S.news_batch_start(so="recursos", itens=["nao-existe"])
+        self.assertIn("pelo menos um eletrônico", e.exception.msg)
+        with self.assertRaises(S.ApiError) as e:
+            S.news_batch_start(so="recursos", itens="x")
+        self.assertIn("lista", e.exception.msg)
+        with mock.patch.object(S, "news_enabled", lambda: True):
+            with self.assertRaises(S.ApiError) as e:
+                S.news_batch_start(so="itens", itens=[])
+            self.assertIn("só para os recursos", e.exception.msg)
