@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.110.1
+
+- **Recursos**: o botão **Buscar os que faltam** passou a se chamar **Os que faltam**, para caber ao lado do **Escolher quais** no celular.
+
 ## 1.110.0
 
 - **Buscar › Filtros**: fechado, mostra ao lado o que está escolhido (o tipo, também o «Todos os tipos», o cômodo e a categoria), numa linha só, como nos outros apps.

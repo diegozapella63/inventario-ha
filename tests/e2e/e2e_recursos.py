@@ -104,7 +104,7 @@ async def body(r, p):
     # 1.110.0 (o dono: "igual do Pareceres, ter aquele Escolher quais"): os eletrônicos com uma caixa; todos já têm, nenhum vem
     # marcado; o marcado é buscado de novo; o Cancelar fecha
     bts = await pg.evaluate("[...document.querySelectorAll('#p-rec .oa .btn')].map((b) => [b.textContent.trim(), Math.round(b.getBoundingClientRect().height)])")
-    r.eq([x[0] for x in bts], ["Buscar os que faltam", "Escolher quais"], "Buscar os que faltam e Escolher quais, como nos Pareceres")
+    r.eq([x[0] for x in bts], ["Os que faltam", "Escolher quais"], "Os que faltam e Escolher quais, lado a lado, como nos Pareceres")
     await pg.click('#p-rec [data-act="rec-escolher"]')
     await pg.wait_for_selector("dialog.modal .par-esc .fcheck")
     r.eq((await pg.text_content("dialog.modal .dlg-h h2")).strip(), "Escolher eletrônicos", "a janela Escolher eletrônicos")

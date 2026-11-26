@@ -2039,7 +2039,7 @@
       <h2>${secIc("spark")}Buscar recursos</h2>
       <p class="lead">Funções, modos e conexões de cada eletrônico, pela página do fabricante.</p>
       <ul class="opts"><li><div class="ot"><b>${oti("checks")}Os que faltam</b><span>O mesmo equipamento em vários cômodos é uma busca só.</span></div>
-        <div class="oa news-tres"><button type="button" class="btn primary" data-act="news-all" data-so="recursos">${ic("spark")}Buscar os que faltam</button>
+        <div class="oa news-tres"><button type="button" class="btn primary" data-act="news-all" data-so="recursos">${ic("spark")}Os que faltam</button>
           <button type="button" class="btn" data-act="rec-escolher">${ic("checks")}Escolher quais</button></div></li></ul>
       <div data-slot="news-job"></div>
     </section>
