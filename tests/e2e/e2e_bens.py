@@ -106,6 +106,9 @@ async def body(r, p):
     # -- a ficha de um bem
     await r.open(pg, f"#/i/{apto['id']}", "dialog.sheet h1")
     r.check("Onde" in txt(await pg.text_content("dialog.sheet .facts, dialog.sheet dl")), "a ficha diz Onde: Bens")
+    props = [txt(t) for t in await pg.locator("dialog.sheet .props dt").all_text_contents()]
+    r.check("Tipo" in props and "Categoria" not in props and await pg.locator('dialog.sheet .props a[href^="#/buscar?tipo=imoveis"]').count() == 1,
+            f"1.105.3: um bem tem o Tipo (que leva à busca dele), não a Categoria ({props})")
     await pg.click('dialog.sheet a[href="#/bens"]')
     await pg.wait_for_selector(".mscreen.bens", timeout=5000)
     r.check(True, "e o link leva para Bens")
@@ -113,17 +116,23 @@ async def body(r, p):
     # -- busca: o filtro Tipo, antes do de cômodos (itens da casa, imóveis, veículos, outros bens)
     await r.open(pg, "#/buscar", ".sbar")
     sels = await pg.evaluate("[...document.querySelectorAll('.sfilters select')].map(s => s.dataset.input)")
-    r.eq(sels, ["search-tipo", "search-room", "search-cat", "search-ord"], "com bens, o Tipo vem antes de Cômodo, Categoria e Ordem")
+    r.eq(sels, ["search-tipo", "search-room", "search-ord"], "Todos os tipos: o Tipo antes do Cômodo e da Ordem, sem Categoria (cada tipo tem as suas)")
     r.eq(await pg.evaluate("[...document.querySelectorAll('[data-input=\"search-tipo\"] option')].map(o => o.textContent)"),
          ["Todos os tipos", "Itens da casa", "Imóveis", "Veículos", "Outros bens"], "os tipos")
     r.check("Bens" not in await pg.evaluate("[...document.querySelectorAll('[data-input=\"search-room\"] option')].map(o => o.textContent)"), "Bens sai da lista de cômodos")
+    all_n = len(await pg.query_selector_all("#results .irow"))
+    await pg.select_option('[data-input="search-tipo"]', "casa")
+    await pg.wait_for_selector('[data-input="search-cat"]', timeout=4000)
+    sels = await pg.evaluate("[...document.querySelectorAll('.sfilters select')].map(s => s.dataset.input)")
+    r.eq(sels, ["search-tipo", "search-room", "search-cat", "search-ord"], "Itens da casa: o Tipo, o Cômodo, a Categoria e a Ordem")
+    cats = await pg.evaluate("[...document.querySelectorAll('[data-input=\"search-cat\"] option')].map(o => o.textContent)")
+    r.check("Imóveis" not in cats and "Veículos" not in cats and "Outros" in cats, f"Itens da casa: as categorias da casa, sem as dos bens ({cats})")
     grid = await pg.evaluate("[...document.querySelectorAll('.sfilters select')].map(s => { const b = s.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width)]; })")
     r.check(len({x[2] for x in grid}) == 1 and len({x[0] for x in grid}) == 2 and len({x[1] for x in grid}) == 2, f"no celular, quatro seleções iguais em duas linhas ({grid})")
     await pg.evaluate("document.fonts.ready.then(() => 1)")  # medir com a fonte do app, não com a de reserva
     cut = await pg.evaluate(CUT)
     r.eq(cut, [], "nenhum texto das seleções cortado")
     await r.shot(pg, "busca-tipos")
-    all_n = len(await pg.query_selector_all("#results .irow"))
     await pg.select_option('[data-input="search-tipo"]', "imoveis")
     await pg.wait_for_selector('.sfilters.n2', timeout=4000)
     r.eq(await pg.locator('[data-input="search-room"], [data-input="search-cat"]').count(), 0, "num tipo de bem, sem Cômodo e Categoria")
@@ -136,6 +145,14 @@ async def body(r, p):
     await pg.wait_for_selector('[data-input="search-room"]', timeout=4000)
     r.eq(len(await pg.query_selector_all("#results .irow")), all_n - 3, "Itens da casa: sem os 3 bens")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
+
+    # 1.106.0: no cadastro de um item da casa, as categorias dos itens, sem Imóveis e Veículos (o tipo de um bem)
+    await r.open(pg, "#/i/sal-001", "dialog.sheet h1")
+    await pg.click('dialog.sheet [data-act="item-edit"]')
+    await pg.wait_for_selector("#f-cat-g .pk", timeout=5000)
+    nomes = [txt(t) for t in await pg.locator("#f-cat-g .pk").all_text_contents()]
+    r.check(nomes and not any(n in ("Imóveis", "Veículos") for n in nomes), f"o item da casa sem Imóveis e Veículos ({nomes})")
+    await pg.keyboard.press("Escape"); await pg.wait_for_timeout(300)
 
     # -- o + de baixo, fora de Bens: Adicionar bem no menu
     await r.open(pg, "#/", ".tag")

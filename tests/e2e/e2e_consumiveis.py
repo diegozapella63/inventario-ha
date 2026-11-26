@@ -230,7 +230,19 @@ async def body(r, p):
     await pg.select_option('[data-input="search-tipo"]', "consumiveis")
     await pg.wait_for_timeout(400)
     r.eq(sorted(await pg.evaluate("[...document.querySelectorAll('#results .irow .nm')].map(n => n.textContent)")), ["Creme de massagem", "Pasta térmica", "Pilhas AA"], "Tipo Consumíveis: só eles")
-    r.eq(await pg.locator('[data-input="search-room"], [data-input="search-cat"]').count(), 0, "num tipo fora dos cômodos, sem Cômodo e Categoria")
+    # 1.105.3: cada tipo com as suas categorias; sem Consumíveis por cômodo, sem o Cômodo
+    r.eq(await pg.locator('[data-input="search-room"]').count(), 0, "Consumíveis, sem Consumíveis por cômodo: sem o Cômodo")
+    ops = await pg.evaluate("[...document.querySelectorAll('[data-input=\"search-cat\"] option')].map(o => o.value)")
+    r.check(len(ops) > 1 and all(v == "" or v.startswith("c-") for v in ops), f"a Categoria com as dos consumíveis ({ops})")
+    pasta = next(i for i in r.data()["items"] if i["name"] == "Pasta térmica")
+    await pg.select_option('[data-input="search-cat"]', pasta["cat"])
+    await pg.wait_for_timeout(400)
+    want = sorted(i["name"] for i in r.data()["items"] if i["room"] == con and i["cat"] == pasta["cat"])
+    r.eq(sorted(await pg.evaluate("[...document.querySelectorAll('#results .irow .nm')].map(n => n.textContent)")), want, "a Categoria filtra os consumíveis")
+    await pg.select_option('[data-input="search-tipo"]', "")
+    await pg.wait_for_timeout(400)
+    r.eq(await pg.locator('[data-input="search-cat"]').count(), 0, "Todos os tipos: sem Categoria")
+    r.check("cat=" not in pg.url, "e a categoria escolhida sai do endereço")
 
     # -- fora do patrimônio: gráficos, relatório e os outros apps
     await r.open(pg, "#/graficos", ".kpis")

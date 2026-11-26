@@ -1,5 +1,16 @@
 # Mudanças
 
+## 1.106.0
+
+- **Buscar › Filtros**: cada tipo mostra só as categorias dele.
+  - **Todos os tipos**: sem o filtro de categoria.
+  - **Itens da casa**: as categorias dos itens, sem Imóveis e Veículos.
+  - **Consumíveis**: as categorias dos consumíveis e, com **Consumíveis por cômodo** ligado, o filtro **Cômodo**, pelos cômodos onde cada um é usado.
+  - **Bens**: sem categoria, como no cadastro.
+- Trocar o tipo limpa a categoria escolhida. Com Todos os tipos e um cômodo, aparecem também os consumíveis usados nele.
+- No cadastro de um item da casa, no **Alterar** em lote e no **Catalogar itens com IA**, Imóveis e Veículos saíram da escolha da categoria (são o tipo de um bem). Um item que já usa uma delas continua com ela.
+- Na ficha de um bem, **Tipo** (Imóvel, Veículo ou Outro bem) no lugar de Categoria, com o toque levando à busca daquele tipo. Na ficha de um consumível, a categoria leva à busca dos consumíveis dela.
+
 ## 1.105.2
 
 - As **perguntas prontas** da Conversa (e as **Mais perguntas** do **Editar perguntas**) ficaram gerais, para valer em qualquer casa: saíram as que citavam itens, valores, compromissos ou cômodos inventados, como «Onde está o liquidificador?» e «O que tem no quarto?». As perguntas que você já editou continuam como estão.

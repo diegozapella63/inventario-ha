@@ -1262,12 +1262,33 @@
   const tipos = () => { const t = [itensOn() && ["casa", "Itens da casa"], ...(D.bensItems.length ? [["imoveis", "Imóveis"], ["veiculos", "Veículos"], ["outros", "Outros bens"]] : []),
     D.consItems.length && ["consumiveis", "Consumíveis"]].filter(Boolean); return t.length > 1 ? [["", "Todos os tipos"], ...t] : []; };
   const tipoBens = (t) => t === "imoveis" || t === "veiculos" || t === "outros";
-  const tipoArea = (t) => tipoBens(t) || t === "consumiveis"; // fora dos cômodos: sem o cômodo e a categoria
+  const tipoArea = (t) => tipoBens(t) || t === "consumiveis"; // fora dos cômodos
+  // 1.105.3 (o dono: "as categorias são individuais"): cada tipo tem as suas categorias. Os itens da casa usam as da
+  // casa sem Imóveis e Veículos (que são o tipo de um bem; só se um item da casa já usa); os consumíveis, as deles; os bens e
+  // Todos os tipos, nenhuma. Com um tipo só, o filtro do tipo não aparece e vale o que há.
+  const BENS_CATS = new Set(["imoveis", "veiculos"]);
+  const catsCasa = (...manter) => CATS.filter(([k]) => !BENS_CATS.has(k) || manter.includes(k));
+  function tipoDaBusca(q) {
+    const T = tipos();
+    if (!T.length) return itensOn() || !D.consItems.length ? "casa" : "consumiveis";
+    if (q.tipo && T.some(([k]) => k === q.tipo)) return q.tipo;
+    if (q.cat && BENS_CATS.has(q.cat) && !D.items.some((i) => !isArea(i.room) && i.cat === q.cat) && T.some(([k]) => k === q.cat)) return q.cat; // um link antigo de um bem
+    if (q.cat && CAT[q.cat] && T.some(([k]) => k === "casa")) return "casa"; // o link de uma categoria (os Gráficos, a ficha)
+    if (q.cat && CCAT[q.cat] && T.some(([k]) => k === "consumiveis")) return "consumiveis";
+    return "";
+  }
+  // o que cada tipo filtra: o cômodo (o do item; num consumível, onde é usado, com Consumíveis por cômodo) e as categorias
+  function filtrosDe(tipo) {
+    const room = tipo === "consumiveis" ? consComodoOn() : !tipoArea(tipo) && itensOn();
+    const cats = tipo === "casa" ? catsCasa(...D.items.filter((i) => !isArea(i.room)).map((i) => i.cat)) : tipo === "consumiveis" ? CCATS : [];
+    return { room, cats };
+  }
+  const noComodo = (it, rid) => it.room === rid || (isCons(it.room) && usadoEm(it).some((r) => r.id === rid));
   function viewSearch(q) {
     const ord = q.ord || (q.q ? "rel" : "val");
     const filtrosShut = LS.get("busca-filtros-fechado", false) === true;
-    const TIPOS = tipos(), tipo = TIPOS.some(([k]) => k === q.tipo) ? q.tipo || "" : "", house = !tipoArea(tipo);
-    const n = (TIPOS.length ? 1 : 0) + (house ? (itensOn() ? 2 : 1) : 0) + 1;
+    const TIPOS = tipos(), tipo = tipoDaBusca(q), F = filtrosDe(tipo);
+    const n = (TIPOS.length ? 1 : 0) + (F.room ? 1 : 0) + (F.cats.length ? 1 : 0) + 1;
     return `
     <section class="sbar">
       <form class="q" data-form="search" role="search">${ic("search")}
@@ -1278,10 +1299,10 @@
       <div class="sfilters n${n}" role="group" aria-labelledby="filtros-h"${filtrosShut ? " hidden" : ""}>
         ${TIPOS.length ? `<select class="select" data-input="search-tipo" aria-label="Tipo">
           ${TIPOS.map(([k, v]) => `<option value="${k}"${k === tipo ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>` : ""}
-        ${house && itensOn() ? `<select class="select" data-input="search-room" aria-label="Cômodo"><option value="">Todos os cômodos</option>
+        ${F.room ? `<select class="select" data-input="search-room" aria-label="Cômodo"><option value="">Todos os cômodos</option>
           ${D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === q.room ? " selected" : ""}>${esc(r.name)}</option>`).join("")}</select>` : ""}
-        ${house ? `<select class="select" data-input="search-cat" aria-label="Categoria"><option value="">Todas as categorias</option>
-          ${CATS.map(([k, v]) => `<option value="${k}"${k === q.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>` : ""}
+        ${F.cats.length ? `<select class="select" data-input="search-cat" aria-label="Categoria"><option value="">Todas as categorias</option>
+          ${F.cats.map(([k, v]) => `<option value="${k}"${k === q.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>` : ""}
         <select class="select ord" data-input="search-ord" aria-label="Ordenar">
           ${ORDERS.map(([k, v]) => `<option value="${k}"${k === ord ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
       </div>
@@ -1291,13 +1312,14 @@
   function searchItems(q) {
     const toks = tokens(q.q || "");
     let list = D.items;
-    const tipo = tipos().some(([k]) => k === q.tipo) ? q.tipo : "";
+    const tipo = tipoDaBusca(q), F = filtrosDe(tipo);
     if (tipo === "casa") list = list.filter((i) => !isArea(i.room));
     else if (tipoBens(tipo)) list = list.filter((i) => isBens(i.room) && (bensGroup(i) || "outros") === tipo);
     else if (tipo === "consumiveis") list = list.filter((i) => isCons(i.room));
-    if (!tipoArea(tipo)) {
-      if (q.room && D.rooms.some((r) => r.id === q.room)) list = list.filter((i) => i.room === q.room); // cômodo de um link antigo: vale Todos, como diz a seleção
-      if (q.cat && CAT[q.cat]) list = list.filter((i) => !isCons(i.room) && (CAT[i.cat] ? i.cat : "outros") === q.cat); // os consumíveis têm as categorias deles
+    if (F.room && q.room && D.rooms.some((r) => r.id === q.room)) list = list.filter((i) => noComodo(i, q.room)); // cômodo de um link antigo: vale Todos, como diz a seleção
+    if (q.cat && F.cats.some(([k]) => k === q.cat)) {
+      list = tipo === "consumiveis" ? list.filter((i) => (CCAT[i.cat] ? i.cat : "c-outros") === q.cat)
+        : list.filter((i) => !isArea(i.room) && (CAT[i.cat] ? i.cat : "outros") === q.cat);
     }
     if (toks.length) list = list.filter((i) => matches(i, toks));
     const ord = q.ord || (toks.length ? "rel" : "val");
@@ -1399,7 +1421,7 @@
             <div class="chips" role="radiogroup" aria-labelledby="bk-l-room">${chip("bk-room", KEEP, "Manter", true)}${D.rooms.map((r) => chip("bk-room", r.id, esc(r.name))).join("")}</div>
             <p class="help" id="bk-help" hidden>Em outro cômodo, o item ganha um código novo${zOn ? " e fica sem zona, se não escolher uma" : ""}.</p></div>
           <div class="field" data-f="cat"><span class="lbl" id="bk-l-cat">Categoria</span>
-            <div class="chips" role="radiogroup" aria-labelledby="bk-l-cat">${chip("bk-cat", KEEP, "Manter", true)}${CATS.map(([k, v]) => chip("bk-cat", k, pontoCat(k) + esc(v))).join("")}</div></div>
+            <div class="chips" role="radiogroup" aria-labelledby="bk-l-cat">${chip("bk-cat", KEEP, "Manter", true)}${catsCasa(...its.map((i) => i.cat)).map(([k, v]) => chip("bk-cat", k, pontoCat(k) + esc(v))).join("")}</div></div>
           ${zOn ? `<div class="field" data-f="zone"><span class="lbl" id="bk-l-zone">Zona</span>
             <div class="chips" id="bk-zones" role="radiogroup" aria-labelledby="bk-l-zone">${zoneChips("")}</div>
             <input id="bk-zone-new" class="input" placeholder="Nome da zona" maxlength="120" autocomplete="off" aria-label="Nome da zona" hidden></div>` : ""}
@@ -3856,10 +3878,13 @@
           <dt>${room.kind ? "Onde" : "Cômodo"}</dt><dd><a href="${room.kind === "bens" ? "#/bens" : room.kind === "consumiveis" ? "#/consumiveis" : `#/c/${encodeURIComponent(room.id)}`}"><span class="mt soft">${esc(room.code)}</span><span class="rnm">${esc(room.name)}</span></a></dd>
           ${zonesOn() && room.kind !== "consumiveis" ? `<dt>Zona</dt><dd>${esc(it.zone || "Sem zona")}</dd>` : ""}
           ${room.kind === "consumiveis"
-            ? `<dt>Categoria</dt><dd><span class="rnm">${esc(CCAT[it.cat] || "Outros")}</span></dd>
+            ? `<dt>Categoria</dt><dd><a href="#/buscar?tipo=consumiveis&amp;cat=${esc(CCAT[it.cat] ? it.cat : "c-outros")}"><span class="rnm">${esc(CCAT[it.cat] || "Outros")}</span></a></dd>
           ${consComodoOn() ? `<dt>Usado em</dt><dd data-slot="usado-em">${usadoEm(it).length ? usadoEm(it).map((r) => `<a href="#/c/${encodeURIComponent(r.id)}"><span class="rnm">${esc(r.name)}</span></a>`).join(", ") : "Nenhum cômodo"}</dd>` : ""}
           ${durAte(it) ? `<dt>Dura até</dt><dd data-slot="dura-ate"${durFim(it) ? ' class="fim"' : ""}>${esc(durAte(it))}${durFim(it) ? " · acabou" : ""}</dd>` : `<dt>Duração estimada</dt><dd>Sem duração</dd>`}`
-            : `<dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
+            : room.kind === "bens" // 1.105.3: um bem não tem categoria, tem o tipo (como no editor)
+              ? `<dt>Tipo</dt><dd><a href="#/buscar?tipo=${bensGroup(it) || "outros"}&amp;ord=val"><span class="rnm">${{ imoveis: "Imóvel", veiculos: "Veículo" }[bensGroup(it)] || "Outro bem"}</span></a></dd>
+          <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>`
+              : `<dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
           <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>`}
           <dt>Origem</dt><dd>${esc(SOURCES[it.source] || "Cadastro manual")}</dd>
           ${it.createdAt ? `<dt>Cadastrado</dt><dd>${esc(dateTime(it.createdAt))}${by(it.createdBy)}</dd>` : ""}
@@ -4017,7 +4042,7 @@
             <div class="field"><label for="f-details">${cons ? "O que é e para que serve" : "Detalhes"}</label><textarea id="f-details" class="textarea" name="details" rows="3" maxlength="4000" placeholder="${bem ? "Endereço, modelo, ano e estado" : cons ? "Ex.: Pasta para o processador, ao trocar o cooler" : "Marca, modelo, cor, tamanho e estado"}">${esc(F.details)}</textarea></div>
             ${bem ? `<div class="field"><span class="lbl" id="f-tipo-l">Tipo</span><div class="seg tipo" role="group" aria-labelledby="f-tipo-l" data-slot="tipo">${tipoBtns()}</div></div>`
               : `${cons ? "" : zonesOn() ? `${roomField}${zoneField}` : roomField}
-            <div class="field"><span class="lbl" id="f-cat-l">Categoria</span><select id="f-cat" class="select fora" name="cat" tabindex="-1" aria-hidden="true" aria-label="Categoria"><option value="">Escolha a categoria</option>${(cons ? CCATS : CATS).map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select><div class="pick-grid" id="f-cat-g" role="group" aria-labelledby="f-cat-l"></div></div>`}
+            <div class="field"><span class="lbl" id="f-cat-l">Categoria</span><select id="f-cat" class="select fora" name="cat" tabindex="-1" aria-hidden="true" aria-label="Categoria"><option value="">Escolha a categoria</option>${(cons ? CCATS : catsCasa(F.cat)).map(([k, v]) => `<option value="${k}"${k === F.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select><div class="pick-grid" id="f-cat-g" role="group" aria-labelledby="f-cat-l"></div></div>`}
             ${cons && consComodoOn() ? `<div class="field"><span class="lbl" id="f-usado-l">Cômodos onde é usado</span><div class="pick-grid" id="f-usado" role="group" aria-labelledby="f-usado-l">${usadoBotoes()}</div></div>` : ""}
             ${cons ? `<div class="field" id="f-dur"><span class="lbl" id="f-dur-l">Duração estimada</span>
               <div class="chips grid durs" role="radiogroup" aria-labelledby="f-dur-l" data-slot="durs">${durChips()}</div>
@@ -4455,13 +4480,12 @@
       const { list } = searchItems(q);
       sc.ids = list.slice(0, 40).map((i) => i.id);
       sc.total = list.length;
-      const TIPOS = tipos(), tipo = TIPOS.some(([k]) => k === q.tipo) ? q.tipo || "" : "", f = [];
-      if (tipo) f.push((TIPOS.find(([k]) => k === tipo) || ["", ""])[1]);
-      if (!tipoArea(tipo)) {
-        const r = D.rooms.find((x) => x.id === q.room);
-        if (r) f.push(r.name);
-        if (q.cat && CAT[q.cat]) f.push(CAT[q.cat]);
-      }
+      const TIPOS = tipos(), tipo = tipoDaBusca(q), F = filtrosDe(tipo), f = [];
+      if (tipo && TIPOS.length) f.push((TIPOS.find(([k]) => k === tipo) || ["", ""])[1]);
+      const r = F.room && D.rooms.find((x) => x.id === q.room);
+      if (r) f.push(r.name);
+      const c = F.cats.find(([k]) => k === q.cat);
+      if (c) f.push(c[1]);
       if (f.filter(Boolean).length) sc.filtros = f.filter(Boolean).join(" · ");
     }
     else if (base.name === "data") sc.tab = moreTab(base.tab);
@@ -4831,7 +4855,7 @@
                 <input class="input" data-ri="${i}" data-rf="qty" value="${esc(r.qty)}" aria-label="Quantidade">
                 <div class="money"><input class="input" data-ri="${i}" data-rf="value" value="${esc(moneyInput(r.value))}" inputmode="decimal" aria-label="Valor total"></div></div>
               <div class="frow2">${each ? `<select class="select${r.room ? "" : " need"}" data-ri="${i}" data-rf="room" aria-label="Cômodo">${roomOpts(r.room || "", r.room ? null : ["", "Qual cômodo?"])}</select>` : ""}
-                <select class="select" data-ri="${i}" data-rf="cat" aria-label="Categoria">${CATS.map(([k, v]) => `<option value="${k}"${k === r.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
+                <select class="select" data-ri="${i}" data-rf="cat" aria-label="Categoria">${catsCasa(r.cat).map(([k, v]) => `<option value="${k}"${k === r.cat ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
                 ${zonesUse ? `<input class="input" data-ri="${i}" data-rf="zone" value="${esc(r.zone)}"${r.room ? ` data-sug="cr-zones-${zl.indexOf(r.room)}"` : ""} placeholder="Zona" aria-label="Zona" autocomplete="off">` : ""}</div>
               ${r.details ? `<p class="fdet">${esc(r.details)}</p>` : ""}
               ${r.existing || r.confidence === "baixa" ? `<div class="fflag">${r.existing ? `<span class="pill warn">Parece já cadastrado: ${esc(r.existing)}</span>` : ""}${r.confidence === "baixa" ? `<span class="pill">IA pouco segura, confira</span>` : ""}</div>` : ""}
@@ -5646,8 +5670,8 @@
     const t = e.target;
     const k = t.dataset && t.dataset.input;
     if (!k) return;
-    if (k === "search-tipo") { // num tipo de bem, cômodo e categoria saem (e as seleções somem)
-      base.q = { ...base.q, tipo: t.value, ...(tipoArea(t.value) ? { room: "", cat: "" } : {}) };
+    if (k === "search-tipo") { // cada tipo tem as suas categorias: a escolhida sai; o cômodo fica se o tipo novo filtra por ele
+      base.q = { ...base.q, tipo: t.value, cat: "", ...(filtrosDe(t.value).room ? {} : { room: "" }) };
       try { history.replaceState(history.state, "", hashOf(base)); } catch { /* sem histórico */ }
       searchLimit = 120; renderView(false);
     }

@@ -105,6 +105,20 @@ async def body(r, p):
     i2 = (n2.get("item") or n2)["id"]
     await r.open(pg, "#/buscar?tipo=consumiveis", ".ssum")
     r.eq(await pg.locator(".ssum > b").count(), 0, "só consumíveis: sem a soma em reais")
+    # 1.105.3 (o dono: "se eles podem estar vinculados a cômodos, por que não aparece filtro por cômodos e por categoria?")
+    sels = await pg.evaluate("[...document.querySelectorAll('.sfilters select')].map(s => s.dataset.input)")
+    r.eq(sels, ["search-tipo", "search-room", "search-cat", "search-ord"], "Consumíveis, usados em cômodos: o Cômodo e a Categoria")
+    ops = await pg.evaluate("[...document.querySelectorAll('[data-input=\"search-cat\"] option')].map(o => o.value)")
+    r.check(len(ops) > 1 and all(v == "" or v.startswith("c-") for v in ops), f"as categorias dos consumíveis ({ops})")
+    await pg.select_option('[data-input="search-room"]', "quarto")
+    await pg.wait_for_timeout(400)
+    r.eq(await pg.evaluate("[...document.querySelectorAll('#results .irow .nm')].map(n => n.textContent)"), ["Detergente"], "Quarto: só o usado lá")
+    await pg.select_option('[data-input="search-tipo"]', "")
+    await pg.wait_for_timeout(400)
+    r.check(await pg.input_value('[data-input="search-room"]') == "quarto" and await pg.locator('[data-input="search-cat"]').count() == 0
+            and "Detergente" in await pg.evaluate("[...document.querySelectorAll('#results .irow .nm')].map(n => n.textContent)"),
+            "Todos os tipos: o cômodo fica, sem Categoria, e o consumível usado lá aparece junto dos itens")
+    await r.open(pg, "#/buscar?tipo=consumiveis", ".ssum")
     await pg.click('[data-act="sel-start"]')
     await pg.wait_for_selector(".selbar")
     r.eq(await pg.locator(".irow.selr:not([disabled])").count(), 2, "os consumíveis entram no Selecionar")
