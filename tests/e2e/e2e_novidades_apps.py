@@ -106,8 +106,8 @@ async def body(r, p):
 
     # 1.58.0: Todas as novidades, Só equipamentos e Só apps; 1.68.0: e Só eletrônicos (os recursos), um botão por linha
     bts = await pg.evaluate("""[...document.querySelectorAll('#p-news [data-act="news-all"]')].map(b => [b.textContent.trim(), b.dataset.so, Math.round(b.getBoundingClientRect().width), Math.round(b.getBoundingClientRect().top), !!b.querySelector('svg')])""")
-    r.eq([(x[0], x[1]) for x in bts], [("Todas as novidades", ""), ("Só equipamentos", "itens"), ("Só apps", "apps"), ("Só eletrônicos", "recursos")], "os quatro botões")
-    r.check(len({x[2] for x in bts}) == 1 and all(bts[i][3] < bts[i + 1][3] for i in range(3)) and all(x[4] for x in bts), f"um por linha, do mesmo tamanho, com o ícone ({bts})")
+    r.eq([(x[0], x[1]) for x in bts], [("Todas as novidades", ""), ("Só equipamentos", "itens"), ("Só apps", "apps")], "os três botões (1.107.0: o Só eletrônicos foi para a aba Recursos)")
+    r.check(len({x[2] for x in bts}) == 1 and all(bts[i][3] < bts[i + 1][3] for i in range(2)) and all(x[4] for x in bts), f"um por linha, do mesmo tamanho, com o ícone ({bts})")
     # conferir todos: os equipamentos e os apps
     await pg.click('[data-act="news-all"][data-so=""]')
     await pg.locator(".toast", has_text="Conferidos").wait_for(timeout=60000)

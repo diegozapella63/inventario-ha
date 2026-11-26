@@ -239,6 +239,12 @@
   const zonesOn = () => S.settings.zones === true;
   const newsOn = () => aiOn() && S.settings.news !== false; // Novidades: precisa da IA e pode ser desligada em Opções
   const appsOn = () => newsOn() && S.settings.news_apps === true; // Apps do celular nas Novidades (1.56.0): desligado de início
+  // 1.107.0 (o dono: "uma central mesmo de coisas que eu vou buscar de novidades, recursos, avaliações"): Mais › Pesquisas da
+  // IA, em abas: Novidades (com as Novidades ligadas), Recursos (os eletrônicos) e Pareceres (com os consumíveis)
+  const pesqOn = () => aiOn();
+  const pesqTabs = () => [newsOn() && ["novidades", "Novidades", "spark"], ["recursos", "Recursos", "sliders"], consOn() && ["pareceres", "Pareceres", "star"]].filter(Boolean);
+  const pesqTab = (t) => { const T = pesqTabs(); return (T.find(([k]) => k === t) || T[0])[0]; };
+  const pesqDesc = () => { const t = joinE(pesqTabs().map(([, l]) => l.toLowerCase())); return `${t[0].toUpperCase()}${t.slice(1)}, pela internet.`; };
   const sensorsOn = () => S.settings.ha_sensors === true; // sensores no Home Assistant: só com a opção ligada
   let D = null;
   const roomFilter = {};
@@ -740,12 +746,13 @@
       case "comodos": return { name: mainTab(), q }; // sem os itens da casa, a aba é Bens (ou Consumíveis)
       case "mais": // #/mais é o menu; #/mais/<aba> é o endereço antigo de Configurações (e de Novidades)
         if (!parts[1]) return { name: "menu", q };
-        if (parts[1] === "novidades") return { name: newsOn() ? "news" : "menu", q };
+        if (parts[1] === "novidades") return pesqOn() ? { name: "news", tab: pesqTab("novidades"), q } : { name: "menu", q };
         if (parts[1] === "sobre") return { name: "about", q }; // como no CronologIA (#/mais/sobre)
         return { name: "data", tab: moreTab(parts[1]), q };
       case "config": return { name: "data", tab: moreTab(parts[1]), q };
       case "dados": return { name: "data", tab: "dados", q }; // o endereço antigo dos Dados
-      case "novidades": return { name: newsOn() ? "news" : "menu", q }; // Novidades usa a IA e pode ser desligada: fica o menu
+      case "novidades": return pesqOn() ? { name: "news", tab: pesqTab("novidades"), q } : { name: "menu", q }; // o endereço de antes (e o do aviso no celular)
+      case "pesquisas": return pesqOn() ? { name: "news", tab: parts[1] ? pesqTab(parts[1]) : "", q } : { name: "menu", q }; // usa a IA: desligada, fica o menu
       case "categorias": return { name: "cats", q };
       case "graficos": return { name: "charts", q };
       case "sobre": return { name: "about", q };
@@ -764,7 +771,7 @@
       case "report": return "#/relatorio";
       case "rooms": return "#/comodos";
       case "menu": return "#/mais";
-      case "news": return "#/novidades";
+      case "news": return "#/pesquisas" + (r.tab ? `/${r.tab}` : "");
       case "cats": return "#/categorias";
       case "charts": return "#/graficos";
       case "bens": return "#/bens";
@@ -833,7 +840,7 @@
 
   function viewTitle(r) {
     if (r.name === "room") return D.roomById.get(r.id)?.name || "Cômodo";
-    return { home: "Agora", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", bens: "Bens", cons: "Consumíveis", charts: "Gráficos", news: "Novidades", cats: "Categorias", data: "Configurações", about: "Sobre" }[r.name] || "InventarIA";
+    return { home: "Agora", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", bens: "Bens", cons: "Consumíveis", charts: "Gráficos", news: "Pesquisas da IA", cats: "Categorias", data: "Configurações", about: "Sobre" }[r.name] || "InventarIA";
   }
   // Topo de cada tela, igual nos apps da família (EconomIA, ResolvIA): nome do app com "IA" na cor
   // do app, saudação ao usuário do Home Assistant e o título grande da tela.
@@ -938,7 +945,7 @@
         case "report": html = viewReport(); break;
         case "rooms": html = viewRooms(); break;
         case "menu": html = viewMenu(); break;
-        case "news": html = `<div class="mscreen">${moreNews()}</div>`; break;
+        case "news": html = viewPesq(); break;
         case "cats": html = `<div class="mscreen">${viewCats()}</div>`; break;
         case "charts": html = viewCharts(); break;
         case "bens": html = viewBens(); break;
@@ -1006,7 +1013,7 @@
       box?.focus({ preventScroll: true });
     }
     if (base.name === "data") loadDataPanels();
-    if (base.name === "news") { loadNews(); loadRecAll(); }
+    if (base.name === "news") loadPesq();
     if (base.name === "charts") drawArea();
     if (navigated && slideFrom) { // a tela nova entra pelo lado para onde o dedo foi
       const dir = slideFrom;
@@ -1644,7 +1651,7 @@
       bensOn() && mainTab() !== "bens" && ["#/bens", "home", "Bens", "Casa, terreno, carro: o que fica fora de casa."],
       consOn() && mainTab() !== "cons" && ["#/consumiveis", "drop", "Consumíveis", "Pasta térmica, creme, pilhas: o que se gasta."],
       ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
-      newsOn() && ["#/novidades", "spark", "Novidades", "Atualizações, lançamentos e recalls dos eletrônicos."],
+      pesqOn() && ["#/pesquisas", "spark", "Pesquisas da IA", pesqDesc()],
       ["#/categorias", "grid", "Categorias", "O nome e a cor de cada uma."],
       ["#/relatorio", "report", "Relatório do inventário", `Por cômodo, com ${LS.get("reportPhotos", true) ? "fotos e " : ""}gráficos. Baixa em PDF.`], // sem Mostrar fotos, não promete fotos
       ["#/config", "gear", "Configurações", "Integrações, dados e backup, aparência e opções."],
@@ -1894,9 +1901,39 @@
       </ul>
     </section>`;
   }
-  // -- novidades de todos os equipamentos: a IA escolhe, nas categorias marcadas, o que faz sentido conferir. A ordem
-  // (1.61.2): o que foi achado (Equipamentos, Apps do celular), depois Conferir novidades e, por último, Limpar
-  function moreNews() {
+  // -- Pesquisas da IA (1.107.0; antes, Novidades): uma aba para cada coisa que a IA busca na internet, cada uma com o que
+  // foi achado e o botão de buscar todos. Com uma aba só, sem a barra.
+  function viewPesq() {
+    const T = pesqTabs(), tab = pesqTab(base.tab), label = T.find(([k]) => k === tab)[1];
+    const bodies = { novidades: pesqNovidades, recursos: pesqRecursos, pareceres: pesqPareceres };
+    const bar = T.length > 1 ? `<div class="more-anchor" aria-hidden="true"></div>
+    <div class="tabs-wrap"><div class="more-tabs" role="tablist" aria-label="Seções das Pesquisas da IA">
+      ${T.map(([k, l, i]) => `<button type="button" role="tab" id="pt-${k}" aria-controls="pp" aria-selected="${k === tab}" tabindex="${k === tab ? 0 : -1}" data-act="pesq-tab" data-tab="${k}">${ic(i, "sm")}<span>${l}</span></button>`).join("")}
+    </div><span class="tabs-fim esq" aria-hidden="true">${ic("back", "sm")}</span><span class="tabs-fim dir" aria-hidden="true">${ic("chev", "sm")}</span></div>` : "";
+    return `<div class="mscreen pesq">${bar}<div class="more-panel" id="pp" role="tabpanel"${T.length > 1 ? ` aria-labelledby="pt-${tab}"` : ""} aria-label="${label}">${bodies[tab]()}</div></div>`;
+  }
+  function loadPesq() {
+    const tab = pesqTab(base.tab);
+    if (tab === "novidades") loadNews();
+    else if (tab === "recursos") loadRecAll();
+    else loadParAll();
+  }
+  function setPesqTab(k) {
+    k = pesqTab(k);
+    if (base.name !== "news" || pesqTab(base.tab) === k) return;
+    const y = window.scrollY;
+    const anchor = $("#view .more-anchor"), tabs = $("#view .more-tabs");
+    const natural = anchor && tabs ? anchor.getBoundingClientRect().top + window.scrollY + (parseFloat(getComputedStyle(tabs).marginTop) || 0) : 0;
+    base = { ...base, tab: k };
+    try { history.replaceState(history.state, "", hashOf(base)); } catch { /* ok */ }
+    renderView(false);
+    window.scrollTo(0, Math.min(y, natural));
+    $(`#pt-${k}`)?.focus({ preventScroll: true });
+    showMoreTab();
+    loadPesq();
+  }
+  // Novidades: o que foi achado (Equipamentos, Apps do celular), depois Conferir novidades e, por último, Limpar (1.61.2)
+  function pesqNovidades() {
     return `
     <section class="panel" id="p-news-list">
       <h2>${secIc("tag")}Equipamentos</h2>
@@ -1906,17 +1943,12 @@
       <h2>${secIc("phone")}Apps do celular</h2>
       <div data-slot="news-apps"><p class="muted">Carregando…</p></div>
     </section>` : ""}
-    ${aiOn() ? `<section class="panel" id="p-news-rec">
-      <h2>${secIc("sliders")}Eletrônicos</h2>
-      <div data-slot="rec-list"><p class="muted">Carregando…</p></div>
-    </section>` : ""}
     <section class="panel" id="p-news">
       <h2>${secIc("spark")}Conferir novidades</h2>
       <p class="lead">Atualizações, lançamentos, modelo novo, recalls e fim de suporte dos eletrônicos${appsOn() ? " e dos apps do celular" : ""}.</p>
       <ul class="opts"><li><div class="ot"><b>${oti("checks")}Todos de uma vez</b><span>${appsOn() ? "A IA escolhe os eletrônicos e os apps que vale conferir, e busca os recursos que faltam." : "A IA escolhe, entre os eletrônicos, os que vale conferir, e busca os recursos que faltam."}</span></div>
         <div class="oa news-tres"><button type="button" class="btn primary" data-act="news-all" data-so="">${ic("spark")}Todas as novidades</button>
-          <button type="button" class="btn" data-act="news-all" data-so="itens">${ic("tag")}Só equipamentos</button>${appsOn() ? `<button type="button" class="btn" data-act="news-all" data-so="apps">${ic("phone")}Só apps</button>` : ""}
-          <button type="button" class="btn" data-act="news-all" data-so="recursos">${ic("sliders")}Só eletrônicos</button></div></li></ul>
+          <button type="button" class="btn" data-act="news-all" data-so="itens">${ic("tag")}Só equipamentos</button>${appsOn() ? `<button type="button" class="btn" data-act="news-all" data-so="apps">${ic("phone")}Só apps</button>` : ""}</div></li></ul>
       <div data-slot="news-job"></div>
     </section>
     <section class="panel" id="p-news-clear">
@@ -1925,6 +1957,37 @@
         ${appsOn() ? `<div class="oa news-tres"><button type="button" class="btn" data-act="news-clear" data-so="">${ic("trash")}Limpar novidades</button>
           <button type="button" class="btn" data-act="news-clear" data-so="itens">${ic("tag")}Só equipamentos</button><button type="button" class="btn" data-act="news-clear" data-so="apps">${ic("phone")}Só apps</button></div>`
           : `<div class="oa"><button type="button" class="btn" data-act="news-clear" data-so="">${ic("trash")}Limpar novidades</button></div>`}</li></ul>
+    </section>`;
+  }
+  // Recursos: os eletrônicos (Novidades › Eletrônicos até a 1.106) e Buscar recursos (antes, Conferir novidades › Só eletrônicos)
+  function pesqRecursos() {
+    return `
+    <section class="panel" id="p-news-rec">
+      <h2>${secIc("sliders")}Eletrônicos</h2>
+      <div data-slot="rec-list"><p class="muted">Carregando…</p></div>
+    </section>
+    <section class="panel" id="p-rec">
+      <h2>${secIc("spark")}Buscar recursos</h2>
+      <p class="lead">Funções, modos e conexões de cada eletrônico, pela página do fabricante.</p>
+      <ul class="opts"><li><div class="ot"><b>${oti("checks")}Os que faltam</b><span>O mesmo equipamento em vários cômodos é uma busca só.</span></div>
+        <div class="oa"><button type="button" class="btn primary" data-act="news-all" data-so="recursos">${ic("spark")}Buscar os que faltam</button></div></li></ul>
+      <div data-slot="news-job"></div>
+    </section>`;
+  }
+  // Pareceres: os consumíveis, com a nota de cada um, e Avaliar consumíveis (os sem parecer, ou os escolhidos)
+  function pesqPareceres() {
+    return `
+    <section class="panel" id="p-par-list">
+      <h2>${secIc("drop")}Consumíveis</h2>
+      <div data-slot="par-list"><p class="muted">Carregando…</p></div>
+    </section>
+    <section class="panel" id="p-par">
+      <h2>${secIc("star")}Avaliar consumíveis</h2>
+      <p class="lead">Nota, pontos fortes e fracos, dicas e outras opções, pelas avaliações na internet.</p>
+      <ul class="opts"><li><div class="ot"><b>${oti("checks")}Vários de uma vez</b><span>Um por um; Parar guarda os que já foram avaliados.</span></div>
+        <div class="oa news-tres"><button type="button" class="btn primary" data-act="par-faltam">${ic("spark")}Os sem parecer</button>
+          <button type="button" class="btn" data-act="par-escolher">${ic("checks")}Escolher quais</button></div></li></ul>
+      <div data-slot="par-job"></div>
     </section>`;
   }
   let newsOv = null, newsJob = null, newsTimer = null, newsNums = null;
@@ -1967,8 +2030,8 @@
   // uma linha por equipamento: o mesmo em vários cômodos (ou no plural) fica junto, com o nome mais curto
   // 1.73.0: Buscar também em Equipamentos e Eletrônicos (com mais de 6), como nos Apps do celular: pelo nome, pelo
   // código ou pelo cômodo, sem acento; um deixado de fora que bate abre a lista dele
-  const NEWS_BUSCA = { "news-list": ["Buscar equipamento", "Nenhum equipamento com"], "rec-list": ["Buscar eletrônico", "Nenhum eletrônico com"] };
-  const newsBusca = { "news-list": "", "rec-list": "" };
+  const NEWS_BUSCA = { "news-list": ["Buscar equipamento", "Nenhum equipamento com"], "rec-list": ["Buscar eletrônico", "Nenhum eletrônico com"], "par-list": ["Buscar consumível", "Nenhum consumível com"] };
+  const newsBusca = { "news-list": "", "rec-list": "", "par-list": "" };
   const buscaDe = (items) => esc(items.map((x) => `${x.name} ${tagOf(x)} ${D.roomById.get(x.room)?.name || ""}`).join(" "));
   function buscaHtml(slot, n) {
     if (n <= 6) return "";
@@ -2096,7 +2159,7 @@
     if (st && st.stage === "error") { js.innerHTML = `<p class="formerr njob">${esc(st.msg)}</p>`; return; }
     // os números de agora (1.49.1): os equipamentos que estão na lista e já foram conferidos; um item apagado (ou que
     // saiu de Eletrônicos) depois de conferir não conta mais
-    const u = newsOv && newsOv.ultima, c = newsNums;
+    const u = $("#view #p-news") && newsOv && newsOv.ultima, c = newsNums; // o Conferido é das Novidades (não da aba Recursos)
     js.innerHTML = u ? `<p class="muted njob">Conferido ${esc(whenShort(u.at))}: ${c && c.conferidos ? `${int(c.com)} de ${int(c.conferidos)} com novidades novas` : "nada para conferir agora"}.</p>` : "";
   }
   let newsSo = "";
@@ -2118,11 +2181,12 @@
     }
     API.del(`api/news/${newsJob}`).catch(() => {});
     newsJob = null;
+    renderNewsJob(null); // os botões voltam (na aba Recursos não há a lista das novidades, que fazia isso)
     const sm = st.summary || {};
     const rec = sm.recursos ? ` Recursos de ${plural(sm.recursos, "eletrônico", "eletrônicos")}.` : "";
     if (st.stage === "done") toast(sm.conferidos ? `Conferidos ${int(sm.conferidos)}: ${int(sm.novos || 0)} com novidades novas.${rec}` : rec ? rec.trim() : newsSo === "recursos" ? "Todos os eletrônicos já têm os recursos." : "Tudo conferido nos últimos 7 dias.");
     loadRecAll();
-    await loadNews();
+    if (newsOn()) await loadNews();
     if (st.stage === "error") renderNewsJob(st);
   }
   // -- Novidades › Eletrônicos (1.65.0): os recursos de cada eletrônico (o mesmo em vários cômodos numa linha só); um
@@ -2133,6 +2197,7 @@
     try { recOv = await API.get("api/recursos/todos"); }
     catch (e) { const sl = $('#view [data-slot="rec-list"]'); if (sl) sl.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
     renderRecAll();
+    if (recOv.job && !newsJob && $('#view [data-slot="news-job"]')) { newsJob = recOv.job.id; newsSo = recOv.job.so || ""; pollNewsAll(); } // uma busca andando: acompanha
   }
   function recGroups() {
     const res = (recOv && recOv.itens) || {}, grp = (recOv && recOv.grupos) || {}, by = new Map();
@@ -2170,14 +2235,15 @@
       cls: "modal", label: "Recursos",
       html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("sliders", "Recursos")}</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
         <div class="dlg-b"><p class="news-of">${esc(it.name)}</p><div data-slot="rec" aria-live="polite"></div></div>
-        <div class="dlg-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Ver de novo</button><span class="grow"></span>
+        <div class="dlg-f news-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Ver de novo</button>
+          <button type="button" class="btn" data-apagar hidden>${ic("trash")}Apagar</button><span class="grow"></span>
           <button type="button" class="btn primary" data-item>${ic("external")}Ver item</button></div></div>`,
       onClose: () => { gen++; clearTimeout(timer); if (job) API.del(`api/recursos/${job}`).catch(() => {}); job = null; },
     });
-    const dlg = entry.dlg, slot = $('[data-slot="rec"]', dlg), again = $("[data-again]", dlg);
-    const show = (html, done) => { slot.innerHTML = html; again.hidden = !done; };
+    const dlg = entry.dlg, slot = $('[data-slot="rec"]', dlg), again = $("[data-again]", dlg), apagar = $("[data-apagar]", dlg);
+    const show = (html, done, tem = false) => { slot.innerHTML = html; again.hidden = !done; apagar.hidden = !tem; };
     const render = (r) => show(`<ul class="rec-list">${(r.recursos || []).map((x) => `<li><b>${esc(x.nome)}</b>${x.detalhe ? `<span>${esc(x.detalhe)}</span>` : ""}</li>`).join("")}</ul>
-      ${r.fonte ? `<p class="rec-src">Fonte: <a href="${esc(r.fonte)}" target="_blank" rel="noopener">${esc(r.site || r.fonte)}</a></p>` : ""}`, true);
+      ${r.fonte ? `<p class="rec-src">Fonte: <a href="${esc(r.fonte)}" target="_blank" rel="noopener">${esc(r.site || r.fonte)}</a></p>` : ""}`, true, !!(r.recursos || []).length);
     async function poll(my) {
       let st;
       try { st = await API.get(`api/recursos/${job}`); }
@@ -2197,12 +2263,173 @@
       catch (e) { if (my === gen) show(`<p class="formerr">${esc(e.message)}</p>`, true); return; }
       poll(my);
     }
-    dlg.addEventListener("click", (e) => {
+    dlg.addEventListener("click", async (e) => {
       if (e.target.closest("[data-again]")) start();
-      if (e.target.closest("[data-item]")) { finalizeThen(entry, () => nav(`#/i/${encodeURIComponent(it.id)}`)); return; } // a ficha; o Voltar volta para as Novidades
+      if (e.target.closest("[data-apagar]") && await dismissRec(it)) show(`<p class="muted">Recursos apagados.</p>`, true);
+      if (e.target.closest("[data-item]")) { finalizeThen(entry, () => nav(`#/i/${encodeURIComponent(it.id)}`)); return; } // a ficha; o Voltar volta para as Pesquisas da IA
     });
     const my0 = gen;
     API.get(`api/recursos?item=${encodeURIComponent(it.id)}`).then((r) => { if (my0 === gen) { if (r && r.recursos && r.recursos.length) render(r); else start(); } }).catch(() => { if (my0 === gen) start(); });
+  }
+  // -- Pesquisas da IA › Pareceres (1.107.0): os consumíveis com a nota de cada um (os avaliados primeiro); um toque abre o
+  // parecer (sem ele, avalia). Avaliar consumíveis: os que ainda não têm, ou os escolhidos, um por um, com o Parar.
+  let parOv = null, parJob = null, parTimer = null, parFeitos = -1;
+  const notaTxt = (n) => String(n).replace(".", ",");
+  async function loadParAll() {
+    if (!aiOn() || !consOn()) return;
+    try { parOv = await API.get("api/parecer/todos"); }
+    catch (e) { const sl = $('#view [data-slot="par-list"]'); if (sl) sl.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+    renderParAll();
+    if (parOv.job && !parJob) { parJob = parOv.job.id; pollParLote(); }
+    else if (!parJob) renderParJob(null);
+  }
+  function renderParAll() {
+    const sl = $('#view [data-slot="par-list"]');
+    if (!sl || !parOv) return;
+    const res = parOv.itens || {};
+    const its = D.consItems.filter((it) => it.id in res).sort((a, b) => Number(!res[a.id]) - Number(!res[b.id]) || a.name.localeCompare(b.name, "pt-BR"));
+    const ativo = buscando("par-list");
+    sl.innerHTML = its.length ? `${buscaHtml("par-list", its.length)}<ul class="nlist">${its.map((it) => {
+      const r = res[it.id];
+      return `<li data-busca="${esc(`${it.name} ${CCAT[it.cat] || ""} ${usadoEm(it).map((x) => x.name).join(" ")}`)}"><button type="button" class="nrow" data-act="par-open" data-id="${esc(it.id)}">
+        <span class="nb"><b>${esc(it.name)}</b><span class="nm">${esc(CCAT[it.cat] || "Outros")} · ${esc(r ? `Avaliado ${whenShort(r.at)}` : "Ainda não avaliado")}</span></span>
+        ${r && r.nota ? `<span class="pill par-pill" aria-label="Nota ${notaTxt(r.nota)}">${ic("star", "sm")}${notaTxt(r.nota)}</span>` : ""}${ic("chev", "sm")}</button></li>`;
+    }).join("")}</ul>` : `<p class="muted">Nenhum consumível ainda.</p>`;
+    depoisDaBusca("par-list", ativo);
+  }
+  function renderParJob(st) {
+    const js = $('#view [data-slot="par-job"]');
+    if (!js) return;
+    for (const b of $$('#view [data-act="par-faltam"], #view [data-act="par-escolher"]')) b.disabled = !!(st && st.stage === "busy");
+    if (st && st.stage === "busy") {
+      const p = st.progress || {}, pct = p.total ? Math.round((p.feitos / p.total) * 100) : 0;
+      js.innerHTML = `<div class="njob" aria-live="polite"><p><span class="spin"></span><span>${esc(st.msg || "Avaliando…")}</span></p>
+        <div class="prog" role="progressbar" aria-label="Progresso" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>
+        <button type="button" class="btn sm" data-act="par-cancel">${ic("close", "sm")}Parar</button></div>`;
+      return;
+    }
+    js.innerHTML = st && st.stage === "error" ? `<p class="formerr njob">${esc(st.msg)}</p>` : "";
+  }
+  async function startParLote(itens) {
+    try { parJob = (await API.post("api/parecer/lote", itens ? { itens } : {})).id; parFeitos = -1; renderParJob({ stage: "busy", msg: "Começando…" }); pollParLote(); }
+    catch (e) { fail(e); }
+  }
+  async function pollParLote() {
+    clearTimeout(parTimer);
+    if (!parJob) return;
+    let st;
+    try { st = await API.get(`api/parecer/${parJob}`); }
+    catch (e) { parJob = null; renderParJob({ stage: "error", msg: e.message }); return; }
+    if (st.stage === "busy") {
+      renderParJob(st);
+      if (!$('#view [data-slot="par-job"]')) { parJob = null; return; } // saiu da aba: segue no servidor
+      const f = (st.progress || {}).feitos;
+      if (f !== parFeitos) { parFeitos = f; if (f > 0) API.get("api/parecer/todos").then((r) => { parOv = { ...r, job: null }; renderParAll(); }).catch(() => {}); } // o que já foi avaliado aparece na lista
+      parTimer = setTimeout(pollParLote, 1500);
+      return;
+    }
+    API.del(`api/parecer/${parJob}`).catch(() => {});
+    parJob = null;
+    const sm = st.summary || {};
+    if (st.stage === "done") toast(sm.avaliados ? `${plural(sm.avaliados, "consumível avaliado", "consumíveis avaliados")}${sm.erros ? `; ${plural(sm.erros, "não deu", "não deram")}` : ""}.` : "Nenhum consumível avaliado.");
+    await loadParAll();
+    if (st.stage === "error") renderParJob(st);
+  }
+  async function cancelParLote() {
+    if (!parJob) return;
+    const j = parJob;
+    parJob = null;
+    clearTimeout(parTimer);
+    await API.del(`api/parecer/${j}`).catch(() => {});
+    toast("Avaliação parada. Os já avaliados ficaram salvos.");
+    loadParAll();
+  }
+  // Escolher quais: os consumíveis com uma caixa de marcar; vêm marcados os que ainda não têm parecer
+  function escolherPareceres() {
+    const res = (parOv && parOv.itens) || {};
+    const its = D.consItems.filter((it) => it.id in res).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    if (!its.length) { toast("Nenhum consumível ainda."); return; }
+    const entry = openDialog({
+      cls: "modal", label: "Escolher consumíveis",
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("checks", "Escolher consumíveis")}</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <div class="dlg-b"><div class="par-atalhos"><button type="button" class="btn" data-todos>${ic("checks")}Todos</button><button type="button" class="btn" data-faltam>${ic("star")}Sem parecer</button></div>
+          <ul class="nlist par-esc">${its.map((it) => `<li><label class="nrow"><input type="checkbox" class="fcheck" value="${esc(it.id)}"${res[it.id] ? "" : " checked"}>
+            <span class="nb"><b>${esc(it.name)}</b><span class="nm">${esc(res[it.id] ? `${res[it.id].nota ? `Nota ${notaTxt(res[it.id].nota)} · ` : ""}Avaliado ${whenShort(res[it.id].at)}` : "Ainda não avaliado")}</span></span></label></li>`).join("")}</ul></div>
+        <div class="dlg-f"><button type="button" class="btn" data-x>${ic("close")}Cancelar</button><span class="grow"></span><button type="button" class="btn primary" data-ok>${ic("spark")}<span>Avaliar</span></button></div></div>`,
+    });
+    const dlg = entry.dlg, ok = $("[data-ok]", dlg), caixas = () => $$(".fcheck", dlg);
+    const conta = () => { const n = caixas().filter((c) => c.checked).length; ok.disabled = !n; $("span", ok).textContent = n ? `Avaliar ${n}` : "Avaliar"; };
+    dlg.addEventListener("change", conta);
+    dlg.addEventListener("click", (e) => {
+      if (e.target.closest("[data-todos]")) { const on = caixas().some((c) => !c.checked); caixas().forEach((c) => { c.checked = on; }); conta(); }
+      else if (e.target.closest("[data-faltam]")) { caixas().forEach((c) => { c.checked = !res[c.value]; }); conta(); }
+      else if (e.target.closest("[data-ok]")) { const ids = caixas().filter((c) => c.checked).map((c) => c.value); finalizeThen(entry, () => startParLote(ids)); }
+    });
+    conta();
+  }
+  // a janela do parecer de um consumível: o guardado, sem chamar a IA; sem nada guardado, avalia
+  function openPar(it) {
+    if (!aiOn()) { toast("A IA está desligada. Para usar, ligue em Mais > Configurações > Integrações."); return; }
+    let job = null, timer = null, gen = 0;
+    const entry = openDialog({
+      cls: "modal", label: "Parecer da IA",
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("star", "Parecer da IA")}</h2><button type="button" class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <div class="dlg-b"><p class="news-of">${esc(it.name)}</p><div data-slot="par" aria-live="polite"></div></div>
+        <div class="dlg-f news-f"><button type="button" class="btn" data-again hidden>${ic("refresh")}Avaliar de novo</button>
+          <button type="button" class="btn" data-apagar hidden>${ic("trash")}Apagar</button><span class="grow"></span>
+          <button type="button" class="btn primary" data-item>${ic("external")}Ver item</button></div></div>`,
+      onClose: () => { gen++; clearTimeout(timer); if (job) API.del(`api/parecer/${job}`).catch(() => {}); job = null; },
+    });
+    const dlg = entry.dlg, slot = $('[data-slot="par"]', dlg), again = $("[data-again]", dlg), apagar = $("[data-apagar]", dlg);
+    const show = (html, done, tem = false) => { slot.innerHTML = html; again.hidden = !done; apagar.hidden = !tem; };
+    async function poll(my) {
+      let st;
+      try { st = await API.get(`api/parecer/${job}`); }
+      catch (e) { if (my === gen) show(`<p class="formerr">${esc(e.message)}</p>`, true); return; }
+      if (my !== gen) return;
+      if (st.stage === "busy") { timer = setTimeout(() => poll(my), 1200); return; }
+      API.del(`api/parecer/${job}`).catch(() => {});
+      job = null;
+      if (st.stage === "error") { show(`<p class="formerr">${esc(st.msg)}</p>`, true); return; }
+      show(parBody(st.parecer || {}), true, true);
+      loadParAll();
+    }
+    async function start() {
+      const my = ++gen;
+      show(`<div class="wbusy"><span class="spin"></span><p><b>Avaliando…</b><span>Pode levar até um minuto.</span></p></div>`, false);
+      try { job = (await API.post("api/parecer", { item: it.id })).id; }
+      catch (e) { if (my === gen) show(`<p class="formerr">${esc(e.message)}</p>`, true); return; }
+      poll(my);
+    }
+    dlg.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-again]")) start();
+      if (e.target.closest("[data-apagar]") && await dismissPar(it)) show(`<p class="muted">Parecer apagado.</p>`, true);
+      if (e.target.closest("[data-item]")) { finalizeThen(entry, () => nav(`#/i/${encodeURIComponent(it.id)}`)); return; } // a ficha; o Voltar volta para as Pesquisas da IA
+    });
+    const my0 = gen;
+    API.get(`api/parecer?item=${encodeURIComponent(it.id)}`).then((r) => { if (my0 === gen) { if (r && (r.resumo || (r.fortes || []).length)) show(parBody(r), true, true); else start(); } }).catch(() => { if (my0 === gen) start(); });
+  }
+  // 1.107.0 (o dono: "todos esses caras que a gente buscou da IA, ele tem que ter uma opção para poder apagar"): Apagar os
+  // recursos e o parecer, na ficha e nas janelas das Pesquisas da IA, como as novidades
+  async function dismissRec(it) {
+    const ok = await confirmBox({ title: "Apagar os recursos?", body: "Dá para buscar de novo quando quiser.", ok: "Apagar", danger: true });
+    if (!ok) return false;
+    try { await API.del(`api/recursos?item=${encodeURIComponent(it.id)}`); }
+    catch (e) { fail(e); return false; }
+    if (IREC.id === it.id) { IREC.st = null; paintItemRec(); }
+    if (recOv) loadRecAll();
+    toast("Recursos apagados.");
+    return true;
+  }
+  async function dismissPar(it) {
+    const ok = await confirmBox({ title: "Apagar o parecer?", body: "Dá para avaliar de novo quando quiser.", ok: "Apagar", danger: true });
+    if (!ok) return false;
+    try { await API.del(`api/parecer?item=${encodeURIComponent(it.id)}`); }
+    catch (e) { fail(e); return false; }
+    if (IPAR.id === it.id) { IPAR.st = null; paintItemPar(); }
+    if (parOv && parOv.itens && it.id in parOv.itens) { parOv.itens[it.id] = null; renderParAll(); }
+    toast("Parecer apagado.");
+    return true;
   }
   // 1.64.0: Limpar todas, só as dos equipamentos ou só as dos apps do celular
   async function clearNews(so = "") {
@@ -3331,7 +3558,7 @@
     const r = st.r || {};
     const list = (r.recursos || []).map((x) => `<li><b>${esc(x.nome)}</b>${x.detalhe ? `<span>${esc(x.detalhe)}</span>` : ""}</li>`).join("");
     const src = r.fonte ? `<p class="rec-src">Fonte: <a href="${esc(r.fonte)}" target="_blank" rel="noopener">${esc(r.site || r.fonte)}</a></p>` : "";
-    return `${head}<ul class="rec-list">${list}</ul>${src}${btn("refresh", "Ver de novo")}`;
+    return `${head}<ul class="rec-list">${list}</ul>${src}<div class="inews-acts">${btn("refresh", "Ver de novo")}<button type="button" class="btn" data-act="item-rec-del" data-id="${esc(it.id)}">${ic("trash")}Apagar</button></div>`;
   }
   function paintItemRec() {
     const slot = sheet && sheet.itemId === IREC.id && $('[data-slot="item-rec"]', sheet.dlg);
@@ -3386,16 +3613,19 @@
     if (!st) return `${head}<p class="muted">Qualidade, pontos fortes e fracos, dicas e outras opções, pelas avaliações na internet.</p>${btn("spark", "Avaliar com IA")}`;
     if (st.busy) return `${head}<div class="wbusy"><span class="spin"></span><p><b>Avaliando…</b><span>Pode levar até um minuto.</span></p></div>`;
     if (st.error) return `${head}<p class="formerr">${esc(st.error)}</p>${btn("refresh", "Avaliar de novo")}`;
-    const p = st.p || {};
+    return `${head}${parBody(st.p || {})}<div class="inews-acts">${btn("refresh", "Avaliar de novo")}<button type="button" class="btn" data-act="item-par-del" data-id="${esc(it.id)}">${ic("trash")}Apagar</button></div>`;
+  }
+  // o parecer (na ficha e na janela das Pesquisas da IA): a nota, o resumo, o preço, os pontos fortes e fracos, as dicas e as fontes
+  function parBody(p) {
     const lista = (icon, titulo, xs) => xs && xs.length ? `<div class="par-bloco"><b>${ic(icon, "sm")}${titulo}</b><ul>${xs.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "";
     const alts = (p.alternativas || []).length ? `<div class="par-bloco"><b>${ic("layers", "sm")}Outras opções</b><ul>${p.alternativas.map((a) => `<li><span class="par-alt">${esc(a.nome)}</span>${a.porque ? ` · ${esc(a.porque)}` : ""}</li>`).join("")}</ul></div>` : "";
     const fontes = (p.fontes || []).length ? `<p class="rec-src">Fontes: ${p.fontes.map((f) => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.site || f.url)}</a>`).join(", ")}</p>` : "";
-    return `${head}<div class="par">
+    return `<div class="par">
         ${p.nota ? estrelas(p.nota) : ""}
         ${p.resumo ? `<p class="par-resumo">${esc(p.resumo)}</p>` : ""}
         ${p.preco ? `<p class="par-preco">${ic("receipt", "sm")}<span>Preço hoje: <b>${esc(p.preco)}</b></span></p>` : ""}
         ${lista("check", "Pontos fortes", p.fortes)}${lista("alert", "Pontos fracos", p.fracos)}${lista("info", "Dicas", p.dicas)}${alts}${fontes}
-        ${p.at ? `<p class="par-em">Avaliado em ${esc(dataCurta(p.at.slice(0, 10)))}</p>` : ""}</div>${btn("refresh", "Avaliar de novo")}`;
+        ${p.at ? `<p class="par-em">Avaliado em ${esc(dataCurta(p.at.slice(0, 10)))}</p>` : ""}</div>`;
   }
   function paintItemPar() {
     const slot = sheet && sheet.itemId === IPAR.id && $('[data-slot="item-par"]', sheet.dlg);
@@ -4495,7 +4725,7 @@
     if (sc.item) return D.itemById.get(sc.item)?.name || "este item";
     if (sc.room) return D.roomById.get(sc.room)?.name || "este cômodo";
     if (sc.view === "search") return sc.q ? `a busca “${sc.q}”` : "a busca";
-    if (sc.view === "news") return "as novidades dos eletrônicos";
+    if (sc.view === "news") return "as pesquisas da IA";
     return ""; // 1.60.0: fora de um item, de um cômodo, da busca ou das novidades, nada (já se sabe que é o inventário)
   }
   // 1.76.0: 6 perguntas à vista (as da tela primeiro) e, em Editar perguntas, mais 20 modelos (um toque põe); as dos
@@ -4518,7 +4748,7 @@
   function chatIdeas(sc) {
     const first = sc.item ? ["Vale a pena pôr no seguro?", "Como conservar melhor?", "Quanto vale hoje, mais ou menos?"]
       : sc.room ? ["Qual o item mais caro daqui?", "O que falta cadastrar num cômodo assim?"]
-        : sc.view === "news" ? ["Alguma novidade importante?", "Tem algum recall?"] : [];
+        : sc.view === "news" ? [...(newsOn() ? ["Alguma novidade importante?", "Tem algum recall?"] : []), ...(consOn() ? ["Qual consumível tem a melhor nota?"] : [])] : [];
     return [...new Set([...first, ...chatPool()])].slice(0, 6);
   }
   function chatModels(sc) {
@@ -5560,6 +5790,8 @@
       case "item-news-del": if (item) dismissNews(item); break;
       case "item-rec": if (item) searchItemRec(item); break;
       case "item-par": if (item) avaliarItem(item); break;
+      case "item-rec-del": if (item) dismissRec(item); break;
+      case "item-par-del": if (item) dismissPar(item); break;
       case "item-dup": if (item) openEditor({ dup: item }); break;
       case "tarefa-nova": if (item) openTarefaNova(item); break;
       case "copy-field": copyField(b.dataset.target); break;
@@ -5612,6 +5844,11 @@
         break;
       case "news-open": { const it = D.itemById.get(b.dataset.id); if (it) openNews(it); break; }
       case "rec-open": { const it = D.itemById.get(b.dataset.id); if (it) openRec(it); break; }
+      case "par-open": { const it = D.itemById.get(b.dataset.id); if (it) openPar(it); break; }
+      case "par-faltam": startParLote(null); break;
+      case "par-escolher": escolherPareceres(); break;
+      case "par-cancel": cancelParLote(); break;
+      case "pesq-tab": setPesqTab(b.dataset.tab); break;
       case "apps-ia": openAppsFinder(); break;
       case "app-del": { const a = ((newsOv && newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === b.dataset.id); if (a) removeApp(a); break; }
       case "app-rename": { const a = ((newsOv && newsOv.apps && newsOv.apps.lista) || []).find((x) => x.pacote === b.dataset.id); if (a) openAppName(a); break; }
@@ -5749,9 +5986,10 @@
     const tabBtn = e.target.closest && e.target.closest('.more-tabs [role="tab"]');
     if (tabBtn && ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
       e.preventDefault();
-      const keys = moreTabs().map(([k]) => k), i = keys.indexOf(tabBtn.dataset.tab);
+      const pesq = tabBtn.dataset.act === "pesq-tab";
+      const keys = (pesq ? pesqTabs() : moreTabs()).map(([k]) => k), i = keys.indexOf(tabBtn.dataset.tab);
       const j = e.key === "Home" ? 0 : e.key === "End" ? keys.length - 1 : (i + (e.key === "ArrowRight" ? 1 : -1) + keys.length) % keys.length;
-      setMoreTab(keys[j]);
+      (pesq ? setPesqTab : setMoreTab)(keys[j]);
       return;
     }
     if (stack.length) {
@@ -5829,7 +6067,7 @@
       const p = String((e.data.route && e.data.route.path) || "").replace(/\/+$/, "");
       if (p === haPath) return;
       haPath = p;
-      if (p === "/novidades") nav("#/novidades");
+      if (p === "/novidades" || p === "/pesquisas") nav(`#${p}`);
       else haOpen(p);
     });
     try { window.parent.postMessage({ type: "home-assistant/subscribe-properties" }, "*"); } catch { /* fora do Home Assistant */ }

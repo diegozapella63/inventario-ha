@@ -5,7 +5,7 @@ from e2e_lib import SIZES, main
 
 SIZES.setdefault("tablet-deitado", (1100, 820, True))  # só neste teste; o e2e_lib já tem o tablet em pé ("tablet")
 
-PAGES = ["#/", "#/buscar", "#/comodos", "#/c/sala", "#/relatorio", "#/mais", "#/graficos", "#/novidades", "#/categorias", "#/config", "#/config/dados", "#/config/aparencia", "#/config/opcoes", "#/sobre"]
+PAGES = ["#/", "#/buscar", "#/comodos", "#/c/sala", "#/relatorio", "#/mais", "#/graficos", "#/pesquisas", "#/categorias", "#/config", "#/config/dados", "#/config/aparencia", "#/config/opcoes", "#/sobre"]
 # (nome, endereço, como abrir, o que aparece, tipo da janela)
 DIALOGS = [
     ("item-novo", "#/c/escritorio", '.rhead-actions [data-act="item-new"]', "#f-name", "modal"),
@@ -40,7 +40,7 @@ PAGE_CHECK = """(mode) => {
   const mt = [...document.querySelectorAll('.more-tabs [role=tab]')];
   if (mt.length) {
     const bar = box(document.querySelector('.more-tabs'));
-    if (mt.length < 4 || mt.some(t => box(t).right > bar.right + 1 || box(t).left < bar.left - 1 || t.scrollWidth > t.clientWidth + 2)) bad.push('abas de Mais não cabem');
+    if (mt.length < (location.hash.includes('pesquisas') ? 2 : 4) || mt.some(t => box(t).right > bar.right + 1 || box(t).left < bar.left - 1 || t.scrollWidth > t.clientWidth + 2)) bad.push('abas de Mais não cabem');
     if (mt.some(t => !vis(t.querySelector('.ic')))) bad.push('abas de Mais sem os ícones');
     if (new Set(mt.map(t => Math.round(box(t).height))).size > 1) bad.push('abas de Mais de alturas diferentes');
   }

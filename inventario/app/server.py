@@ -3697,6 +3697,19 @@ def rec_save(iid: str, found: dict):
         write_json_atomic(REC_FILE, d)
 
 
+def rec_dismiss(iid: str) -> dict:
+    """1.107.0: Apagar os recursos de um equipamento (e dos outros cômodos com o mesmo, que os copiariam de volta)."""
+    need_ai_on()
+    if not STORE.item(iid):
+        raise ApiError(404, "Item não encontrado.")
+    ids = set(news_group_ids(iid))
+    with REC_LOCK:
+        d = rec_read()
+        if any(k in d for k in ids):
+            write_json_atomic(REC_FILE, {k: v for k, v in d.items() if k not in ids})
+    return {}
+
+
 def _rec_job_run(jid: str, iid: str, name: str, details: str, entity: str):
     job = WEB_JOBS[jid]
     try:
@@ -3838,6 +3851,17 @@ def par_save(iid: str, found: dict) -> dict:
         return {k: v for k, v in d[iid].items() if k != "sig"}
 
 
+def par_dismiss(iid: str) -> dict:
+    """1.107.0: Apagar o parecer de um consumível."""
+    it = par_item(iid)
+    with PAR_LOCK:
+        d = read_json(PAR_FILE, None)
+        if isinstance(d, dict) and it["id"] in d:
+            d.pop(it["id"])
+            write_json_atomic(PAR_FILE, d)
+    return {}
+
+
 def par_item(iid: str) -> dict:
     need_ai_on()
     it = STORE.item(str(iid or ""))
@@ -3881,6 +3905,98 @@ def par_job_start(body: dict) -> dict:
     return {"id": jid}
 
 
+# ---------- Pesquisas da IA › Consumíveis (1.107.0): o parecer de cada consumível e Avaliar consumíveis, vários de uma vez
+# (os que ainda não têm, ou os escolhidos), um por um, com o andamento e o Parar (o que já foi avaliado fica guardado).
+PAR_LOTE_MAX = 200
+
+
+def need_cons_on():
+    if not consumiveis_enabled():
+        raise ApiError(409, "Ligue Usar consumíveis em Mais > Configurações > Opções.")
+
+
+def par_overview() -> dict:
+    """Os consumíveis e o parecer guardado de cada um ({id: {nota, at} ou None}) e a avaliação de vários em andamento."""
+    need_ai_on()
+    need_cons_on()
+    d = read_json(PAR_FILE, None)
+    d = d if isinstance(d, dict) else {}
+    itens = {}
+    for it in STORE.data["items"]:
+        if STORE.is_cons(it["room"]):
+            p = d.get(it["id"])
+            ok = isinstance(p, dict) and p.get("sig") == item_sig(it) and (p.get("resumo") or p.get("fortes"))
+            itens[it["id"]] = {"nota": p.get("nota"), "at": p.get("at")} if ok else None
+    job = next(({"id": j, "stage": v["stage"], "msg": v["msg"], "progress": v.get("progress")}
+                for j, v in WEB_JOBS.items() if v.get("kind") == "par-lote" and v["stage"] == "busy" and not v.get("cancelled")), None)
+    return {"itens": itens, "job": job}
+
+
+def _par_lote_run(jid: str, ids: list[str]):
+    job = WEB_JOBS[jid]
+    feitos = erros = 0
+    total = len(ids)
+    try:
+        for n, iid in enumerate(ids):
+            if job.get("cancelled"):
+                break
+            it = STORE.item(iid)
+            if not it or not STORE.is_cons(it["room"]):  # apagado ou mudado de lado no meio: fica de fora
+                continue
+            job["progress"] = {"feitos": n, "total": total, "atual": it["name"]}
+            job["msg"] = f"Avaliando {n + 1} de {total}: {it['name']}"
+            try:
+                avaliar(iid)  # guarda já: um que chega depois do Parar também fica (a IA já foi usada)
+            except ApiError as e:
+                if is_quota(e.msg) or "busca na web" in e.msg or e.status in (409, 503):
+                    raise  # a cota acabou, a IA não busca na web ou foi desligada: os próximos também não vão
+                erros += 1
+                continue
+            feitos += 1
+        job.update(stage="done", msg="", summary={"avaliados": feitos, "erros": erros, "total": total},
+                   progress={"feitos": total, "total": total, "atual": ""})
+    except ApiError as e:
+        job.update(stage="error", msg=(f"{feitos} {'avaliado' if feitos == 1 else 'avaliados'} antes de parar. " if feitos else "") + e.msg,
+                   summary={"avaliados": feitos, "erros": erros, "total": total})
+    except Exception:  # noqa: BLE001
+        log.exception("avaliar consumíveis")
+        job.update(stage="error", msg="Não deu para avaliar agora. Tente de novo em instantes.", summary={"avaliados": feitos, "erros": erros, "total": total})
+
+
+def par_lote_start(body: dict) -> dict:
+    """Avaliar vários: {itens: [ids]} os escolhidos, ou sem itens os que ainda não têm parecer (ou mudaram depois)."""
+    need_ai_on()
+    need_cons_on()
+    if not SUPERVISOR_TOKEN and not AI_MOCK:
+        raise ApiError(503, "O app não tem acesso à API do Home Assistant.")
+    with WEB_LOCK:
+        for j, v in WEB_JOBS.items():
+            if v.get("kind") == "par-lote" and v["stage"] == "busy" and not v.get("cancelled"):
+                return {"id": j}  # já tem uma avaliação andando: acompanha a mesma
+    cons = [it for it in STORE.sorted_items() if STORE.is_cons(it["room"])]
+    pedidos = body.get("itens")
+    if pedidos is None:
+        ids = [it["id"] for it in cons if not par_of(it["id"])]
+        if not ids:
+            raise ApiError(400, "Todos os consumíveis já têm parecer.")
+    else:
+        if not isinstance(pedidos, list) or not all(isinstance(x, str) for x in pedidos):
+            raise ApiError(400, "Mande os consumíveis numa lista.")
+        quer = set(pedidos)
+        ids = [it["id"] for it in cons if it["id"] in quer]
+        if not ids:
+            raise ApiError(400, "Escolha pelo menos um consumível.")
+    if len(ids) > PAR_LOTE_MAX:
+        raise ApiError(400, f"Até {PAR_LOTE_MAX} de uma vez.")
+    web_jobs_cleanup()
+    jid = secrets.token_hex(8)
+    with WEB_LOCK:
+        WEB_JOBS[jid] = {"stage": "busy", "msg": "Começando…", "results": [], "at": time.time(), "kind": "par-lote",
+                         "progress": {"feitos": 0, "total": len(ids), "atual": ""}}
+    threading.Thread(target=_par_lote_run, args=(jid, ids), daemon=True).start()
+    return {"id": jid}
+
+
 # ---------- Novidades › Eletrônicos (1.65.0): os recursos de todos os eletrônicos. Conferir novidades › Só eletrônicos
 # (1.68.0, na conferência das novidades) busca os que ainda não têm (ou que mudaram depois); o mesmo equipamento em
 # vários cômodos é uma busca só, guardada em todos.
@@ -3895,7 +4011,9 @@ def rec_overview() -> dict:
         if it.get("cat") == REC_LOTE_CAT:
             r = rec_of(it["id"])
             itens[it["id"]] = {"n": len(r.get("recursos") or []), "at": r.get("at")} if r else None
-    return {"itens": itens, "grupos": {i: news_group_key(STORE.item(i)) for i in itens}}
+    job = next(({"id": j, "stage": v["stage"], "msg": v["msg"], "progress": v.get("progress"), "so": v.get("so") or ""}
+                for j, v in WEB_JOBS.items() if v.get("kind") == "lote" and v["stage"] == "busy" and not v.get("cancelled")), None)
+    return {"itens": itens, "grupos": {i: news_group_key(STORE.item(i)) for i in itens}, "job": job}
 
 
 def rec_pending() -> list[list[dict]]:
@@ -4929,7 +5047,10 @@ def news_auto_loop():
 
 def news_batch_start(auto: bool = False, so: str = "") -> dict:
     """A conferência de todos (so ""), só dos equipamentos ("itens") ou só dos apps do celular ("apps")."""
-    need_news_on()
+    if so == "recursos":  # 1.107.0: Pesquisas da IA › Recursos, também com as Novidades desligadas
+        need_ai_on()
+    else:
+        need_news_on()
     if so not in ("", "itens", "apps", "recursos"):
         raise ApiError(400, "Escolha o que conferir: todas as novidades, só os equipamentos, só os apps ou só os eletrônicos.")
     if so == "apps" and not apps_enabled():
@@ -5103,10 +5224,17 @@ def chat_context(screen: dict) -> str:
             if it and (v.get("news") or {}).get("novidades") and news_group_key(it) not in seen:  # o mesmo equipamento uma vez só
                 seen.add(news_group_key(it))
                 com.append((it, v))
-        lines.append(f"Tela Novidades: {len(com)} eletrônicos com novidades conferidas.")
+        lines.append(f"Tela Pesquisas da IA › Novidades: {len(com)} eletrônicos com novidades conferidas.")
         for i, v in com[:20]:
             ns = v["news"]["novidades"]
             lines.append(f"- {i['name']}: " + "; ".join(f"[{n.get('tipo')}] {n.get('titulo')}" for n in ns[:3]))
+        if consumiveis_enabled():  # 1.107.0: a aba Pareceres, com a nota de cada consumível avaliado
+            pars = [(i, par_of(i["id"])) for i in STORE.sorted_items() if STORE.is_cons(i["room"])]
+            com_p = [(i, p) for i, p in pars if p.get("resumo") or p.get("fortes")]
+            lines.append(f"Pareceres: {len(com_p)} de {len(pars)} consumíveis avaliados.")
+            for i, p in sorted(com_p, key=lambda x: -(x[1].get("nota") or 0))[:20]:
+                nota = f"{p['nota']:g}".replace(".", ",") if isinstance(p.get("nota"), (int, float)) else "?"
+                lines.append(f"- {i['name']}: nota {nota}; {' '.join(str(p.get('resumo') or '').split())[:160]}")
     # 1.76.0: todos os itens (antes, fora de um cômodo ou da busca, a IA só via os totais e os 10 mais valiosos), na ordem
     # da tela: os cômodos e, por último, os Bens
     ordem = {r["id"]: (1 if r.get("kind") == "bens" else 0, r.get("order", 0)) for r in rooms}
@@ -5740,7 +5868,23 @@ def r_par_start(h, query):
 
 def r_par_status(h, jid, query):
     job = web_job(jid)
-    h.send_json({"stage": job["stage"], "msg": job["msg"], "parecer": job.get("parecer")})
+    h.send_json({"stage": job["stage"], "msg": job["msg"], "parecer": job.get("parecer"), "progress": job.get("progress"), "summary": job.get("summary")})
+
+
+def r_par_todos(h, query):
+    h.send_json(par_overview())
+
+
+def r_par_lote(h, query):
+    h.send_json(par_lote_start(h.read_body()), 202)
+
+
+def r_rec_del(h, query):
+    h.send_json(rec_dismiss((query.get("item") or [""])[0]))
+
+
+def r_par_del(h, query):
+    h.send_json(par_dismiss((query.get("item") or [""])[0]))
 
 
 def r_rec_all_get(h, query):
@@ -6307,6 +6451,8 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/news/apps/adicionar", r_news_apps_add),
     ("GET", r"/api/news/people", r_news_people),
     ("POST", r"/api/news/notify-test", r_news_notify_test),
+    ("GET", r"/api/parecer/todos", r_par_todos),  # 1.107.0: Pesquisas da IA › Consumíveis e Avaliar consumíveis
+    ("POST", r"/api/parecer/lote", r_par_lote),
     ("GET", r"/api/parecer", r_par_get),  # 1.103.0: Avaliar com IA (os consumíveis)
     ("POST", r"/api/parecer", r_par_start),
     ("GET", r"/api/parecer/([a-f0-9]{16})", r_par_status),
@@ -6314,6 +6460,8 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("GET", r"/api/recursos", r_rec_get),
     ("GET", r"/api/recursos/todos", r_rec_all_get),  # 1.65.0: Novidades › Eletrônicos
     ("POST", r"/api/recursos", r_rec_start),
+    ("DELETE", r"/api/recursos", r_rec_del),  # 1.107.0: Apagar os recursos (e o parecer, logo abaixo)
+    ("DELETE", r"/api/parecer", r_par_del),
     ("GET", r"/api/recursos/([a-f0-9]{16})", r_rec_status),
     ("DELETE", r"/api/recursos/([a-f0-9]{16})", r_news_cancel),
     ("GET", r"/api/news/([a-f0-9]{16})", r_news_status),

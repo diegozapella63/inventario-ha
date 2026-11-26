@@ -1,5 +1,14 @@
 # Mudanças
 
+## 1.107.0
+
+- **Pesquisas da IA** (Mais), no lugar de Novidades: uma central do que a IA busca na internet, em abas.
+  - **Novidades**: os equipamentos, os apps do celular, Conferir novidades e Limpar.
+  - **Recursos**: os eletrônicos, com quantos recursos cada um tem, e **Buscar recursos › Buscar os que faltam** (antes, o Só eletrônicos das Novidades). Funciona também com as Novidades desligadas.
+  - **Pareceres** (com os consumíveis): cada consumível com a nota do parecer, os avaliados primeiro. Um toque abre o parecer. **Avaliar consumíveis** avalia de uma vez **Os sem parecer** ou os que você marcar em **Escolher quais**, um por um, com o andamento e o **Parar**, que guarda os já avaliados.
+- **Apagar** o que a IA buscou: além das novidades, os **Recursos** e o **Parecer da IA** têm o Apagar, na ficha do item (ao lado de Ver de novo e Avaliar de novo) e nas janelas das Pesquisas da IA. Os recursos saem também dos outros cômodos com o mesmo equipamento. Dá para buscar de novo quando quiser.
+- O endereço de antes das Novidades (e o link do aviso no celular) continua abrindo as Novidades.
+
 ## 1.106.0
 
 - **Buscar › Filtros**: cada tipo mostra só as categorias dele.

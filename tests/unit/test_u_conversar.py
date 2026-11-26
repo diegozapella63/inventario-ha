@@ -148,12 +148,12 @@ class Contexto(UnitBase):
     def test_tela_novidades(self):
         server.news_save_result(TV, server.news_clean({"novidades": [{"titulo": "Firmware novo", "fonte": "https://fab.exemplo/f"}]}))
         c = server.chat_context({"view": "news"})
-        self.assertIn("Tela Novidades: 1 eletrônicos com novidades conferidas.", c)
+        self.assertIn("Tela Pesquisas da IA › Novidades: 1 eletrônicos com novidades conferidas.", c)
         self.assertIn("- Smart TV 55 polegadas: [outro] Firmware novo", c)
 
     def test_tela_novidades_pelo_jeito_antigo(self):
         server.news_save_result(TV, server.news_clean({"novidades": [{"titulo": "Firmware novo", "fonte": "https://fab.exemplo/f"}]}))
-        self.assertIn("Tela Novidades:", server.chat_context({"view": "data", "tab": "novidades"}))
+        self.assertIn("Tela Pesquisas da IA › Novidades:", server.chat_context({"view": "data", "tab": "novidades"}))
 
     def test_menu_mais_e_categorias_levam_so_o_resumo(self):
         for view in ("menu", "cats"):

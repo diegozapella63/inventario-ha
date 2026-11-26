@@ -17,8 +17,9 @@ async def body(r, p):
     ctx, pg = await r.page(b, "cel", "dark", accent="laranja")
     await r.open(pg, "#/novidades", "#p-news")
     await pg.wait_for_selector('[data-slot="news-list"] p, #p-news-list .nlist', timeout=8000)
-    r.eq((await pg.text_content(".page-title")).strip(), "Novidades", "Novidades numa tela própria, aberta pelo endereço")
-    r.eq(await pg.locator("#view .more-tabs").count(), 0, "sem as abas de configurações")
+    r.eq((await pg.text_content(".page-title")).strip(), "Pesquisas da IA", "1.107.0: Pesquisas da IA, aberta pelo endereço de antes")
+    r.eq(await pg.evaluate("[...document.querySelectorAll('#view .more-tabs [role=tab]')].map(t => [t.textContent.trim(), t.getAttribute('aria-selected')])"),
+         [["Novidades", "true"], ["Recursos", "false"]], "as abas Novidades (a aberta) e Recursos, sem as de Configurações")
     r.eq(await pg.locator("#view .chip, #p-news-cats").count(), 0, "sem escolher categorias")
     r.check("dos eletrônicos" in await pg.text_content("#p-news .lead"), "diz que é dos eletrônicos")
     r.check("Toque em Conferir novidades" in await pg.text_content('[data-slot="news-list"]'), "antes da primeira vez, diz o que fazer")
@@ -95,7 +96,7 @@ async def body(r, p):
     await pg.go_back()
     await pg.wait_for_selector("dialog.sheet", state="detached", timeout=4000)
     await pg.wait_for_timeout(300)
-    r.check(pg.url.endswith("#/novidades") and await pg.locator("#p-news-list .nrow").count() > 0, "o Voltar volta para as Novidades")
+    r.check(pg.url.endswith("/novidades") and await pg.locator("#p-news-list .nrow").count() > 0, "o Voltar volta para as Novidades")
     # 1.68.0: abriu, viu: deixa de ser nova na lista
     tvr = next(x for x in await pg.evaluate(ROWS) if x[0] == "Smart TV 55 polegadas")
     r.check(vistos and " · 3 novidades · hoje" in tvr[1] and await pg.locator(".nrow", has_text="Smart TV 55 polegadas").locator(".pill.nova").count() == 0,
@@ -212,7 +213,7 @@ async def body(r, p):
     # e pela ficha do item: Buscar de novo e Apagar lado a lado
     await r.open(pg, f"#/i/{tv}", "dialog.sheet h1")
     await pg.wait_for_selector('dialog.sheet [data-act="item-news-del"]', timeout=6000)
-    b2 = await pg.evaluate("""[...document.querySelectorAll('dialog.sheet .inews-acts .btn')].map(b => { const q = b.getBoundingClientRect(); return [b.textContent.trim(), Math.round(q.width), Math.round(q.top)]; })""")
+    b2 = await pg.evaluate("""[...document.querySelectorAll('dialog.sheet [data-slot="item-news"] .inews-acts .btn')].map(b => { const q = b.getBoundingClientRect(); return [b.textContent.trim(), Math.round(q.width), Math.round(q.top)]; })""")
     r.check([x[0] for x in b2] == ["Buscar de novo", "Apagar"] and b2[0][1:] == b2[1][1:], f"na ficha, Buscar de novo e Apagar lado a lado, do mesmo tamanho ({b2})")
     await r.shot(pg, "ficha-apagar")
     await pg.click('dialog.sheet [data-act="item-news-del"]')

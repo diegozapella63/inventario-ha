@@ -603,6 +603,47 @@
       ST.jobs.set(id, { at: Date.now(), item: it.id });
       return { id };
     }
+    // Pesquisas da IA › Pareceres (1.107.0): os consumíveis com a nota, Avaliar vários e Apagar
+    const parEx = (it) => ({ nota: 4, resumo: `Exemplo da prévia: no Home Assistant, a IA pesquisa as avaliações de ${it.name} e diz se vale a pena.`,
+      fortes: ["Rende bastante"], fracos: ["A embalagem vaza se ficar deitada"], dicas: ["Guarde em pé."], alternativas: [], preco: "R$ 20 a R$ 30", fontes: [], at: new Date().toISOString() });
+    const consDe = () => d.items.filter((i) => { const r = d.rooms.find((x) => x.id === i.room); return r && r.kind === "consumiveis"; });
+    if (method === "GET" && path === "api/parecer/todos") {
+      aiOff();
+      const lj = [...ST.jobs.entries()].find(([, j]) => j.lote && j.feitos < j.lote.length);
+      return { itens: Object.fromEntries(consDe().map((i) => { const p = (ST.par || {})[i.id]; return [i.id, p ? { nota: p.nota, at: p.at } : null]; })),
+        job: lj ? { id: lj[0], stage: "busy", msg: "Avaliando…", progress: null } : null };
+    }
+    if (method === "POST" && path === "api/parecer/lote") {
+      aiOff();
+      const cons = consDe();
+      const ids = body.itens ? cons.filter((i) => body.itens.includes(i.id)).map((i) => i.id) : cons.filter((i) => !(ST.par || {})[i.id]).map((i) => i.id);
+      if (!ids.length) fail(body.itens ? "Escolha pelo menos um consumível." : "Todos os consumíveis já têm parecer.");
+      const id = Math.random().toString(16).slice(2, 10).padEnd(8, "0") + Math.random().toString(16).slice(2, 10).padEnd(8, "0");
+      ST.jobs.set(id, { at: Date.now(), lote: ids, feitos: 0 });
+      return { id };
+    }
+    if (method === "DELETE" && path.startsWith("api/parecer?item=")) {
+      const { [decodeURIComponent(path.slice("api/parecer?item=".length))]: _fora, ...resto } = ST.par || {};
+      ST.par = resto;
+      return {};
+    }
+    if (method === "DELETE" && path.startsWith("api/recursos?item=")) {
+      const { [decodeURIComponent(path.slice("api/recursos?item=".length))]: _fora, ...resto } = ST.rec || {};
+      ST.rec = resto;
+      return {};
+    }
+    if ((m = path.match(/^api\/parecer\/([a-f0-9]+)$/)) && (ST.jobs.get(m[1]) || {}).lote) {
+      const j = ST.jobs.get(m[1]);
+      if (method === "DELETE") { ST.jobs.delete(m[1]); return { ok: true }; }
+      const n = Math.min(j.lote.length, Math.floor((Date.now() - j.at) / 900));
+      for (const iid of j.lote.slice(j.feitos, n)) { const it = d.items.find((i) => i.id === iid); if (it) ST.par = { ...(ST.par || {}), [iid]: parEx(it) }; }
+      j.feitos = n;
+      if (n < j.lote.length) {
+        const it = d.items.find((i) => i.id === j.lote[n]);
+        return { stage: "busy", msg: `Avaliando ${n + 1} de ${j.lote.length}: ${it ? it.name : ""}`, progress: { feitos: n, total: j.lote.length, atual: it ? it.name : "" } };
+      }
+      return { stage: "done", msg: "", summary: { avaliados: n, erros: 0, total: n }, progress: { feitos: n, total: n, atual: "" } };
+    }
     if ((m = path.match(/^api\/parecer\/([a-f0-9]+)$/))) {
       const j = ST.jobs.get(m[1]);
       if (method === "DELETE") { ST.jobs.delete(m[1]); return { ok: true }; }

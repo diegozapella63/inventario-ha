@@ -117,3 +117,153 @@ class Ferramenta(Base):
         with self.assertRaises(F.ErroFerramenta) as e:
             self.chamar({"id": self.cons["id"]})
         self.assertIn("IA do InventarIA está desligada", str(e.exception))
+
+
+def _espera(job, s=5):
+    t0 = time.time()
+    while job["stage"] == "busy" and time.time() - t0 < s:
+        time.sleep(0.02)
+
+
+class Pesquisas(Base):
+    """1.107.0 (o dono: "uma central mesmo de coisas que eu vou buscar de novidades, recursos, avaliações"; "todos esses caras
+    que a gente buscou da IA, ele tem que ter uma opção para poder apagar"): Pesquisas da IA › Pareceres (a lista, Avaliar
+    vários) e o Apagar dos recursos e do parecer."""
+
+    def setUp(self):
+        super().setUp()
+        area = self.cons["room"]
+        self.outro = self.store.create_items([{"room": area, "name": "Pilhas AA Exemplo"}, {"room": area, "name": "Creme Exemplo"}], "Ana")
+
+    def test_a_lista_dos_pareceres(self):
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S.time, "sleep", lambda s: None):
+            S.avaliar(self.cons["id"])
+        ov = S.par_overview()
+        self.assertEqual(set(ov["itens"]), {self.cons["id"]} | {i["id"] for i in self.outro}, "só os consumíveis")
+        self.assertEqual(ov["itens"][self.cons["id"]]["nota"], 4)
+        self.assertIsNone(ov["itens"][self.outro[0]["id"]])
+        self.assertIsNone(ov["job"])
+        c = S.chat_context({"view": "news"})
+        self.assertIn("Pareceres: 1 de 3 consumíveis avaliados.", c)
+        self.assertIn("- Pasta térmica Exemplo: nota 4;", c)
+        self.store.settings["consumiveis"] = False
+        with self.assertRaises(S.ApiError) as e:
+            S.par_overview()
+        self.assertEqual(e.exception.status, 409)
+
+    def test_avaliar_os_sem_parecer_e_os_escolhidos(self):
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S.time, "sleep", lambda s: None):
+            S.avaliar(self.cons["id"])
+            vistos = []
+            real = S.ai_find_par
+            with mock.patch.object(S, "ai_find_par", side_effect=lambda it, e: vistos.append(it["name"]) or real(it, e)):
+                jid = S.par_lote_start({})["id"]
+                self.assertEqual(S.par_lote_start({})["id"], jid, "uma avaliação andando: acompanha a mesma")
+                job = S.WEB_JOBS[jid]
+                _espera(job)
+            self.assertEqual(job["stage"], "done")
+            self.assertEqual(sorted(vistos), ["Creme Exemplo", "Pilhas AA Exemplo"], "só os sem parecer")
+            self.assertEqual(job["summary"], {"avaliados": 2, "erros": 0, "total": 2})
+            with self.assertRaises(S.ApiError) as e:
+                S.par_lote_start({})
+            self.assertIn("já têm parecer", e.exception.msg)
+            jid = S.par_lote_start({"itens": [self.cons["id"], "nao-existe"]})["id"]
+            _espera(S.WEB_JOBS[jid])
+            self.assertEqual(S.WEB_JOBS[jid]["summary"]["avaliados"], 1, "os escolhidos, mesmo os que já têm")
+            for ruim, parte in (({"itens": []}, "pelo menos um"), ({"itens": "x"}, "numa lista"), ({"itens": [1]}, "numa lista")):
+                with self.assertRaises(S.ApiError) as e:
+                    S.par_lote_start(ruim)
+                self.assertIn(parte, e.exception.msg)
+
+    def test_um_que_falha_segue_e_a_cota_para(self):
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S.time, "sleep", lambda s: None):
+            with mock.patch.object(S, "ai_find_par", side_effect=S.ApiError(502, "A IA não achou avaliações.")):
+                jid = S.par_lote_start({})["id"]
+                _espera(S.WEB_JOBS[jid])
+            self.assertEqual((S.WEB_JOBS[jid]["stage"], S.WEB_JOBS[jid]["summary"]["erros"]), ("done", 3))
+            n = []
+            def cota(it, e):
+                n.append(1)
+                if len(n) == 1:
+                    return S.MOCK_PAR
+                raise S.ApiError(429, "A cota da IA acabou.")
+            with mock.patch.object(S, "ai_find_par", side_effect=cota):
+                jid = S.par_lote_start({})["id"]
+                _espera(S.WEB_JOBS[jid])
+            job = S.WEB_JOBS[jid]
+            self.assertEqual(job["stage"], "error")
+            self.assertTrue(job["msg"].startswith("1 avaliado antes de parar."), job["msg"])
+            self.assertEqual(len(n), 2, "a cota acabou: os próximos não são tentados")
+
+    def test_parar_guarda_os_que_ja_foram(self):
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S.time, "sleep", lambda s: None):
+            ids = []
+            def um(it, e):
+                ids.append(it["id"])
+                for v in S.WEB_JOBS.values():  # Parar no meio do primeiro (o jid pode ainda não ter voltado)
+                    if v.get("kind") == "par-lote":
+                        v["cancelled"] = True
+                return S.MOCK_PAR
+            with mock.patch.object(S, "ai_find_par", side_effect=um):
+                jid = S.par_lote_start({})["id"]
+                _espera(S.WEB_JOBS[jid])
+        self.assertEqual(len(ids), 1, "parou depois do primeiro")
+        self.assertTrue(S.par_of(ids[0]), "o que chegou ficou guardado")
+
+    def test_apagar_o_parecer_e_os_recursos(self):
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S.time, "sleep", lambda s: None):
+            S.avaliar(self.cons["id"])
+        self.assertEqual(S.par_dismiss(self.cons["id"]), {})
+        self.assertEqual(S.par_of(self.cons["id"]), {})
+        self.assertEqual(S.par_dismiss(self.cons["id"]), {}, "de novo: nada a apagar, sem erro")
+        el = [i for i in self.store.data["items"] if i.get("cat") == "eletronicos"][:1]
+        if not el:
+            self.skipTest("a casa de teste sem eletrônicos")
+        sala = el[0]
+        gemeo = self.store.create_items([{"room": next(r["id"] for r in self.store.data["rooms"] if not r.get("kind") and r["id"] != sala["room"]),
+                                          "name": sala["name"], "cat": "eletronicos"}], "Ana")[0]
+        for i in (sala, gemeo):
+            S.rec_save(i["id"], {"recursos": [{"nome": "Wi-Fi", "detalhe": ""}], "fonte": "", "site": ""})
+        self.assertTrue(S.rec_of(gemeo["id"]))
+        S.rec_dismiss(sala["id"])
+        self.assertEqual((S.rec_of(sala["id"]), S.rec_of(gemeo["id"])), ({}, {}), "o mesmo equipamento no outro cômodo também")
+        with self.assertRaises(S.ApiError) as e:
+            S.rec_dismiss("nao-existe")
+        self.assertEqual(e.exception.status, 404)
+
+    def test_recursos_sem_as_novidades_e_o_andamento_na_lista(self):
+        self.store.settings["news"] = False
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S, "rec_pending", return_value=[]):
+            jid = S.news_batch_start(so="recursos")["id"]
+            _espera(S.WEB_JOBS[jid])
+            self.assertEqual(S.WEB_JOBS[jid]["stage"], "done")
+            with self.assertRaises(S.ApiError):
+                S.news_batch_start(so="itens")
+        S.WEB_JOBS["f" * 16] = {"kind": "lote", "stage": "busy", "msg": "Conferindo…", "so": "recursos", "at": time.time()}
+        try:
+            self.assertEqual((S.rec_overview()["job"]["id"], S.rec_overview()["job"]["so"]), ("f" * 16, "recursos"), "a busca andando vai para a aba Recursos")
+        finally:
+            S.WEB_JOBS.pop("f" * 16, None)
+
+    def test_as_ferramentas(self):
+        nomes = [f["nome"] for f in F.lista()]
+        self.assertIn("pareceres", nomes)
+        self.assertIn("apagar_pesquisa", nomes)
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S.time, "sleep", lambda s: None):
+            S.avaliar(self.cons["id"])
+        r = json.loads(F.chamar(S, "pareceres", {}, {"nome": "Ana"}, "Claude"))
+        self.assertEqual([x["item"] for x in r["com_parecer"]], ["Pasta térmica Exemplo"])
+        self.assertEqual(sorted(x["item"] for x in r["sem_parecer"]), ["Creme Exemplo", "Pilhas AA Exemplo"])
+        self.assertNotIn("com_parecer", json.loads(F.chamar(S, "pareceres", {"so_sem": True}, {"nome": "Ana"}, "Claude")))
+        r = json.loads(F.chamar(S, "apagar_pesquisa", {"id": self.cons["id"], "o_que": "parecer"}, {"nome": "Ana"}, "Claude"))
+        self.assertEqual(r["apagado"], "parecer")
+        self.assertEqual(S.par_of(self.cons["id"]), {})
+        for args, parte in (({"id": self.cons["id"], "o_que": "parecer"}, "não tem parecer"), ({"id": self.cons["id"], "o_que": "recursos"}, "não tem recursos"),
+                            ({"id": self.cons["id"], "o_que": "tudo"}, "novidades, recursos ou parecer")):
+            with self.assertRaises(F.ErroFerramenta) as e:
+                F.chamar(S, "apagar_pesquisa", args, {"nome": "Ana"}, "Claude")
+            self.assertIn(parte, str(e.exception))
+        self.store.settings["consumiveis"] = False
+        with self.assertRaises(F.ErroFerramenta) as e:
+            F.chamar(S, "pareceres", {}, {"nome": "Ana"}, "Claude")
+        self.assertIn("consumíveis estão desligados", str(e.exception))

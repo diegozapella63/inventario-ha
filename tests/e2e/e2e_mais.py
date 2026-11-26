@@ -1,4 +1,4 @@
-"""Mais é um menu (Bens, Gráficos, Novidades, Categorias, Relatório, Configurações, Sobre), com Voltar e os endereços antigos; Mais > Configurações > Dados: abas,
+"""Mais é um menu (Bens, Gráficos, Pesquisas da IA, Categorias, Relatório, Configurações, Sobre), com Voltar e os endereços antigos; Mais > Configurações > Dados: abas,
 exportar (CSV, JSON, ZIP), backup na pasta share, versões anteriores, importar; botões do mesmo tamanho e alinhados."""
 import csv
 import io
@@ -33,15 +33,15 @@ async def body(r, p):
     await pg.wait_for_selector(".menu-list")
     r.eq((await pg.text_content(".page-title")).strip(), "Mais", "a aba Mais abre um menu")
     rows = await pg.evaluate("[...document.querySelectorAll('.menu-row')].map(a => [a.querySelector('b').textContent, a.getAttribute('href')])")
-    r.eq(rows, [["Bens", "#/bens"], ["Gráficos", "#/graficos"], ["Novidades", "#/novidades"], ["Categorias", "#/categorias"], ["Relatório do inventário", "#/relatorio"], ["Configurações", "#/config"], ["Sobre", "#/sobre"]],
-         "com Bens, Gráficos, Novidades, Categorias, Relatório, Configurações e, por último, Sobre")
+    r.eq(rows, [["Bens", "#/bens"], ["Gráficos", "#/graficos"], ["Pesquisas da IA", "#/pesquisas"], ["Categorias", "#/categorias"], ["Relatório do inventário", "#/relatorio"], ["Configurações", "#/config"], ["Sobre", "#/sobre"]],
+         "com Bens, Gráficos, Pesquisas da IA (1.107.0, antes Novidades), Categorias, Relatório, Configurações e, por último, Sobre")
     r.eq(await pg.locator("#view .more-tabs").count(), 0, "sem as abas de configurações no menu")
     r.eq(await pg.get_attribute('.tabbar a[data-tab="data"]', "aria-current"), "page", "a aba Mais fica marcada")
     hs = await pg.evaluate("[...document.querySelectorAll('.menu-row')].map(a => Math.round(a.getBoundingClientRect().height))")
     r.check(min(hs) >= 64 and max(hs) - min(hs) <= 24, f"linhas grandes, fáceis de tocar ({hs})")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "menu")
-    for title, href, wait in (("Gráficos", "#/graficos", ".kpis"), ("Novidades", "#/novidades", "#p-news"), ("Categorias", "#/categorias", "#p-cats"),
+    for title, href, wait in (("Gráficos", "#/graficos", ".kpis"), ("Pesquisas da IA", "#/pesquisas", "#p-news"), ("Categorias", "#/categorias", "#p-cats"),
                               ("Relatório", "#/relatorio", ".report"), ("Configurações", "#/config", ".more-tabs"), ("Sobre", "#/sobre", ".about")):
         await pg.click(f'.menu-row[href="{href}"]')
         await pg.wait_for_selector(wait, timeout=8000)
@@ -60,7 +60,7 @@ async def body(r, p):
     r.check(True, "o link Mais, no alto, volta ao menu")
 
     # endereços antigos: Mais com abas
-    for old, new in (("#/mais/integracoes", "#/config"), ("#/config/integracoes", "#/config"), ("#/mais/opcoes", "#/config/opcoes"), ("#/mais/novidades", "#/novidades"), ("#/dados", "#/config/dados"), ("#/mais/dados", "#/config/dados")):
+    for old, new in (("#/mais/integracoes", "#/config"), ("#/config/integracoes", "#/config"), ("#/mais/opcoes", "#/config/opcoes"), ("#/mais/novidades", "#/pesquisas/novidades"), ("#/novidades", "#/pesquisas/novidades"), ("#/dados", "#/config/dados"), ("#/mais/dados", "#/config/dados")):
         await pg.goto("about:blank")
         await pg.goto(r.base + old)
         await pg.wait_for_selector(".more-tabs, #p-news", timeout=8000)

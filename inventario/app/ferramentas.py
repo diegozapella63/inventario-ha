@@ -96,6 +96,11 @@ FERRAMENTAS = [
                   "pontos fortes e fracos, dicas para render mais, outras opções e o preço de hoje. Devolve o parecer guardado; sem "
                   "ele (ou com nova), avalia agora (demora até um minuto).",
      "entrada": _obj({"id": _ID, "nova": {"type": "boolean", "description": "Avaliar de novo, mesmo com um parecer guardado."}}, ["id"])},
+    {"nome": "pareceres", "titulo": "Pareceres dos consumíveis", "grava": False,
+     "descricao": "Os consumíveis com o parecer guardado do Avaliar com IA (a nota de 1 a 5, o resumo e quando foi avaliado) e os que "
+                  "ainda não têm, como a tela Pesquisas da IA › Pareceres. Só lê o que já foi avaliado: para avaliar um, use avaliar. "
+                  "Filtro: so_sem (só os que não têm parecer).",
+     "entrada": _obj({"so_sem": {"type": "boolean", "description": "true: só os consumíveis sem parecer."}})},
     {"nome": "cadastrar_itens", "titulo": "Cadastrar itens", "grava": True,
      "descricao": "Cadastra um ou mais itens num cômodo (ou em Bens: casa, terreno, carro; ou em Consumíveis: o que se gasta "
                   "e se compra de novo, como pasta térmica e creme de massagem). Cada item ganha o próximo código "
@@ -161,6 +166,11 @@ FERRAMENTAS = [
      "descricao": "Guarda num item que já existe a foto que a pessoa acabou de mandar na conversa (a nota, o estado, a "
                   "etiqueta). Ache o item antes, com inventario_buscar_itens. Só serve logo depois de a pessoa mandar a foto.",
      "entrada": _obj({"id": {"type": "string", "description": "O id ou o código do item (SAL-003)."}}, ["id"])},
+    {"nome": "apagar_pesquisa", "titulo": "Apagar o que a IA buscou", "grava": True, "apaga": True,
+     "descricao": "Apaga de um item o que a IA buscou na internet, como o Apagar da ficha: as novidades (não voltam nas próximas "
+                  "conferências), os recursos (de um eletrônico; também nos outros cômodos com o mesmo equipamento) ou o parecer (de "
+                  "um consumível). O item não muda, e dá para buscar de novo.",
+     "entrada": _obj({"id": _ID, "o_que": {"type": "string", "enum": ["novidades", "recursos", "parecer"], "description": "O que apagar."}}, ["id", "o_que"])},
 ]
 POR_NOME = {f["nome"]: f for f in FERRAMENTAS}
 
@@ -646,6 +656,9 @@ def _ver(srv, a) -> str:
         if n > 1:
             out["valor_de_cada"] = round(out["valor"] / n, 2)
         out["valor_desde"] = str(it.get("valueAt") or it.get("createdAt") or "")[:10]
+    rec = srv.rec_of(it["id"]) if srv.ai_enabled() else {}
+    if rec.get("recursos"):  # 1.107.0: os recursos guardados (os de Pesquisas da IA › Recursos)
+        out["recursos"] = [r.get("nome") for r in rec["recursos"] if r.get("nome")]
     out["detalhes"] = it.get("details") or ""
     out["observacao"] = it.get("flag") or ""
     out["fotos"] = len(it.get("photos") or [])
@@ -885,6 +898,50 @@ def _avaliar(srv, a) -> str:
     return json.dumps(out, ensure_ascii=False)
 
 
+def _pareceres(srv, a) -> str:
+    """1.107.0: os pareceres guardados dos consumíveis (o que a tela Pesquisas da IA › Pareceres mostra), sem chamar a IA."""
+    if not srv.ai_enabled():
+        raise ErroFerramenta("A IA do InventarIA está desligada (Mais › Configurações › Integrações › Usar IA). Diga isso à pessoa.")
+    if not srv.consumiveis_enabled():
+        raise ErroFerramenta("Os consumíveis estão desligados (Mais › Configurações › Opções › Usar consumíveis). Diga isso à pessoa.")
+    com, sem = [], []
+    for it in srv.STORE.sorted_items():
+        if not _eh_cons(srv, it):
+            continue
+        p = srv.par_of(it["id"])
+        if p and (p.get("resumo") or p.get("fortes")):
+            com.append({"id": it["id"], "item": it.get("name"), "nota": p.get("nota"), "resumo": p.get("resumo"), "avaliado_em": (p.get("at") or "")[:10]})
+        else:
+            sem.append({"id": it["id"], "item": it.get("name")})
+    out = {"sem_parecer": sem} if a.get("so_sem") is True else {"com_parecer": sorted(com, key=lambda x: -(x["nota"] or 0)), "sem_parecer": sem}
+    return json.dumps(out, ensure_ascii=False)
+
+
+def _apagar_pesquisa(srv, a) -> str:
+    """1.107.0: Apagar as novidades, os recursos ou o parecer de um item (o Apagar da ficha), fora da trava do Store."""
+    o_que = a.get("o_que")
+    if o_que not in ("novidades", "recursos", "parecer"):
+        raise ErroFerramenta("o_que: novidades, recursos ou parecer.")
+    with srv.STORE.lock:
+        it = _achar_item(srv, a.get("id"))
+    if o_que == "novidades":
+        r = srv.news_of(it["id"])
+        if not ((r.get("news") or {}).get("novidades")):
+            raise ErroFerramenta(f"{it.get('name')} não tem novidades para apagar.")
+        srv.news_dismiss(it["id"])
+    elif o_que == "recursos":
+        if not srv.rec_of(it["id"]):
+            raise ErroFerramenta(f"{it.get('name')} não tem recursos guardados.")
+        srv.rec_dismiss(it["id"])
+    else:
+        if not _eh_cons(srv, it):
+            raise ErroFerramenta(f"{it.get('name')} não é um consumível: o parecer é dos consumíveis.")
+        if not srv.par_of(it["id"]):
+            raise ErroFerramenta(f"{it.get('name')} não tem parecer para apagar.")
+        srv.par_dismiss(it["id"])
+    return json.dumps({"item": it.get("name"), "id": it["id"], "apagado": o_que}, ensure_ascii=False)
+
+
 def _comprei(srv, a, quem) -> str:
     it = _achar_item(srv, a.get("id"))
     if not _eh_cons(srv, it):
@@ -1073,6 +1130,11 @@ def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
     if nome == "avaliar":  # 1.103.0: a IA pesquisa na web, fora da trava do Store
         try:
             return _avaliar(srv, a)
+        except srv.ApiError as e:
+            raise ErroFerramenta(e.msg) from None
+    if nome in ("pareceres", "apagar_pesquisa"):  # 1.107.0: cada arquivo tem a trava dele
+        try:
+            return _pareceres(srv, a) if nome == "pareceres" else _apagar_pesquisa(srv, a)
         except srv.ApiError as e:
             raise ErroFerramenta(e.msg) from None
     if nome in ("cadastrar_por_foto", "anexar_foto", "ler_arquivo"):  # as que recebem a foto (a leitura por IA fica fora da trava do Store)
