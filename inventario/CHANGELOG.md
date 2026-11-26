@@ -1,5 +1,14 @@
 # Mudanças
 
+## 1.108.0
+
+- **Buscar › Agrupar por**, no mesmo jeito dos Consumíveis, num bloco depois dos Filtros: **Nenhum**, **Cômodo**, **Categoria** (com um tipo escolhido que tenha categorias) e, em Todos os tipos, **Tipo**.
+  - Por Cômodo, os consumíveis aparecem nos cômodos onde são usados, e os bens ficam à parte.
+  - Cada grupo tem o ícone, o nome, quantos itens e a soma, e fecha num toque no título.
+  - O Selecionar funciona com os grupos.
+- O título **Agrupar por** fecha e abre o bloco, aqui e nos Consumíveis. Fechado, mostra ao lado o que está escolhido. O aparelho lembra a escolha, o bloco fechado e os grupos fechados.
+- Os grupos dos **Bens** (Imóveis, Veículos, Outros) também fecham num toque no título.
+
 ## 1.107.0
 
 - **Pesquisas da IA** (Mais), no lugar de Novidades: uma central do que a IA busca na internet, em abas.

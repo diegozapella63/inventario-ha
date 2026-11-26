@@ -717,7 +717,14 @@ button.zone-h .seta { color: var(--muted); flex: none; transition: transform .2s
 /* 1.102.1 (o dono: "Agrupar por ficou ridículo, cria nos mesmos padrões dos apps"): o título pequeno com o ícone e, embaixo,
    as escolhas lado a lado, do mesmo tamanho, num controle só (como o Agrupar por do ResolvIA e do OdisseIA) */
 .agrupar { display: grid; gap: 8px; margin: 0 0 18px; }
-.agrupar-l { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
+.agrupar-l { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 32px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+/* 1.108.0: o Agrupar por fecha pelo título (fechado, o escolhido ao lado), com a seta no canto, como os grupos */
+.agrupar-l > .seta { margin-left: auto; color: var(--muted); transition: transform .2s; transform: rotate(90deg); }
+.agrupar.fechado > .agrupar-l > .seta { transform: none; }
+.agrupar-l > .agrupar-val { color: var(--ink); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sbar .agrupar { margin: 14px 0 0; }
+.agrupar.fechado { gap: 0; }
+#results .busca-g:first-child { margin-top: 18px; }
 .seg.agrupar-seg { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); width: min(100%, 520px); }
 .seg.agrupar-seg button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; min-height: 40px; padding: 0 6px; min-width: 0; font-size: 14.5px; cursor: pointer; }
 .seg.agrupar-seg button > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

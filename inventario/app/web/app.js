@@ -1220,10 +1220,26 @@
     const groups = BENS_GROUPS.map(([k, name]) => [name, D.bensItems.filter((it) => bensGroup(it) === k).sort((a, b) => vl(b) - vl(a))])
       .filter(([, its]) => its.length);
     return `<div class="mscreen bens">
-      ${groups.map(([name, its]) => `<section class="zone">
-        <div class="zone-h"><h3><span class="zone-ic" aria-hidden="true">${ic({ "Imóveis": "home", "Veículos": "car" }[name] || "gem")}</span>${esc(name)}</h3><span class="zs">${plural(its.length, "bem", "bens")}<b>${moneyR(its.reduce((t, i) => t + vl(i), 0))}</b></span></div>
-        <ul class="ilist">${its.map((it) => itemRow(it, { mode: name === "Outros" ? "bens" : "room" })).join("")}</ul></section>`).join("")}
+      ${groups.map(([name, its]) => grupoHtml("bens-fechados", name, name, { "Imóveis": "home", "Veículos": "car" }[name] || "gem",
+        `${plural(its.length, "bem", "bens")}<b>${moneyR(its.reduce((t, i) => t + vl(i), 0))}</b>`,
+        `<ul class="ilist">${its.map((it) => itemRow(it, { mode: name === "Outros" ? "bens" : "room" })).join("")}</ul>`)).join("")}
     </div>`;
+  }
+  // 1.108.0, o padrão da família (o dono: "deixa tudo bem bonito nesse padrão"; o modelo é o dos Consumíveis): o Agrupar por
+  // num bloco dele, que fecha pelo título (fechado, o escolhido ao lado; o aparelho lembra), com as escolhas do mesmo tamanho
+  // numa linha; e cada grupo com o ícone, o nome, a contagem e a seta, que fecha pelo título (o aparelho lembra).
+  function agruparHtml(key, opcoes, atual, act) {
+    const shut = LS.get(`${key}-fechado`, false) === true;
+    const nome = (opcoes.find(([k]) => k === atual) || opcoes[0])[1];
+    return `<div class="agrupar${shut ? " fechado" : ""}">
+      <button type="button" class="agrupar-l" id="${key}-l" data-act="agrupar-dobra" data-k="${key}" aria-expanded="${!shut}">${ic("layers", "sm")}<span>Agrupar por</span>${shut ? `<span class="agrupar-val">· ${esc(nome)}</span>` : ""}${ic("chev", "sm seta")}</button>
+      <div class="seg agrupar-seg" role="group" aria-labelledby="${key}-l" style="--n:${opcoes.length}"${shut ? " hidden" : ""}>${opcoes.map(([k, v, i]) => `<button type="button" data-act="${act}" data-v="${k}" aria-pressed="${atual === k}">${ic(i, "sm")}<span>${v}</span></button>`).join("")}</div></div>`;
+  }
+  function grupoHtml(ls, key, name, icone, conta, corpo, cls = "") {
+    const shut = new Set(LS.get(ls, [])).has(key);
+    return `<section class="zone dobra-z${shut ? " fechada" : ""}${cls ? ` ${cls}` : ""}" data-zk="${esc(key)}" data-ls="${ls}">
+        <button type="button" class="zone-h" data-act="grupo-dobra" aria-expanded="${!shut}"><h3><span class="zone-ic" aria-hidden="true">${ic(icone)}</span>${esc(name)}</h3><span class="zs">${conta}</span>${ic("chev", "sm seta")}</button>
+        ${corpo}</section>`;
   }
   // -- Consumíveis (1.78.0, Mais > Consumíveis): o que se gasta e se compra de novo, por categoria, com a quantidade
   function viewCons() {
@@ -1247,14 +1263,11 @@
         ? VENCE.map(([k, name]) => [`v:${k}`, name, k === "sem" ? "drop" : "clock", D.consItems.filter((it) => venceGrupo(it, hoje) === k)])
         : CCATS.map(([k, name]) => [`c:${k}`, name, "drop", D.consItems.filter((it) => (CCAT[it.cat] ? it.cat : "c-outros") === k)])
     ).filter((g) => g[3].length);
-    const shut = new Set(LS.get("cons-fechados", []));
     const opcoes = [["cat", "Categoria", "grid"], ["vence", "Vencimento", "clock"], ...(consComodoOn() ? [["comodo", "Cômodo", "rooms"]] : [])];
     return `<div class="mscreen cons">
-      <div class="agrupar"><span class="agrupar-l" id="cons-agrupar-l">${ic("layers", "sm")}Agrupar por</span>
-        <div class="seg agrupar-seg" role="group" aria-labelledby="cons-agrupar-l" style="--n:${opcoes.length}">${opcoes.map(([k, v, i]) => `<button type="button" data-act="cons-agrupar" data-v="${k}" aria-pressed="${como === k}">${ic(i, "sm")}<span>${v}</span></button>`).join("")}</div></div>
-      ${groups.map(([key, name, icone, its]) => `<section class="zone dobra-z${shut.has(key) ? " fechada" : ""}${key === "v:acabou" ? " acabou" : ""}" data-zk="${esc(key)}">
-        <button type="button" class="zone-h" data-act="cons-dobra" aria-expanded="${!shut.has(key)}"><h3><span class="zone-ic" aria-hidden="true">${ic(icone)}</span>${esc(name)}</h3><span class="zs">${plural(its.length, "consumível", "consumíveis")}</span>${ic("chev", "sm seta")}</button>
-        <ul class="ilist">${its.sort(como === "vence" ? porData : porNome).map((it) => itemRow(it, { mode: como === "comodo" ? "cons" : "room" })).join("")}</ul></section>`).join("")}
+      ${agruparHtml("cons-agrupar", opcoes, como, "cons-agrupar")}
+      ${groups.map(([key, name, icone, its]) => grupoHtml("cons-fechados", key, name, icone, plural(its.length, "consumível", "consumíveis"),
+        `<ul class="ilist">${its.sort(como === "vence" ? porData : porNome).map((it) => itemRow(it, { mode: como === "comodo" ? "cons" : "room" })).join("")}</ul>`, key === "v:acabou" ? "acabou" : "")).join("")}
     </div>`;
   }
   function matches(it, toks) {
@@ -1291,6 +1304,33 @@
     return { room, cats };
   }
   const noComodo = (it, rid) => it.room === rid || (isCons(it.room) && usadoEm(it).some((r) => r.id === rid));
+  // 1.108.0: Buscar › Agrupar por (o padrão dos Consumíveis, fora dos Filtros): Nenhum, Cômodo (os itens da casa pelo cômodo,
+  // os consumíveis pelos cômodos onde são usados, os bens e os outros consumíveis à parte), Categoria (com um tipo que as tem) e,
+  // em Todos os tipos, Tipo. As escolhas seguem os filtros do tipo; a de antes que não vale mais vira Nenhum.
+  function buscaOpcoes(q) {
+    const tipo = tipoDaBusca(q), F = filtrosDe(tipo);
+    return [["", "Nenhum", "sort"], ...(F.room ? [["comodo", "Cômodo", "rooms"]] : []), ...(F.cats.length ? [["cat", "Categoria", "grid"]] : []),
+      ...(tipo === "" && tipos().length ? [["tipo", "Tipo", "layers"]] : [])];
+  }
+  const buscaComo = (q) => { const k = LS.get("busca-agrupar", ""); return buscaOpcoes(q).some(([o]) => o === k) ? k : ""; };
+  const buscaAgrupar = (q) => (buscaOpcoes(q).length > 1 ? agruparHtml("busca-agrupar", buscaOpcoes(q), buscaComo(q), "busca-agrupar") : "");
+  function gruposDaBusca(q, list) {
+    const como = buscaComo(q), tipo = tipoDaBusca(q);
+    let ordem;
+    if (como === "comodo") ordem = [...D.rooms.map((r) => [`r:${r.id}`, r.name, "rooms"]), ["a:bens", "Bens", "home"], ["a:cons", "Consumíveis", "drop"], ["r:", "Sem cômodo", "drop"]];
+    else if (como === "cat") ordem = tipo === "consumiveis" ? CCATS.map(([k, v]) => [k, v, "drop"]) : CATS.map(([k, v]) => [k, v, "grid"]);
+    else ordem = tipos().filter(([k]) => k).map(([k, v]) => [k, v, { casa: "rooms", imoveis: "home", veiculos: "car", outros: "gem", consumiveis: "drop" }[k] || "tag"]);
+    const by = new Map(ordem.map(([k]) => [k, []]));
+    const por = (it) => {
+      if (como === "cat") return [isCons(it.room) ? (CCAT[it.cat] ? it.cat : "c-outros") : CAT[it.cat] ? it.cat : "outros"];
+      if (como === "tipo") return [isBens(it.room) ? bensGroup(it) || "outros" : isCons(it.room) ? "consumiveis" : "casa"];
+      if (isBens(it.room)) return ["a:bens"];
+      if (isCons(it.room)) { const us = usadoEm(it); return us.length ? us.map((r) => `r:${r.id}`) : [tipo === "consumiveis" ? "r:" : "a:cons"]; }
+      return [`r:${it.room}`];
+    };
+    for (const it of list) for (const k of por(it)) if (by.has(k)) by.get(k).push(it);
+    return ordem.map(([k, nome, icone]) => ({ k, nome, icone, its: by.get(k) })).filter((g) => g.its.length);
+  }
   function viewSearch(q) {
     const ord = q.ord || (q.q ? "rel" : "val");
     const filtrosShut = LS.get("busca-filtros-fechado", false) === true;
@@ -1313,6 +1353,7 @@
         <select class="select ord" data-input="search-ord" aria-label="Ordenar">
           ${ORDERS.map(([k, v]) => `<option value="${k}"${k === ord ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>
       </div>
+      ${buscaAgrupar(q)}
     </section>
     <div id="results">${resultsHtml(q)}</div>`;
   }
@@ -1364,16 +1405,24 @@
     const pickable = SEL && (SEL.size || !podem.some((i) => isCons(i.room) !== lado)) ? podem.filter((i) => isCons(i.room) === lado) : podem;
     const soCons = list.every((i) => isCons(i.room)); // só consumíveis: sem a soma (eles não têm valor)
     const more = list.length > shown.length ? `<div class="more"><button class="btn" data-act="more-results">${ic("down")}Mostrar mais ${int(Math.min(120, list.length - shown.length))}</button></div>` : "";
+    // 1.108.0: com o Agrupar por, um grupo por cômodo, categoria ou tipo, cada um com a contagem (e a soma) e que fecha
+    const lista = (row) => {
+      const gs = buscaComo(q) ? gruposDaBusca(q, shown) : null;
+      if (!gs) return `<ul class="ilist">${shown.map(row).join("")}</ul>`;
+      return gs.map((g) => grupoHtml("busca-fechados", g.k, g.nome, g.icone,
+        g.its.every((i) => isCons(i.room)) ? plural(g.its.length, "consumível", "consumíveis") : `${plural(g.its.length, "item", "itens")}<b>${moneyR(g.its.reduce((t, i) => t + vl(i), 0))}</b>`,
+        `<ul class="ilist">${g.its.map(row).join("")}</ul>`, "busca-g")).join("");
+    };
     if (!SEL) {
       return `<div class="ssum"><span>${plural(list.length, "item", "itens")}</span>${pickable.length ? `<button type="button" class="btn ghost sm sel-go" data-act="sel-start">${ic("checks", "sm")}Selecionar</button>` : ""}${soCons ? "" : `<b>${moneyR(sum)}</b>`}</div>
-      <ul class="ilist">${shown.map((it) => itemRow(it, { toks })).join("")}</ul>${more}`;
+      ${lista((it) => itemRow(it, { toks }))}${more}`;
     }
     const n = SEL.size, all = n > 0 && n === podem.filter((i) => isCons(i.room) === lado).length;
     const selSum = pickable.reduce((s, i) => s + (SEL.has(i.id) ? vl(i) : 0), 0);
     return `<div class="ssum sel"><button type="button" class="btn ghost icon sm" data-act="sel-end" aria-label="Cancelar seleção">${ic("close")}</button>
         <span class="sel-n">${n ? plural(n, "selecionado", "selecionados") : "Selecionar"}</span>${n && !lado ? `<b>${moneyR(selSum)}</b>` : ""}
         <button type="button" class="btn ghost sm" data-act="sel-all">${ic("checks", "sm")}${all ? "Nenhum" : "Todos"}</button></div>
-      <ul class="ilist">${shown.map((it) => itemRow(it, { toks, pick: pickable.includes(it) ? SEL.has(it.id) : "off" })).join("")}</ul>${more}
+      ${lista((it) => itemRow(it, { toks, pick: pickable.includes(it) ? SEL.has(it.id) : "off" }))}${more}
       <div class="selbar"><button type="button" class="btn primary" data-act="sel-change"${n ? "" : " disabled"}>${ic("edit")}${n ? `Alterar ${lado ? plural(n, "consumível", "consumíveis") : plural(n, "item", "itens")}` : "Alterar"}</button></div>`;
   }
   // Buscar › Selecionar: marcar vários itens e alterar de uma vez o cômodo, a categoria e a zona (com Desfazer), como no
@@ -5806,15 +5855,17 @@
         break;
       }
       case "cons-agrupar": LS.set("cons-agrupar", b.dataset.v); renderView(false); break;
-      case "cons-dobra": { // 1.91.0: o grupo dos Consumíveis fecha e abre pelo título (o aparelho lembra)
-        const sec = b.closest(".zone"), shut = new Set(LS.get("cons-fechados", []));
+      case "grupo-dobra": { // 1.91.0 (Consumíveis); 1.108.0, em todo grupo: fecha e abre pelo título (o aparelho lembra)
+        const sec = b.closest(".zone"), ls = sec.dataset.ls, shut = new Set(LS.get(ls, []));
         const fechar = !sec.classList.contains("fechada");
         if (fechar) shut.add(sec.dataset.zk); else shut.delete(sec.dataset.zk);
-        LS.set("cons-fechados", [...shut]);
+        LS.set(ls, [...shut]);
         sec.classList.toggle("fechada", fechar);
         b.setAttribute("aria-expanded", String(!fechar));
         break;
       }
+      case "agrupar-dobra": LS.set(`${b.dataset.k}-fechado`, !(LS.get(`${b.dataset.k}-fechado`, false) === true)); renderView(false); break;
+      case "busca-agrupar": LS.set("busca-agrupar", b.dataset.v); renderView(false); break;
       case "search-clear": { const inp = $('#view [data-input="search-q"]'); if (inp) { inp.value = ""; inp.focus(); } updateSearch({ q: "" }); break; }
       case "search-reset": base.q = { q: base.q.q || "" }; renderView(false); try { history.replaceState(history.state, "", hashOf(base)); } catch { /* ok */ } break;
       case "more-results": searchLimit += 120; selRender(); break;
