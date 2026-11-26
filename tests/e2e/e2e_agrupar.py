@@ -82,6 +82,21 @@ async def body(r, p):
     await pg.wait_for_timeout(300)
     r.check(await pg.evaluate(OVERFLOW), "320 px: sem rolagem para o lado")
     await r.shot(pg, "320")
+    # 1.109.0 (o dono: "cadê a opção de agrupar?", no cômodo): Categoria (sem as zonas) ou Nenhum; cada grupo fecha pelo nome
+    await r.open(pg, "#/c/sala", ".rhead")
+    r.eq(await pg.evaluate(OPCOES), [["Categoria", "true"], ["Nenhum", "false"]], "o cômodo: Categoria (de início) e Nenhum")
+    cats = await pg.evaluate("() => [...document.querySelectorAll('#zones .zone .zone-h h3')].map(h => h.textContent.trim())")
+    n_itens = await pg.locator("#zones .irow").count()
+    r.check(len(cats) >= 2 and len(set(cats)) == len(cats), f"um grupo por categoria ({cats})")
+    z0 = pg.locator("#zones .zone").first
+    await z0.locator(".zone-h").click()
+    r.check(not await z0.locator(".ilist").is_visible() and await z0.locator(".zone-h").get_attribute("aria-expanded") == "false", "um grupo do cômodo fecha pelo nome")
+    await z0.locator(".zone-h").click()
+    await pg.click('#zones .agrupar-seg [data-v=""]')
+    await pg.wait_for_timeout(200)
+    r.eq((await pg.locator("#zones .zone-h").count(), await pg.locator("#zones .irow").count()), (0, n_itens), "Nenhum: a lista de sempre, com os mesmos itens")
+    await pg.click('#zones .agrupar-seg [data-v="cat"]')
+    await pg.wait_for_timeout(200)
     # os grupos dos Bens também fecham pelo título
     await r.open(pg, "#/bens", ".zone")
     r.eq([txt(t) for t in await pg.locator(".bens .zone h3").all_inner_texts()], ["Imóveis", "Veículos"], "os grupos dos Bens")

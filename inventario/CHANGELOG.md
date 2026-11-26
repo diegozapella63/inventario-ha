@@ -1,5 +1,14 @@
 # Mudanças
 
+## 1.109.0
+
+- **Cômodo › Agrupar por**: **Zona** (com as zonas ligadas), **Categoria** ou **Nenhum**. Cada grupo mostra quantos itens e o valor, e fecha num toque no nome; o aparelho lembra.
+- **Pesquisas da IA › Recursos** e **Pareceres**: o cartão **Limpar**, como o das Novidades, apaga os recursos de todos os eletrônicos ou os pareceres de todos os consumíveis (com a confirmação).
+- O **Cancelar** e o **X** da janela **Escolher consumíveis** fecham, como o X das janelas do parecer e dos recursos (antes, só o Voltar fechava).
+- Na janela de um bem, o **Tipo** (Imóvel, Veículo, Outro) volta ao jeito das outras escolhas: a barra com a altura dos outros campos e o escolhido na altura toda.
+- O campo **Quantidade e valor** agora se chama **Valores**.
+- As setas de abrir e fechar iguais em tudo: aberto, para baixo; fechado, para o lado (o **Filtros** do Buscar apontava para cima).
+
 ## 1.108.0
 
 - **Buscar › Agrupar por**, no mesmo jeito dos Consumíveis, num bloco depois dos Filtros: **Nenhum**, **Cômodo**, **Categoria** (com um tipo escolhido que tenha categorias) e, em Todos os tipos, **Tipo**.

@@ -67,10 +67,10 @@ async def body(r, p):
     await r.shot(pg, "avisos")
     await pg.fill("#f-value", "1")
     r.check(await pg.is_hidden('[data-err="value"]'), "ao corrigir o valor, o aviso some")
-    # 1.105.1: um erro no bloco Quantidade e valor fechado abre o bloco, para o aviso aparecer
+    # 1.105.1: um erro no bloco Valores (antes, Quantidade e valor) fechado abre o bloco, para o aviso aparecer
     await pg.fill("#f-value", "doze reais")
-    await pg.click("dialog .field.dobravel > .lbl:has-text('Quantidade e valor')"); await pg.wait_for_timeout(150)
-    r.check(not await pg.is_visible("#f-value"), "o bloco Quantidade e valor fechado")
+    await pg.click("dialog .field.dobravel > .lbl:has-text('Valores')"); await pg.wait_for_timeout(150)
+    r.check(not await pg.is_visible("#f-value"), "o bloco Valores fechado")
     await pg.click('[data-ed="save"]')
     await pg.wait_for_selector('[data-err="value"]:not([hidden])', timeout=3000)
     r.check(await pg.is_visible('[data-err="value"]') and await pg.is_visible("#f-value"), "o erro no bloco fechado abre o bloco")

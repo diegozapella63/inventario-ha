@@ -3710,6 +3710,19 @@ def rec_dismiss(iid: str) -> dict:
     return {}
 
 
+def rec_clear() -> dict:
+    """1.109.0 (o dono: "criar opção para apagar todos", como o Limpar das novidades): apaga os recursos de todos os
+    eletrônicos e para as buscas de recursos em andamento (as que acharem depois não gravam)."""
+    need_ai_on()
+    for jid, job in list(WEB_JOBS.items()):
+        if job.get("kind") == "recursos" or (job.get("kind") == "lote" and job.get("so") == "recursos"):
+            job.update(cancelled=True, cleared=True)
+            WEB_JOBS.pop(jid, None)
+    with REC_LOCK:
+        write_json_atomic(REC_FILE, {})
+    return {}
+
+
 def _rec_job_run(jid: str, iid: str, name: str, details: str, entity: str):
     job = WEB_JOBS[jid]
     try:
@@ -3859,6 +3872,18 @@ def par_dismiss(iid: str) -> dict:
         if isinstance(d, dict) and it["id"] in d:
             d.pop(it["id"])
             write_json_atomic(PAR_FILE, d)
+    return {}
+
+
+def par_clear() -> dict:
+    """1.109.0: apaga os pareceres de todos os consumíveis e para as avaliações em andamento."""
+    need_ai_on()
+    for jid, job in list(WEB_JOBS.items()):
+        if job.get("kind") in ("parecer", "par-lote"):
+            job.update(cancelled=True, cleared=True)
+            WEB_JOBS.pop(jid, None)
+    with PAR_LOCK:
+        write_json_atomic(PAR_FILE, {})
     return {}
 
 
@@ -5880,11 +5905,12 @@ def r_par_lote(h, query):
 
 
 def r_rec_del(h, query):
-    h.send_json(rec_dismiss((query.get("item") or [""])[0]))
+    # ?todos=1 (1.109.0): os de todos os eletrônicos; senão, os do item
+    h.send_json(rec_clear() if (query.get("todos") or [""])[0] == "1" else rec_dismiss((query.get("item") or [""])[0]))
 
 
 def r_par_del(h, query):
-    h.send_json(par_dismiss((query.get("item") or [""])[0]))
+    h.send_json(par_clear() if (query.get("todos") or [""])[0] == "1" else par_dismiss((query.get("item") or [""])[0]))
 
 
 def r_rec_all_get(h, query):

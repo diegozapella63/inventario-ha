@@ -66,6 +66,13 @@ async def body(r, p):
     await pg.wait_for_timeout(500)
     r.eq(corpos, ["{}"], "Os sem parecer: o servidor escolhe os que faltam")
     r.check(all(x[2] == "4" for x in await pg.evaluate(ROWS)), "todos com a nota")
+    # 1.108.1 (o dono: "Botão de cancelar e fechar não funciona"): o Cancelar e o X fecham a janela
+    for fecha in ("dialog.modal .dlg-f [data-x]", "dialog.modal .dlg-h [data-x]"):
+        await pg.click('[data-act="par-escolher"]')
+        await pg.wait_for_selector("dialog.modal .par-esc .fcheck")
+        await pg.click(fecha)
+        await pg.wait_for_timeout(300)
+        r.eq(await pg.locator("dialog[open] .par-esc").count(), 0, f"Escolher consumíveis: {'o Cancelar' if 'dlg-f' in fecha else 'o X'} fecha")
     # Escolher quais: vêm marcados os sem parecer (nenhum agora); Todos marca e o botão diz quantos
     await pg.click('[data-act="par-escolher"]')
     await pg.wait_for_selector("dialog.modal .par-esc .fcheck")
@@ -89,10 +96,18 @@ async def body(r, p):
     await pg.locator('dialog[open] [data-r="1"]').last.click()
     await pg.locator(".toast", has_text="Parecer apagado").wait_for(timeout=6000)
     r.check("Parecer apagado" in await pg.text_content("dialog.modal [data-slot=par]"), "a janela diz que apagou")
-    await pg.keyboard.press("Escape")
+    await pg.click("dialog.modal .dlg-h [data-x]")
     await pg.wait_for_timeout(300)
+    r.eq(await pg.locator("dialog[open] [data-slot=par]").count(), 0, "o X da janela do parecer fecha")
     rows = await pg.evaluate(ROWS)
     r.check(rows[-1][1].endswith("Ainda não avaliado") and rows[-1][2] == "", f"e a lista também, no fim ({rows[-1]})")
+    # 1.109.0 (o dono: "criar opção para apagar todos", igual ao Limpar das Novidades): Limpar › Limpar pareceres, com a confirmação
+    r.eq((await pg.locator("#p-par-clear h2").inner_text()).strip(), "Limpar", "o cartão Limpar, depois do Avaliar consumíveis")
+    await pg.click('#p-par-clear [data-act="par-clear"]')
+    await pg.locator('dialog[open] [data-r="1"]').last.click()
+    await pg.locator(".toast", has_text="Pareceres limpos").wait_for(timeout=6000)
+    await pg.wait_for_timeout(400)
+    r.check(all(x[1].endswith("Ainda não avaliado") for x in await pg.evaluate(ROWS)), "todos sem parecer")
     # na ficha: Avaliar de novo e Apagar lado a lado
     await r.open(pg, f"#/i/{cid}", ".dlg .ihead")
     if await pg.locator('[data-act="item-par-del"]').count() == 0:

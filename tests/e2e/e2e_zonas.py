@@ -41,13 +41,14 @@ async def body(r, p):
 
     # -- ligar
     await r.open(pg, "#/c/sala", ".rhead")
-    r.eq(await pg.locator("#view .zone-h").count(), 0, "de início, zonas desligadas: a sala é uma lista só")
+    r.eq([t.strip() for t in await pg.locator("#view .agrupar-seg button").all_inner_texts()], ["Categoria", "Nenhum"], "de início, zonas desligadas: o Agrupar por sem a Zona")
     await r.open(pg, "#/config/opcoes", ".more-tabs")
     await switch(pg, True)
     r.check(r.data()["settings"]["zones"] is True and await pg.is_checked('[data-input="zones-on"]'), "a chave liga as zonas para a casa toda")
 
-    # -- o cômodo separado por zona, com subtotal
+    # -- o cômodo separado por zona, com subtotal (1.109.0: a Zona é a primeira escolha do Agrupar por)
     await r.open(pg, "#/c/sala", ".rhead")
+    r.eq(await pg.get_attribute('#view .agrupar-seg [data-v="zona"]', "aria-pressed"), "true", "com as zonas, o Agrupar por começa na Zona")
     got = await pg.evaluate(ZONES)
     want = [[z, f"{n} {'item' if n == 1 else 'itens'}", brl(v), n] for z, (n, v) in groups.items()]
     r.eq(got, want, "cada zona com quantos itens e o subtotal, na ordem dos itens")
@@ -131,7 +132,7 @@ async def body(r, p):
     await switch(pg, False)
     r.eq({i["id"]: i["zone"] for i in r.data()["items"] if i.get("zone")}, zoned, "desligar as zonas não apaga nenhuma")
     await r.open(pg, "#/c/sala", ".rhead")
-    r.check(await pg.locator("#view .zone-h").count() == 0 and "zona" not in await pg.text_content(".rhead .stats"), "desligadas: lista única, sem contar zonas")
+    r.check("Zona" not in await pg.locator("#view .agrupar-seg").inner_text() and "zona" not in await pg.text_content(".rhead .stats"), "desligadas: sem a Zona no Agrupar por, sem contar zonas")
     await r.open(pg, "#/i/sal-001", "dialog.sheet h1")
     r.check("Zona" not in await props(pg), "desligadas: a ficha não mostra a zona")
     await pg.click('dialog.sheet [data-act="item-edit"].primary')

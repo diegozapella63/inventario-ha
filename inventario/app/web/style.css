@@ -418,7 +418,7 @@ button.chip { font: inherit; font-size: 14.5px; text-align: left; }
 .chat-ed-mais { margin-top: 6px; }
 .chat-ed-modelo { width: 100%; border: 1.5px dashed var(--line); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .chat-empty .chat-ed-modelo { background: none; }
-.chat-ed-mais-ic { width: 40px; height: 40px; flex: none !important; display: grid; place-items: center; color: var(--accent-ink, var(--accent)); }
+.chat-ed-mais-ic { width: 40px; height: 40px; flex: none !important; display: grid; place-items: center; color: var(--tag-text); }
 .chat-ed-new { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .chat-ed-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 /* o microfone grande, com um anel que acompanha a voz */
@@ -699,7 +699,7 @@ div.croom:hover { background: none; }
 .zone-ic .ic { width: 17px; height: 17px; stroke-width: 1.9; }
 .zone-h { align-items: center; }
 /* 1.91.0: os grupos dos Consumíveis fecham pelo título; Agrupar por (Categoria ou Cômodo) */
-button.zone-h { width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+button.zone-h { width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; } /* 1.109.0: sem a faixa azul do toque no Android */
 button.zone-h h3 { flex: 1; }
 button.zone-h .seta { color: var(--muted); flex: none; transition: transform .2s; transform: rotate(90deg); }
 .dobra-z.fechada > .zone-h .seta { transform: none; }
@@ -716,13 +716,17 @@ button.zone-h .seta { color: var(--muted); flex: none; transition: transform .2s
 .pick-grid .pk:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* 1.102.1 (o dono: "Agrupar por ficou ridículo, cria nos mesmos padrões dos apps"): o título pequeno com o ícone e, embaixo,
    as escolhas lado a lado, do mesmo tamanho, num controle só (como o Agrupar por do ResolvIA e do OdisseIA) */
-.agrupar { display: grid; gap: 8px; margin: 0 0 18px; }
-.agrupar-l { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 32px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.agrupar { display: grid; gap: 4px; margin: 0 0 18px; }
+/* 1.109.0 (PADROES.md, "O alto das listas"): o título do Agrupar por igual ao do Filtros, nos 8 apps: o ícone na cor do app,
+   15 px, peso 500, na cor do texto; fechado, o escolhido ao lado, em cinza; a seta no fim */
+.agrupar-l { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 2px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.agrupar-l > svg:first-child { color: var(--tag-text); }
 /* 1.108.0: o Agrupar por fecha pelo título (fechado, o escolhido ao lado), com a seta no canto, como os grupos */
 .agrupar-l > .seta { margin-left: auto; color: var(--muted); transition: transform .2s; transform: rotate(90deg); }
 .agrupar.fechado > .agrupar-l > .seta { transform: none; }
-.agrupar-l > .agrupar-val { color: var(--ink); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sbar .agrupar { margin: 14px 0 0; }
+.agrupar-l > .agrupar-val { color: var(--muted); font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sbar .agrupar { margin: 0; }
+.agrupar .seg.agrupar-seg { margin-bottom: 8px; }
 .agrupar.fechado { gap: 0; }
 #results .busca-g:first-child { margin-top: 18px; }
 .seg.agrupar-seg { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); width: min(100%, 520px); }
@@ -736,30 +740,34 @@ button.zone-h .seta { color: var(--muted); flex: none; transition: transform .2s
 .zone-h .zs b { color: var(--ink); font: 600 17px/1 var(--font-c); margin-left: 10px; }
 
 /* ---------- busca */
-.sbar { display: grid; gap: 12px; padding: 14px 0 4px; }
+.sbar { display: grid; gap: 0; padding: 14px 0 4px; } /* 1.109.0: o Filtros e o Agrupar por um embaixo do outro, sem vão */
+.sbar .q { margin-bottom: 12px; }
 .sbar .q { position: relative; }
 .sbar .q .ic { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); }
 .sbar .q .input { height: 52px; padding-left: 46px; padding-right: 44px; font-size: 18px; border-radius: 10px; }
 .sbar .q .clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
 /* 1.80.0: Buscar › Filtros: o título dos filtros (como nos outros apps), que fecha e abre num toque */
-.filtros-h { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 0 2px; border: 0; background: none; color: var(--ink); font: inherit; font-weight: 600; font-size: 15px; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.filtros-h { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 2px; border: 0; background: none; color: var(--ink); font: inherit; font-weight: 500; font-size: 15px; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .filtros-h > span { flex: 1; min-width: 0; }
-.filtros-h > svg:first-child { color: var(--accent-ink, var(--accent)); }
-.filtros-h .seta { color: var(--muted); transition: transform .2s; }
-.filtros-h[aria-expanded="false"] .seta { transform: rotate(-90deg); }
+.filtros-h > svg:first-child { color: var(--tag-text); }
+/* 1.109.0 (o dono: "padronizar as setas em todos os apps"): aberto, a seta para baixo; fechado, para o lado (a "chev" aponta para o lado) */
+.filtros-h .seta { color: var(--muted); transition: transform .2s; transform: rotate(90deg); }
+.filtros-h[aria-expanded="false"] .seta { transform: none; }
 .filtros-h:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
 .sfilters[hidden] { display: none; }
-.sfilters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.sfilters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 4px 0 8px; }
 .sfilters .select { height: 44px; font-size: 15px; padding-left: 10px; padding-right: 26px; background-position: right 6px center; } /* "Todas as categorias" cabe em meia largura */
 .sfilters.n4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .sfilters.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 560px) { .sfilters, .sfilters.n4 { grid-template-columns: 1fr 1fr; } .sfilters.n3 .ord { grid-column: span 2; } }
 @media (max-width: 384px) { .sfilters .select { font-size: 14px; padding-left: 8px; padding-right: 22px; background-position: right 4px center; background-size: 16px; } }
 @media (max-width: 356px) { .sfilters, .sfilters.n4, .sfilters.n2 { grid-template-columns: 1fr; } .sfilters.n3 .ord { grid-column: auto; } } /* 320 px: uma por linha, nada cortado */
-.ssum { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 18px 0 8px; padding: 0 6px; color: var(--muted); font-size: 15px; }
+.ssum { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 12px 0 8px; padding: 0 2px; color: var(--muted); font-size: 15px; }
+/* 1.109.0 (PADROES.md): a contagem (e a soma) à esquerda, o Selecionar à direita, na cor do app */
+.ssum .ssum-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ssum .sel-go { display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 40px; margin: -8px 0; padding: 0 2px; border: 0; background: none; color: var(--tag-text); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .ssum b { color: var(--ink); font: 600 19px/1 var(--font-c); }
 /* Buscar › Selecionar: marcar vários e mudar o cômodo, a categoria ou a zona de uma vez */
-.ssum .sel-go { margin: -8px auto -8px -2px; align-self: center; }
 .ssum.sel { align-items: center; }
 .ssum.sel { gap: 8px; }
 .ssum.sel .sel-n { flex: 1; min-width: 0; color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -975,7 +983,7 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 @media (min-width: 1000px) { :is(#p-news, #p-news-clear, #p-par) .opts .oa.news-tres { flex: none; width: 280px; } }
 /* 1.107.0: Pesquisas da IA › Pareceres: a nota na lista e a janela Escolher consumíveis */
 .pill.par-pill { display: inline-flex; align-items: center; gap: 3px; }
-.pill.par-pill .ic { width: 14px; height: 14px; color: var(--accent-ink, var(--accent)); }
+.pill.par-pill .ic { width: 14px; height: 14px; color: var(--tag-text); }
 .par-atalhos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
 .par-atalhos > .btn { min-width: 0; justify-content: center; }
 .par-esc .nrow { cursor: pointer; }
@@ -1536,6 +1544,9 @@ textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh;
 .seg button { height: auto; }
 .seg.themes button, .seg.tipo button { flex-direction: row; gap: 7px; min-height: 0; height: auto; padding: 0 6px; }
 .seg.tipo button { justify-content: center; text-align: center; }
+/* 1.108.1 (o dono: "a parte do tipo tá bugado a seleção"): os quadros do Agora (a.tipo) davam a borda, o padding e os cantos
+   deles ao Tipo do bem; e o botão marcado ocupa a altura da barra, como nos outros */
+.seg.tipo button { min-height: calc(var(--altura) - 8px); }
 .seg.themes button .ic { width: 18px; height: 18px; flex: none; }
 @media (max-width: 380px) { .seg.themes button .ic { display: none; } }
 .found .input, .found .select { height: 38px; }
@@ -1590,19 +1601,19 @@ textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh;
    contagem, o total e um toque para abrir a tela do tipo */
 .tipos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 28px; }
 .tipos.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.tipo { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; align-content: start; min-width: 0; padding: 14px 12px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink); text-decoration: none; }
-.tipo:hover { border-color: var(--line-2); }
-.tipo:active { background: var(--surface-2); }
-.tipo .sec-ic { width: 34px; height: 34px; border-radius: 10px; margin-bottom: 8px; }
-.tipo b { font: 600 14px/1.25 var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tipo .tn { font: 700 30px/1.05 var(--font-c); margin-top: 4px; }
-.tipo .ts { color: var(--muted); font-size: 13px; line-height: 1.2; }
-.tipo .tv { font: 600 15px/1.2 var(--font-c); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (min-width: 700px) { .tipos { gap: 14px; } .tipo { padding: 18px 18px 16px; } .tipo b { font-size: 16px; } .tipo .tn { font-size: 36px; } }
+a.tipo { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; align-content: start; min-width: 0; padding: 14px 12px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink); text-decoration: none; }
+a.tipo:hover { border-color: var(--line-2); }
+a.tipo:active { background: var(--surface-2); }
+a.tipo .sec-ic { width: 34px; height: 34px; border-radius: 10px; margin-bottom: 8px; }
+a.tipo b { font: 600 14px/1.25 var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+a.tipo .tn { font: 700 30px/1.05 var(--font-c); margin-top: 4px; }
+a.tipo .ts { color: var(--muted); font-size: 13px; line-height: 1.2; }
+a.tipo .tv { font: 600 15px/1.2 var(--font-c); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 700px) { .tipos { gap: 14px; } a.tipo { padding: 18px 18px 16px; } a.tipo b { font-size: 16px; } a.tipo .tn { font-size: 36px; } }
 /* no celular, o nome um pouco menor e com menos margem, para "Itens da casa" caber com folga em qualquer fonte */
-@media (max-width: 480px) { .tipo { padding: 14px 10px; } .tipo b { font-size: 13px; } }
+@media (max-width: 480px) { a.tipo { padding: 14px 10px; } a.tipo b { font-size: 13px; } }
 /* no celular estreito, o nome do tipo pode ir para duas linhas (os três com a mesma altura, para os números ficarem alinhados) */
-@media (max-width: 380px) { .tipos { gap: 6px; } .tipo { padding: 12px 8px; } .tipo b { font-size: 13px; white-space: normal; min-height: 2.5em; overflow-wrap: anywhere; } .tipo .ts { font-size: 12px; } .tipo .tv { font-size: 13px; } }
+@media (max-width: 380px) { .tipos { gap: 6px; } a.tipo { padding: 12px 8px; } a.tipo b { font-size: 13px; white-space: normal; min-height: 2.5em; overflow-wrap: anywhere; } a.tipo .ts { font-size: 12px; } a.tipo .tv { font-size: 13px; } }
 /* 1.85.0: Compras no EconomIA, na ficha do consumível: as linhas como as tarefas e os botões lado a lado, do mesmo tamanho */
 .cbtns { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
 .cbtns:empty { display: none; }

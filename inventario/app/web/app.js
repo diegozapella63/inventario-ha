@@ -493,7 +493,7 @@
   const textoBotao = (b) => [...b.childNodes].filter((n) => n.nodeType === 3 || (n.nodeType === 1 && !n.matches(SUB_CAMPO) && n.tagName !== "svg"))
     .map((n) => n.textContent).join(" ").replace(/\s+/g, " ").trim();
   function valorCampo(f) {
-    // o bloco com dois campos lado a lado (Quantidade e valor): o de cada um, separados
+    // o bloco com dois campos lado a lado (Valores: a quantidade e o valor): o de cada um, separados
     const lado = [...f.querySelectorAll(":scope > .row3 > .field")];
     if (lado.length) return lado.map(valorCampo).filter(Boolean).join(" · ");
     const meu = (el) => el.closest(".field") === f && !el.closest(".lbl");
@@ -1197,18 +1197,26 @@
     const toks = tokens(roomFilter[id] || "");
     const list = toks.length ? all.filter((it) => matches(it, toks)) : all;
     if (!list.length) return `<div class="empty"><h2>Nada com “${esc(roomFilter[id])}”</h2></div>`;
-    if (!zonesOn()) return `<section class="zone"><ul class="ilist">${list.map((it) => itemRow(it, { toks, mode: "room" })).join("")}</ul></section>`;
+    // 1.109.0 (o dono: "cadê a opção de agrupar?", no cômodo): Agrupar por Zona (com as zonas ligadas), Categoria ou Nenhum;
+    // cada grupo com o ícone, o nome, quantos e o valor, que fecha pelo nome (o aparelho lembra)
+    const ops = comodoOpcoes(), como = comodoComo();
+    const barra = all.length > 1 ? agruparHtml("comodo-agrupar", ops, como, "comodo-agrupar") : "";
+    const linhas = (its) => `<ul class="ilist">${its.map((it) => itemRow(it, { toks, mode: "room" })).join("")}</ul>`;
+    if (!como) return `${barra}<section class="zone">${linhas(list)}</section>`;
     const groups = new Map();
     for (const it of list) {
-      const z = it.zone || "Sem zona";
-      if (!groups.has(z)) groups.set(z, []);
-      groups.get(z).push(it);
+      const k = como === "zona" ? it.zone || "Sem zona" : CAT[it.cat] ? it.cat : "outros";
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(it);
     }
-    const ordered = [...groups.entries()].sort((a, b) => Math.min(...a[1].map((i) => i.seq || 0)) - Math.min(...b[1].map((i) => i.seq || 0)));
-    return ordered.map(([z, its]) => `<section class="zone">
-      <div class="zone-h"><h3><span class="zone-ic" aria-hidden="true">${ic("pin")}</span>${hl(z, toks)}</h3><span class="zs">${plural(its.length, "item", "itens")}<b>${moneyR(its.reduce((s, i) => s + vl(i), 0))}</b></span></div>
-      <ul class="ilist">${its.map((it) => itemRow(it, { toks, mode: "room" })).join("")}</ul></section>`).join("");
+    const ordered = como === "zona"
+      ? [...groups.entries()].sort((a, b) => Math.min(...a[1].map((i) => i.seq || 0)) - Math.min(...b[1].map((i) => i.seq || 0)))
+      : CATS.map(([k]) => k).filter((k) => groups.has(k)).map((k) => [k, groups.get(k)]);
+    return barra + ordered.map(([k, its]) => grupoHtml("comodo-fechados", `${id}:${como}:${k}`, como === "zona" ? k : CAT[k] || "Outros", como === "zona" ? "pin" : "grid",
+      `${plural(its.length, "item", "itens")}<b>${moneyR(its.reduce((s, i) => s + vl(i), 0))}</b>`, linhas(its))).join("");
   }
+  const comodoOpcoes = () => [...(zonesOn() ? [["zona", "Zona", "pin"]] : []), ["cat", "Categoria", "grid"], ["", "Nenhum", "sort"]];
+  const comodoComo = () => { const k = LS.get("comodo-agrupar", null); const ops = comodoOpcoes(); return ops.some(([o]) => o === k) ? k : ops[0][0]; };
   // -- Bens (Mais > Bens): Imóveis, Veículos e Outros, cada grupo com o total
   function viewBens() { // com bens, adicionar é o + de baixo (ou o Adicionar do alto, no computador): sem botão repetido
     const rid = D.bens ? D.bens.id : BENS_NEW;
@@ -1396,7 +1404,7 @@
         <p>${filtered ? "Tente limpar os filtros de cômodo e categoria." : "Tente outra palavra, como a marca ou o tipo do objeto."}</p>
         ${filtered ? `<div class="acts"><button class="btn" data-act="search-reset">${ic("close")}Limpar filtros</button></div>` : ""}</div>`;
     }
-    const shown = list.slice(0, searchLimit);
+    const shown = list; // 1.109.0 (o dono: "ódio mortal pelo mostrar mais 120… buscar tudo por padrão"): tudo de uma vez
     // os bens não têm cômodo: ficam de fora. 1.89.0: os consumíveis entram (a categoria e o cômodo onde são usados), mas
     // uma seleção é de um lado só: marcado um consumível, os itens da casa ficam de fora, e o contrário
     const podem = list.filter((i) => !isArea(i.room) || isCons(i.room));
@@ -1404,7 +1412,7 @@
     const lado = SEL && SEL.size ? isCons(D.itemById.get([...SEL][0]).room) : podem.length ? isCons(podem[0].room) : false;
     const pickable = SEL && (SEL.size || !podem.some((i) => isCons(i.room) !== lado)) ? podem.filter((i) => isCons(i.room) === lado) : podem;
     const soCons = list.every((i) => isCons(i.room)); // só consumíveis: sem a soma (eles não têm valor)
-    const more = list.length > shown.length ? `<div class="more"><button class="btn" data-act="more-results">${ic("down")}Mostrar mais ${int(Math.min(120, list.length - shown.length))}</button></div>` : "";
+    const more = "";
     // 1.108.0: com o Agrupar por, um grupo por cômodo, categoria ou tipo, cada um com a contagem (e a soma) e que fecha
     const lista = (row) => {
       const gs = buscaComo(q) ? gruposDaBusca(q, shown) : null;
@@ -1414,7 +1422,8 @@
         `<ul class="ilist">${g.its.map(row).join("")}</ul>`, "busca-g")).join("");
     };
     if (!SEL) {
-      return `<div class="ssum"><span>${plural(list.length, "item", "itens")}</span>${pickable.length ? `<button type="button" class="btn ghost sm sel-go" data-act="sel-start">${ic("checks", "sm")}Selecionar</button>` : ""}${soCons ? "" : `<b>${moneyR(sum)}</b>`}</div>
+      // 1.109.0 (o dono: "o padrão é na direita"): a contagem e a soma à esquerda, o Selecionar à direita, como nos outros apps
+      return `<div class="ssum"><span class="ssum-n">${plural(list.length, "item", "itens")}${soCons ? "" : ` · <b>${moneyR(sum)}</b>`}</span>${pickable.length ? `<button type="button" class="sel-go" data-act="sel-start">${ic("checks", "sm")}Selecionar</button>` : ""}</div>
       ${lista((it) => itemRow(it, { toks }))}${more}`;
     }
     const n = SEL.size, all = n > 0 && n === podem.filter((i) => isCons(i.room) === lado).length;
@@ -2021,7 +2030,27 @@
       <ul class="opts"><li><div class="ot"><b>${oti("checks")}Os que faltam</b><span>O mesmo equipamento em vários cômodos é uma busca só.</span></div>
         <div class="oa"><button type="button" class="btn primary" data-act="news-all" data-so="recursos">${ic("spark")}Buscar os que faltam</button></div></li></ul>
       <div data-slot="news-job"></div>
+    </section>
+    ${limparHtml("p-rec-clear", "Os recursos de todos os eletrônicos.", "rec-clear", "Limpar recursos")}`;
+  }
+  // 1.109.0 (o dono: "criar opção para apagar todos", igual ao Limpar das Novidades): o cartão Limpar dos Recursos e dos Pareceres
+  function limparHtml(id, sub, act, rot) {
+    return `<section class="panel" id="${id}">
+      <h2>${secIc("trash")}Limpar</h2>
+      <ul class="opts"><li><div class="ot"><b>${oti("trash")}Apagar o que foi achado</b><span>${sub}</span></div>
+        <div class="oa"><button type="button" class="btn" data-act="${act}">${ic("trash")}${rot}</button></div></li></ul>
     </section>`;
+  }
+  async function clearPesquisa(qual) {
+    const rec = qual === "recursos";
+    const ok = await confirmBox({ title: rec ? "Limpar os recursos?" : "Limpar os pareceres?", body: "O inventário não muda, e dá para buscar de novo.", ok: "Limpar", danger: true });
+    if (!ok) return;
+    try { await API.del(rec ? "api/recursos?todos=1" : "api/parecer?todos=1"); }
+    catch (e) { fail(e); return; }
+    // a busca ou a avaliação em andamento parou no servidor
+    if (rec) { if (newsJob && (newsOv && newsOv.job ? newsOv.job.so : "recursos") === "recursos") { newsJob = null; clearTimeout(newsTimer); renderNewsJob(null); } IREC.st = null; loadRecAll(); }
+    else { if (parJob) { parJob = null; clearTimeout(parTimer); renderParJob(null); } IPAR.st = null; loadParAll(); }
+    toast(rec ? "Recursos limpos." : "Pareceres limpos.");
   }
   // Pareceres: os consumíveis, com a nota de cada um, e Avaliar consumíveis (os sem parecer, ou os escolhidos)
   function pesqPareceres() {
@@ -2037,7 +2066,8 @@
         <div class="oa news-tres"><button type="button" class="btn primary" data-act="par-faltam">${ic("spark")}Os sem parecer</button>
           <button type="button" class="btn" data-act="par-escolher">${ic("checks")}Escolher quais</button></div></li></ul>
       <div data-slot="par-job"></div>
-    </section>`;
+    </section>
+    ${limparHtml("p-par-clear", "Os pareceres de todos os consumíveis.", "par-clear", "Limpar pareceres")}`;
   }
   let newsOv = null, newsJob = null, newsTimer = null, newsNums = null;
   async function loadNews() {
@@ -2313,6 +2343,7 @@
       poll(my);
     }
     dlg.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; } // 1.108.1: o X fechava só pelo Voltar
       if (e.target.closest("[data-again]")) start();
       if (e.target.closest("[data-apagar]") && await dismissRec(it)) show(`<p class="muted">Recursos apagados.</p>`, true);
       if (e.target.closest("[data-item]")) { finalizeThen(entry, () => nav(`#/i/${encodeURIComponent(it.id)}`)); return; } // a ficha; o Voltar volta para as Pesquisas da IA
@@ -2410,6 +2441,7 @@
     const conta = () => { const n = caixas().filter((c) => c.checked).length; ok.disabled = !n; $("span", ok).textContent = n ? `Avaliar ${n}` : "Avaliar"; };
     dlg.addEventListener("change", conta);
     dlg.addEventListener("click", (e) => {
+      if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; } // 1.108.1 (o dono: "Botão de cancelar e fechar não funciona")
       if (e.target.closest("[data-todos]")) { const on = caixas().some((c) => !c.checked); caixas().forEach((c) => { c.checked = on; }); conta(); }
       else if (e.target.closest("[data-faltam]")) { caixas().forEach((c) => { c.checked = !res[c.value]; }); conta(); }
       else if (e.target.closest("[data-ok]")) { const ids = caixas().filter((c) => c.checked).map((c) => c.value); finalizeThen(entry, () => startParLote(ids)); }
@@ -2451,6 +2483,7 @@
       poll(my);
     }
     dlg.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-x]")) { requestClose(entry, { force: true }); return; }
       if (e.target.closest("[data-again]")) start();
       if (e.target.closest("[data-apagar]") && await dismissPar(it)) show(`<p class="muted">Parecer apagado.</p>`, true);
       if (e.target.closest("[data-item]")) { finalizeThen(entry, () => nav(`#/i/${encodeURIComponent(it.id)}`)); return; } // a ficha; o Voltar volta para as Pesquisas da IA
@@ -4326,7 +4359,7 @@
             ${cons ? `<div class="field" id="f-dur"><span class="lbl" id="f-dur-l">Duração estimada</span>
               <div class="chips grid durs" role="radiogroup" aria-labelledby="f-dur-l" data-slot="durs">${durChips()}</div>
               <div data-slot="dur-outra">${durOutra()}</div></div>` : ""}
-            <div class="field" id="f-qv"${cons ? " hidden" : ""}><span class="lbl" id="f-qv-l">Quantidade e valor</span>
+            <div class="field" id="f-qv"${cons ? " hidden" : ""}><span class="lbl" id="f-qv-l">Valores</span>
               <div class="row3">
                 <div class="field"><label for="f-qty">Quantidade</label><input id="f-qty" class="input" name="qty" maxlength="30" value="${esc(F.qty)}" inputmode="text"></div>
                 <div class="field"><label for="f-value">Valor total</label><div class="money"><input id="f-value" class="input" name="value" inputmode="decimal" value="${esc(F.value)}" placeholder="0"></div>
@@ -5866,6 +5899,7 @@
       }
       case "agrupar-dobra": LS.set(`${b.dataset.k}-fechado`, !(LS.get(`${b.dataset.k}-fechado`, false) === true)); renderView(false); break;
       case "busca-agrupar": LS.set("busca-agrupar", b.dataset.v); renderView(false); break;
+      case "comodo-agrupar": LS.set("comodo-agrupar", b.dataset.v); renderView(false); break;
       case "search-clear": { const inp = $('#view [data-input="search-q"]'); if (inp) { inp.value = ""; inp.focus(); } updateSearch({ q: "" }); break; }
       case "search-reset": base.q = { q: base.q.q || "" }; renderView(false); try { history.replaceState(history.state, "", hashOf(base)); } catch { /* ok */ } break;
       case "more-results": searchLimit += 120; selRender(); break;
@@ -5898,6 +5932,8 @@
       case "par-open": { const it = D.itemById.get(b.dataset.id); if (it) openPar(it); break; }
       case "par-faltam": startParLote(null); break;
       case "par-escolher": escolherPareceres(); break;
+      case "rec-clear": clearPesquisa("recursos"); break;
+      case "par-clear": clearPesquisa("pareceres"); break;
       case "par-cancel": cancelParLote(); break;
       case "pesq-tab": setPesqTab(b.dataset.tab); break;
       case "apps-ia": openAppsFinder(); break;

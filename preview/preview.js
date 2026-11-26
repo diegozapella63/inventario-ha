@@ -622,6 +622,9 @@
       ST.jobs.set(id, { at: Date.now(), lote: ids, feitos: 0 });
       return { id };
     }
+    // 1.109.0: o Limpar dos Recursos e dos Pareceres (todos)
+    if (method === "DELETE" && path === "api/parecer?todos=1") { ST.par = {}; return {}; }
+    if (method === "DELETE" && path === "api/recursos?todos=1") { ST.rec = {}; return {}; }
     if (method === "DELETE" && path.startsWith("api/parecer?item=")) {
       const { [decodeURIComponent(path.slice("api/parecer?item=".length))]: _fora, ...resto } = ST.par || {};
       ST.par = resto;

@@ -76,8 +76,11 @@ async def body(r, p):
 
     # página do cômodo: filtro, ordem pelos códigos, fotos
     await r.open(pg, "#/c/sala", ".rhead")
+    # 1.109.0: o cômodo agrupa por Categoria de início; em Nenhum, a lista de sempre, na ordem dos códigos
+    await pg.click('#zones .agrupar-seg [data-v=""]')
+    await pg.wait_for_timeout(250)
     tags = await pg.evaluate("[...document.querySelectorAll('#view .irow .mt')].map(e => e.textContent.trim())")
-    r.check(tags == sorted(tags), f"itens na ordem dos códigos ({tags[:4]})")
+    r.check(tags == sorted(tags), f"Nenhum: itens na ordem dos códigos ({tags[:4]})")
     r.check(await pg.locator(".strip .ph").count() >= 3, "fotos do cômodo no alto")
     await pg.fill('[data-input="room-filter"]', "tv")
     await pg.wait_for_timeout(300)
@@ -97,6 +100,8 @@ async def body(r, p):
     # zonas ligadas: itens separados por zona, com subtotal
     r.api("PUT", "api/settings", {"zones": True})
     await r.open(pg, "#/c/sala", ".rhead")
+    await pg.click('#zones .agrupar-seg [data-v="zona"]')
+    await pg.wait_for_timeout(250)
     zonas = await pg.evaluate("[...document.querySelectorAll('#view .zone-h h3')].map(e => e.textContent.trim())")
     r.check(len(zonas) >= 3 and "Sofá" in zonas, f"zonas ligadas: itens separados por zona ({zonas})")
     await r.shot(pg, "sala-zonas")
@@ -106,7 +111,8 @@ async def body(r, p):
     await pg.click('[data-ed="cancel"]')
     r.api("PUT", "api/settings", {"zones": False})
     await r.open(pg, "#/c/sala", ".rhead")
-    r.eq(await pg.locator("#view .zone-h").count(), 0, "zonas desligadas: lista única")
+    # 1.109.0: o cômodo agrupa (Zona, Categoria ou Nenhum); sem as zonas, o Agrupar por começa na Categoria
+    r.eq([t.strip() for t in await pg.locator("#view .agrupar-seg button").all_inner_texts()], ["Categoria", "Nenhum"], "zonas desligadas: sem a Zona no Agrupar por")
     await ctx.close()
 
     ctx, pg = await r.page(b, "pc", "light")

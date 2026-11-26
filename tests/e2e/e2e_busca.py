@@ -1,5 +1,5 @@
 """Buscar, além do básico (e2e_inicio_busca): ordem por nome, valor, recentes e código; código e categoria na busca; zonas
-ligadas e desligadas; "Mostrar mais" com muitos itens; o X que limpa; Voltar mantém a busca; cômodo e categoria pelo endereço."""
+ligadas e desligadas; todos de uma vez, com muitos itens; o X que limpa; Voltar mantém a busca; cômodo e categoria pelo endereço."""
 from e2e_lib import OVERFLOW, main
 
 NAMES = "[...document.querySelectorAll('#view .irow .nm')].map(e => e.textContent)"
@@ -141,18 +141,18 @@ async def body(r, p):
     r.check(await pg.input_value('[data-input="search-cat"]') == "eletronicos" and await pg.input_value('[data-input="search-ord"]') == "val",
             "uma categoria nos Gráficos abre a busca dela, por valor")
 
-    # -- muitos itens: Mostrar mais
+    # -- muitos itens: tudo de uma vez (1.109.0, o dono: "ódio mortal pelo mostrar mais 120… buscar tudo por padrão")
     for start in (0, 60, 120):
         r.api("POST", "api/items/batch", {"items": [{"name": f"Pote organizador {k + 1:03d}", "room": "lavanderia", "cat": "utilidades", "value": 10}
                                                     for k in range(start, min(start + 60, 130))]})
     await r.open(pg, "#/buscar", ".ssum")
-    r.check((await pg.text_content(".ssum span")).strip() == "168 itens" and await rows(pg) == 120, "168 itens: mostra os primeiros 120")
-    r.eq((await pg.text_content('[data-act="more-results"]')).strip(), "Mostrar mais 48", "o botão diz quantos faltam")
-    await pg.click('[data-act="more-results"]')
-    await pg.wait_for_timeout(300)
-    r.check(await rows(pg) == 168 and await pg.locator('[data-act="more-results"]').count() == 0, "Mostrar mais traz o resto e o botão some")
+    r.check((await pg.text_content(".ssum .ssum-n")).strip().startswith("168 itens") and await rows(pg) == 168, "168 itens: todos na tela")
+    r.eq(await pg.locator('[data-act="more-results"]').count(), 0, "sem o Mostrar mais")
     await query(pg, "pote")
-    r.check(await rows(pg) == 120 and (await pg.text_content('[data-act="more-results"]')).strip() == "Mostrar mais 10", "uma busca nova volta a mostrar 120 de cada vez")
+    r.check(await rows(pg) == 130, "uma busca: todos os que batem")
+    # a contagem e a soma à esquerda, o Selecionar à direita (PADROES.md)
+    pos = await pg.evaluate("(() => { const c = document.querySelector('.ssum').getBoundingClientRect(), n = document.querySelector('.ssum .ssum-n').getBoundingClientRect(), s = document.querySelector('.ssum .sel-go').getBoundingClientRect(); return [Math.round(n.left - c.left), Math.round(c.right - s.right)]; })()")
+    r.check(pos[0] <= 4 and pos[1] <= 4, f"a contagem à esquerda e o Selecionar à direita ({pos})")
     r.check(await pg.evaluate(OVERFLOW), "sem rolagem para o lado")
     await r.shot(pg, "mostrar-mais")
     await ctx.close()

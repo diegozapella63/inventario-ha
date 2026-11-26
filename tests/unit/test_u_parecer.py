@@ -231,6 +231,39 @@ class Pesquisas(Base):
             S.rec_dismiss("nao-existe")
         self.assertEqual(e.exception.status, 404)
 
+    def test_limpar_todos(self):
+        """1.109.0 (o dono: "criar opção para apagar todos"): o Limpar dos Recursos e dos Pareceres, pela rota e pela ferramenta."""
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S.time, "sleep", lambda s: None):
+            S.avaliar(self.cons["id"])
+        S.rec_save(self.cons["id"], {"recursos": [{"nome": "Wi-Fi", "detalhe": ""}], "fonte": "", "site": ""})
+        S.WEB_JOBS["a" * 16] = {"kind": "par-lote", "stage": "busy", "at": time.time()}
+        S.WEB_JOBS["b" * 16] = {"kind": "lote", "so": "recursos", "stage": "busy", "at": time.time()}
+        S.WEB_JOBS["c" * 16] = {"kind": "lote", "so": "", "stage": "busy", "at": time.time()}
+        try:
+            par_job, rec_job = S.WEB_JOBS["a" * 16], S.WEB_JOBS["b" * 16]
+            self.assertEqual(S.par_clear(), {})
+            self.assertEqual((S.par_of(self.cons["id"]), par_job.get("cancelled"), "a" * 16 in S.WEB_JOBS), ({}, True, False), "os pareceres e a avaliação em andamento")
+            self.assertEqual(S.rec_clear(), {})
+            self.assertEqual((S.rec_of(self.cons["id"]), rec_job.get("cancelled"), "c" * 16 in S.WEB_JOBS), ({}, True, True), "os recursos e a busca deles; a conferência das novidades segue")
+        finally:
+            S.WEB_JOBS.pop("c" * 16, None)
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S.time, "sleep", lambda s: None):
+            S.avaliar(self.cons["id"])
+        r = json.loads(F.chamar(S, "apagar_pesquisa", {"o_que": "parecer", "todos": True}, {"nome": "Ana"}, "Claude"))
+        self.assertEqual((r, S.par_of(self.cons["id"])), ({"apagado": "parecer", "todos": True}, {}))
+        r = json.loads(F.chamar(S, "apagar_pesquisa", {"o_que": "recursos", "todos": True}, {"nome": "Ana"}, "Claude"))
+        self.assertEqual(r["apagado"], "recursos")
+        for args, parte in (({"o_que": "novidades", "todos": True}, "Limpar"), ({"o_que": "parecer"}, "id do item")):
+            with self.assertRaises(F.ErroFerramenta) as e:
+                F.chamar(S, "apagar_pesquisa", args, {"nome": "Ana"}, "Claude")
+            self.assertIn(parte, str(e.exception))
+        self.store.settings["ai"] = False
+        try:
+            with self.assertRaises(S.ApiError):
+                S.par_clear()
+        finally:
+            self.store.settings["ai"] = True
+
     def test_recursos_sem_as_novidades_e_o_andamento_na_lista(self):
         self.store.settings["news"] = False
         with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S, "rec_pending", return_value=[]):

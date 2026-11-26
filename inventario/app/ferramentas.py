@@ -169,8 +169,10 @@ FERRAMENTAS = [
     {"nome": "apagar_pesquisa", "titulo": "Apagar o que a IA buscou", "grava": True, "apaga": True,
      "descricao": "Apaga de um item o que a IA buscou na internet, como o Apagar da ficha: as novidades (não voltam nas próximas "
                   "conferências), os recursos (de um eletrônico; também nos outros cômodos com o mesmo equipamento) ou o parecer (de "
-                  "um consumível). O item não muda, e dá para buscar de novo.",
-     "entrada": _obj({"id": _ID, "o_que": {"type": "string", "enum": ["novidades", "recursos", "parecer"], "description": "O que apagar."}}, ["id", "o_que"])},
+                  "um consumível). O item não muda, e dá para buscar de novo. Com todos: true (sem id), os recursos de todos os "
+                  "eletrônicos ou os pareceres de todos os consumíveis, como o Limpar das Pesquisas da IA.",
+     "entrada": _obj({"id": _ID, "o_que": {"type": "string", "enum": ["novidades", "recursos", "parecer"], "description": "O que apagar."},
+                      "todos": {"type": "boolean", "description": "Os recursos ou os pareceres de todos (sem id). As novidades de todos se limpam na tela."}}, ["o_que"])},
 ]
 POR_NOME = {f["nome"]: f for f in FERRAMENTAS}
 
@@ -922,6 +924,13 @@ def _apagar_pesquisa(srv, a) -> str:
     o_que = a.get("o_que")
     if o_que not in ("novidades", "recursos", "parecer"):
         raise ErroFerramenta("o_que: novidades, recursos ou parecer.")
+    if a.get("todos") is True:  # 1.109.0: os de todos, como o Limpar da tela
+        if o_que == "novidades":
+            raise ErroFerramenta("As novidades de todos se limpam em Mais › Pesquisas da IA › Novidades › Limpar. Aqui, com todos, recursos ou parecer.")
+        (srv.rec_clear if o_que == "recursos" else srv.par_clear)()
+        return json.dumps({"apagado": o_que, "todos": True}, ensure_ascii=False)
+    if not a.get("id"):
+        raise ErroFerramenta("Diga o id do item (ou todos: true para os recursos ou os pareceres de todos).")
     with srv.STORE.lock:
         it = _achar_item(srv, a.get("id"))
     if o_que == "novidades":

@@ -41,6 +41,9 @@ async def body(r, p):
     r.eq(tipos, [["Imóvel", "false"], ["Veículo", "false"], ["Outro", "true"]], "só o Tipo: Imóvel, Veículo ou Outro (de início, Outro)")
     w = await pg.evaluate("[...document.querySelectorAll('.seg.tipo button')].map(b => Math.round(b.getBoundingClientRect().width))")
     r.check(len(set(w)) == 1, f"os três do mesmo tamanho ({w})")
+    # 1.108.1 (o dono: "a parte do tipo tá bugado a seleção"): cada botão ocupa a altura da barra, que tem os 50 px dos outros
+    alt = await pg.evaluate("(() => { const s = document.querySelector('.seg.tipo'), r = s.getBoundingClientRect(); return [Math.round(r.height), ...[...s.querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().height))]; })()")
+    r.check(alt[0] == 50 and all(h >= 40 for h in alt[1:]), f"o Tipo: a barra com 50 px e cada botão com a altura dela ({alt})")
     r.eq(txt(await pg.text_content('[data-ed="save"]')), "Salvar bem", "o botão diz Salvar bem")
     await pg.fill("#f-name", "Apartamento na praia")
     await pg.click('.seg.tipo [data-v="imoveis"]')

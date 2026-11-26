@@ -55,12 +55,12 @@ async def body(r, p):
     r.eq(unit, "R$ 617,25 cada", "valor por unidade")
     # 1.104.0: fechado, o escolhido ao lado do título (Cômodo · Escritório, Fotos · 1 foto)
     campo = lambda t: pg.locator("dialog .field.dobravel > .lbl", has_text=t)
-    CAMPOS = ("Fotos", "Cômodo", "Categoria", "Quantidade e valor")
+    CAMPOS = ("Fotos", "Cômodo", "Categoria", "Valores")
     for t in CAMPOS:
         await campo(t).click(); await pg.wait_for_timeout(120)
     vals = [await campo(t).get_attribute("data-val") for t in CAMPOS]
     r.eq(vals, ["1 foto", "Escritório", "Decoração e arte", "2 · R$ 1.234,50"], "fechados, o escolhido ao lado do título (1.105.1: a Quantidade e o Valor total num bloco só)")
-    r.check(not await pg.locator("#f-qty").is_visible() and not await pg.locator("#f-value").is_visible(), "Quantidade e valor fechado: os dois campos somem juntos")
+    r.check(not await pg.locator("#f-qty").is_visible() and not await pg.locator("#f-value").is_visible(), "Valores fechado: a quantidade e o valor somem juntos")
     antes = await pg.evaluate("() => getComputedStyle(document.querySelector('dialog .field.shut > .lbl[data-val]'), '::before').content")
     r.check(antes.startswith('"· '), f"desenhado depois do título ({antes})")
     await r.shot(pg, "editor-campos-fechados")
