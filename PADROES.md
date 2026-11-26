@@ -112,7 +112,11 @@ do app vira aba (o CorrerIA tem também WhatsApp e MCP).
   `list=`. A caixa fechada é igual aos outros campos (altura, cantos, seta), no claro e no escuro.
 - Com o foco num campo, ou quando o teclado muda a altura da tela, as páginas em volta do app (a do Home Assistant)
   voltam para o começo (`tecladoCalmo`).
-- **Agrupar por**: o título com o ícone e as escolhas do mesmo tamanho numa linha; cada grupo fecha pelo nome.
+- **Agrupar por**: um bloco dele, fora dos Filtros, que fecha e abre pelo título (fechado, o escolhido ao lado); as
+  escolhas do mesmo tamanho numa linha; cada grupo fecha pelo nome.
+- **Fotos**: o **Tirar foto** é a câmera do próprio app (`getUserMedia`, a do Digitalizar com IA), porque o app do Home
+  Assistant no Android ignora o `capture` e abre a galeria; o seletor de arquivos é feito na hora no documento (fora do
+  Shadow DOM) e, no app do Android, sem `multiple` (escolhendo várias, ele não entrega nenhuma: uma de cada vez lá).
 - **Selecionar** (o modelo é o do OdisseIA): na linha do resumo da lista; segurar o dedo numa linha também começa; uma
   seleção é de um tipo só; em cima, o X, quantos e o Todos; embaixo, o **Alterar** (cada campo começa em Manter) e, onde
   o app apaga, o **Apagar**, com o Desfazer depois; a seleção ocupa uma entrada no histórico e acaba ao sair da tela.
