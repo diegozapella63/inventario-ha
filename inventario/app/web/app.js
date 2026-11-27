@@ -517,14 +517,17 @@
     // o valor em reais diz que é em reais
     return escrito && f.querySelector(".money") ? `R$ ${escrito}` : escrito;
   }
+  const CAMPO_FEM = /^(fotos?|categoria|observaç|zona|dica|nota|cor\b|duraç|marca|loja|data)/i;
   function valoresCampos(root) {
     for (const f of root.querySelectorAll(".field.dobravel")) {
       const l = f.querySelector(":scope > .lbl");
       if (!l) continue;
-      let v = valorCampo(f);
+      // 1.110.3 (o dono: "quando retraído sem selecionar nada deve estar como nenhum… em todos os apps"): sem nada, «Nenhum»
+      // (ou «Nenhuma», de uma palavra feminina; o campo pode dizer outra coisa no data-vazio)
+      const t = l.textContent.trim();
+      let v = valorCampo(f) || f.dataset.vazio || (/^categoria/i.test(t) ? "Sem categoria" : CAMPO_FEM.test(t) ? "Nenhuma" : "Nenhum");
       if (v.length > 48) v = v.slice(0, 47) + "…";
-      if (v) { if (l.getAttribute("data-val") !== v) l.setAttribute("data-val", v); }
-      else l.removeAttribute("data-val");
+      if (l.getAttribute("data-val") !== v) l.setAttribute("data-val", v);
     }
   }
   function alternarCampo(l) {
@@ -5131,11 +5134,17 @@
     const roomName = (rid = C.room) => D.roomById.get(rid)?.name || "";
     const roomOpts = (sel, first) => (first ? `<option value="${first[0]}"${sel === first[0] ? " selected" : ""}>${first[1]}</option>` : "")
       + D.rooms.map((r) => `<option value="${esc(r.id)}"${r.id === sel ? " selected" : ""}>${esc(r.name)}</option>`).join("");
+    // 1.110.3 (o dono: "seleção de cômodo fora do padrão"): um botão por cômodo, como no Novo item; a caixa de seleção fica no
+    // formulário, fora da vista, e é quem guarda o valor (o botão muda e avisa, como se ela tivesse mudado)
+    const roomField = (sel, first, need = false) => `<div class="field"><span class="lbl" id="c-room-l">Cômodo</span>
+      <select id="c-room" class="select fora${need ? " need" : ""}" data-ct-in="room" tabindex="-1" aria-hidden="true" aria-label="Cômodo">${roomOpts(sel, first)}</select>
+      <div class="pick-grid" role="group" aria-labelledby="c-room-l">${[...(first && first[0] !== "" || (first && first[1] === "A IA escolhe") ? [[first[0], first[1], first[0] === "*" ? "layers" : "spark"]] : []), ...D.rooms.map((r) => [r.id, r.name, "rooms"])]
+        .map(([v, t, i]) => `<button type="button" class="pk${v === sel ? " on" : ""}" data-ct-pick="${esc(v)}" aria-pressed="${v === sel}">${ic(i, "sm")}<span>${esc(t)}</span></button>`).join("")}</div></div>`;
     // na revisão, o cômodo de todos (com "Cada item no seu" quando a IA pôs em cômodos diferentes)
     const shared = () => { const set = new Set(C.results.map((r) => r.room || "")); return set.size === 1 ? [...set][0] : "*"; };
     const reviewRoom = () => {
       const sel = shared();
-      return `<div class="field"><label for="c-room">Cômodo</label><select id="c-room" class="select${sel === "" ? " need" : ""}" data-ct-in="room">${roomOpts(sel, sel === "*" ? ["*", "Cada item no seu"] : sel === "" ? ["", "Escolha o cômodo"] : null)}</select></div>`;
+      return roomField(sel, sel === "*" ? ["*", "Cada item no seu"] : sel === "" ? ["", "Escolha o cômodo"] : null, sel === "");
     };
     const perItem = () => C.voice && C.results.length > 1; // quem fala pode citar um cômodo para cada item
     const heardBox = () => (C.heard ? `<p class="heard">${ic("mic", "sm")}<span>“${esc(C.heard)}”</span></p>` : "");
@@ -5168,7 +5177,7 @@
                 ${hasRoomPhotos ? `<button type="button" class="add" style="aspect-ratio:4/3" data-ct="roomphoto">${ic("images", "lg")}Foto do cômodo</button>` : ""}`}
               </div>${COARSE ? "" : `<p class="help" style="margin:0">Também dá para arrastar ou colar (Ctrl+V).</p>`}`}
           <div class="${zonesUse ? "row2" : ""}">
-            <div class="field"><label for="c-room">Cômodo</label><select id="c-room" class="select" data-ct-in="room">${roomOpts(C.room, ["", "A IA escolhe"])}</select></div>
+            ${roomField(C.room, ["", "A IA escolhe"])}
             ${zonesUse ? `<div class="field"><label for="c-zone">Zona (opcional)</label><input id="c-zone" class="input" data-ct-in="zone" data-sug="c-zones" value="${esc(C.zone)}" placeholder="Deixe vazio para a IA sugerir" autocomplete="off">
               <datalist id="c-zones">${zonesOf(C.room).map((z) => `<option value="${esc(z)}">`).join("")}</datalist></div>` : ""}
           </div>
@@ -5334,6 +5343,12 @@
       } catch (e) { fail(e); C.busy = false; if (document.contains(dlg)) render(); }
     }
     dlg.addEventListener("click", async (e) => {
+      const pk = e.target.closest("[data-ct-pick]");
+      if (pk) {
+        const s = $("#c-room", dlg);
+        if (s && s.value !== pk.dataset.ctPick) { s.value = pk.dataset.ctPick; s.dispatchEvent(new Event("change", { bubbles: true })); }
+        return;
+      }
       const b = e.target.closest("[data-ct]");
       if (!b) return;
       const act = b.dataset.ct;

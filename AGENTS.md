@@ -190,3 +190,5 @@ Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versã
 1.110.1: o botão dos recursos que faltam é **Os que faltam** (o «Buscar os que faltam» ficava cortado ao lado do Escolher quais; o `e2e_telas` pegou no GitHub).
 
 1.110.2: o `#p-rec` entra nas regras do `.oa.news-tres` (uma coluna, como o `#p-par`): no GitHub, o `e2e_telas` pegou o botão cortado em 320 px, que aqui passava (a fonte de lá é outra).
+
+1.110.3 (o dono: "está criando scroll e ficando feio quando está com detalhes, tem que mostrar os ..."; "seleção de cômodo fora do padrão"; "quando retraído sem selecionar nada deve estar como nenhum… em todos os apps"): `.field.dobravel { grid-template-columns: minmax(0, 1fr) }` e o `.lbl` com `min-width: 0`; o `valoresCampos` sem valor diz o `data-vazio` do campo, «Sem categoria» (Categoria), «Nenhuma» (`CAMPO_FEM`) ou «Nenhum»; no Catalogar, o `roomField(sel, first, need)` (a caixa `#c-room` fora da vista, quem guarda o valor, e o `.pick-grid` com o `data-ct-pick`). Testes: `e2e_itens` e `e2e_catalogar_falar`.

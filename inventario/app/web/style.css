@@ -1576,6 +1576,10 @@ textarea.input.grow { height: auto; min-height: var(--altura); max-height: 40vh;
 
 /* 1.61.2: numa janela, os campos de escolhas fecham e abrem pelo título (a seta no fim); fechado, só o título */
 .field.dobravel > .lbl { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+/* 1.110.3 (o dono: "está criando scroll e ficando feio quando está com detalhes, tem que mostrar os ..."): o título com o escrito
+   ao lado não alarga o campo; o que não cabe termina em «…» */
+.field.dobravel { grid-template-columns: minmax(0, 1fr); }
+.field.dobravel > .lbl { min-width: 0; }
 .field.dobravel > .lbl::after { content: ""; flex: none; width: 18px; height: 18px; margin-left: auto; background: var(--muted); transition: transform .2s;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 18px no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 18px no-repeat; }

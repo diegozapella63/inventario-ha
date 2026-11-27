@@ -22,6 +22,12 @@ async def body(r, p):
     await pg.wait_for_selector('[data-ct="upload"]')
     r.check(await pg.is_disabled('[data-ct="read"]'), "Digitalizar com IA desligado até escolher a foto")
     r.eq(await pg.input_value("#c-room"), "escritorio", "o cômodo de onde abriu já vem escolhido")
+    # 1.110.3 (o dono: "seleção de cômodo fora do padrão"): um botão por cômodo, como no Novo item
+    picks = [t.strip() for t in await pg.locator("dialog[open] [data-ct-pick]").all_inner_texts()]
+    r.check(picks[0] == "A IA escolhe" and "Escritório" in picks and await pg.locator("dialog[open] [data-ct-pick].on").inner_text() == "Escritório", f"os cômodos em botões, o de onde abriu marcado ({picks})")
+    await pg.locator("dialog[open] [data-ct-pick]", has_text="Quarto").click(); await pg.wait_for_timeout(200)
+    r.eq(await pg.input_value("#c-room"), "quarto", "um toque escolhe")
+    await pg.locator("dialog[open] [data-ct-pick]", has_text="Escritório").click(); await pg.wait_for_timeout(200)
     async with pg.expect_file_chooser() as fc:
         await pg.click('[data-ct="upload"]')
     await (await fc.value).set_files(foto)

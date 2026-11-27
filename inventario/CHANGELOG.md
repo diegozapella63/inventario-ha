@@ -1,5 +1,11 @@
 # Mudanças
 
+## 1.110.3
+
+- Nas janelas, um campo fechado **sem nada escolhido nem escrito** diz ao lado **Nenhum** (ou **Nenhuma**, **Sem categoria**), como nos outros apps.
+- Um texto longo ao lado do título fechado (os **Detalhes**) não alarga mais a janela nem cria rolagem para o lado: o que não cabe termina em «…».
+- **Catalogar itens com IA**: o **Cômodo** em botões (A IA escolhe e um por cômodo), como no Novo item.
+
 ## 1.110.2
 
 - **Recursos**: **Os que faltam** e **Escolher quais** um embaixo do outro, como nos Pareceres (lado a lado, no celular estreito, o texto ficava cortado).

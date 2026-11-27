@@ -46,6 +46,19 @@ async def body(r, p):
     await pg.click('[data-ed="save"]')
     await pg.wait_for_timeout(300)
     r.check(await pg.is_visible('[data-err="name"]'), "sem nome, o editor avisa")
+    # 1.110.3 (o dono: "quando retraído sem selecionar nada deve estar como nenhum"): vazio, Nenhum (Sem categoria, Nenhuma)
+    campo0 = lambda t: pg.locator("dialog .field.dobravel > .lbl", has_text=t)
+    for t in ("Detalhes", "Observação"):
+        await campo0(t).click(); await pg.wait_for_timeout(120)
+    r.eq([await campo0(t).get_attribute("data-val") for t in ("Detalhes", "Observação")], ["Nenhum", "Nenhuma"], "vazios e fechados: Nenhum, Nenhuma")
+    # o escrito longo não alarga a janela: termina em «…»
+    for t in ("Detalhes", "Observação"):
+        await campo0(t).click(); await pg.wait_for_timeout(120)
+    await pg.fill("#f-details", "Abertura superior, tampa de vidro preta, lavagem a vapor, motor com dez anos de garantia e mais coisas")
+    await campo0("Detalhes").click(); await pg.wait_for_timeout(150)
+    larg = await pg.evaluate("() => { const l = document.querySelector('dialog[open] #f-details').closest('.field').querySelector(':scope > .lbl'); const d = l.closest('dialog'); return [Math.round(l.getBoundingClientRect().right), Math.round(d.getBoundingClientRect().right)]; }")
+    r.check(larg[0] <= larg[1], f"Detalhes fechado com o texto longo: dentro da janela ({larg})")
+    await campo0("Detalhes").click(); await pg.wait_for_timeout(120)
     await pg.fill("#f-name", "Luminária de mesa")
     await pg.fill("#f-details", "Braço articulado")
     await pg.select_option("#f-cat", "decoracao")
