@@ -622,3 +622,28 @@ class PelaFoto(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AcabaEmDias(Base):
+    """1.111.0 (a etapa Acabam esta semana das rondas do CorrerIA): buscar_itens com acaba_em_dias, pelo Dura até."""
+
+    def test_so_os_que_acabam_ate_la_na_ordem(self):
+        a = self.consumivel("Creme A", dur=10)
+        b = self.consumivel("Creme B", dur=3)
+        c = self.consumivel("Creme C", dur=200)
+        d = self.consumivel("Creme D")  # sem duração
+        velho = self.consumivel("Creme velho", dur=5)
+        for it, quando in ((a, "2026-11-01"), (b, "2026-11-01"), (c, "2026-11-01"), (velho, "2026-10-01")):
+            self.store.item(it["id"])["durAt"] = quando + "T08:00:00"
+        with mock.patch.dict(os.environ, {"INV_HOJE": "2026-11-05"}):
+            r = self.json("buscar_itens", {"acaba_em_dias": 7})
+            self.assertEqual([i["nome"] for i in r["itens"]], ["Creme velho", "Creme B", "Creme A"], "os que já acabaram também, o que acaba antes primeiro")
+            self.assertEqual(r["itens"][1]["dura_ate"], "2026-11-04")
+            self.assertEqual([i["nome"] for i in self.json("buscar_itens", {"acaba_em_dias": 0})["itens"]], ["Creme velho", "Creme B"])
+            self.assertEqual([i["nome"] for i in self.json("buscar_itens", {"acaba_em_dias": 7, "ordem": "nome"})["itens"]], ["Creme A", "Creme B", "Creme velho"])
+            todos = [i["nome"] for i in self.json("buscar_itens", {"comodo": "Consumíveis", "ordem": "acaba"})["itens"]]
+            self.assertEqual(todos[-1], "Creme D", "sem duração, no fim")
+        for ruim in (-1, 3651, 1.5, True, "7"):
+            self.erro("buscar_itens", {"acaba_em_dias": ruim}, "acaba_em_dias")
+        self.erro("buscar_itens", {"ordem": "x"}, "acaba")
+        self.assertNotIn(d["id"], [i["id"] for i in self.json("buscar_itens", {"acaba_em_dias": 3650})["itens"]])

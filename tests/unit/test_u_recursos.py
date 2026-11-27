@@ -1,5 +1,6 @@
 """1.54.0: Recursos. O pedido à IA (o produto, os detalhes, a página indicada), a limpeza do que ela responde (nomes
 curtos sem repetir, no máximo 12, a fonte só com http) e as respostas fora do formato ou sem nada."""
+import json
 import time
 import unittest
 from unittest import mock
@@ -157,3 +158,79 @@ class Escolher(UnitBase):
             with self.assertRaises(S.ApiError) as e:
                 S.news_batch_start(so="itens", itens=[])
             self.assertIn("só para os recursos", e.exception.msg)
+
+
+class Ferramentas1111(UnitBase):
+    """1.111.0 (o dono, às ferramentas que faltavam para o CorrerIA: "pode colocar todas"): recursos (lê os guardados, um
+    por equipamento) e buscar_recursos (o Os que faltam e o Escolher quais, em segundo plano)."""
+    REC = {"produto": "X", "recursos": [{"nome": "Bluetooth", "detalhe": "Liga no celular."}], "fonte": "https://exemplo.com/x", "site": "exemplo.com"}
+
+    def chamar(self, nome, args):
+        import ferramentas as F
+        return json.loads(F.chamar(S, nome, args, {"nome": "Ana"}, "Claude"))
+
+    def test_recursos_e_buscar_recursos(self):
+        import ferramentas as F
+        nomes = [f["nome"] for f in F.lista()]
+        self.assertIn("recursos", nomes)
+        self.assertTrue(F.POR_NOME["buscar_recursos"]["grava"], "a busca gasta a IA: espera o sim")
+        eletr = [it for it in S.STORE.data["items"] if it.get("cat") == S.REC_LOTE_CAT]
+        um = eletr[0]
+        S.rec_save(um["id"], self.REC)
+        r = self.chamar("recursos", {})
+        self.assertEqual([g["recursos"] for g in r["com_recursos"]], [["Bluetooth"]])
+        self.assertTrue(r["sem_recursos"], "os que ainda não têm")
+        self.assertTrue(all(g["comodos"] for g in r["sem_recursos"]))
+        grupos = {S.news_group_key(it) for it in eletr}
+        self.assertEqual(len(r["com_recursos"]) + len(r["sem_recursos"]), len(grupos), "um por equipamento")
+        self.assertNotIn("com_recursos", self.chamar("recursos", {"so_sem": True}))
+        um_r = self.chamar("recursos", {"id": um["id"]})
+        self.assertEqual((um_r["recursos"][0]["detalhe"], um_r["fonte"]), ("Liga no celular.", "https://exemplo.com/x"))
+        outro = next(it for it in eletr if S.news_group_key(it) != S.news_group_key(um))
+        self.assertIn("inventario_buscar_recursos", self.chamar("recursos", {"id": outro["id"]})["aviso"])
+        movel = next(it for it in S.STORE.data["items"] if it.get("cat") not in S.REC_CATS and not S.STORE.is_cons(it["room"]))
+        import ferramentas as F
+        with self.assertRaises(F.ErroFerramenta) as e:
+            self.chamar("recursos", {"id": movel["id"]})
+        self.assertIn("não é um eletrônico", str(e.exception))
+        with self.assertRaises(F.ErroFerramenta) as e:
+            self.chamar("buscar_recursos", {"ids": [movel["id"]]})
+        self.assertIn("Não são eletrônicos", str(e.exception))
+        with self.assertRaises(F.ErroFerramenta) as e:
+            self.chamar("buscar_recursos", {"ids": "x"})
+        self.assertIn("uma lista", str(e.exception))
+        calls = []
+
+        def fake(name, details, entity):
+            calls.append(name)
+            return self.REC
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S, "ai_find_rec", fake), mock.patch.object(S.time, "sleep", lambda s: None):
+            r = self.chamar("buscar_recursos", {})
+            self.assertEqual((r["comecou"], r["equipamentos"]), (True, len(grupos) - 1), "os que faltam")
+            job = next(v for v in S.WEB_JOBS.values() if v.get("kind") == "lote")
+            t0 = time.time()
+            while job["stage"] == "busy" and time.time() - t0 < 10:
+                time.sleep(0.02)
+            self.assertEqual(len(calls), len(grupos) - 1)
+            with self.assertRaises(F.ErroFerramenta) as e:
+                self.chamar("buscar_recursos", {})
+            self.assertIn("já têm os recursos", str(e.exception))
+            calls.clear()
+            r = self.chamar("buscar_recursos", {"ids": [S.STORE.tag(um)]})
+            self.assertEqual(r["equipamentos"], 1, "pelo código, de novo")
+            job = [v for v in S.WEB_JOBS.values() if v.get("kind") == "lote"][-1]
+            t0 = time.time()
+            while job["stage"] == "busy" and time.time() - t0 < 10:
+                time.sleep(0.02)
+            self.assertEqual(len(calls), 1)
+            job["stage"] = "busy"
+            with self.assertRaises(F.ErroFerramenta) as e:
+                self.chamar("buscar_recursos", {"ids": [um["id"]]})
+            self.assertIn("andando", str(e.exception))
+            self.assertIn("buscando_agora", self.chamar("recursos", {}))
+            job["stage"] = "done"
+        S.STORE.settings["ai"] = False
+        for nome in ("recursos", "buscar_recursos"):
+            with self.assertRaises(F.ErroFerramenta) as e:
+                self.chamar(nome, {})
+            self.assertIn("IA do InventarIA está desligada", str(e.exception))

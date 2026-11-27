@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.111.0
+
+- **Pelo CorrerIA** (WhatsApp, Claude, Gemini e a Conversa de lá): agora dá para pedir os **recursos** dos eletrônicos ("o que a TV faz que eu não uso?"), **buscar os recursos** dos que faltam ou dos escolhidos e **avaliar vários consumíveis** de uma vez, como em Mais › Pesquisas da IA. As buscas rodam em segundo plano e ficam guardadas, como na tela.
+- Também pelo CorrerIA: os **consumíveis que acabam** nos próximos dias ("o que acaba esta semana?"), pelo Dura até.
+
 ## 1.110.3
 
 - Nas janelas, um campo fechado **sem nada escolhido nem escrito** diz ao lado **Nenhum** (ou **Nenhuma**, **Sem categoria**), como nos outros apps.

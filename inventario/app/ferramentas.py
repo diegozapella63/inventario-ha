@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import json
 import re
+from datetime import timedelta
 
 MAX_LISTA = 200   # itens numa busca
 PADRAO_LISTA = 50
@@ -54,7 +55,8 @@ FERRAMENTAS = [
     {"nome": "buscar_itens", "titulo": "Buscar itens", "grava": False,
      "descricao": "Busca itens por texto (todas as palavras, sem ligar para acentos, no nome, nos detalhes, na observação, no "
                   "código, no cômodo, na categoria e na zona), cômodo, zona, categoria e faixa de valor. Devolve quantos achou, a soma dos valores e os itens (id, código, nome, cômodo, "
-                  "zona, categoria, quantidade, valor; num consumível, no lugar da quantidade e do valor, quanto dura e para que serve). Sem filtros, todos. Para achar pelo uso "
+                  "zona, categoria, quantidade, valor; num consumível, no lugar da quantidade e do valor, quanto dura, até quando (dura_ate) e para que serve). Sem filtros, todos. "
+                  "Com acaba_em_dias, só os consumíveis que acabam até daqui a N dias (os que já acabaram também), primeiro os que acabam antes. Para achar pelo uso "
                   "(o que temos para massagem?), busque só o começo da palavra do uso (massag acha massagem e massageador): ele vale no "
                   "nome e nos detalhes, onde fica o que é e para que serve.",
      "entrada": _obj({"texto": {"type": "string", "description": "Palavras ou o código (ex.: SAL-003)."},
@@ -62,8 +64,10 @@ FERRAMENTAS = [
                       "usado_em": {"type": "string", "description": "Só os consumíveis usados neste cômodo (o id ou o nome; com Consumíveis por cômodo ligado)."},
                       "valor_min": {"type": "number", "minimum": 0}, "valor_max": {"type": "number", "minimum": 0},
                       "sem_foto": {"type": "boolean", "description": "true: só os itens que ainda não têm foto (1.99.0)."},
-                      "ordem": {"type": "string", "enum": ["codigo", "valor", "nome", "recentes"],
-                                "description": "codigo: na ordem dos cômodos (padrão); valor: do maior para o menor; recentes: os últimos cadastrados primeiro."},
+                      "acaba_em_dias": {"type": "integer", "minimum": 0, "maximum": 3650,
+                                        "description": "Só os consumíveis que acabam até daqui a N dias, pelo Dura até (0: hoje; 7: esta semana). Os que já acabaram entram."},
+                      "ordem": {"type": "string", "enum": ["codigo", "valor", "nome", "recentes", "acaba"],
+                                "description": "codigo: na ordem dos cômodos (padrão); valor: do maior para o menor; recentes: os últimos cadastrados primeiro; acaba: os consumíveis que acabam antes primeiro (padrão com acaba_em_dias)."},
                       "limite": {"type": "integer", "minimum": 1, "maximum": MAX_LISTA, "description": f"Padrão: {PADRAO_LISTA}."}})},
     # 1.98.0 (o dono: "pode criar ferramenta… o que precisar para melhorarmos o processo"; a Ronda da casa do CorrerIA 1.33.0
     # pergunta pelas novidades): só lê o que o app já conferiu e guardou; não procura na internet nem chama a IA
@@ -101,6 +105,24 @@ FERRAMENTAS = [
                   "ainda não têm, como a tela Pesquisas da IA › Pareceres. Só lê o que já foi avaliado: para avaliar um, use avaliar. "
                   "Filtro: so_sem (só os que não têm parecer).",
      "entrada": _obj({"so_sem": {"type": "boolean", "description": "true: só os consumíveis sem parecer."}})},
+    # 1.111.0 (o dono, às ferramentas que faltavam: "pode colocar todas"): os Recursos e o Avaliar vários das Pesquisas da IA
+    {"nome": "recursos", "titulo": "Recursos dos eletrônicos", "grava": False,
+     "descricao": "Os recursos já guardados dos eletrônicos (o que o aparelho faz e pouca gente usa: modos, atalhos, funções), como a "
+                  "tela Pesquisas da IA › Recursos, e os que ainda não têm. O mesmo equipamento em vários cômodos aparece uma vez, com os "
+                  "cômodos. Com id, os de um item (também de uma utilidade ou de um veículo). Só lê o que já foi buscado: para buscar, use "
+                  "inventario_buscar_recursos.",
+     "entrada": _obj({"id": _ID, "so_sem": {"type": "boolean", "description": "true: só os eletrônicos que ainda não têm os recursos."}})},
+    {"nome": "buscar_recursos", "titulo": "Buscar os recursos com IA", "grava": True,
+     "descricao": "Busca na internet, com a IA do InventarIA, os recursos dos eletrônicos: sem ids, os que ainda não têm (o Os que "
+                  "faltam da tela); com ids, os escolhidos (o Escolher quais), também os que já têm, que são buscados de novo. O mesmo "
+                  "equipamento em vários cômodos é uma busca só. Roda em segundo plano (cerca de um minuto por equipamento) e o que "
+                  "achar fica guardado: depois, inventario_recursos mostra.",
+     "entrada": _obj({"ids": {"type": "array", "minItems": 1, "maxItems": 200, "items": _ID, "description": "Os ids ou os códigos dos eletrônicos."}})},
+    {"nome": "avaliar_varios", "titulo": "Avaliar vários consumíveis com IA", "grava": True,
+     "descricao": "O Avaliar com IA de vários consumíveis de uma vez (o Avaliar consumíveis da tela Pesquisas da IA › Pareceres): sem "
+                  "ids, os que ainda não têm parecer; com ids, os escolhidos (também os que já têm, que são avaliados de novo). Roda em "
+                  "segundo plano (cerca de um minuto cada) e os pareceres ficam guardados: depois, inventario_pareceres mostra.",
+     "entrada": _obj({"ids": {"type": "array", "minItems": 1, "maxItems": 200, "items": _ID, "description": "Os ids ou os códigos dos consumíveis."}})},
     {"nome": "cadastrar_itens", "titulo": "Cadastrar itens", "grava": True,
      "descricao": "Cadastra um ou mais itens num cômodo (ou em Bens: casa, terreno, carro; ou em Consumíveis: o que se gasta "
                   "e se compra de novo, como pasta térmica e creme de massagem). Cada item ganha o próximo código "
@@ -515,6 +537,10 @@ def _buscar(srv, a) -> str:
     sem_foto = a.get("sem_foto")
     if sem_foto not in (None, "", True, False):
         raise ErroFerramenta("sem_foto é true ou false.")
+    acaba = a.get("acaba_em_dias")
+    if acaba is not None and (isinstance(acaba, bool) or not isinstance(acaba, (int, float)) or acaba != int(acaba) or not 0 <= acaba <= 3650):
+        raise ErroFerramenta("acaba_em_dias: de 0 a 3650 (7 é esta semana).")
+    ate = (srv.news_today() + timedelta(days=int(acaba))).isoformat() if acaba is not None else None
     if vmin is not None and vmax is not None and vmax < vmin:
         raise ErroFerramenta("valor_max é menor que valor_min.")
     zonas = srv.zones_enabled()
@@ -523,9 +549,9 @@ def _buscar(srv, a) -> str:
         raise ErroFerramenta("As zonas estão desligadas no InventarIA. Busque sem a zona.")
     palavras = [srv.fold(w) for w in str(a.get("texto") or "").split()][:12]
     usado = (_usado_em(srv, a["usado_em"]) or None) if a.get("usado_em") not in (None, "") else None
-    ordem = a.get("ordem") or "codigo"
-    if ordem not in ("codigo", "valor", "nome", "recentes"):
-        raise ErroFerramenta("ordem: codigo, valor, nome ou recentes.")
+    ordem = a.get("ordem") or ("acaba" if ate else "codigo")
+    if ordem not in ("codigo", "valor", "nome", "recentes", "acaba"):
+        raise ErroFerramenta("ordem: codigo, valor, nome, recentes ou acaba.")
     lim = a.get("limite", PADRAO_LISTA)
     if isinstance(lim, bool) or not isinstance(lim, (int, float)) or not 1 <= int(lim) <= MAX_LISTA:
         raise ErroFerramenta(f"limite: de 1 a {MAX_LISTA}.")
@@ -545,6 +571,8 @@ def _buscar(srv, a) -> str:
             continue
         if sem_foto and (it.get("photos") or []):
             continue
+        if ate and not (_eh_cons(srv, it) and srv.dur_until(it) and srv.dur_until(it) <= ate):
+            continue
         if zona is not None and zona not in srv.fold(it.get("zone") or ""):
             continue
         if palavras:  # como a busca da tela (matches no app.js), mais a observação
@@ -560,6 +588,8 @@ def _buscar(srv, a) -> str:
         achados.sort(key=lambda i: srv.fold(i.get("name") or ""))
     elif ordem == "recentes":
         achados.sort(key=lambda i: str(i.get("createdAt") or ""), reverse=True)
+    elif ordem == "acaba":  # 1.111.0: os que acabam antes primeiro; sem duração, no fim
+        achados.sort(key=lambda i: (srv.dur_until(i) if _eh_cons(srv, i) else "") or "9999")
     else:
         achados.sort(key=lambda i: (order.get(i.get("room"), 999), i.get("seq") or 0))
     mostrar = achados[:int(lim)]
@@ -919,6 +949,102 @@ def _pareceres(srv, a) -> str:
     return json.dumps(out, ensure_ascii=False)
 
 
+def _ia_ligada(srv):
+    if not srv.ai_enabled():
+        raise ErroFerramenta("A IA do InventarIA está desligada (Mais › Configurações › Integrações › Usar IA). Diga isso à pessoa.")
+
+
+def _ids_itens(srv, v) -> list | None:
+    """1.111.0: os ids (ou códigos) de uma lista, cada um conferido; sem a lista, None."""
+    if v is None:
+        return None
+    if not isinstance(v, list) or not v:
+        raise ErroFerramenta("ids: uma lista com os ids ou os códigos dos itens.")
+    with srv.STORE.lock:
+        return list(dict.fromkeys(_achar_item(srv, x)["id"] for x in v))
+
+
+def _lote_andando(srv, kind) -> dict | None:
+    return next((v for v in list(srv.WEB_JOBS.values()) if v.get("kind") == kind and v.get("stage") == "busy" and not v.get("cancelled")), None)
+
+
+def _recursos(srv, a) -> str:
+    """1.111.0: os recursos guardados (o que a tela Pesquisas da IA › Recursos mostra), sem chamar a IA."""
+    _ia_ligada(srv)
+    if a.get("id"):
+        with srv.STORE.lock:
+            it = _achar_item(srv, a["id"])
+        if it.get("cat") not in srv.REC_CATS:
+            raise ErroFerramenta(f"{it.get('name')} não é um eletrônico, uma utilidade nem um veículo: os recursos são deles.")
+        r = srv.rec_of(it["id"])
+        if not r:
+            return json.dumps({"item": it.get("name"), "id": it["id"], "recursos": [],
+                               "aviso": "Ainda sem os recursos guardados: inventario_buscar_recursos busca."}, ensure_ascii=False)
+        return json.dumps({"item": it.get("name"), "id": it["id"], "buscado_em": (r.get("at") or "")[:10], "recursos": r["recursos"],
+                           **({"fonte": r["fonte"]} if r.get("fonte") else {})}, ensure_ascii=False)
+    grupos = {}
+    with srv.STORE.lock:
+        for it in srv.STORE.sorted_items():
+            if it.get("cat") == srv.REC_LOTE_CAT:
+                grupos.setdefault(srv.news_group_key(it), []).append(it)
+    com, sem = [], []
+    for ms in grupos.values():
+        comodos = list(dict.fromkeys(_nome_comodo(srv, m.get("room")) for m in ms))
+        base = {"id": ms[0]["id"], "item": ms[0].get("name"), "comodos": comodos}
+        r = next((x for x in (srv.rec_of(m["id"]) for m in ms) if x), None)
+        if r:
+            com.append({**base, "recursos": [x["nome"] for x in r["recursos"]], "buscado_em": (r.get("at") or "")[:10]})
+        else:
+            sem.append(base)
+    out = {"sem_recursos": sem} if a.get("so_sem") is True else {"com_recursos": com, "sem_recursos": sem}
+    job = _lote_andando(srv, "lote")
+    if job and job.get("so") == "recursos":
+        out["buscando_agora"] = job.get("msg") or "Buscando os recursos."
+    return json.dumps(out, ensure_ascii=False)
+
+
+def _buscar_recursos(srv, a) -> str:
+    """1.111.0: o Os que faltam (sem ids) e o Escolher quais (com ids) de Recursos, em segundo plano, pelo news_batch_start."""
+    _ia_ligada(srv)
+    ids = _ids_itens(srv, a.get("ids"))
+    if ids is not None:
+        fora = [srv.STORE.item(i).get("name") for i in ids if (srv.STORE.item(i) or {}).get("cat") != srv.REC_LOTE_CAT]
+        if fora:
+            raise ErroFerramenta(f"Não são eletrônicos: {', '.join(fora)}. Os recursos em lote são dos eletrônicos.")
+        n = len(srv.rec_escolhidos(ids))
+    else:
+        n = len(json.loads(_recursos(srv, {"so_sem": True}))["sem_recursos"])
+        if not n:
+            raise ErroFerramenta("Todos os eletrônicos já têm os recursos. Para buscar de novo, mande os ids.")
+    if _lote_andando(srv, "lote"):
+        raise ErroFerramenta("Já tem uma conferência das Pesquisas da IA andando: espere terminar (Mais › Pesquisas da IA).")
+    srv.news_batch_start(so="recursos", itens=ids)
+    return json.dumps({"comecou": True, "equipamentos": n, "aviso": "Roda em segundo plano, cerca de um minuto por equipamento. "
+                       "O que achar fica guardado: inventario_recursos mostra."}, ensure_ascii=False)
+
+
+def _avaliar_varios(srv, a) -> str:
+    """1.111.0: o Avaliar consumíveis de Pareceres (os sem parecer, ou os escolhidos), em segundo plano, pelo par_lote_start."""
+    _ia_ligada(srv)
+    if not srv.consumiveis_enabled():
+        raise ErroFerramenta("Os consumíveis estão desligados (Mais › Configurações › Opções › Usar consumíveis). Diga isso à pessoa.")
+    ids = _ids_itens(srv, a.get("ids"))
+    if ids is not None:
+        fora = [srv.STORE.item(i).get("name") for i in ids if not _eh_cons(srv, srv.STORE.item(i))]
+        if fora:
+            raise ErroFerramenta(f"Não são consumíveis: {', '.join(fora)}. O Avaliar com IA é dos consumíveis.")
+        n = len(ids)
+    else:
+        n = len(json.loads(_pareceres(srv, {"so_sem": True}))["sem_parecer"])
+        if not n:
+            raise ErroFerramenta("Todos os consumíveis já têm parecer. Para avaliar de novo, mande os ids.")
+    if _lote_andando(srv, "par-lote"):
+        raise ErroFerramenta("Já tem uma avaliação de consumíveis andando: espere terminar (Mais › Pesquisas da IA › Pareceres).")
+    srv.par_lote_start({"itens": ids} if ids is not None else {})
+    return json.dumps({"comecou": True, "consumiveis": n, "aviso": "Roda em segundo plano, cerca de um minuto cada. "
+                       "Os pareceres ficam guardados: inventario_pareceres mostra."}, ensure_ascii=False)
+
+
 def _apagar_pesquisa(srv, a) -> str:
     """1.107.0: Apagar as novidades, os recursos ou o parecer de um item (o Apagar da ficha), fora da trava do Store."""
     o_que = a.get("o_que")
@@ -1141,9 +1267,10 @@ def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
             return _avaliar(srv, a)
         except srv.ApiError as e:
             raise ErroFerramenta(e.msg) from None
-    if nome in ("pareceres", "apagar_pesquisa"):  # 1.107.0: cada arquivo tem a trava dele
+    if nome in ("pareceres", "apagar_pesquisa", "recursos", "buscar_recursos", "avaliar_varios"):  # 1.107.0: cada arquivo tem a trava dele
         try:
-            return _pareceres(srv, a) if nome == "pareceres" else _apagar_pesquisa(srv, a)
+            return {"pareceres": _pareceres, "apagar_pesquisa": _apagar_pesquisa, "recursos": _recursos,
+                    "buscar_recursos": _buscar_recursos, "avaliar_varios": _avaliar_varios}[nome](srv, a)
         except srv.ApiError as e:
             raise ErroFerramenta(e.msg) from None
     if nome in ("cadastrar_por_foto", "anexar_foto", "ler_arquivo"):  # as que recebem a foto (a leitura por IA fica fora da trava do Store)

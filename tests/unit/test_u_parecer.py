@@ -300,3 +300,45 @@ class Pesquisas(Base):
         with self.assertRaises(F.ErroFerramenta) as e:
             F.chamar(S, "pareceres", {}, {"nome": "Ana"}, "Claude")
         self.assertIn("consumíveis estão desligados", str(e.exception))
+
+
+class AvaliarVarios(Pesquisas):
+    """1.111.0 (o dono, às ferramentas que faltavam para o CorrerIA: "pode colocar todas"): avaliar_varios, o Avaliar
+    consumíveis de Pareceres pelo CorrerIA (os sem parecer, ou os escolhidos), em segundo plano."""
+
+    def chamar(self, args):
+        return json.loads(F.chamar(S, "avaliar_varios", args, {"nome": "Ana"}, "Claude"))
+
+    def test_os_sem_parecer_os_escolhidos_e_o_que_vale(self):
+        self.assertTrue(F.POR_NOME["avaliar_varios"]["grava"], "gasta a IA: espera o sim")
+        with mock.patch.object(S, "AI_MOCK", True), mock.patch.object(S.time, "sleep", lambda s: None):
+            S.avaliar(self.cons["id"])
+            r = self.chamar({})
+            self.assertEqual((r["comecou"], r["consumiveis"]), (True, 2))
+            job = next(v for v in S.WEB_JOBS.values() if v.get("kind") == "par-lote")
+            _espera(job)
+            self.assertEqual(job["summary"]["avaliados"], 2)
+            with self.assertRaises(F.ErroFerramenta) as e:
+                self.chamar({})
+            self.assertIn("já têm parecer", str(e.exception))
+            r = self.chamar({"ids": [self.cons["id"], S.STORE.tag(self.outro[0])]})
+            self.assertEqual(r["consumiveis"], 2, "os escolhidos, pelo id ou pelo código")
+            job = [v for v in S.WEB_JOBS.values() if v.get("kind") == "par-lote"][-1]
+            with self.assertRaises(F.ErroFerramenta) as e:
+                self.chamar({"ids": [self.cons["id"]]})
+            self.assertIn("andando", str(e.exception))
+            _espera(job)
+        casa = next(i for i in self.store.data["items"] if not self.store.is_cons(i["room"]))
+        for args, parte in (({"ids": [casa["id"]]}, "Não são consumíveis"), ({"ids": []}, "uma lista"), ({"ids": ["nao-existe"]}, "não")):
+            with self.assertRaises(F.ErroFerramenta) as e:
+                self.chamar(args)
+            self.assertIn(parte, str(e.exception))
+        self.store.settings["consumiveis"] = False
+        with self.assertRaises(F.ErroFerramenta) as e:
+            self.chamar({})
+        self.assertIn("consumíveis estão desligados", str(e.exception))
+        self.store.settings["ai"] = False
+        with self.assertRaises(F.ErroFerramenta) as e:
+            self.chamar({})
+        self.assertIn("IA do InventarIA está desligada", str(e.exception))
+

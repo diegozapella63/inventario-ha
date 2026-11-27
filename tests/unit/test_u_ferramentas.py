@@ -95,7 +95,7 @@ class Novidades(Base):
 class Lista(Base):
     def test_formato_do_contrato(self):
         fs = F.lista()
-        self.assertTrue(5 <= len(fs) <= 20)
+        self.assertTrue(5 <= len(fs) <= 30)
         nomes = [f["nome"] for f in fs]
         self.assertEqual(len(set(nomes)), len(nomes))
         for f in fs:
@@ -116,7 +116,7 @@ class Lista(Base):
         grava = [f["grava"] for f in fs]
         self.assertEqual(grava, sorted(grava), "primeiro as leituras, depois as gravações")
         self.assertEqual([f["nome"] for f in fs if f["apaga"]], ["apagar_item", "editar_comodo", "categoria", "apagar_pesquisa"])
-        self.assertEqual([f["nome"] for f in fs if not f["grava"]], ["resumo", "buscar_itens", "novidades", "ver_item", "ler_arquivo", "avaliar", "pareceres"])
+        self.assertEqual([f["nome"] for f in fs if not f["grava"]], ["resumo", "buscar_itens", "novidades", "ver_item", "ler_arquivo", "avaliar", "pareceres", "recursos"])
 
     def test_nada_de_fotos_backups_ou_configuracoes(self):
         texto = json.dumps(F.lista(), ensure_ascii=False).lower()
@@ -258,7 +258,7 @@ class Buscar(Base):
         self.assertIn("Móveis (moveis)", self.erro("buscar_itens", {"categoria": "Ferramentas"}))
         self.erro("buscar_itens", {"limite": 0}, "limite: de 1 a 200.")
         self.erro("buscar_itens", {"limite": 500}, "limite: de 1 a 200.")
-        self.erro("buscar_itens", {"ordem": "preco"}, "ordem: codigo, valor, nome ou recentes.")
+        self.erro("buscar_itens", {"ordem": "preco"}, "ordem: codigo, valor, nome, recentes ou acaba.")
         self.erro("buscar_itens", {"valor_min": 500, "valor_max": 100}, "valor_max é menor que valor_min.")
         self.erro("buscar_itens", {"valor_min": "muito"}, "Valor inválido")
 
