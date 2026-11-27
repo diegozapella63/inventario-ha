@@ -28,6 +28,13 @@ CLOSED = """() => { const bad = [], muted = getComputedStyle(document.documentEl
   }
   return n ? bad : ['nenhuma caixa']; }"""
 
+PICKS = """() => { const bad = [], bs = [...document.querySelectorAll('[data-ct-pick]')];
+  if (!bs.length) return ['nenhum botão'];
+  for (const k of bs) { const r = k.getBoundingClientRect();
+    if (Math.round(r.height) !== 50) bad.push(k.textContent.trim() + ': altura ' + r.height);
+    if (r.right > innerWidth + 1 || r.left < -1) bad.push(k.textContent.trim() + ': passa da tela'); }
+  return bad; }"""
+
 
 async def tap(pg, sel):
     loc = pg.locator(sel).first
@@ -151,6 +158,10 @@ async def body(r, p):
                 await pg.click(opener)
                 await pg.wait_for_selector(wait)
                 await pg.wait_for_timeout(400)
+                if wait == "#c-room":  # 1.110.3: o Cômodo do Catalogar é botões; a caixa fica fora da vista
+                    bad = await pg.evaluate(PICKS)
+                    r.check(not bad, f"[{size} {scheme}] {wait}: os botões do cômodo com 50 px, dentro da tela" + (f": {bad[:3]}" if bad else ""))
+                    continue
                 bad = await pg.evaluate(CLOSED)
                 r.check(not bad, f"[{size} {scheme}] {wait}: as caixas fechadas iguais aos campos" + (f": {bad[:3]}" if bad else ""))
                 if wait == "#mv-room" and size == "cel":
