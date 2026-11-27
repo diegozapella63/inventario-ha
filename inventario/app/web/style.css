@@ -979,9 +979,9 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .apps-inativos .app-det-l { margin-top: 2px; }
 /* Conferir (1.58.0): Todas as novidades na largura toda e, embaixo, Só equipamentos e Só apps dividindo a linha */
 /* Conferir e (1.64.0) Limpar: 1.68.0, um botão por linha, na largura do cartão (no computador, 280 px à direita) */
-:is(#p-news, #p-news-clear, #p-par) .opts .oa.news-tres { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; flex: 1 1 100%; }
-:is(#p-news, #p-news-clear, #p-par) .opts .oa.news-tres > .btn { width: auto; max-width: none; min-width: 0; justify-content: center; }
-@media (min-width: 1000px) { :is(#p-news, #p-news-clear, #p-par) .opts .oa.news-tres { flex: none; width: 280px; } }
+:is(#p-news, #p-news-clear, #p-par, #p-rec) .opts .oa.news-tres { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; flex: 1 1 100%; }
+:is(#p-news, #p-news-clear, #p-par, #p-rec) .opts .oa.news-tres > .btn { width: auto; max-width: none; min-width: 0; justify-content: center; }
+@media (min-width: 1000px) { :is(#p-news, #p-news-clear, #p-par, #p-rec) .opts .oa.news-tres { flex: none; width: 280px; } }
 /* 1.107.0: Pesquisas da IA › Pareceres: a nota na lista e a janela Escolher consumíveis */
 .pill.par-pill { display: inline-flex; align-items: center; gap: 3px; }
 .pill.par-pill .ic { width: 14px; height: 14px; color: var(--tag-text); }

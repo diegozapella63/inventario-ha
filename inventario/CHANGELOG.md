@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.110.2
+
+- **Recursos**: **Os que faltam** e **Escolher quais** um embaixo do outro, como nos Pareceres (lado a lado, no celular estreito, o texto ficava cortado).
+
 ## 1.110.1
 
 - **Recursos**: o botão **Buscar os que faltam** passou a se chamar **Os que faltam**, para caber ao lado do **Escolher quais** no celular.
