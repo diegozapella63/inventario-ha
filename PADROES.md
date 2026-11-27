@@ -101,7 +101,8 @@ do app vira aba (o CorrerIA tem também WhatsApp e MCP).
 - Botões de ação na largura do cartão no celular (dois lado a lado dividem a linha); no computador, com a largura fixa do
   app (250 ou 280 px). Botões lado a lado com o mesmo tamanho e alinhados; nada torto nem cortado.
 - Nas janelas, cada campo fecha pelo título (o aparelho lembra); fechado, o escolhido ou escrito aparece ao lado do
-  título («Onde · Casa», «Prazo · Sem prazo»).
+  título («Onde · Casa», «Prazo · Sem prazo»). O nome do que se cria (Título, Item, Tarefa) não fecha. O que vem logo
+  abaixo de um campo e é dele (um aviso, os botões dele) fecha junto.
 - Escolhas curtas (categoria, cômodo, quem, onde, a cor) são botões direto na tela, não uma caixa de seleção.
 - Texto livre que pode ficar longo (o que foi, títulos, descrições, nomes) é uma caixa de texto que mostra tudo: cresce com
   o texto (`field-sizing: content`, até 40vh), sem rolagem dentro dela, e aumenta puxando o canto, com o tamanho guardado
