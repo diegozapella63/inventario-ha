@@ -48,7 +48,7 @@ async def body(r, p):
          "a tarefa aberta do item, uma vez só, a lista (o nome do ResolvIA) e o prazo")
     # as tarefas acima das Novidades, e os botões das duas do mesmo tamanho
     blocos = await pg.locator(".dlg-b > .inews").evaluate_all("es => es.map(e => e.dataset.slot)")
-    r.eq(blocos, ["item-tarefas", "item-rec", "item-news"], "Tarefas no ResolvIA, Recursos (1.54.0) e Novidades, nesta ordem")
+    r.eq(blocos, ["item-venda", "item-tarefas", "item-rec", "item-news"], "Venda (1.115.0), Tarefas no ResolvIA, Recursos (1.54.0) e Novidades, nesta ordem")
     await pg.locator('[data-slot="item-news"] .btn').first.wait_for(timeout=8000)
     tam = await pg.locator(".dlg-b > .inews > .btn").evaluate_all("es => es.map(e => { const b = e.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; })")
     r.check(len(tam) == 3 and tam[0] == tam[1] == tam[2], f"Nova tarefa, Ver recursos e Buscar novidades do mesmo tamanho ({tam})")

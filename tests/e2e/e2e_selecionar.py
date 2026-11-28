@@ -36,8 +36,8 @@ async def body(r, p):
     await pg.click('.selbar [data-act="sel-change"]')
     await pg.wait_for_selector("dialog.modal [data-bk]")
     r.eq((await pg.text_content("dialog.modal h2")).strip(), "Alterar 2 itens", "a janela")
-    r.eq(await pg.evaluate("[...document.querySelectorAll('dialog.modal .chips input:checked')].map(i => i.value)"), ["__manter__", "__manter__"],
-         "Cômodo e Categoria começam em Manter (zonas desligadas: sem Zona)")
+    r.eq(await pg.evaluate("[...document.querySelectorAll('dialog.modal .chips input:checked')].map(i => i.value)"), ["__manter__", "__manter__", "__manter__"],
+         "Cômodo, Categoria e À venda (1.115.0) começam em Manter (zonas desligadas: sem Zona)")
     r.check(await pg.is_disabled("dialog.modal [data-ok]"), "sem mudança, o Aplicar fica desligado")
     await pg.locator("dialog.modal .chip", has=pg.locator('input[name="bk-cat"][value="decoracao"]')).click()
     await pg.locator("dialog.modal .chip", has=pg.locator('input[name="bk-room"][value="varanda"]')).click()

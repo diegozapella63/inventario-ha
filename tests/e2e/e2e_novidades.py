@@ -91,7 +91,7 @@ async def body(r, p):
     with open(mock, "w", encoding="utf-8") as f:
         json.dump({"produto": "Monitor", "novidades": []}, f)
     await r.open(pg, "#/i/sal-001", "dialog.sheet h1")
-    r.eq(await pg.locator('dialog.sheet .inews, dialog.sheet [data-act="item-news"]').count(), 0, "o sofá (Móveis) não tem Novidades: só os eletrônicos")
+    r.eq(await pg.locator('dialog.sheet .inews:not(.ivenda), dialog.sheet [data-act="item-news"]').count(), 0, "o sofá (Móveis) não tem Novidades: só os eletrônicos")
     await r.open(pg, "#/i/esc-002", "dialog.sheet h1")
     await pg.click('dialog.sheet [data-act="item-news"]')
     await pg.wait_for_selector("dialog.sheet .news-foot", timeout=10000)
