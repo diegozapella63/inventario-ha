@@ -255,6 +255,16 @@ Quando sai uma versão nova, o Home Assistant mostra **Atualizar** na página do
 - **A IA demora**: modelos locais podem levar mais de um minuto por foto. Modelos na nuvem costumam responder em 5 a 20 segundos.
 - **Ver o que está acontecendo**: aba **Registro** do app.
 
+## Vendas
+
+Na ficha de um item da casa ou de um bem, o bloco **Venda** tem **Pôr à venda** (com o **Preço pedido** e uma **Observação**, os dois opcionais) e **Vendido**. Um item à venda ganha a etiqueta **À venda** nas listas e aparece em **Mais › Vendas**, que mostra quantos são e a soma dos preços pedidos, agrupados por cômodo ou por categoria. Para vários de uma vez: **Buscar › Selecionar › Alterar › À venda**.
+
+**Vendido** pede o valor e o dia da venda. O item sai do inventário (e do patrimônio, do relatório e do que os outros apps veem) e vai para **Vendidos**, no fim da tela Vendas, recolhidos. Ali, **Desfazer** traz o item de volta ao cômodo (com outro número, se o dele já foi usado) e **Apagar** tira da lista de vez.
+
+Com o GerencIA 1.102.0 ou mais novo instalado, a janela do Vendido pergunta **Lançar o recebimento no GerencIA?**: com **Lançar**, o valor entra lá como um recebimento já recebido, no dia da venda ("Venda: nome do item"). Com **Não lançar**, o botão **Lançar no GerencIA** continua na linha do vendido. Desfazer a venda não apaga o recebimento no GerencIA.
+
+Um consumível não vai à venda. Os vendidos entram no Exportar e no backup; o **Começar do zero** apaga.
+
 ## Tabela FIPE
 
 Num bem do tipo **Veículo**, o editor tem o campo **Tabela FIPE**: escreva o código FIPE e o ano-modelo do veículo (por exemplo, `005340-6 2014`; o código está no site da FIPE e em muitos documentos do seguro). A ficha mostra o valor da tabela do mês e de quando ela é. **Usar este valor** troca o valor do bem pelo da tabela, com o Desfazer; sem esse toque, o valor que você informou continua o mesmo. A consulta é feita pela BrasilAPI, um serviço gratuito mantido pela comunidade: se ele estiver fora do ar, a ficha mostra o último valor guardado. A FIPE é um preço médio de referência, não uma avaliação do seu veículo.

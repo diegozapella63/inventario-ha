@@ -1653,3 +1653,23 @@ h2 > .cnt { margin-left: 6px; color: var(--muted); font-weight: 500; font-size: 
 /* 1.102.0: Consumíveis › Agrupar por Vencimento: o que já acabou, em vermelho */
 .zone.acabou .zone-ic { background: var(--danger-soft); color: var(--danger); }
 :root[data-theme="dark"] .zone.acabou .zone-ic { background: color-mix(in srgb, var(--danger) 18%, transparent); }
+
+/* 1.115.0: Vendas. Na ficha, o bloco Venda (os botões lado a lado, do mesmo tamanho); na linha, a etiqueta À venda; em
+   Mais › Vendas, os Vendidos recolhidos no fim */
+.ivenda .venda-l { margin: 8px 0 0; color: var(--muted); }
+.ivenda .venda-l b { color: var(--ink); }
+.ivenda .venda-b { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.ivenda .venda-b .btn { min-width: 0; padding-inline: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 420px) { .ivenda .venda-b:has(> :nth-child(3)) { grid-template-columns: 1fr 1fr; } .ivenda .venda-b:has(> :nth-child(3)) > :first-child { grid-column: 1 / -1; } }
+.irow .venda-tag { flex: none; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--tag-text); background: var(--tag-soft); }
+.vendas .vendas-nada { margin: 12px 2px; }
+.vendas .vendidos { margin-top: 18px; }
+.vendas .vend-soma { margin: 8px 2px 0; color: var(--muted); font-size: 14px; }
+.vendas .vend-l { list-style: none; margin: 8px 0 0; padding: 0; }
+.vendas .vend { padding: 12px 2px; border-top: 1px solid var(--line); }
+.vendas .vend:first-child { border-top: 0; }
+.vendas .vend-t { display: grid; gap: 2px; min-width: 0; }
+.vendas .vend-t b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vendas .vend-t span { color: var(--muted); font-size: 14px; }
+.vendas .vend-b { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.vendas .vend-b .btn { min-width: 0; padding-inline: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

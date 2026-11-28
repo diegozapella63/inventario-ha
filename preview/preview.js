@@ -23,6 +23,13 @@
     ["c-outros", "Outros"]].map(([id, name]) => ({ id, name }));
   const ccatsOf = (d) => { if (!Array.isArray(d.consCats) || !d.consCats.length) d.consCats = clone(DEF_CCATS); return comCores(d.consCats); };
   const isCons = (d, rid) => (d.rooms.find((r) => r.id === rid) || {}).kind === "consumiveis";
+  // 1.115.0: à venda: true, false ou { price, note } → { at, price?, note? } (ou null), como o clean_sale do servidor
+  const vendaDe = (v, antes) => {
+    if (!v) return null;
+    const o = typeof v === "object" ? v : {}, p = money(o.price), n = String(o.note || "").trim().slice(0, 200);
+    if (typeof v !== "object" && antes) return antes;
+    return { at: (antes && antes.at) || new Date().toISOString(), ...(p > 0 ? { price: p } : {}), ...(n ? { note: n } : {}) };
+  };
   // 1.114.0: «005340-6 2014» → { fipe, fipeYear } (ou null), como o clean_fipe do servidor
   const fipeDe = (t) => { const m = /(\d{6})\s*-?\s*(\d)(?!\d)(.*)$/.exec(String(t || "")), a = m && /(19[5-9]\d|20\d\d)/.exec(m[3]); return m && a ? { fipe: `${m[1]}-${m[2]}`, fipeYear: +a[1] } : null; };
   // 1.91.0: os cômodos onde um consumível é usado: um id (o jeito de antes) ou uma lista; só os cômodos da casa
@@ -149,6 +156,32 @@
       if (rp && room(d, rp.room) && !room(d, rp.room).photos.some((p) => p.file === rp.file)) room(d, rp.room).photos.push({ file: rp.file, label: rp.label || "" });
       return { items: clone(created), rooms: clone(d.rooms), rev: bump() };
     }
+    // 1.115.0: Vendas (pôr à venda fica no PUT do item; aqui o Vendido, o Desfazer e o Apagar dos vendidos)
+    if ((m = path.match(/^api\/items\/([^/]+)\/sell$/)) && method === "POST") {
+      const it = d.items.find((i) => i.id === decodeURIComponent(m[1]));
+      if (!it) fail("Este item não existe mais.", 404);
+      if (isCons(d, it.room)) fail("Um consumível não vai à venda.");
+      const valor = money(body.value);
+      if (!(valor >= 0) || String(body.value == null ? "" : body.value).trim() === "") fail("Coloque o valor da venda.");
+      d.items.splice(d.items.indexOf(it), 1);
+      const v = { ...it, soldValue: valor, soldAt: body.date || now().slice(0, 10), soldTs: now(), soldRoom: (room(d, it.room) || {}).name || "" };
+      delete v.sale;
+      d.sold = (d.sold || []).filter((x) => x.id !== v.id).concat([v]);
+      return { sold: clone(v), recebido: false, erro_gerencia: "", rev: bump() };
+    }
+    if ((m = path.match(/^api\/sold\/([^/]+)\/restore$/)) && method === "POST") {
+      const v = (d.sold || []).find((x) => x.id === decodeURIComponent(m[1]));
+      if (!v) fail("Essa venda não existe mais.", 404);
+      d.sold = d.sold.filter((x) => x !== v);
+      const it = { ...v }; for (const k of Object.keys(it)) if (k.startsWith("sold")) delete it[k];
+      if (!room(d, it.room)) it.room = d.rooms[0].id;
+      it.updatedAt = now(); d.items.push(it);
+      return { item: clone(it), rev: bump() };
+    }
+    if ((m = path.match(/^api\/sold\/([^/]+)$/)) && method === "DELETE") {
+      d.sold = (d.sold || []).filter((x) => x.id !== decodeURIComponent(m[1]));
+      return { ok: true, rev: bump() };
+    }
     if (method === "POST" && path === "api/items/bulk") { // Buscar › Selecionar: vários de uma vez, tudo ou nada
       const plan = (body.items || []).map((ch) => {
         const it = d.items.find((i) => i.id === ch.id);
@@ -168,6 +201,7 @@
         if ("cat" in ch) it.cat = ch.cat;
         if ("zone" in ch) it.zone = String(ch.zone || "").trim();
         if ("usedIn" in ch) { if (usados(d, ch.usedIn).length) it.usedIn = usados(d, ch.usedIn); else delete it.usedIn; }
+        if ("sale" in ch && !isCons(d, it.room)) { const s = vendaDe(ch.sale, it.sale); if (s) it.sale = s; else delete it.sale; }
         it.updatedAt = t;
       }
       return { items: clone(plan.map(([it]) => it)), rev: bump() };
@@ -182,6 +216,8 @@
         for (const k of ["zone", "details", "flag", "source"]) if (k in body) it[k] = typeof body[k] === "string" ? body[k].trim() : body[k];
         if (isCons(d, it.room)) delete it.warranty;
         else if ("warranty" in body) { if (/^\d{4}-\d{2}-\d{2}$/.test(body.warranty || "")) it.warranty = body.warranty; else delete it.warranty; }
+        if (isCons(d, it.room)) delete it.sale; // 1.115.0: à venda
+        else if ("sale" in body) { const s = vendaDe(body.sale, it.sale); if (s) it.sale = s; else delete it.sale; }
         if (isCons(d, it.room) || it.cat !== "veiculos") { delete it.fipe; delete it.fipeYear; }
         else if ("fipe" in body) { delete it.fipe; delete it.fipeYear; Object.assign(it, fipeDe(body.fipe) || {}); }
         if ("name" in body) { const n = String(body.name || "").trim(); if (!n) fail("Preencha o campo nome."); it.name = n; }

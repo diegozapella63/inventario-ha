@@ -67,6 +67,7 @@ FERRAMENTAS = [
                       "usado_em": {"type": "string", "description": "Só os consumíveis usados neste cômodo (o id ou o nome; com Consumíveis por cômodo ligado)."},
                       "valor_min": {"type": "number", "minimum": 0}, "valor_max": {"type": "number", "minimum": 0},
                       "sem_foto": {"type": "boolean", "description": "true: só os itens que ainda não têm foto (1.99.0)."},
+                      "a_venda": {"type": "boolean", "description": "true: só os itens marcados como À venda (1.115.0)."},
                       "garantia_em_dias": {"type": "integer", "minimum": 0, "maximum": 3650,
                                            "description": "Só os itens com a Garantia até que acaba de hoje até daqui a N dias (60 é os próximos dois meses), a que acaba antes primeiro (1.113.0)."},
                       "acaba_em_dias": {"type": "integer", "minimum": 0, "maximum": 3650,
@@ -127,6 +128,11 @@ FERRAMENTAS = [
      "descricao": "As tarefas abertas no ResolvIA ligadas a um item (a troca do filtro, o conserto), com a lista e o prazo, e as "
                   "listas onde dá para criar uma. Só com Usar equipamentos ligado no ResolvIA; um consumível não tem.",
      "entrada": _obj({"id": _ITEM}, ["id"])},
+    # 1.115.0 (o dono: "criar nova aba na parte mais chamada vendas, e criar a possibilidade de marcar itens para venda")
+    {"nome": "vendas", "titulo": "Vendas", "grava": False,
+     "descricao": "O que está à venda (com o preço pedido e o valor gravado) e os últimos vendidos (com o valor, o dia e se o "
+                  "recebimento já foi para o GerencIA), como a tela Mais › Vendas.",
+     "entrada": _obj({})},
     {"nome": "buscar_recursos", "titulo": "Buscar os recursos com IA", "grava": True,
      "descricao": "Busca na internet, com a IA do InventarIA, os recursos dos eletrônicos: sem ids, os que ainda não têm (o Os que "
                   "faltam da tela); com ids, os escolhidos (o Escolher quais), também os que já têm, que são buscados de novo. O mesmo "
@@ -232,6 +238,22 @@ FERRAMENTAS = [
                   "eletrônicos ou os pareceres de todos os consumíveis, como o Limpar das Pesquisas da IA.",
      "entrada": _obj({"id": _ID, "o_que": {"type": "string", "enum": ["novidades", "recursos", "parecer"], "description": "O que apagar."},
                       "todos": {"type": "boolean", "description": "Os recursos ou os pareceres de todos (sem id). As novidades de todos se limpam na tela."}}, ["o_que"])},
+    # 1.115.0: Vendas
+    {"nome": "por_a_venda", "titulo": "Pôr à venda (ou tirar)", "grava": True,
+     "descricao": "Marca itens da casa ou bens como À venda (com o preco pedido, opcional, e uma observacao), ou tira da venda "
+                  "(tirar true). Vários de uma vez pelos ids; o preço e a observação só com um item. Um consumível não vai à venda.",
+     "entrada": _obj({"ids": {"type": "array", "minItems": 1, "maxItems": 200, "items": _ID}, "preco": {"type": "number", "minimum": 0},
+                      "observacao": {"type": "string"}, "tirar": {"type": "boolean"}}, ["ids"])},
+    {"nome": "marcar_vendido", "titulo": "Marcar como vendido", "grava": True,
+     "descricao": "O item foi vendido: sai do inventário e do patrimônio e fica nos Vendidos, com o valor e o dia (hoje, sem a "
+                  "data). Antes de chamar, pergunte à pessoa se quer lançar o recebimento no GerencIA; se sim, mande "
+                  "receber_no_gerencia true (o valor entra lá como recebimento já recebido, no dia da venda).",
+     "entrada": _obj({"id": _ID, "valor": {"type": "number", "minimum": 0}, "data": {"type": "string", "description": "AAAA-MM-DD; sem ela, hoje."},
+                      "receber_no_gerencia": {"type": "boolean"}}, ["id", "valor"])},
+    {"nome": "desfazer_venda", "titulo": "Desfazer uma venda", "grava": True,
+     "descricao": "Traz de volta ao inventário um item dos Vendidos (o id dele, que a ferramenta vendas mostra). O recebimento "
+                  "que foi para o GerencIA não sai de lá.",
+     "entrada": _obj({"id": {"type": "string", "description": "O id do item vendido."}}, ["id"])},
 ]
 POR_NOME = {f["nome"]: f for f in FERRAMENTAS}
 
@@ -450,6 +472,12 @@ def _linha(srv, it, cats=None, taxas=None) -> dict:
         out["quantidade"] = it.get("qty")
     if srv.warranty_days(it) is not None:  # 1.113.0: a Garantia até
         out["garantia_ate"], out["garantia_dias"] = it["warranty"], srv.warranty_days(it)
+    if it.get("sale"):  # 1.115.0: à venda
+        out["a_venda"] = True
+        if it["sale"].get("price"):
+            out["preco_pedido"] = _num(it["sale"]["price"])
+        if it["sale"].get("note"):
+            out["observacao_da_venda"] = it["sale"]["note"]
     out["valor"] = _v(srv, it, taxas)
     if taxas:
         out["valor_gravado"] = _num(it.get("value"))
@@ -689,6 +717,8 @@ def _buscar(srv, a) -> str:
         if (vmin is not None and v < vmin) or (vmax is not None and v > vmax):
             continue
         if sem_foto and (it.get("photos") or []):
+            continue
+        if a.get("a_venda") is True and not it.get("sale"):
             continue
         if ate and not (_eh_cons(srv, it) and srv.dur_until(it) and srv.dur_until(it) <= ate):
             continue
@@ -1277,6 +1307,78 @@ def _comprei(srv, a, quem) -> str:
             if srv.dur_until(novo) else f"Comprei anotado: {novo.get('name')}") + "."
 
 
+# -- 1.115.0: Vendas (o que a tela Mais › Vendas faz)
+def _vendas(srv) -> str:
+    _, items = srv.visible_data(consumiveis=False)
+    taxas = _taxas(srv)
+    venda = sorted((i for i in items if i.get("sale")), key=lambda i: str(i["sale"].get("at") or ""), reverse=True)
+    vendidos = sorted(srv.STORE.sold(), key=lambda i: (i.get("soldAt") or "", i.get("soldTs") or ""), reverse=True)
+    out = {"a_venda": [_linha(srv, i, None, taxas) for i in venda[:MAX_LISTA]], "total_a_venda": len(venda),
+           "soma_pedida": round(sum(_num((i["sale"] or {}).get("price")) for i in venda), 2),
+           "vendidos": [{"id": i["id"], "nome": i.get("name") or "", "valor_da_venda": _num(i.get("soldValue")), "vendido_em": i.get("soldAt"),
+                         "valor_gravado": _num(i.get("value")), "comodo": i.get("soldRoom") or "",
+                         "recebimento_no_gerencia": bool(i.get("soldReceived"))} for i in vendidos[:20]],
+           "total_vendidos": len(vendidos), "soma_vendida": round(sum(_num(i.get("soldValue")) for i in vendidos), 2),
+           "gerencia_recebe": srv.gerencia_recebe() is not None}
+    return json.dumps(out, ensure_ascii=False)
+
+
+def _por_a_venda(srv, a, quem) -> str:
+    ids = a.get("ids")
+    if not isinstance(ids, list) or not ids:
+        raise ErroFerramenta("Falta: ids (os itens).")
+    its = list({i["id"]: i for i in (_achar_item(srv, x) for x in ids)}.values())
+    cons = [i for i in its if _eh_cons(srv, i)]
+    if cons:
+        raise ErroFerramenta(f"{cons[0].get('name')} é um consumível: não vai à venda.")
+    tirar = a.get("tirar") is True
+    if not tirar and len(its) > 1 and (a.get("preco") is not None or a.get("observacao")):
+        raise ErroFerramenta("O preço e a observação valem para um item só: mande um id de cada vez.")
+    if tirar:
+        fora = [i for i in its if not i.get("sale")]
+        if fora:
+            raise ErroFerramenta(f"{fora[0].get('name')} não está à venda.")
+        srv.STORE.update_items([{"id": i["id"], "sale": False} for i in its], quem)
+        return "Fora da venda: " + ", ".join(i.get("name") or "" for i in its) + "."
+    venda = {}
+    if a.get("preco") is not None:
+        venda["price"] = a["preco"]
+    if a.get("observacao"):
+        venda["note"] = a["observacao"]
+    if len(its) == 1:
+        novo = srv.STORE.update_item(its[0]["id"], {"sale": venda or True}, quem)
+        preco = (novo.get("sale") or {}).get("price")
+        return f"À venda: {_frase(srv, novo)}" + (f", pedindo R$ {_num(preco):.2f}".replace(".", ",") if preco else "") + "."
+    srv.STORE.update_items([{"id": i["id"], "sale": True} for i in its], quem)
+    return f"{len(its)} itens à venda: " + ", ".join(i.get("name") or "" for i in its) + "."
+
+
+def _marcar_vendido(srv, a, quem) -> str:
+    with srv.STORE.lock:
+        it = _achar_item(srv, a.get("id"))
+    if a.get("valor") is None:
+        raise ErroFerramenta("Falta: valor (por quanto foi vendido).")
+    r = srv.vender(it["id"], a.get("valor"), a.get("data"), quem, receber=a.get("receber_no_gerencia") is True)
+    v = r["sold"]
+    txt = f"Vendido: {v.get('name')} por R$ {_num(v.get('soldValue')):.2f}".replace(".", ",") + f", em {v.get('soldAt')}. Saiu do inventário (id nos vendidos: {v['id']})."
+    if r["recebido"]:
+        txt += " O recebimento foi lançado no GerencIA."
+    elif r["erro_gerencia"]:
+        txt += " O recebimento não foi para o GerencIA: " + r["erro_gerencia"]
+    elif srv.gerencia_recebe() is not None and v.get("soldValue"):
+        txt += " O recebimento não foi lançado no GerencIA (dá para lançar na tela Vendas)."
+    return txt
+
+
+def _desfazer_venda(srv, a, quem) -> str:
+    alvo = str(a.get("id") or "").strip()
+    vend = srv.STORE.sold_item(alvo) or next((i for i in srv.STORE.sold() if srv.fold(i.get("name") or "") == srv.fold(alvo)), None)
+    if not vend:
+        raise ErroFerramenta("Esse item não está nos vendidos. A ferramenta vendas mostra os ids.")
+    it = srv.STORE.unsell_item(vend["id"])
+    return f"De volta ao inventário: {_frase(srv, it)}." + (" O recebimento lançado no GerencIA continua lá." if vend.get("soldReceived") else "")
+
+
 def _editar_comodo(srv, a, quem) -> str:
     room = _achar_comodo(srv, a.get("comodo"))
     if room.get("kind"):
@@ -1457,6 +1559,11 @@ def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
                     "conferir_novidades": _conferir_novidades}[nome](srv, a)
         except srv.ApiError as e:
             raise ErroFerramenta(e.msg) from None
+    if nome == "marcar_vendido":  # 1.115.0: pode falar com o GerencIA, fora da trava do Store
+        try:
+            return _marcar_vendido(srv, a, quem)
+        except srv.ApiError as e:
+            raise ErroFerramenta(e.msg) from None
     if nome == "fipe":  # 1.114.0: consulta a internet, fora da trava do Store
         try:
             return _fipe(srv, a)
@@ -1482,8 +1589,11 @@ def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
                 return _ver(srv, a)
             if nome == "novidades":
                 return _novidades(srv, a)
+            if nome == "vendas":
+                return _vendas(srv)
             faz = {"cadastrar_itens": _cadastrar, "editar_item": _editar, "mover_itens": _mover, "apagar_item": _apagar,
-                   "alterar_itens": _alterar_itens, "novo_comodo": _novo_comodo, "comprei": _comprei, "editar_comodo": _editar_comodo, "categoria": _categoria}[nome]
+                   "alterar_itens": _alterar_itens, "novo_comodo": _novo_comodo, "comprei": _comprei, "editar_comodo": _editar_comodo, "categoria": _categoria,
+                   "por_a_venda": _por_a_venda, "desfazer_venda": _desfazer_venda}[nome]
             return faz(srv, a, quem)
     except srv.ApiError as e:  # as regras do Store (nome obrigatório, valor, cômodo que não existe…) viram 400 para a IA
         raise ErroFerramenta(e.msg) from None

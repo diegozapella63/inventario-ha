@@ -1,5 +1,14 @@
 # Mudanças
 
+## 1.115.0
+
+- **Vendas** (em **Mais**): a lista do que está à venda, com o preço pedido e a soma, agrupada por cômodo ou categoria.
+- **Pôr à venda**: na ficha de um item da casa ou de um bem, com o preço pedido e uma observação (os dois opcionais). Em **Buscar › Selecionar › Alterar** dá para pôr ou tirar vários de uma vez. Na lista, o item ganha a etiqueta **À venda**.
+- **Vendido**: pede o valor e o dia. O item sai do inventário e do patrimônio e fica em **Vendidos**, recolhidos no fim da tela Vendas, com **Desfazer** (volta ao cômodo) e **Apagar**.
+- **Recebimento no GerencIA**: com o GerencIA 1.102.0 ou mais novo, ao marcar como vendido o app pergunta se o valor deve ser lançado lá como recebido. Quem disse não pode lançar depois, pelos Vendidos.
+- **Pelo CorrerIA**: "o que está à venda?", "põe a bicicleta à venda por 800", "vendi o sofá por 1.400" e "desfaz a venda do sofá". As mudanças só depois do seu sim.
+- Um consumível não vai à venda.
+
 ## 1.114.0
 
 - **Tabela FIPE**: num bem do tipo Veículo, o campo novo **Tabela FIPE** guarda o código e o ano do carro (como 005340-6 2014). A ficha passa a mostrar o valor da tabela do mês e o botão **Usar este valor**. O valor do bem só muda se você tocar nele (e dá para desfazer).

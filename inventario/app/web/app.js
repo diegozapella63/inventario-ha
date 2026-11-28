@@ -196,7 +196,7 @@
   const ALL_TABS = [["integracoes", "Integrações", "plug"], ["dados", "Dados", "archive"], ["aparencia", "Aparência", "palette"], ["opcoes", "Opções", "toggle"]];
   const moreTabs = () => ALL_TABS;
   const moreTab = (t) => (ALL_TABS.some(([k]) => k === t) ? t : ALL_TABS[0][0]);
-  const IN_MORE = ["menu", "bens", "cons", "charts", "news", "cats", "data", "report", "about"]; // telas que ficam embaixo de Mais
+  const IN_MORE = ["menu", "bens", "cons", "vendas", "charts", "news", "cats", "data", "report", "about"]; // telas que ficam embaixo de Mais
   function applyAccent(a) {
     if (a === ACCENT0) delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = a;
@@ -401,6 +401,7 @@
       rooms: d.rooms || [], items: d.items || [], rev: d.rev || 0, updatedAt: d.updatedAt, user: d.user || null,
       version: d.version || "", features: d.features || {}, settings: d.settings || {}, loaded: true, error: null, stale: false,
       correriaUso: d.correria_uso || null, gerencia: d.gerencia || null, resolvia: d.resolvia === true, economia: d.economia === true, atalho: d.atalho || null,
+      sold: d.sold || [], gerenciaRecebe: d.gerencia_recebe === true, // 1.115.0: Vendas
     });
     applyCats(d.cats, d.consCats || null);
     derive();
@@ -763,6 +764,7 @@
       case "c": return D && D.bens && parts[1] === D.bens.id ? { name: "bens", q } : D && D.cons && parts[1] === D.cons.id ? { name: "cons", q } : { name: "room", id: parts[1], q };
       case "bens": return bensOn() ? { name: "bens", q } : { name: "menu" }; // bens desligados: o menu Mais
       case "consumiveis": return consOn() ? { name: "cons", q } : { name: "menu" };
+      case "vendas": return { name: "vendas", q }; // 1.115.0
       case "i": return { name: "item", id: parts[1], q };
       case "buscar": return { name: "search", q };
       case "relatorio": return { name: "report", q };
@@ -799,6 +801,7 @@
       case "charts": return "#/graficos";
       case "bens": return "#/bens";
       case "cons": return "#/consumiveis";
+      case "vendas": return "#/vendas";
       case "about": return "#/sobre";
       case "data": { const t = moreTab(r.tab); return t === ALL_TABS[0][0] ? "#/config" : `#/config/${t}`; }
       default: return "#/";
@@ -863,13 +866,13 @@
 
   function viewTitle(r) {
     if (r.name === "room") return D.roomById.get(r.id)?.name || "Cômodo";
-    return { home: "Agora", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", bens: "Bens", cons: "Consumíveis", charts: "Gráficos", news: "Pesquisas da IA", cats: "Categorias", data: "Configurações", about: "Sobre" }[r.name] || "InventarIA";
+    return { home: "Agora", search: "Buscar", rooms: "Cômodos", report: "Relatório", menu: "Mais", bens: "Bens", cons: "Consumíveis", vendas: "Vendas", charts: "Gráficos", news: "Pesquisas da IA", cats: "Categorias", data: "Configurações", about: "Sobre" }[r.name] || "InventarIA";
   }
   // Topo de cada tela, igual nos apps da família (EconomIA, ResolvIA): nome do app com "IA" na cor
   // do app, saudação ao usuário do Home Assistant e o título grande da tela.
   // 1.59.1: o título de cada tela com o ícone (o mesmo da linha do Mais ou da aba de baixo), como as seções
-  const PAGE_IC = { home: "clock", search: "search", rooms: "rooms", menu: "more", bens: "home", cons: "drop", charts: "bars", news: "spark", cats: "grid", data: "gear", about: "info" };
-  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", menu: "data", bens: "data", cons: "data", charts: "data", news: "data", cats: "data", data: "data", report: "data", about: "data" };
+  const PAGE_IC = { home: "clock", search: "search", rooms: "rooms", menu: "more", bens: "home", cons: "drop", vendas: "tag", charts: "bars", news: "spark", cats: "grid", data: "gear", about: "info" };
+  const TAB_OF = { home: "home", search: "search", rooms: "rooms", room: "rooms", menu: "data", bens: "data", cons: "data", vendas: "data", charts: "data", news: "data", cats: "data", data: "data", report: "data", about: "data" };
   const inMore = (name) => IN_MORE.includes(name) && name !== mainTab(); // a tela do tipo que está na aba não fica embaixo do Mais
   function renderTop() {
     const el = $("#topbar");
@@ -973,6 +976,7 @@
         case "charts": html = viewCharts(); break;
         case "bens": html = viewBens(); break;
         case "cons": html = viewCons(); break;
+        case "vendas": html = viewVendas(); break;
         case "data": html = viewData(); break;
         case "about": html = viewAbout(); break;
         default: html = viewHome();
@@ -1055,15 +1059,18 @@
     if (mode === "room") where = [usadoEm(it).length ? `<b class="usado">${esc(usadoNomes(it))}</b>` : "", it.details ? hl(snippet(it.details), toks) : ""].filter(Boolean).join(" · "); // 1.88.0: o cômodo onde o consumível é usado
     else if (mode === "cons" || (mode === "bens" && isCons(it.room))) where = esc([CCAT[it.cat] || "Outros", usadoNomes(it)].filter(Boolean).join(" · "));
     else if (mode === "bens") where = esc(CAT[it.cat] || "Outros");
+    else if (mode === "venda") where = esc([room?.name, (it.sale || {}).note].filter(Boolean).join(" · "));
     else where = hl([room?.name, zonesOn() ? it.zone : ""].filter(Boolean).join(", "), toks);
     const qty = qtyClean(it.qty);
     const thumb = ph ? `<img class="thumb" src="${esc(src(ph))}" alt="" loading="lazy" decoding="async" width="56" height="56">` : `<span class="thumb">${ic("tag")}</span>`;
     const inner = `${pick === null ? thumb : `<span class="tw">${thumb}<span class="pk" aria-hidden="true">${ic("check", "sm")}</span></span>`}
       <span class="ib"><span class="nm">${hl(it.name, toks)}</span>
-        <span class="meta"><span class="mt soft">${esc(tagOf(it))}</span>${where ? `<span class="z">${where}</span>` : ""}</span></span>
+        <span class="meta"><span class="mt soft">${esc(tagOf(it))}</span>${it.sale && mode !== "venda" ? `<span class="venda-tag">À venda</span>` : ""}${where ? `<span class="z">${where}</span>` : ""}</span></span>
       ${isCons(it.room) // 1.82.0: um consumível: quanto dura (estimado); sem quantidade e sem valor
     ? (durNum(it.dur) ? `<span class="iv cons"><span class="val">${esc(durText(it.dur))}</span>${durAte(it) ? `<span class="qty ate${durFim(it) ? " fim" : ""}">${durFim(it) ? "acabou em" : "até"} ${esc(durAte(it).slice(6) === String(new Date().getFullYear()) ? durAte(it).slice(0, 5) : durAte(it))}</span>` : ""}</span>` : "")
-    : `<span class="iv"><span class="val">${money(vl(it))}</span>${qty !== "1" ? `<span class="qty">${esc(qtyShort(it.qty))}</span>` : ""}</span>`}`;
+    : mode === "venda" // 1.115.0: em Vendas, o preço pedido (sem ele, o valor gravado)
+      ? `<span class="iv"><span class="val">${money((it.sale || {}).price || vl(it))}</span><span class="qty">${(it.sale || {}).price ? "pedido" : "valor"}</span></span>`
+      : `<span class="iv"><span class="val">${money(vl(it))}</span>${qty !== "1" ? `<span class="qty">${esc(qtyShort(it.qty))}</span>` : ""}</span>`}`;
     if (pick !== null) return `<li><button type="button" class="irow selr" data-act="sel-toggle" data-id="${esc(it.id)}" aria-pressed="${pick === true}"${pick === "off" ? " disabled" : ""}>${inner}</button></li>`;
     return `<li><a class="irow" href="#/i/${encodeURIComponent(it.id)}">${inner}</a></li>`;
   }
@@ -1272,6 +1279,151 @@
         <button type="button" class="zone-h" data-act="grupo-dobra" aria-expanded="${!shut}"><h3><span class="zone-ic" aria-hidden="true">${ic(icone)}</span>${esc(name)}</h3><span class="zs">${conta}</span>${ic("chev", "sm seta")}</button>
         ${corpo}</section>`;
   }
+  // -- 1.115.0 (o dono: "criar nova aba na parte mais chamada vendas, e criar a possibilidade de marcar itens para venda";
+  // "Ao marcar como vendido solicitar se quer adicionar este recebido"): Mais › Vendas. O que está à venda (agrupado, com
+  // o preço pedido) e, no fim, recolhidos, os Vendidos (com o Desfazer, o recebimento no GerencIA e o Apagar).
+  const aVenda = () => D.items.concat(D.bensItems || []).filter((it, i, a) => it.sale && a.findIndex((x) => x.id === it.id) === i);
+  function vendaHtml(it) {
+    const s = it.sale, bt = (act, icone, txt, cls = "") => `<button type="button" class="btn${cls}" data-act="${act}" data-id="${esc(it.id)}">${ic(icone)}${txt}</button>`;
+    return `<h3 class="inews-h">${ic("tag")}Venda</h3>
+      ${s ? `<p class="venda-l" data-slot="venda-l"><b>À venda</b>${s.price ? ` · pedindo ${esc(money(s.price))}` : ""}${s.note ? ` · ${esc(s.note)}` : ""}</p>` : ""}
+      <div class="venda-b">${s ? bt("venda-vendido", "check", "Vendido", " primary") + bt("venda-por", "edit", "Mudar") + bt("venda-tirar", "close", "Tirar da venda")
+        : bt("venda-por", "tag", "Pôr à venda") + bt("venda-vendido", "check", "Vendido")}</div>`;
+  }
+  function viewVendas() {
+    const its = aVenda().sort((a, b) => String((b.sale || {}).at || "").localeCompare(String((a.sale || {}).at || "")));
+    const vendidos = (S.sold || []).slice().sort((a, b) => String(b.soldAt || "").localeCompare(String(a.soldAt || "")) || String(b.soldTs || "").localeCompare(String(a.soldTs || "")));
+    if (!its.length && !vendidos.length) {
+      return `<div class="mscreen"><div class="empty">${emptyMark()}<h2>Nada à venda</h2><p>Abra um item e toque em Pôr à venda.</p></div></div>`;
+    }
+    const como = LS.get("vendas-agrupar", "comodo");
+    const chave = (it) => como === "cat" ? (isArea(it.room) ? "Bens" : CAT[it.cat] || "Outros") : como === "comodo" ? (D.roomById.get(it.room) || {}).name || "Outros" : "";
+    const nomes = [...new Set(its.map(chave))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    const pedido = its.reduce((t, i) => t + (+(i.sale || {}).price || 0), 0);
+    const lista = (ls) => `<ul class="ilist">${ls.map((it) => itemRow(it, { mode: "venda" })).join("")}</ul>`;
+    const linhaV = (v) => `<li class="vend" data-vid="${esc(v.id)}"><div class="vend-t"><b>${esc(v.name)}</b>
+        <span>${esc(money(v.soldValue || 0))} · ${esc(dataCurta(v.soldAt))}${v.soldRoom ? ` · ${esc(v.soldRoom)}` : ""}${v.soldReceived ? " · no GerencIA" : ""}</span></div>
+      <div class="vend-b"><button type="button" class="btn sm" data-act="vendido-desfazer" data-id="${esc(v.id)}">${ic("history", "sm")}Desfazer</button>
+        ${S.gerenciaRecebe && !v.soldReceived && +v.soldValue ? `<button type="button" class="btn sm" data-act="vendido-receber" data-id="${esc(v.id)}">${ic("wallet", "sm")}Lançar no GerencIA</button>` : ""}
+        <button type="button" class="btn sm" data-act="vendido-apagar" data-id="${esc(v.id)}">${ic("trash", "sm")}Apagar</button></div></li>`;
+    return `<div class="mscreen vendas">
+      ${its.length ? `${agruparHtml("vendas-agrupar", [["comodo", "Cômodo", "rooms"], ["cat", "Categoria", "grid"], ["", "Nenhum", "sort"]], como, "vendas-agrupar")}
+        <div class="ssum"><span class="ssum-n">${plural(its.length, "item à venda", "itens à venda")}${pedido ? ` · ${esc(moneyR(pedido))} pedidos` : ""}</span></div>
+        ${como ? nomes.map((n) => { const ls = its.filter((i) => chave(i) === n); return grupoHtml("vendas-fechados", n, n, como === "cat" ? "grid" : "rooms", plural(ls.length, "item", "itens"), lista(ls)); }).join("") : lista(its)}`
+        : `<p class="muted vendas-nada">Nada à venda agora.</p>`}
+      ${vendidos.length ? `<details class="news-out vendidos"${document.querySelector(".vendidos[open]") ? " open" : ""}><summary>${ic("chev", "sm")}${oti("archive")}Vendidos (${int(vendidos.length)})</summary>
+        <p class="vend-soma">${esc(money(vendidos.reduce((t, v) => t + (+v.soldValue || 0), 0)))} no total</p><ul class="vend-l">${vendidos.map(linhaV).join("")}</ul></details>` : ""}
+    </div>`;
+  }
+  function openVendaPor(it) {
+    const s = it.sale || {};
+    const entry = openDialog({
+      cls: "modal narrow", label: it.sale ? "À venda" : "Pôr à venda",
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("tag", it.sale ? "À venda" : "Pôr à venda")}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <form class="dlg-b" data-vp><div class="form">
+          <div class="field"><label for="vp-preco">Preço pedido</label><div class="money"><input id="vp-preco" class="input" name="preco" inputmode="decimal" value="${esc(moneyInput(s.price))}" placeholder="Opcional" autocomplete="off"></div></div>
+          <div class="field"><label for="vp-nota">Observação</label><textarea id="vp-nota" class="input grow" rows="1" name="nota" maxlength="200" placeholder="Opcional" autocomplete="off">${esc(s.note || "")}</textarea></div>
+          <div class="formerr" data-err hidden></div>
+        </div></form>
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok>${ic("check")}${it.sale ? "Salvar" : "Pôr à venda"}</button></div></div>`,
+    });
+    const form = $("[data-vp]", entry.dlg), err = $("[data-err]", entry.dlg);
+    const go = async () => {
+      try {
+        const res = await API.put(`api/items/${encodeURIComponent(it.id)}`, { sale: { price: form.preco.value.trim(), note: form.nota.value.trim() }, _base: it.updatedAt });
+        setRev(res.rev); upsertItem(res.item); derive();
+        finalizeThen(entry, () => { refreshAll(); toast(it.sale ? "Venda salva" : "À venda"); });
+      } catch (e) { err.hidden = false; err.textContent = e.message; }
+    };
+    form.addEventListener("submit", (e) => { e.preventDefault(); go(); });
+    entry.dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); if (e.target.closest("[data-ok]")) go(); });
+  }
+  async function tirarDaVenda(it) {
+    const antes = it.sale;
+    try {
+      const res = await API.put(`api/items/${encodeURIComponent(it.id)}`, { sale: false, _base: it.updatedAt });
+      setRev(res.rev); upsertItem(res.item); derive(); refreshAll();
+      toast("Fora da venda", { action: "Desfazer", onAction: async () => {
+        try { const now = D.itemById.get(it.id); const back = await API.put(`api/items/${encodeURIComponent(it.id)}`, { sale: antes, _base: now?.updatedAt }); setRev(back.rev); upsertItem(back.item); derive(); refreshAll(); }
+        catch (e) { fail(e); }
+      } });
+    } catch (e) { fail(e); }
+  }
+  // Vendido: o valor, o dia e, com o GerencIA ligado, a pergunta do recebimento (a pessoa escolhe: lançar ou não)
+  function openVendido(it) {
+    const chip = (name, value, label, on = false) => `<label class="chip"><input type="radio" name="${name}" value="${esc(value)}"${on ? " checked" : ""}>${label}</label>`;
+    const hojeIso = diaMais(0), ontemIso = diaMais(-1);
+    const entry = openDialog({
+      cls: "modal narrow", label: "Vendido",
+      html: `<div class="dlg"><div class="dlg-h"><h2>${dlgT("check", "Vendido")}</h2><button class="btn ghost icon" data-x aria-label="Fechar">${ic("close")}</button></div>
+        <form class="dlg-b" data-vd><div class="form">
+          <p class="help">${esc(it.name)} sai do inventário e fica em Vendas › Vendidos.</p>
+          <div class="field"><label for="vd-valor">Valor da venda</label><div class="money"><input id="vd-valor" class="input" name="valor" inputmode="decimal" value="${esc(moneyInput((it.sale || {}).price))}" autocomplete="off"></div></div>
+          <div class="field"><span class="lbl" id="vd-dia-l">Quando</span><div class="chips" role="radiogroup" aria-labelledby="vd-dia-l">${chip("vd-dia", hojeIso, "Hoje", true)}${chip("vd-dia", ontemIso, "Ontem")}${chip("vd-dia", "outra", "Outra data")}</div>
+            <input id="vd-data" class="input" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" autocomplete="off" aria-label="Data da venda" hidden></div>
+          ${S.gerenciaRecebe ? `<div class="field" data-f="receber"><span class="lbl" id="vd-rec-l">Lançar o recebimento no GerencIA?</span>
+            <div class="chips" role="radiogroup" aria-labelledby="vd-rec-l">${chip("vd-rec", "sim", "Lançar")}${chip("vd-rec", "nao", "Não lançar")}</div></div>` : ""}
+          <div class="formerr" data-err hidden></div>
+        </div></form>
+        <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok>${ic("check")}Vendido</button></div></div>`,
+    });
+    const dlg = entry.dlg, form = $("[data-vd]", dlg), err = $("[data-err]", dlg), data = $("#vd-data", dlg);
+    const val = (name) => (form.querySelector(`input[name="${name}"]:checked`) || {}).value || "";
+    dlg.addEventListener("change", (e) => { if (e.target.name === "vd-dia") { data.hidden = e.target.value !== "outra"; if (!data.hidden) setTimeout(() => data.focus(), 0); } err.hidden = true; });
+    data.addEventListener("input", () => { data.value = garMask(data.value); });
+    setTimeout(() => form.valor.focus(), 50);
+    let busy = false;
+    const go = async () => {
+      if (busy) return;
+      const erro = (m, campo) => { err.hidden = false; err.textContent = m; if (campo) campo.focus(); };
+      if (!form.valor.value.trim()) return erro("Coloque o valor da venda.", form.valor);
+      const dia = val("vd-dia") === "outra" ? garIso(data.value) : val("vd-dia");
+      if (!dia) return erro("A data: como 28/11/2026.", data);
+      const rec = val("vd-rec");
+      if (S.gerenciaRecebe && !rec) return erro("Escolha se o recebimento vai para o GerencIA.");
+      busy = true;
+      try {
+        const res = await API.post(`api/items/${encodeURIComponent(it.id)}/sell`, { value: form.valor.value.trim(), date: dia, receber: rec === "sim" });
+        setRev(res.rev); removeItem(it.id); S.sold = (S.sold || []).filter((x) => x.id !== res.sold.id).concat([res.sold]); derive();
+        finalizeThen(entry, () => {
+          if (sheet && sheet.itemId === it.id) requestClose(sheet, { force: true });
+          refreshAll();
+          if (res.erro_gerencia) fail(new Error(`Vendido. O recebimento não foi para o GerencIA: ${res.erro_gerencia}`));
+          else toast(res.recebido ? "Vendido. O recebimento foi para o GerencIA." : "Vendido", { action: "Desfazer", onAction: () => desfazerVenda(res.sold.id) });
+        });
+      } catch (e) { erro(e.message); }
+      finally { busy = false; }
+    };
+    form.addEventListener("submit", (e) => { e.preventDefault(); go(); });
+    dlg.addEventListener("click", (e) => { if (e.target.closest("[data-x]")) requestClose(entry, { force: true }); if (e.target.closest("[data-ok]")) go(); });
+  }
+  async function desfazerVenda(id) {
+    const v = (S.sold || []).find((x) => x.id === id);
+    try {
+      const res = await API.post(`api/sold/${encodeURIComponent(id)}/restore`, {});
+      setRev(res.rev); S.sold = (S.sold || []).filter((x) => x.id !== id); upsertItem(res.item); derive(); refreshAll();
+      toast(v && v.soldReceived ? "De volta ao inventário. O recebimento continua no GerencIA." : "De volta ao inventário");
+    } catch (e) { fail(e); }
+  }
+  async function receberVenda(id) {
+    try {
+      const res = await API.post(`api/sold/${encodeURIComponent(id)}/receber`, {});
+      setRev(res.rev); S.sold = (S.sold || []).map((x) => (x.id === id ? res.sold : x)); refreshAll();
+      toast("Recebimento lançado no GerencIA");
+    } catch (e) { fail(e); }
+  }
+  async function apagarVendido(id) {
+    const v = (S.sold || []).find((x) => x.id === id);
+    if (!v) return;
+    const ok = await confirmBox({ title: "Apagar dos vendidos?", body: `<b>${esc(v.name)}</b> sai da lista dos vendidos de vez.`, ok: "Apagar", danger: true });
+    if (!ok) return;
+    try {
+      const res = await API.del(`api/sold/${encodeURIComponent(id)}`);
+      setRev(res.rev); S.sold = (S.sold || []).filter((x) => x.id !== id); refreshAll();
+      toast("Apagado dos vendidos");
+    } catch (e) { fail(e); }
+  }
+
   // -- Consumíveis (1.78.0, Mais > Consumíveis): o que se gasta e se compra de novo, por categoria, com a quantidade
   function viewCons() {
     if (!D.consItems.length) {
@@ -1524,6 +1676,8 @@
           ${zOn ? `<div class="field" data-f="zone"><span class="lbl" id="bk-l-zone">Zona</span>
             <div class="chips" id="bk-zones" role="radiogroup" aria-labelledby="bk-l-zone">${zoneChips("")}</div>
             <input id="bk-zone-new" class="input" placeholder="Nome da zona" maxlength="120" autocomplete="off" aria-label="Nome da zona" hidden></div>` : ""}
+          <div class="field" data-f="venda"><span class="lbl" id="bk-l-venda">À venda</span>
+            <div class="chips" role="radiogroup" aria-labelledby="bk-l-venda">${chip("bk-venda", KEEP, "Manter", true)}${chip("bk-venda", "sim", "Sim")}${chip("bk-venda", "nao", "Não")}</div></div>
         </div></form>
         <div class="dlg-f"><span class="grow"></span><button class="btn ghost" data-x>${ic("close")}Cancelar</button><button class="btn primary" data-ok disabled>${ic("check")}Aplicar</button></div></div>`,
     });
@@ -1534,7 +1688,7 @@
       const room = val("bk-room"), z = zOn ? val("bk-zone") : KEEP;
       $("#bk-help", dlg).hidden = room === KEEP;
       if (zOn) $("#bk-zone-new", dlg).hidden = z !== OTHER;
-      $("[data-ok]", dlg).disabled = (room === KEEP && val("bk-cat") === KEEP && z === KEEP) || (z === OTHER && !zoneOf());
+      $("[data-ok]", dlg).disabled = (room === KEEP && val("bk-cat") === KEEP && z === KEEP && val("bk-venda") === KEEP) || (z === OTHER && !zoneOf());
     };
     dlg.addEventListener("change", (e) => {
       if (zOn && e.target.name === "bk-room") $("#bk-zones", dlg).innerHTML = zoneChips(e.target.value === KEEP ? "" : e.target.value); // as zonas do cômodo novo
@@ -1547,17 +1701,18 @@
       if (busy || $("[data-ok]", dlg).disabled) return;
       busy = true;
       try {
-        const room = val("bk-room"), cat = val("bk-cat"), zone = zoneOf();
+        const room = val("bk-room"), cat = val("bk-cat"), zone = zoneOf(), venda = val("bk-venda");
         const todo = [];
         for (const i of its) {
           const c = {};
           if (room !== KEEP && room !== i.room) { c.room = room; c.zone = zone !== KEEP ? zone : ""; }
           else if (zone !== KEEP && zone !== (i.zone || "")) c.zone = zone;
           if (cat !== KEEP && cat !== i.cat) c.cat = cat;
+          if (venda !== KEEP && (venda === "sim") !== !!i.sale) c.sale = venda === "sim"; // 1.115.0: pôr ou tirar da venda
           if (Object.keys(c).length) todo.push({ id: i.id, ...c });
         }
         if (!todo.length) { requestClose(entry, { force: true }); toast("Nada mudou."); return; }
-        const before = todo.map((t) => { const i = D.itemById.get(t.id); return { id: i.id, room: i.room, seq: i.seq, zone: i.zone || "", cat: i.cat }; });
+        const before = todo.map((t) => { const i = D.itemById.get(t.id); return { id: i.id, room: i.room, seq: i.seq, zone: i.zone || "", cat: i.cat, ...("sale" in t ? { sale: i.sale || false } : {}) }; });
         const res = await API.post("api/items/bulk", { items: todo });
         if (SEL) SEL = new Set(); // 1.84.0: feita a alteração, os itens ficam desmarcados
         setRev(res.rev); res.items.forEach(upsertItem); derive(); requestClose(entry, { force: true }); refreshAll();
@@ -1742,6 +1897,7 @@
     const rows = [
       bensOn() && mainTab() !== "bens" && ["#/bens", "home", "Bens", "Casa, terreno, carro: o que fica fora de casa."],
       consOn() && mainTab() !== "cons" && ["#/consumiveis", "drop", "Consumíveis", "Pasta térmica, creme, pilhas: o que se gasta."],
+      ["#/vendas", "tag", "Vendas", aVenda().length ? `${plural(aVenda().length, "item à venda", "itens à venda")}.` : "O que está à venda e o que já foi vendido."],
       ["#/graficos", "bars", "Gráficos", "Cômodos, categorias e itens que mais valem."],
       pesqOn() && ["#/pesquisas", "spark", "Pesquisas da IA", pesqDesc()],
       ["#/categorias", "grid", "Categorias", "O nome e a cor de cada uma."],
@@ -4296,6 +4452,7 @@ ${room.kind === "bens" && it.fipe ? `<dt>Tabela FIPE</dt><dd data-slot="fipe">${
           ${it.createdAt ? `<dt>Cadastrado</dt><dd>${esc(dateTime(it.createdAt))}${by(it.createdBy)}</dd>` : ""}
           ${it.updatedAt && it.updatedAt !== it.createdAt ? `<dt>Alterado</dt><dd>${esc(dateTime(it.updatedAt))}${by(it.updatedBy)}</dd>` : ""}
         </dl>
+        ${room.kind !== "consumiveis" ? `<div class="inews ivenda" data-slot="item-venda">${vendaHtml(it)}</div>` : ""}
         ${S.resolvia && room.kind !== "consumiveis" ? `<div class="inews itasks" data-slot="item-tarefas">
           <h3 class="inews-h">${ic("checks")}Tarefas no ResolvIA</h3>
           <div data-slot="tarefas-lista" aria-live="polite">${tarefasHtml(it)}</div>
@@ -5995,6 +6152,13 @@ ${room.kind === "bens" && it.fipe ? `<dt>Tabela FIPE</dt><dd data-slot="fipe">${
       case "item-rec-del": if (item) dismissRec(item); break;
       case "item-par-del": if (item) dismissPar(item); break;
       case "fipe-usar": if (item) usarFipe(item); break;
+      case "venda-por": if (item) openVendaPor(item); break; // 1.115.0: Vendas
+      case "venda-tirar": if (item) tirarDaVenda(item); break;
+      case "venda-vendido": if (item) openVendido(item); break;
+      case "vendido-desfazer": desfazerVenda(b.dataset.id); break;
+      case "vendido-receber": receberVenda(b.dataset.id); break;
+      case "vendido-apagar": apagarVendido(b.dataset.id); break;
+      case "vendas-agrupar": LS.set("vendas-agrupar", b.dataset.v); renderView(false); break;
       case "item-dup": if (item) openEditor({ dup: item }); break;
       case "tarefa-nova": if (item) openTarefaNova(item); break;
       case "copy-field": copyField(b.dataset.target); break;

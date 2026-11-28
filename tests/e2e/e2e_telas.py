@@ -3,7 +3,7 @@ nada passa da largura (o Chrome do celular encolheria a página), as janelas cab
 de baixo visíveis, e nenhum texto de botão fica cortado."""
 from e2e_lib import main
 
-PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/bens", "#/consumiveis", "#/graficos", "#/novidades", "#/pesquisas/recursos", "#/pesquisas/pareceres", "#/categorias", "#/config", "#/config/dados", "#/config/aparencia", "#/config/opcoes", "#/sobre"]
+PAGES = ["#/", "#/buscar", "#/buscar?q=mesa", "#/comodos", "#/c/sala", "#/c/varanda", "#/relatorio", "#/mais", "#/bens", "#/consumiveis", "#/vendas", "#/graficos", "#/novidades", "#/pesquisas/recursos", "#/pesquisas/pareceres", "#/categorias", "#/config", "#/config/dados", "#/config/aparencia", "#/config/opcoes", "#/sobre"]
 
 # (nome, endereço, como abrir (um seletor ou vários, um depois do outro), seletor que aparece)
 DIALOGS = [
@@ -107,6 +107,9 @@ async def body(r, p):
     con = r.api("POST", "api/rooms", {"kind": "consumiveis"})["room"]["id"]
     r.api("POST", "api/items", {"room": con, "name": "Creme de massagem relaxante de arnica", "details": "Creme para massagem nas costas e nas pernas.", "qty": "2 potes", "value": 1234})
     r.api("POST", "api/items", {"room": con, "name": "Pilhas AA", "cat": "utilidades", "qty": "8"})
+    # 1.115.0: Vendas com um item à venda (nome comprido, preço pedido e observação) e um vendido
+    r.api("PUT", "api/items/sal-001", {"sale": {"price": 12345.67, "note": "Com as capas e as almofadas de encosto, retirada no local"}})
+    r.api("POST", "api/items/sal-003/sell", {"value": 98765.43})
     b = await r.browser(p, camera=True, mic=True)
     for size in ("estreito", "cel", "tablet", "pc"):
         for scheme in ("light", "dark"):

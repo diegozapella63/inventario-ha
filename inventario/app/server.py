@@ -271,6 +271,36 @@ def clean_dur(v) -> int:
     return n if 0 < n <= 3650 else 0
 
 
+MAX_SOLD = 500  # 1.115.0: os Vendidos guardados (os mais antigos saem)
+
+
+def clean_sale(v, antes=None):
+    """1.115.0 (o dono: "criar a possibilidade de marcar itens para venda"): o À venda de um item da casa ou de um bem:
+    None, False ou "" tira; true ou {price?, note?} põe (o preço pedido é opcional; `at` é desde quando)."""
+    if v in (None, False, "", 0):
+        return None
+    d = v if isinstance(v, dict) else {}
+    antes = antes if isinstance(antes, dict) else {}
+    out = {"at": str(antes.get("at") or now_iso())}
+    preco = parse_value(d.get("price")) if "price" in d else antes.get("price") or 0
+    if preco:
+        out["price"] = preco
+    nota = text(d.get("note"), 200, "observação da venda") if "note" in d else str(antes.get("note") or "")
+    if nota:
+        out["note"] = nota
+    return out
+
+
+def clean_sold(lista) -> list:
+    """Os Vendidos de um arquivo: só o que parece um item vendido (id, nome e quando)."""
+    out, vistos = [], set()
+    for i in lista if isinstance(lista, list) else []:
+        if isinstance(i, dict) and i.get("id") and i.get("name") and i["id"] not in vistos and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(i.get("soldAt") or "")):
+            vistos.add(i["id"])
+            out.append(i)
+    return out[-MAX_SOLD:]
+
+
 def clean_warranty(v) -> str:
     """1.113.0: a Garantia até de um item da casa ou de um bem: AAAA-MM-DD (aceita DD/MM/AAAA); vazio tira; outra coisa, 400."""
     s = str(v or "").strip()
@@ -641,6 +671,7 @@ class Store:
         return {
             "rev": self.data["rev"], "updatedAt": self.data.get("updatedAt"),
             "rooms": self.data["rooms"], "items": self.data["items"], "cats": self.cats(), "consCats": self.cons_cats(),
+            "sold": self.sold(),
         }
 
     # -- categorias: a lista padrão até alguém editar; editada, fica no inventário (entra no backup e nas versões)
@@ -796,6 +827,8 @@ class Store:
                 it["qty"], it["value"] = "1", 0
         elif clean_warranty(body.get("warranty")):  # 1.113.0: a Garantia até (os itens da casa e os bens)
             it["warranty"] = clean_warranty(body["warranty"])
+        if room.get("kind") != "consumiveis" and clean_sale(body.get("sale")):  # 1.115.0: à venda (um consumível não)
+            it["sale"] = clean_sale(body["sale"], body["sale"] if restore else None)
         if room.get("kind") != "consumiveis" and it["cat"] == "veiculos" and body.get("fipe"):  # 1.114.0: a Tabela FIPE de um veículo
             it["fipe"], it["fipeYear"] = clean_fipe(body["fipe"], body.get("fipeYear"))
         src = clean_photo_src(body.get("photoSrc"), it["photos"])
@@ -898,6 +931,14 @@ class Store:
                     new.pop("photoSrc", None)
             if "flag" in body:
                 new["flag"] = text(body["flag"], 200, "observação") or None
+            if cons:  # 1.115.0: um consumível não vai à venda
+                new.pop("sale", None)
+            elif "sale" in body:
+                venda = clean_sale(body["sale"], it.get("sale"))
+                if venda:
+                    new["sale"] = venda
+                else:
+                    new.pop("sale", None)
             if cons:  # 1.113.0: um consumível não tem garantia
                 new.pop("warranty", None)
             elif "warranty" in body:
@@ -965,6 +1006,8 @@ class Store:
                     if len(self.home_rooms(quer)) != len(set(map(str, quer))):
                         raise ApiError(400, "Escolha um cômodo que exista.")
                     new["usedIn"] = self.home_rooms(quer)
+                if "sale" in ch and not self.is_cons(new.get("room", it["room"])):  # 1.115.0: pôr ou tirar da venda
+                    new["sale"] = clean_sale(ch["sale"], it.get("sale"))
                 plan.append((it, new, ch.get("seq")))
             t, out = now_iso(), []
             for it, new, want in plan:
@@ -981,6 +1024,13 @@ class Store:
                         it["usedIn"] = new["usedIn"]
                     else:
                         it.pop("usedIn", None)
+                if "sale" in new:
+                    if new["sale"]:
+                        it["sale"] = new["sale"]
+                    else:
+                        it.pop("sale", None)
+                if self.is_cons(it["room"]):
+                    it.pop("sale", None)
                 # 1.82.0: mudou de lado (casa ou consumíveis): a categoria do outro lado não vale; vai para Outros
                 if self.is_cons(it["room"]):
                     if it.get("cat") not in self.cons_cat_map() and "room" in new:
@@ -994,6 +1044,76 @@ class Store:
                 out.append(it)
             self.save()
             return out
+
+    # -- 1.115.0: vender. O item vendido sai dos itens (do inventário, do patrimônio e dos outros apps) e fica nos Vendidos,
+    # inteiro, com o valor e o dia da venda; o Desfazer o traz de volta.
+    def sold(self) -> list:
+        return self.data.get("sold") if isinstance(self.data.get("sold"), list) else []
+
+    def sold_item(self, iid):
+        return next((i for i in self.sold() if i.get("id") == iid), None)
+
+    def sell_item(self, iid: str, value, when, user) -> dict:
+        with self.lock:
+            it = self.item(iid)
+            if not it:
+                raise ApiError(404, "Este item não existe mais.")
+            if self.is_cons(it.get("room")):
+                raise ApiError(400, "Um consumível não se vende por aqui.")
+            valor = parse_value(value)
+            dia = str(when or "").strip() or news_today().isoformat()
+            try:
+                dia = date.fromisoformat(dia).isoformat()
+            except ValueError:
+                raise ApiError(400, "A data da venda: como 2026-11-28.")
+            # o dia é o do relógio de quem vende (o celular): um dia de folga para o fuso
+            if dia > (max(news_today(), date.today()) + timedelta(days=1)).isoformat():
+                raise ApiError(400, "A data da venda não pode ser no futuro.")
+            room = self.room(it.get("room")) or {}
+            vend = dict(it, soldValue=valor, soldAt=dia, soldTs=now_iso(), soldRoom=room.get("name") or "", soldTag=self.tag(it))
+            if user:
+                vend["soldBy"] = user
+            self.data["items"].remove(it)
+            self._retire_seq(it)
+            self.data["sold"] = (self.sold() + [vend])[-MAX_SOLD:]
+            self.save()
+            return vend
+
+    def unsell_item(self, iid: str) -> dict:
+        with self.lock:
+            vend = self.sold_item(iid)
+            if not vend:
+                raise ApiError(404, "Este item não está mais nos vendidos.")
+            if not self.room(vend.get("room")):
+                raise ApiError(409, "O cômodo deste item não existe mais: não dá para trazê-lo de volta.")
+            if self.item(iid):
+                raise ApiError(409, "Já há um item com este código no inventário.")
+            it = {k: v for k, v in vend.items() if not k.startswith("sold")}
+            usados = {i.get("seq") for i in self.data["items"] if i.get("room") == it["room"]}
+            if it.get("seq") in usados:
+                it["seq"] = self.next_seq(it["room"])
+            self.data["sold"] = [i for i in self.sold() if i is not vend]
+            self.data["items"].append(it)
+            self.save()
+            return it
+
+    def delete_sold(self, iid: str) -> dict:
+        with self.lock:
+            vend = self.sold_item(iid)
+            if not vend:
+                raise ApiError(404, "Este item não está mais nos vendidos.")
+            self.data["sold"] = [i for i in self.sold() if i is not vend]
+            self.save()
+            return vend
+
+    def mark_received(self, iid: str, onde: str) -> dict:
+        with self.lock:
+            vend = self.sold_item(iid)
+            if not vend:
+                raise ApiError(404, "Este item não está mais nos vendidos.")
+            vend["soldReceived"] = onde
+            self.save()
+            return vend
 
     def delete_item(self, iid: str) -> dict:
         with self.lock:
@@ -1189,6 +1309,11 @@ class Store:
                 i["value"] = parse_value(i.get("value"))  # "1.200,50" num .json feito à mão vira número (planilha e backup contam)
             except ApiError:
                 i["value"] = 0
+        sold = clean_sold(data.get("sold"))  # 1.115.0: os Vendidos
+        if sold:
+            data["sold"] = sold
+        else:
+            data.pop("sold", None)
         ccats = clean_cons_cats(data.get("consCats"))  # 1.82.0
         if ccats:
             data["consCats"] = ccats
@@ -1571,6 +1696,94 @@ def gerencia_taxas() -> dict | None:
                  if isinstance(v, (int, float)) and not isinstance(v, bool)} if isinstance(dep, dict) else {}
         _ger.update(mtime=mt, taxas=taxas or None)
     return _ger["taxas"]
+
+
+def gerencia_recebe() -> dict | None:
+    """1.115.0: o GerencIA (1.102.0) aceita o recebimento de uma venda? O arquivo dele diz onde (`recebimentos`), com o
+    endereço e a chave."""
+    try:
+        with open(GERENCIA_ARQ, encoding="utf-8") as f:
+            info = json.load(f)
+    except (OSError, ValueError):
+        return None
+    ok = isinstance(info, dict) and info.get("chave") and (info.get("url") or info.get("ip_url")) and str(info.get("recebimentos") or "").startswith("/api/")
+    return info if ok else None
+
+
+def gerencia_receber(vend: dict) -> str:
+    """Lança no GerencIA o que se recebeu numa venda (um recebimento já recebido, no dia da venda). Devolve o id de lá."""
+    info = gerencia_recebe()
+    if not info:
+        raise ApiError(409, "O GerencIA não está ligado: lá, ligue a ligação com os outros apps em Mais › Configurações › Integrações.")
+    if not vend.get("soldValue"):
+        raise ApiError(400, "Sem o valor da venda não há o que lançar.")
+    corpo = {"tipo": "receita", "descricao": ("Venda: " + str(vend.get("name") or ""))[:120], "valor": vend["soldValue"],
+             "vencimento": vend["soldAt"], "pago": True, "obs": "Pelo InventarIA"}
+    sem_proxy = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    ultimo = "O GerencIA não respondeu."
+    for base in (info.get("url"), info.get("ip_url")):
+        if not base:
+            continue
+        req = urllib.request.Request(str(base).rstrip("/") + info["recebimentos"], method="POST", data=json.dumps(corpo).encode(),
+                                     headers={"Authorization": "Bearer " + str(info["chave"]), "Content-Type": "application/json", "X-App": "InventarIA"})
+        try:
+            with sem_proxy.open(req, timeout=8) as r:
+                out = json.loads(r.read(20_000))
+            if isinstance(out, dict) and out.get("ok"):
+                return str(out.get("id") or "")[:80]
+        except urllib.error.HTTPError as e:
+            try:
+                erro = str((json.loads(e.read(20_000)) or {}).get("erro") or "")
+            except (ValueError, AttributeError, OSError):
+                erro = ""
+            ultimo = erro or ("O GerencIA recusou: ligue de novo a ligação com os outros apps lá." if e.code == 401 else f"O GerencIA respondeu {e.code}.")
+            if e.code in (400, 401):
+                break
+        except (urllib.error.URLError, OSError, ValueError):
+            continue
+    raise ApiError(502, ultimo)
+
+
+def vender(iid, value, when, user, receber=False) -> dict:
+    """Marca como vendido e, se pedido, lança o recebimento no GerencIA: {sold, recebido, erro_gerencia}."""
+    vend = STORE.sell_item(iid, value, when, user)
+    out = {"sold": vend, "recebido": False, "erro_gerencia": ""}
+    if receber:
+        try:
+            gerencia_receber(vend)
+            out["sold"], out["recebido"] = STORE.mark_received(vend["id"], "gerencia"), True
+        except ApiError as e:
+            out["erro_gerencia"] = e.msg
+    return out
+
+
+def r_item_sell(h, iid, query):
+    body = h.read_body() or {}
+    out = vender(iid, body.get("value"), body.get("date"), h.user(), receber=body.get("receber") is True)
+    h.send_json(dict(out, rev=STORE.data["rev"]))
+
+
+def r_sold_restore(h, iid, query):
+    h.read_body()
+    it = STORE.unsell_item(iid)
+    h.send_json({"item": it, "rev": STORE.data["rev"]})
+
+
+def r_sold_delete(h, iid, query):
+    h.read_body()
+    STORE.delete_sold(iid)
+    h.send_json({"ok": True, "rev": STORE.data["rev"]})
+
+
+def r_sold_receber(h, iid, query):
+    h.read_body()
+    vend = STORE.sold_item(iid)
+    if not vend:
+        raise ApiError(404, "Este item não está mais nos vendidos.")
+    if vend.get("soldReceived"):
+        raise ApiError(409, "O recebimento deste item já foi lançado.")
+    gerencia_receber(vend)
+    h.send_json({"sold": STORE.mark_received(iid, "gerencia"), "rev": STORE.data["rev"]})
 
 
 def deprec_enabled() -> bool:
@@ -5782,6 +5995,7 @@ def r_data(h, query):
                              "news_hora": news_hora(), "news_aviso": news_aviso(), "news_para": news_para_salvo(),
                              "news_apps": STORE.settings.get("news_apps") is True,
                              "accent": app_accent(), "accent_daily": app_accent_daily(), "deprec": STORE.settings.get("deprec") is True},
+                "gerencia_recebe": gerencia_recebe() is not None,
                 "gerencia": {"taxas": gerencia_taxas()} if gerencia_taxas() else None, "resolvia": resolvia_on(), "economia": economia_on(), "atalho": ingress_path(),
                 "correria_uso": correria_uso() if correria_enabled() else None,
                 "features": {"ai": bool(SUPERVISOR_TOKEN) or AI_MOCK, "share": share_available()}})
@@ -6331,6 +6545,7 @@ def r_erase(h, query):
         STORE.snapshot_if_due(force=True, reason="erase")
         STORE.data["rooms"] = []
         STORE.data["items"] = []
+        STORE.data.pop("sold", None)
         STORE.save()
         rev = STORE.data["rev"]
     log.info("Começar do zero: cômodos e itens apagados (a versão de antes ficou em Versões anteriores)")
@@ -6578,6 +6793,10 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/items", r_item_create),
     ("POST", r"/api/items/batch", r_items_batch),
     ("POST", r"/api/items/bulk", r_items_bulk),
+    ("POST", r"/api/items/([A-Za-z0-9_-]+)/sell", r_item_sell),  # 1.115.0: Vendas
+    ("POST", r"/api/sold/([A-Za-z0-9_-]+)/restore", r_sold_restore),
+    ("POST", r"/api/sold/([A-Za-z0-9_-]+)/receber", r_sold_receber),
+    ("DELETE", r"/api/sold/([A-Za-z0-9_-]+)", r_sold_delete),
     ("PUT", r"/api/items/([A-Za-z0-9_-]+)", r_item_update),
     ("DELETE", r"/api/items/([A-Za-z0-9_-]+)", r_item_delete),
     ("POST", r"/api/cats", r_cat_create),

@@ -40,6 +40,7 @@ A primeira instalação leva alguns minutos, porque o app é montado no próprio
 - **Buscar** por nome, marca ou detalhe, sem se importar com acentos, com filtros por cômodo e categoria, e **Selecionar** para alterar o cômodo, a categoria e a zona de vários itens de uma vez.
 - **Bens** fora de casa (casa, terreno, carro), separados em Imóveis, Veículos e Outros: contam no patrimônio e vêm à parte no relatório.
 - **Consumíveis** (pasta térmica, creme de massagem, pilhas): o que se gasta, com as categorias deles, a duração estimada e o cômodo onde é usado, fora do patrimônio, agrupados por categoria, cômodo ou **vencimento** (esta semana, este mês, mês que vem). **Avaliar com IA** traz um parecer de cada um (de vários de uma vez em **Pesquisas da IA › Pareceres**), e a ficha mostra as compras no [EconomIA](https://github.com/diegozapella63/economia-ha). Os itens da casa, os bens e os consumíveis têm cada um a sua chave.
+- **Vendas**: ponha um item à venda (com o preço pedido), veja tudo o que está à venda e marque como vendido; o item sai do inventário, fica nos Vendidos (com o Desfazer) e, com o GerencIA, o valor pode ser lançado lá como recebido.
 - **Relatório do inventário** por cômodo, com fotos e gráficos, para baixar em PDF.
 - **Gráficos**: os cômodos, as categorias e os itens que mais valem, as faixas de valor e o patrimônio mês a mês.
 - **Exportar** em CSV, JSON ou ZIP com fotos, **backup** na pasta `share/inventario`, versões automáticas a cada 10 minutos de uso e **Começar do zero** (com uma cópia antes).
