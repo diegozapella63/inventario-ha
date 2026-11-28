@@ -449,7 +449,7 @@
   // e o título de cada campo com o ícone pelas palavras dele, quando não traz o seu (o padrão da família)
   const ICONE_CAMPO = [[/^Fotos/, "image"], [/^Nome|^Tarefa|^Título/, "edit"], [/^Detalhes|^Observa/, "report"], [/^Tipo|^Categoria/, "grid"],
     [/^Cômodo|^Onde/, "rooms"], [/^Zona/, "pin"], [/^Quantidade/, "layers"], [/^Duração/, "clock"], [/^Valor|^Preço/, "wallet"], [/^Código/, "tag"], [/^Lista/, "checks"],
-    [/^Prazo|^Data|^Quando/, "calendar"], [/^Hor/, "clock"], [/^Cor/, "palette"], [/^Mensagem|^Texto/, "chat"], [/^Link|^Endereço|^Página/, "external"],
+    [/^Prazo|^Data|^Quando|^Garantia/, "calendar"], [/^Hor/, "clock"], [/^Cor/, "palette"], [/^Mensagem|^Texto/, "chat"], [/^Link|^Endereço|^Página/, "external"],
     [/^Quem|^Pessoa/, "user"], [/^Ícone/, "spark"]];
   const iconeCampo = (t) => (ICONE_CAMPO.find(([re]) => re.test(t)) || [0, "edit"])[1];
   function iconesCampos(root) {
@@ -517,7 +517,27 @@
     // o valor em reais diz que é em reais
     return escrito && f.querySelector(".money") ? `R$ ${escrito}` : escrito;
   }
-  const CAMPO_FEM = /^(fotos?|categoria|observaç|zona|dica|nota|cor\b|duraç|marca|loja|data)/i;
+  const CAMPO_FEM = /^(fotos?|categoria|observaç|zona|dica|nota|cor\b|duraç|marca|loja|data|garantia)/i;
+  // 1.113.0: a Garantia até (os itens da casa e os bens): guardada AAAA-MM-DD, escrita DD/MM/AAAA
+  const garBr = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); return m ? `${m[3]}/${m[2]}/${m[1]}` : ""; };
+  const garMask = (v) => { const d = String(v || "").replace(/\D/g, "").slice(0, 8); return [d.slice(0, 2), d.slice(2, 4), d.slice(4)].filter(Boolean).join("/"); };
+  // "" sem nada; null numa data que não existe
+  function garIso(br) {
+    const t = String(br || "").trim();
+    if (!t) return "";
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(t);
+    if (!m) return null;
+    const d = new Date(+m[3], +m[2] - 1, +m[1]);
+    return d.getFullYear() === +m[3] && d.getMonth() === +m[2] - 1 && d.getDate() === +m[1] && +m[3] >= 2000 && +m[3] <= 2100 ? `${m[3]}-${m[2]}-${m[1]}` : null;
+  }
+  // quantos dias faltam para a garantia acabar (negativo: acabou); null sem garantia
+  function garDias(it) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String((it && it.warranty) || ""));
+    if (!m) return null;
+    const h = new Date();
+    return Math.round((new Date(+m[1], +m[2] - 1, +m[3]) - new Date(h.getFullYear(), h.getMonth(), h.getDate())) / 864e5);
+  }
+  const garTxt = (it) => { const n = garDias(it); return n == null ? "" : garBr(it.warranty) + (n < 0 ? " · acabou" : n === 0 ? " · acaba hoje" : n <= 60 ? ` · ${n === 1 ? "falta 1 dia" : `faltam ${n} dias`}` : ""); };
   function valoresCampos(root) {
     for (const f of root.querySelectorAll(".field.dobravel")) {
       const l = f.querySelector(":scope > .lbl");
@@ -4237,6 +4257,7 @@
           <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>`
               : `<dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
           <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>`}
+          ${room.kind !== "consumiveis" && garTxt(it) ? `<dt>Garantia até</dt><dd data-slot="garantia"${garDias(it) < 0 ? ' class="fim"' : ""}>${esc(garTxt(it))}</dd>` : ""}
           <dt>Origem</dt><dd>${esc(SOURCES[it.source] || "Cadastro manual")}</dd>
           ${it.createdAt ? `<dt>Cadastrado</dt><dd>${esc(dateTime(it.createdAt))}${by(it.createdBy)}</dd>` : ""}
           ${it.updatedAt && it.updatedAt !== it.createdAt ? `<dt>Alterado</dt><dd>${esc(dateTime(it.updatedAt))}${by(it.updatedBy)}</dd>` : ""}
@@ -4342,6 +4363,7 @@
       dur: durNum(from.dur) ? String(durNum(from.dur)) : "", // 1.82.0: só num consumível
       usedIn: usadoIds(from), // 1.88.0: onde se usa (Consumíveis por cômodo); 1.91.0: um ou vários
       flag: from.flag || "", photos: [...(from.photos || photos || [])], photoSrc: { ...(from.photoSrc || {}) },
+      warranty: garBr(from.warranty), // 1.113.0: a Garantia até, DD/MM/AAAA
       source: item ? item.source || "manual" : dup ? dup.source || "manual" : "manual",
       dirty: !!(dup || (photos && photos.length)), busy: false, uploading: 0, aiBusy: false, hint: "",
     };
@@ -4405,6 +4427,7 @@
                   <p class="unit-hint" data-slot="unit"></p><p class="err" data-err="value" hidden></p></div>
               </div>
             </div>
+            ${cons ? "" : `<div class="field dobravel${F.warranty ? "" : " shut"}" data-lembra="nao" data-f="warranty" id="f-gar-f"><span class="lbl" id="f-gar-l">Garantia até</span><input id="f-gar" class="input" name="warranty" inputmode="numeric" maxlength="10" autocomplete="off" aria-labelledby="f-gar-l" placeholder="DD/MM/AAAA" value="${esc(F.warranty)}"><p class="err" data-err="warranty" hidden></p></div>`}
             <div class="field dobravel${F.flag ? "" : " shut"}" data-lembra="nao" data-f="flag"><span class="lbl" id="f-flag-l">Observação</span><textarea id="f-flag" class="input grow" rows="1" name="flag" maxlength="200" aria-labelledby="f-flag-l" placeholder="Algo para lembrar sobre este item">${esc(F.flag)}</textarea></div>
             <div class="formerr" data-slot="formerr" hidden></div>
           </div>
@@ -4498,6 +4521,7 @@
         if (F.durOutra) form.durN.focus();
         return;
       }
+      if (t.name === "warranty") { const m = garMask(t.value); if (m !== t.value) t.value = m; fieldErr("warranty", ""); }
       F[t.name] = t.value;
       F.dirty = true;
       if (t.name === "durN" || t.name === "durU") { durConta(); fieldErr("dur", ""); }
@@ -4574,7 +4598,7 @@
       pintaEscolhas();
       if (bem) slot("tipo").innerHTML = tipoBtns();
       if (cons) { F.durOutra = undefined; F.durN = F.durU = undefined; slot("durs").innerHTML = durChips(); slot("dur-outra").innerHTML = durOutra(); iconesCampos(dlg); }
-      form.qty.value = F.qty; form.value.value = F.value; form.flag.value = F.flag;
+      form.qty.value = F.qty; form.value.value = F.value; form.flag.value = F.flag; if (form.warranty) form.warranty.value = F.warranty;
       if (form.zone) form.zone.value = F.zone;
       renderUnit(); fieldErr("name", ""); fieldErr("value", "");
     }
@@ -4592,10 +4616,13 @@
         $("#f-dur", dlg).classList.remove("shut");
         fieldErr("dur", "Diga quanto dura, até 10 anos."); bad = true;
       }
+      const gar = cons ? "" : garIso(F.warranty);
+      if (gar === null) { fieldErr("warranty", "Uma data, como 31/12/2027."); form.warranty.focus(); return; }
       if (bad) { (name ? form.value : form.name).focus(); return; }
       // sem zonas, a zona escondida só fica se o item continuar no mesmo cômodo
       const zone = cons ? "" : zonesOn() ? F.zone.trim() : item && F.room === item.room ? item.zone || "" : "";
       const body = { name, details: F.details.trim(), room: F.room, zone, cat: F.cat || "outros", qty: F.qty.trim() || "1", value, photos: F.photos, photoSrc: F.photoSrc, flag: F.flag.trim(), source: F.source };
+      if (!cons) body.warranty = gar;
       if (cons) { delete body.qty; delete body.value; body.cat = CCAT[F.cat] ? F.cat : "c-outros"; body.dur = durNum(F.dur); if (consComodoOn()) body.usedIn = F.usedIn || []; } // 1.82.0: sem quantidade e sem valor
       setBusy(true);
       try {
@@ -4607,7 +4634,7 @@
         LS.set("lastRoom", res.item.room); if (zonesOn()) LS.set("lastZone:" + res.item.room, res.item.zone || "");
         refreshAll();
         if (again) {
-          Object.assign(F, { name: "", details: "", qty: "1", value: "", flag: "", photos: [], photoSrc: {}, source: "manual", hint: "", dirty: false });
+          Object.assign(F, { name: "", details: "", qty: "1", value: "", flag: "", warranty: "", photos: [], photoSrc: {}, source: "manual", hint: "", dirty: false });
           fill(); renderPhotos();
           form.name.focus();
           toast(`${res.item.name} adicionado`);
@@ -4667,7 +4694,7 @@
       else if (act === "ai") runAi();
       else if (act === "theirs" && entry.conflict) {
         const c = entry.conflict;
-        Object.assign(F, { base: c.updatedAt, name: c.name, details: c.details || "", room: c.room, zone: c.zone || "", cat: c.cat, qty: qtyClean(c.qty), value: moneyInput(c.value), flag: c.flag || "", photos: [...(c.photos || [])], dirty: false });
+        Object.assign(F, { base: c.updatedAt, name: c.name, details: c.details || "", room: c.room, zone: c.zone || "", cat: c.cat, qty: qtyClean(c.qty), value: moneyInput(c.value), flag: c.flag || "", warranty: garBr(c.warranty), photos: [...(c.photos || [])], dirty: false });
         if (form.room) form.room.value = F.room;
         fill(); renderPhotos(); renderZones(); showErr("");
       } else if (act === "mine" && entry.conflict) { F.base = entry.conflict.updatedAt; showErr(""); save(false); }

@@ -74,6 +74,7 @@
         : { cat: CATS.has(b.cat) ? b.cat : "outros", qty: String(b.qty || "1").trim() || "1", value: money(b.value) }),
       photos: Array.isArray(b.photos) ? [...b.photos] : [], ...(b.photoSrc && Object.keys(b.photoSrc).length ? { photoSrc: { ...b.photoSrc } } : {}),
       checked: !!b.checked, flag: (b.flag || "").trim() || null,
+      ...(r.kind !== "consumiveis" && /^\d{4}-\d{2}-\d{2}$/.test(b.warranty || "") ? { warranty: b.warranty } : {}), // 1.113.0: a Garantia até
       approx: true, source: b.source || "manual", createdAt: restore && b.createdAt ? b.createdAt : t, updatedAt: t,
     };
   }
@@ -176,6 +177,8 @@
         if (body._base && body._base !== it.updatedAt) fail("Este item foi alterado em outro aparelho.", 409, { item: clone(it) });
         if (body.room && body.room !== it.room) { if (!room(d, body.room)) fail("Escolha um cômodo que exista."); it.room = body.room; it.seq = nextSeq(d, body.room); }
         for (const k of ["zone", "details", "flag", "source"]) if (k in body) it[k] = typeof body[k] === "string" ? body[k].trim() : body[k];
+        if (isCons(d, it.room)) delete it.warranty;
+        else if ("warranty" in body) { if (/^\d{4}-\d{2}-\d{2}$/.test(body.warranty || "")) it.warranty = body.warranty; else delete it.warranty; }
         if ("name" in body) { const n = String(body.name || "").trim(); if (!n) fail("Preencha o campo nome."); it.name = n; }
         if (isCons(d, it.room)) { it.cat = consCat(d, "cat" in body ? body.cat : it.cat); if ("dur" in body) { if (dur(body.dur) !== dur(it.dur)) it.durAt = now(); it.dur = dur(body.dur); }
           if ("usedIn" in body) { if (usados(d, body.usedIn).length) it.usedIn = usados(d, body.usedIn); else delete it.usedIn; } }

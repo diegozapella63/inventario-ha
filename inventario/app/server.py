@@ -268,6 +268,32 @@ def clean_dur(v) -> int:
     return n if 0 < n <= 3650 else 0
 
 
+def clean_warranty(v) -> str:
+    """1.113.0: a Garantia até de um item da casa ou de um bem: AAAA-MM-DD (aceita DD/MM/AAAA); vazio tira; outra coisa, 400."""
+    s = str(v or "").strip()
+    if not s:
+        return ""
+    m = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
+    if m:
+        s = f"{m[3]}-{int(m[2]):02d}-{int(m[1]):02d}"
+    try:
+        d = date.fromisoformat(s)
+    except ValueError:
+        raise ApiError(400, "Garantia até: uma data, como 31/12/2027.")
+    if not 2000 <= d.year <= 2100:
+        raise ApiError(400, "Garantia até: um ano de 2000 a 2100.")
+    return d.isoformat()
+
+
+def warranty_days(it, hoje=None):
+    """Quantos dias faltam para a garantia acabar (negativo: já acabou); None sem garantia."""
+    w = str((it or {}).get("warranty") or "")
+    try:
+        return (date.fromisoformat(w) - (hoje or news_today())).days
+    except ValueError:
+        return None
+
+
 def dur_text(dias) -> str:
     """7 → "1 semana"; fora dos atalhos, "45 dias" ou, numa conta redonda (1.83.0, a duração escolhida à mão), "2 anos",
     "4 meses", "3 semanas". A mesma regra do durText do app.js."""
@@ -701,6 +727,8 @@ class Store:
                 it["usedIn"] = self.home_rooms(body["usedIn"])
             if not restore:
                 it["qty"], it["value"] = "1", 0
+        elif clean_warranty(body.get("warranty")):  # 1.113.0: a Garantia até (os itens da casa e os bens)
+            it["warranty"] = clean_warranty(body["warranty"])
         src = clean_photo_src(body.get("photoSrc"), it["photos"])
         if src:
             it["photoSrc"] = src
@@ -801,6 +829,13 @@ class Store:
                     new.pop("photoSrc", None)
             if "flag" in body:
                 new["flag"] = text(body["flag"], 200, "observação") or None
+            if cons:  # 1.113.0: um consumível não tem garantia
+                new.pop("warranty", None)
+            elif "warranty" in body:
+                if clean_warranty(body["warranty"]):
+                    new["warranty"] = clean_warranty(body["warranty"])
+                else:
+                    new.pop("warranty", None)
             if "checked" in body:
                 new["checked"] = bool(body["checked"])
                 if new["checked"] and not it.get("checked"):

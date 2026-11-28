@@ -116,7 +116,7 @@ class Lista(Base):
         grava = [f["grava"] for f in fs]
         self.assertEqual(grava, sorted(grava), "primeiro as leituras, depois as gravações")
         self.assertEqual([f["nome"] for f in fs if f["apaga"]], ["apagar_item", "editar_comodo", "categoria", "apagar_pesquisa"])
-        self.assertEqual([f["nome"] for f in fs if not f["grava"]], ["resumo", "buscar_itens", "novidades", "ver_item", "ler_arquivo", "avaliar", "pareceres", "recursos"])
+        self.assertEqual([f["nome"] for f in fs if not f["grava"]], ["resumo", "buscar_itens", "novidades", "ver_item", "ler_arquivo", "avaliar", "pareceres", "recursos", "tarefas_do_item"])
 
     def test_nada_de_fotos_backups_ou_configuracoes(self):
         texto = json.dumps(F.lista(), ensure_ascii=False).lower()
@@ -258,7 +258,7 @@ class Buscar(Base):
         self.assertIn("Móveis (moveis)", self.erro("buscar_itens", {"categoria": "Ferramentas"}))
         self.erro("buscar_itens", {"limite": 0}, "limite: de 1 a 200.")
         self.erro("buscar_itens", {"limite": 500}, "limite: de 1 a 200.")
-        self.erro("buscar_itens", {"ordem": "preco"}, "ordem: codigo, valor, nome, recentes ou acaba.")
+        self.erro("buscar_itens", {"ordem": "preco"}, "ordem: codigo, valor, nome, recentes, acaba ou garantia.")
         self.erro("buscar_itens", {"valor_min": 500, "valor_max": 100}, "valor_max é menor que valor_min.")
         self.erro("buscar_itens", {"valor_min": "muito"}, "Valor inválido")
 
@@ -716,3 +716,89 @@ class Novas1112(Base):
             self.erro("conferir_novidades", {}, "andando")
         self.store.settings["ai"] = False
         self.erro("conferir_novidades", {}, "IA do InventarIA está desligada")
+
+
+class Novas1113(Base):
+    """1.113.0 (o dono: "foi boa a ideia do garantia, pode seguir também"; "pode seguir em todas"): a Garantia até pelas
+    ferramentas e as Tarefas no ResolvIA de um item."""
+
+    def casa(self):
+        return next(i for i in self.store.data["items"] if not (self.store.room(i["room"]) or {}).get("kind"))
+
+    def test_garantia_ate_ao_cadastrar_editar_ver_e_buscar(self):
+        sala = next(r for r in self.store.data["rooms"] if not r.get("kind"))
+        self.chamar("cadastrar_itens", {"comodo": sala["name"], "itens": [{"nome": "Lavadora Exemplo", "valor": 2000, "garantia_ate": "2026-12-01"},
+                                                                          {"nome": "Forno Exemplo", "garantia_ate": "15/01/2027"}]})
+        lav = next(i for i in self.store.data["items"] if i["name"] == "Lavadora Exemplo")
+        forno = next(i for i in self.store.data["items"] if i["name"] == "Forno Exemplo")
+        self.assertEqual((lav["warranty"], forno["warranty"]), ("2026-12-01", "2027-01-15"))
+        v = self.json("ver_item", {"id": lav["id"]})
+        self.assertEqual((v["garantia_ate"], v["garantia"]), ("2026-12-01", "faltam 27 dias"))
+        r = self.json("buscar_itens", {"garantia_em_dias": 60})
+        self.assertEqual([(i["nome"], i["garantia_dias"]) for i in r["itens"]], [("Lavadora Exemplo", 27)])
+        self.assertEqual([i["nome"] for i in self.json("buscar_itens", {"garantia_em_dias": 365})["itens"]], ["Lavadora Exemplo", "Forno Exemplo"], "a que acaba antes primeiro")
+        self.chamar("editar_item", {"id": lav["id"], "garantia_ate": "2026-11-04"})
+        self.assertEqual(self.json("ver_item", {"id": lav["id"]})["garantia"], "acaba hoje")
+        self.chamar("editar_item", {"id": lav["id"], "garantia_ate": "2026-10-01"})
+        self.assertEqual(self.json("ver_item", {"id": lav["id"]})["garantia"], "acabou")
+        self.assertEqual(self.json("buscar_itens", {"garantia_em_dias": 0})["itens"], [], "a que já acabou não entra")
+        self.chamar("editar_item", {"id": lav["id"], "garantia_ate": ""})
+        self.assertNotIn("warranty", self.store.item(lav["id"]))
+        self.assertNotIn("garantia_ate", self.json("ver_item", {"id": lav["id"]}))
+        self.erro("editar_item", {"id": lav["id"], "garantia_ate": "amanhã"}, "garantia_ate: uma data")
+        self.erro("editar_item", {"id": lav["id"], "garantia_ate": "1990-01-01"}, "2000 a 2100")
+        self.erro("buscar_itens", {"garantia_em_dias": -1}, "de 0 a 3650")
+        self.erro("buscar_itens", {"ordem": "x"}, "garantia")
+        # um consumível não tem garantia
+        self.store.settings["consumiveis"] = True
+        self.erro("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Sabão Exemplo", "garantia_ate": "2027-01-01"}]}, "consumível não tem garantia")
+        self.chamar("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Sabão Exemplo"}]})
+        sab = next(i for i in self.store.data["items"] if i["name"] == "Sabão Exemplo")
+        self.erro("editar_item", {"id": sab["id"], "garantia_ate": "2027-01-01"}, "consumível não tem garantia")
+        # levado para os consumíveis, a garantia sai
+        self.chamar("mover_itens", {"ids": [forno["id"]], "comodo": "Consumíveis"})
+        self.store.update_item(forno["id"], {"name": "Forno Exemplo"}, "Ana")
+        self.assertNotIn("warranty", self.store.item(forno["id"]))
+
+    def test_o_store_guarda_e_tira_a_garantia(self):
+        it = self.casa()
+        self.assertEqual(self.store.update_item(it["id"], {"warranty": "31/12/2027"}, "Ana")["warranty"], "2027-12-31")
+        self.assertEqual(S.warranty_days(self.store.item(it["id"])), 422)
+        self.assertNotIn("warranty", self.store.update_item(it["id"], {"warranty": ""}, "Ana"))
+        self.assertIsNone(S.warranty_days({"warranty": "x"}))
+        with self.assertRaises(S.ApiError):
+            self.store.update_item(it["id"], {"warranty": "31/02/2027"}, "Ana")
+
+    def test_tarefas_do_item_e_criar(self):
+        it = self.casa()
+        self.erro("tarefas_do_item", {"id": it["id"]}, "Ligue Usar equipamentos no ResolvIA")
+        listas = [{"id": "todo.casa", "nome": "Casa", "prazo": True}, {"id": "todo.mercado", "nome": "Lista de compras", "prazo": False}]
+        feitas = []
+
+        def nova(body, user=None):
+            feitas.append((body, user))
+            if body["tarefa"] == "Falha":
+                raise S.ApiError(400, "Essa lista não aceita prazo.")
+            return {"ok": True, "tarefa": body["tarefa"], "lista": body["lista"], "nome_lista": "Casa", "ligada": body["tarefa"] != "Solta", "ja_existia": body["tarefa"] == "Velha"}
+        with mock.patch.object(S, "resolvia_on", lambda: True), mock.patch.object(S, "resolvia_listas", lambda *a: listas), mock.patch.object(S, "resolvia_nova", nova), \
+                mock.patch.object(S, "resolvia_tarefas", lambda iid: [{"lista": "todo.casa", "nome_lista": "Casa", "tarefa": "Trocar o filtro", "prazo": "2026-11-20", "iguais": 2},
+                                                                      {"lista": "todo.casa", "nome_lista": "Casa", "tarefa": "Limpar", "prazo": ""}]):
+            r = self.json("tarefas_do_item", {"id": self.store.tag(it)})
+            self.assertEqual(r["tarefas"], [{"tarefa": "Trocar o filtro", "lista": "Casa", "prazo": "2026-11-20", "iguais": 2}, {"tarefa": "Limpar", "lista": "Casa"}])
+            self.assertEqual(r["listas"][0], {"id": "todo.casa", "nome": "Casa", "aceita_prazo": True})
+            txt = self.chamar("criar_tarefa_do_item", {"id": it["id"], "tarefa": "Revisar", "lista": "casa", "prazo": "2026-12-01"})
+            self.assertEqual(txt, f"Tarefa criada em Casa: Revisar, para 01/12/2026, ligada a {it['name']}.")
+            self.assertEqual(feitas[-1][0], {"item": it["id"], "lista": "todo.casa", "tarefa": "Revisar", "prazo": "2026-12-01"})
+            self.assertTrue(self.chamar("criar_tarefa_do_item", {"id": it["id"], "tarefa": "Velha", "lista": "todo.casa"}).startswith("A tarefa já existia em Casa: Velha, ligada"))
+            self.assertIn("não ficou ligada ao item", self.chamar("criar_tarefa_do_item", {"id": it["id"], "tarefa": "Solta", "lista": "Casa"}))
+            self.erro("criar_tarefa_do_item", {"id": it["id"], "tarefa": "x"}, "Diga a lista. As listas do ResolvIA: Casa, Lista de compras.")
+            self.erro("criar_tarefa_do_item", {"id": it["id"], "tarefa": "x", "lista": "Jardim"}, "Lista não encontrada")
+            self.erro("criar_tarefa_do_item", {"id": it["id"], "tarefa": "Falha", "lista": "Casa"}, "não aceita prazo")
+            listas.pop()
+            self.assertIn("Tarefa criada em Casa: Só uma", self.chamar("criar_tarefa_do_item", {"id": it["id"], "tarefa": "Só uma"}))
+            self.store.settings["consumiveis"] = True
+            self.chamar("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Sabão Exemplo"}]})
+            sab = next(i for i in self.store.data["items"] if i["name"] == "Sabão Exemplo")
+            self.erro("tarefas_do_item", {"id": sab["id"]}, "consumível não tem tarefas")
+        self.assertTrue(F.POR_NOME["criar_tarefa_do_item"]["grava"])
+        self.assertFalse(F.POR_NOME["tarefas_do_item"]["grava"])

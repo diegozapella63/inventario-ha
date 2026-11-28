@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.113.0
+
+- **Garantia até**: no item (da casa ou um bem), um campo novo para a data em que a garantia acaba. A ficha mostra até quando e, nos últimos 60 dias, quantos dias faltam. Um consumível não tem.
+- **Pelo CorrerIA**: dá para informar e mudar a garantia de um item, perguntar "quais garantias vencem nos próximos dois meses?", ver as **tarefas do ResolvIA ligadas a um item** e **criar uma tarefa para o item** ("cria uma tarefa para trocar o filtro do purificador"). As mudanças só depois do Sim.
+
 ## 1.112.0
 
 - **Pelo CorrerIA** (WhatsApp, Claude, Gemini e a Conversa de lá): agora dá para **mudar a categoria de vários itens de uma vez** (ou, nos consumíveis, os cômodos onde são usados), como o Alterar do Buscar › Selecionar, e pedir para **conferir as novidades** dos equipamentos na hora (de todos ou de um), em segundo plano.

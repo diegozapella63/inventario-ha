@@ -41,6 +41,8 @@ _DURACAO = {"type": "integer", "minimum": 0, "maximum": 3650,
 _ZONA = {"type": "string", "description": "Parte do cômodo, como Estante ou Rack da TV (só com as zonas ligadas)."}
 _DETALHES = {"type": "string", "description": "Marca, modelo, cor, tamanho e estado."}
 _OBS = {"type": "string", "description": "Algo para lembrar sobre o item (até 200 caracteres)."}
+_ITEM = {"type": "string", "description": "O id do item (sal-003) ou o código (SAL-003)."}
+_GARANTIA = {"type": "string", "description": "Garantia até: a data em que a garantia acaba, AAAA-MM-DD (num item da casa ou num bem; vazio tira)."}
 _USADO = {"type": "string", "description": "Só num consumível, com Consumíveis por cômodo ligado (opcoes.consumiveis_por_comodo no resumo): "
                                            "o id ou o nome do cômodo onde é usado; mais de um, separados por ponto e vírgula (Cozinha; Lavanderia). Vazio tira."}
 
@@ -64,9 +66,11 @@ FERRAMENTAS = [
                       "usado_em": {"type": "string", "description": "Só os consumíveis usados neste cômodo (o id ou o nome; com Consumíveis por cômodo ligado)."},
                       "valor_min": {"type": "number", "minimum": 0}, "valor_max": {"type": "number", "minimum": 0},
                       "sem_foto": {"type": "boolean", "description": "true: só os itens que ainda não têm foto (1.99.0)."},
+                      "garantia_em_dias": {"type": "integer", "minimum": 0, "maximum": 3650,
+                                           "description": "Só os itens com a Garantia até que acaba de hoje até daqui a N dias (60 é os próximos dois meses), a que acaba antes primeiro (1.113.0)."},
                       "acaba_em_dias": {"type": "integer", "minimum": 0, "maximum": 3650,
                                         "description": "Só os consumíveis que acabam até daqui a N dias, pelo Dura até (0: hoje; 7: esta semana). Os que já acabaram entram."},
-                      "ordem": {"type": "string", "enum": ["codigo", "valor", "nome", "recentes", "acaba"],
+                      "ordem": {"type": "string", "enum": ["codigo", "valor", "nome", "recentes", "acaba", "garantia"],
                                 "description": "codigo: na ordem dos cômodos (padrão); valor: do maior para o menor; recentes: os últimos cadastrados primeiro; acaba: os consumíveis que acabam antes primeiro (padrão com acaba_em_dias)."},
                       "limite": {"type": "integer", "minimum": 1, "maximum": MAX_LISTA, "description": f"Padrão: {PADRAO_LISTA}."}})},
     # 1.98.0 (o dono: "pode criar ferramenta… o que precisar para melhorarmos o processo"; a Ronda da casa do CorrerIA 1.33.0
@@ -112,6 +116,10 @@ FERRAMENTAS = [
                   "cômodos. Com id, os de um item (também de uma utilidade ou de um veículo). Só lê o que já foi buscado: para buscar, use "
                   "inventario_buscar_recursos.",
      "entrada": _obj({"id": _ID, "so_sem": {"type": "boolean", "description": "true: só os eletrônicos que ainda não têm os recursos."}})},
+    {"nome": "tarefas_do_item", "titulo": "Tarefas do item", "grava": False,
+     "descricao": "As tarefas abertas no ResolvIA ligadas a um item (a troca do filtro, o conserto), com a lista e o prazo, e as "
+                  "listas onde dá para criar uma. Só com Usar equipamentos ligado no ResolvIA; um consumível não tem.",
+     "entrada": _obj({"id": _ITEM}, ["id"])},
     {"nome": "buscar_recursos", "titulo": "Buscar os recursos com IA", "grava": True,
      "descricao": "Busca na internet, com a IA do InventarIA, os recursos dos eletrônicos: sem ids, os que ainda não têm (o Os que "
                   "faltam da tela); com ids, os escolhidos (o Escolher quais), também os que já têm, que são buscados de novo. O mesmo "
@@ -134,14 +142,14 @@ FERRAMENTAS = [
                       "itens": {"type": "array", "minItems": 1, "maxItems": MAX_LOTE,
                                 "items": _obj({"nome": {"type": "string", "description": "Curto, como a pessoa diria."},
                                                "valor": _VALOR, "quantidade": _QTD, "categoria": _CATEGORIA, "duracao_dias": _DURACAO,
-                                               "usado_em": _USADO, "detalhes": _DETALHES, "observacao": _OBS, "zona": _ZONA}, ["nome"])}},
+                                               "usado_em": _USADO, "detalhes": _DETALHES, "observacao": _OBS, "zona": _ZONA, "garantia_ate": _GARANTIA}, ["nome"])}},
                      ["comodo", "itens"])},
     {"nome": "editar_item", "titulo": "Editar item", "grava": True,
      "descricao": "Muda um item (só o que vier): nome, valor, quantidade, categoria, zona, detalhes ou observação; num consumível, "
                   "duracao_dias no lugar do valor e da quantidade. Texto vazio "
                   "apaga a zona, os detalhes ou a observação. Para levar a outro cômodo, use inventario_mover_itens.",
      "entrada": _obj({"id": _ID, "nome": {"type": "string"}, "valor": _VALOR, "quantidade": _QTD, "categoria": _CATEGORIA,
-                      "duracao_dias": _DURACAO, "usado_em": _USADO, "zona": _ZONA, "detalhes": _DETALHES, "observacao": _OBS}, ["id"])},
+                      "duracao_dias": _DURACAO, "usado_em": _USADO, "zona": _ZONA, "detalhes": _DETALHES, "observacao": _OBS, "garantia_ate": _GARANTIA}, ["id"])},
     {"nome": "mover_itens", "titulo": "Mover itens", "grava": True,
      "descricao": "Leva um ou mais itens para outro cômodo (ou para Bens ou Consumíveis), ou muda a zona deles. Num cômodo novo, o item ganha "
                   "um código novo (o id continua o mesmo) e fica sem zona, se ela não vier.",
@@ -161,6 +169,14 @@ FERRAMENTAS = [
                   "segundo plano (cerca de um minuto por equipamento) e fica guardado: depois, inventario_novidades mostra. Só com as "
                   "Novidades ligadas.",
      "entrada": _obj({"id": _ID})},
+    # 1.113.0 (o dono, às ferramentas que faltavam para o CorrerIA: "pode seguir em todas"): as Tarefas no ResolvIA da ficha
+    {"nome": "criar_tarefa_do_item", "titulo": "Criar tarefa do item", "grava": True,
+     "descricao": "Cria no ResolvIA uma tarefa ligada a um item daqui (como o Nova tarefa da ficha): vai para a lista escolhida, com "
+                  "o equipamento e o cômodo. Se já há uma aberta com esse nome na lista, o item entra nela. As listas estão em "
+                  "inventario_tarefas_do_item.",
+     "entrada": _obj({"id": _ITEM, "tarefa": {"type": "string", "description": "O nome da tarefa."},
+                      "lista": {"type": "string", "description": "O nome ou o id (todo.…) da lista do ResolvIA; com uma lista só, não precisa."},
+                      "prazo": {"type": "string", "description": "AAAA-MM-DD (opcional; só numa lista com prazo)."}}, ["id", "tarefa"])},
     {"nome": "apagar_item", "titulo": "Apagar item", "grava": True, "apaga": True,
      "descricao": "Tira um item do inventário. Devolve os dados dele, para cadastrar de novo se foi engano (as fotos não voltam).",
      "entrada": _obj({"id": _ID}, ["id"])},
@@ -425,6 +441,8 @@ def _linha(srv, it, cats=None, taxas=None) -> dict:
     out["categoria"] = cats.get(it.get("cat"), cats.get("outros", "Outros"))
     if str(it.get("qty") or "1") != "1":
         out["quantidade"] = it.get("qty")
+    if srv.warranty_days(it) is not None:  # 1.113.0: a Garantia até
+        out["garantia_ate"], out["garantia_dias"] = it["warranty"], srv.warranty_days(it)
     out["valor"] = _v(srv, it, taxas)
     if taxas:
         out["valor_gravado"] = _num(it.get("value"))
@@ -532,6 +550,53 @@ def _usado_em(srv, v):
     return ids
 
 
+def _item_das_tarefas(srv, a):
+    if not srv.resolvia_on():
+        raise ErroFerramenta("Ligue Usar equipamentos no ResolvIA (Mais › Configurações › Integrações › InventarIA) para ver e criar tarefas dos itens.")
+    with srv.STORE.lock:
+        it = dict(_achar_item(srv, a.get("id")))
+        if _eh_cons(srv, it):
+            raise ErroFerramenta("Um consumível não tem tarefas no ResolvIA: vale num item da casa ou num bem.")
+    return it
+
+
+def _tarefas_do_item(srv, a) -> str:
+    """1.113.0: as Tarefas no ResolvIA da ficha do item (resolvia_tarefas) e as listas do Nova tarefa (resolvia_listas)."""
+    it = _item_das_tarefas(srv, a)
+    ts = srv.resolvia_tarefas(it["id"])
+    return _json({"item": it.get("name") or "", "id": it["id"],
+                  "tarefas": [{"tarefa": t["tarefa"], "lista": t["nome_lista"], **({"prazo": t["prazo"]} if t.get("prazo") else {}),
+                               **({"iguais": t["iguais"]} if t.get("iguais") else {})} for t in ts],
+                  "listas": [{"id": x["id"], "nome": x["nome"], "aceita_prazo": bool(x.get("prazo"))} for x in srv.resolvia_listas()]})
+
+
+def _criar_tarefa_do_item(srv, a, quem) -> str:
+    it = _item_das_tarefas(srv, a)
+    listas = srv.resolvia_listas()
+    v = " ".join(str(a.get("lista") or "").split())
+    if v:
+        n = srv.fold(v)
+        achadas = [x for x in listas if x["id"] == v] or [x for x in listas if srv.fold(x["nome"]) == n] or [x for x in listas if n in srv.fold(x["nome"])]
+    else:
+        achadas = listas if len(listas) == 1 else []
+    if len(achadas) != 1:
+        raise ErroFerramenta(("Lista não encontrada" if v and not achadas else "Diga a lista") + ". As listas do ResolvIA: " + (", ".join(x["nome"] for x in listas) or "nenhuma") + ".")
+    r = srv.resolvia_nova({"item": it["id"], "lista": achadas[0]["id"], "tarefa": a.get("tarefa"), "prazo": a.get("prazo") or ""}, quem)
+    return (f"{'A tarefa já existia' if r['ja_existia'] else 'Tarefa criada'} em {r['nome_lista']}: {r['tarefa']}"
+            + (f", para {srv.dia_br(a['prazo'])}" if a.get("prazo") and not r["ja_existia"] else "") + f", ligada a {it.get('name')}."
+            + ("" if r["ligada"] else " A tarefa está na lista, mas não ficou ligada ao item (o Home Assistant não respondeu)."))
+
+
+def _garantia(srv, v, cons=False) -> str:
+    """1.113.0: a Garantia até (AAAA-MM-DD ou DD/MM/AAAA; vazio tira), só num item da casa ou num bem."""
+    if cons:
+        raise ErroFerramenta("Um consumível não tem garantia: garantia_ate vale num item da casa ou num bem.")
+    try:
+        return srv.clean_warranty(v)
+    except srv.ApiError as e:
+        raise ErroFerramenta("garantia_ate: uma data, AAAA-MM-DD (" + e.msg + ")") from None
+
+
 def _buscar(srv, a) -> str:
     rooms, items = srv.visible_data()
     cats = srv.STORE.cat_map()
@@ -555,6 +620,9 @@ def _buscar(srv, a) -> str:
     if acaba is not None and (isinstance(acaba, bool) or not isinstance(acaba, (int, float)) or acaba != int(acaba) or not 0 <= acaba <= 3650):
         raise ErroFerramenta("acaba_em_dias: de 0 a 3650 (7 é esta semana).")
     ate = (srv.news_today() + timedelta(days=int(acaba))).isoformat() if acaba is not None else None
+    gar = a.get("garantia_em_dias")
+    if gar is not None and (isinstance(gar, bool) or not isinstance(gar, (int, float)) or gar != int(gar) or not 0 <= gar <= 3650):
+        raise ErroFerramenta("garantia_em_dias: de 0 a 3650 (60 é os próximos dois meses).")
     if vmin is not None and vmax is not None and vmax < vmin:
         raise ErroFerramenta("valor_max é menor que valor_min.")
     zonas = srv.zones_enabled()
@@ -563,9 +631,9 @@ def _buscar(srv, a) -> str:
         raise ErroFerramenta("As zonas estão desligadas no InventarIA. Busque sem a zona.")
     palavras = [srv.fold(w) for w in str(a.get("texto") or "").split()][:12]
     usado = (_usado_em(srv, a["usado_em"]) or None) if a.get("usado_em") not in (None, "") else None
-    ordem = a.get("ordem") or ("acaba" if ate else "codigo")
-    if ordem not in ("codigo", "valor", "nome", "recentes", "acaba"):
-        raise ErroFerramenta("ordem: codigo, valor, nome, recentes ou acaba.")
+    ordem = a.get("ordem") or ("acaba" if ate else "garantia" if gar is not None else "codigo")
+    if ordem not in ("codigo", "valor", "nome", "recentes", "acaba", "garantia"):
+        raise ErroFerramenta("ordem: codigo, valor, nome, recentes, acaba ou garantia.")
     lim = a.get("limite", PADRAO_LISTA)
     if isinstance(lim, bool) or not isinstance(lim, (int, float)) or not 1 <= int(lim) <= MAX_LISTA:
         raise ErroFerramenta(f"limite: de 1 a {MAX_LISTA}.")
@@ -587,6 +655,8 @@ def _buscar(srv, a) -> str:
             continue
         if ate and not (_eh_cons(srv, it) and srv.dur_until(it) and srv.dur_until(it) <= ate):
             continue
+        if gar is not None and not (not _eh_cons(srv, it) and srv.warranty_days(it) is not None and 0 <= srv.warranty_days(it) <= int(gar)):
+            continue
         if zona is not None and zona not in srv.fold(it.get("zone") or ""):
             continue
         if palavras:  # como a busca da tela (matches no app.js), mais a observação
@@ -602,6 +672,8 @@ def _buscar(srv, a) -> str:
         achados.sort(key=lambda i: srv.fold(i.get("name") or ""))
     elif ordem == "recentes":
         achados.sort(key=lambda i: str(i.get("createdAt") or ""), reverse=True)
+    elif ordem == "garantia":  # 1.113.0: a garantia que acaba antes primeiro; sem garantia, no fim
+        achados.sort(key=lambda i: str(i.get("warranty") or "9999"))
     elif ordem == "acaba":  # 1.111.0: os que acabam antes primeiro; sem duração, no fim
         achados.sort(key=lambda i: (srv.dur_until(i) if _eh_cons(srv, i) else "") or "9999")
     else:
@@ -702,6 +774,10 @@ def _ver(srv, a) -> str:
         if n > 1:
             out["valor_de_cada"] = round(out["valor"] / n, 2)
         out["valor_desde"] = str(it.get("valueAt") or it.get("createdAt") or "")[:10]
+        if srv.warranty_days(it) is not None:  # 1.113.0
+            d = srv.warranty_days(it)
+            out["garantia_ate"] = it["warranty"]
+            out["garantia"] = "acabou" if d < 0 else "acaba hoje" if d == 0 else f"faltam {d} dias"
     rec = srv.rec_of(it["id"]) if srv.ai_enabled() else {}
     if rec.get("recursos"):  # 1.107.0: os recursos guardados (os de Pesquisas da IA › Recursos)
         out["recursos"] = [r.get("nome") for r in rec["recursos"] if r.get("nome")]
@@ -742,7 +818,7 @@ def _cadastrar(srv, a, quem, fotos=None) -> str:
             raise ErroFerramenta(f"Item {n}: mande um objeto, como {{\"nome\": \"Abajur\", \"valor\": 120}}.")
         sobra = sorted(set(x) - set(POR_NOME["cadastrar_itens"]["entrada"]["properties"]["itens"]["items"]["properties"]))
         if sobra:
-            raise ErroFerramenta(f"Item {n}: campo desconhecido: {', '.join(sobra)}. Valem: nome, valor, quantidade, categoria, duracao_dias, usado_em, detalhes, observacao, zona.")
+            raise ErroFerramenta(f"Item {n}: campo desconhecido: {', '.join(sobra)}. Valem: nome, valor, quantidade, categoria, duracao_dias, usado_em, detalhes, observacao, zona, garantia_ate.")
         try:
             if cons:
                 _sem_valor(x)
@@ -757,6 +833,7 @@ def _cadastrar(srv, a, quem, fotos=None) -> str:
                            **({"dur": _duracao(srv, x["duracao_dias"])} if cons and x.get("duracao_dias") is not None else {}),
                            **({"usedIn": _usado_em(srv, x["usado_em"])} if cons and x.get("usado_em") not in (None, "") else {}),
                            "details": _texto(srv, x.get("detalhes"), 4000, "detalhes", linhas=True), "flag": _texto(srv, x.get("observacao"), 200, "observação"),
+                           **({"warranty": _garantia(srv, x["garantia_ate"], cons)} if x.get("garantia_ate") not in (None, "") else {}),
                            "zone": "" if bem else zona, "source": "correria"})
         except (ErroFerramenta, srv.ApiError) as e:
             raise ErroFerramenta(f"Item {n}: {getattr(e, 'msg', None) or e}") from None
@@ -795,6 +872,8 @@ def _editar(srv, a, quem) -> str:
         raise ErroFerramenta("duracao_dias só vale num consumível.")
     elif "usado_em" in a:
         raise ErroFerramenta("usado_em só vale num consumível.")
+    if "garantia_ate" in a:  # 1.113.0: vazio tira
+        novo["warranty"] = _garantia(srv, a["garantia_ate"], cons)
     if "nome" in a:
         novo["name"] = _texto(srv, a["nome"], 200, "nome", obrig=True)
     if "valor" in a:
@@ -819,7 +898,7 @@ def _editar(srv, a, quem) -> str:
         raise ErroFerramenta("Diga o que muda: nome, categoria, duracao_dias, detalhes ou observacao." if cons
                              else "Diga o que muda: nome, valor, quantidade, categoria, zona, detalhes ou observacao.")
     rotulo = {"usedIn": "usado em", "name": "nome", "value": "valor", "qty": "quantidade", "cat": "categoria", "zone": "zona", "details": "detalhes", "flag": "observação",
-              "dur": "duração"}
+              "dur": "duração", "warranty": "garantia até"}
     cats = srv.STORE.cons_cat_map() if cons else srv.STORE.cat_map()
 
     def mostra(k, v):
@@ -829,6 +908,8 @@ def _editar(srv, a, quem) -> str:
             return cats.get(v, "Outros")
         if k == "dur":
             return srv.dur_text(v) or "(sem)"
+        if k == "warranty":
+            return srv.dia_br(v) or "(sem)"
         if k == "usedIn":
             return ", ".join(srv.STORE.room(r)["name"] for r in srv.STORE.home_rooms(v)) or "(nenhum)"
         if k == "details":
@@ -1330,6 +1411,11 @@ def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
             return {"pareceres": _pareceres, "apagar_pesquisa": _apagar_pesquisa, "recursos": _recursos,
                     "buscar_recursos": _buscar_recursos, "avaliar_varios": _avaliar_varios,
                     "conferir_novidades": _conferir_novidades}[nome](srv, a)
+        except srv.ApiError as e:
+            raise ErroFerramenta(e.msg) from None
+    if nome in ("tarefas_do_item", "criar_tarefa_do_item"):  # 1.113.0: falam com o Home Assistant, fora da trava do Store
+        try:
+            return _tarefas_do_item(srv, a) if nome == "tarefas_do_item" else _criar_tarefa_do_item(srv, a, quem)
         except srv.ApiError as e:
             raise ErroFerramenta(e.msg) from None
     if nome in ("cadastrar_por_foto", "anexar_foto", "ler_arquivo"):  # as que recebem a foto (a leitura por IA fica fora da trava do Store)
