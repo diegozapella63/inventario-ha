@@ -1,5 +1,9 @@
 # Mudanças
 
+## 1.112.0
+
+- **Pelo CorrerIA** (WhatsApp, Claude, Gemini e a Conversa de lá): agora dá para **mudar a categoria de vários itens de uma vez** (ou, nos consumíveis, os cômodos onde são usados), como o Alterar do Buscar › Selecionar, e pedir para **conferir as novidades** dos equipamentos na hora (de todos ou de um), em segundo plano.
+
 ## 1.111.0
 
 - **Pelo CorrerIA** (WhatsApp, Claude, Gemini e a Conversa de lá): agora dá para pedir os **recursos** dos eletrônicos ("o que a TV faz que eu não uso?"), **buscar os recursos** dos que faltam ou dos escolhidos e **avaliar vários consumíveis** de uma vez, como em Mais › Pesquisas da IA. As buscas rodam em segundo plano e ficam guardadas, como na tela.

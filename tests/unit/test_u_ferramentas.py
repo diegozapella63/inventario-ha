@@ -670,3 +670,49 @@ class Novas1101(Base):
         self.erro("categoria", {"acao": "nova", "nome": "Piscina", "consumiveis": True}, "consumíveis estão desligados")
         self.store.settings["consumiveis"] = True
         self.assertIn("Categoria dos consumíveis criada: Piscina", self.chamar("categoria", {"acao": "nova", "nome": "Piscina", "consumiveis": True}))
+
+
+class Novas1112(Base):
+    """1.112.0 (o dono, às ferramentas que faltavam para o CorrerIA: "pode seguir neles"): alterar_itens (o Alterar do
+    Buscar › Selecionar) e conferir_novidades (o Conferir novidades, em segundo plano)."""
+
+    def test_alterar_itens_muda_a_categoria_de_varios(self):
+        casa = [i for i in self.store.data["items"] if not (self.store.room(i["room"]) or {}).get("kind")][:3]
+        cat = next(c for c in self.store.cats() if c["id"] not in ("outros", casa[0].get("cat")))
+        txt = self.chamar("alterar_itens", {"ids": [casa[0]["id"], self.store.tag(casa[1]), casa[0]["id"]], "categoria": cat["name"]})
+        self.assertEqual(txt, f"2 itens alterados (categoria {cat['name']}).")
+        self.assertEqual([self.store.item(i["id"])["cat"] for i in casa[:2]], [cat["id"]] * 2)
+        self.assertNotEqual(self.store.item(casa[2]["id"]).get("cat"), None)
+        self.erro("alterar_itens", {"ids": [casa[0]["id"]]}, "Diga o que muda")
+        self.erro("alterar_itens", {"ids": []}, "Falta: ids")
+        self.erro("alterar_itens", {"ids": "x", "categoria": "Outros"}, "uma lista")
+        self.erro("alterar_itens", {"ids": [casa[0]["id"]], "usado_em": "Sala"}, "só dos consumíveis")
+        self.erro("alterar_itens", {"ids": [casa[0]["id"]], "categoria": "Não existe"}, "ategoria")
+        # os consumíveis: a categoria deles e os cômodos onde são usados; os dois lados juntos, não
+        self.store.settings["consumiveis"] = True
+        self.store.settings["cons_comodo"] = True
+        self.chamar("cadastrar_itens", {"comodo": "Consumíveis", "itens": [{"nome": "Sabão Exemplo"}, {"nome": "Esponja Exemplo"}]})
+        cons = [i for i in self.store.data["items"] if self.store.is_cons(i["room"])]
+        sala = next(r for r in self.store.data["rooms"] if not r.get("kind"))
+        txt = self.chamar("alterar_itens", {"ids": [c["id"] for c in cons], "usado_em": sala["name"]})
+        self.assertEqual(txt, f"2 itens alterados (usados em {sala['name']}).")
+        self.assertEqual([self.store.item(c["id"])["usedIn"] for c in cons], [[sala["id"]]] * 2)
+        self.assertIn("sem cômodo de uso", self.chamar("alterar_itens", {"ids": [cons[0]["id"]], "usado_em": ""}))
+        self.erro("alterar_itens", {"ids": [cons[0]["id"], casa[0]["id"]], "categoria": "Outros"}, "um lado só")
+
+    def test_conferir_novidades_comeca_em_segundo_plano(self):
+        self.assertTrue(F.POR_NOME["conferir_novidades"]["grava"], "gasta a IA: espera o sim")
+        self.store.settings["news"] = False
+        self.erro("conferir_novidades", {}, "novidades estão desligadas")
+        self.store.settings["news"] = True
+        with mock.patch.object(S, "news_batch_start", return_value={"id": "x"}) as lote, mock.patch.object(S, "news_job_start", return_value={"id": "y"}) as um:
+            self.assertTrue(self.json("conferir_novidades")["comecou"])
+            lote.assert_called_once_with(so="itens")
+            r = self.json("conferir_novidades", {"id": "sal-007"})
+            self.assertEqual(r["item"], self.store.item("sal-007")["name"])
+            um.assert_called_once_with({"item": "sal-007"})
+            S.WEB_JOBS["z" * 16] = {"kind": "lote", "stage": "busy"}
+            self.addCleanup(S.WEB_JOBS.pop, "z" * 16, None)
+            self.erro("conferir_novidades", {}, "andando")
+        self.store.settings["ai"] = False
+        self.erro("conferir_novidades", {}, "IA do InventarIA está desligada")

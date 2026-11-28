@@ -147,6 +147,20 @@ FERRAMENTAS = [
                   "um código novo (o id continua o mesmo) e fica sem zona, se ela não vier.",
      "entrada": _obj({"ids": {"type": "array", "minItems": 1, "maxItems": MAX_MOVER, "items": _ID}, "comodo": _COMODO, "zona": _ZONA},
                      ["ids", "comodo"])},
+    # 1.112.0 (o dono, às ferramentas que faltavam para o CorrerIA: "pode seguir neles"): o Alterar do Buscar › Selecionar
+    {"nome": "alterar_itens", "titulo": "Alterar vários itens", "grava": True,
+     "descricao": "Muda de uma vez a categoria de vários itens (ou, em consumíveis, também os cômodos onde são usados), como o Alterar "
+                  "do Buscar › Selecionar: todos do mesmo lado (só itens da casa ou só consumíveis; os bens não). Para levar a outro "
+                  "cômodo, use inventario_mover_itens.",
+     "entrada": _obj({"ids": {"type": "array", "minItems": 1, "maxItems": MAX_LISTA, "items": _ID}, "categoria": _CATEGORIA,
+                      "usado_em": {"type": "string", "description": "Só em consumíveis: os cômodos onde são usados (vários com ponto e vírgula); vazio tira."}},
+                     ["ids"])},
+    {"nome": "conferir_novidades", "titulo": "Conferir novidades agora", "grava": True,
+     "descricao": "Confere agora, na internet, com a IA do InventarIA, as novidades dos equipamentos (atualização, modelo novo, recall, fim "
+                  "de suporte): sem id, de todos os que a IA acompanha (o Conferir novidades da tela); com id, de um item. Roda em "
+                  "segundo plano (cerca de um minuto por equipamento) e fica guardado: depois, inventario_novidades mostra. Só com as "
+                  "Novidades ligadas.",
+     "entrada": _obj({"id": _ID})},
     {"nome": "apagar_item", "titulo": "Apagar item", "grava": True, "apaga": True,
      "descricao": "Tira um item do inventário. Devolve os dados dele, para cadastrar de novo se foi engano (as fotos não voltam).",
      "entrada": _obj({"id": _ID}, ["id"])},
@@ -1045,6 +1059,50 @@ def _avaliar_varios(srv, a) -> str:
                        "Os pareceres ficam guardados: inventario_pareceres mostra."}, ensure_ascii=False)
 
 
+def _alterar_itens(srv, a, quem) -> str:
+    """1.112.0: o Alterar do Buscar › Selecionar: a categoria (e, nos consumíveis, o usado_em) de vários, pelo update_items."""
+    v = a.get("ids")
+    if not isinstance(v, list) or not v:
+        raise ErroFerramenta("ids: uma lista com os ids ou os códigos dos itens.")
+    if a.get("categoria") in (None, "") and "usado_em" not in a:
+        raise ErroFerramenta("Diga o que muda: categoria ou usado_em.")
+    its = list({i["id"]: i for i in (_achar_item(srv, x) for x in v)}.values())
+    rooms = {r["id"]: r for r in srv.STORE.data["rooms"]}
+    bens = [i.get("name") for i in its if (rooms.get(i.get("room")) or {}).get("kind") == "bens"]
+    if bens:
+        raise ErroFerramenta(f"Os bens não mudam em lote: {', '.join(bens)}. Use inventario_editar_item em cada um.")
+    lados = {_eh_cons(srv, i) for i in its}
+    if len(lados) > 1:
+        raise ErroFerramenta("Uma seleção é de um lado só: mande só itens da casa ou só consumíveis.")
+    cons = lados.pop()
+    muda = {}
+    if a.get("categoria") not in (None, ""):
+        muda["cat"] = _achar_categoria(srv, a["categoria"], cons=cons)
+    if "usado_em" in a:
+        if not cons:
+            raise ErroFerramenta("usado_em é só dos consumíveis.")
+        muda["usedIn"] = _usado_em(srv, a["usado_em"])
+    srv.STORE.update_items([dict(muda, id=i["id"]) for i in its], quem)
+    o_que = " e ".join(([f"categoria {(srv.STORE.cons_cat_map() if cons else srv.STORE.cat_map()).get(muda['cat'], muda['cat'])}"] if "cat" in muda else [])
+                       + ([("usados em " + ", ".join(rooms[r]["name"] for r in muda["usedIn"])) if muda["usedIn"] else "sem cômodo de uso"] if "usedIn" in muda else []))
+    return f"{len(its)} {'item alterado' if len(its) == 1 else 'itens alterados'} ({o_que})."
+
+
+def _conferir_novidades(srv, a) -> str:
+    """1.112.0: o Conferir novidades da tela (os que a IA acompanha) ou o de um item (o da ficha), em segundo plano."""
+    _ia_ligada(srv)
+    if a.get("id"):
+        with srv.STORE.lock:
+            it = _achar_item(srv, a["id"])
+        srv.news_job_start({"item": it["id"]})
+        return json.dumps({"comecou": True, "item": it.get("name"), "aviso": "Roda em segundo plano, cerca de um minuto. Depois, inventario_novidades mostra."}, ensure_ascii=False)
+    if _lote_andando(srv, "lote"):
+        raise ErroFerramenta("Já tem uma conferência das Pesquisas da IA andando: espere terminar (Mais › Pesquisas da IA).")
+    srv.news_batch_start(so="itens")
+    return json.dumps({"comecou": True, "aviso": "Roda em segundo plano, cerca de um minuto por equipamento. O que achar fica guardado: "
+                       "inventario_novidades mostra."}, ensure_ascii=False)
+
+
 def _apagar_pesquisa(srv, a) -> str:
     """1.107.0: Apagar as novidades, os recursos ou o parecer de um item (o Apagar da ficha), fora da trava do Store."""
     o_que = a.get("o_que")
@@ -1267,10 +1325,11 @@ def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
             return _avaliar(srv, a)
         except srv.ApiError as e:
             raise ErroFerramenta(e.msg) from None
-    if nome in ("pareceres", "apagar_pesquisa", "recursos", "buscar_recursos", "avaliar_varios"):  # 1.107.0: cada arquivo tem a trava dele
+    if nome in ("pareceres", "apagar_pesquisa", "recursos", "buscar_recursos", "avaliar_varios", "conferir_novidades"):  # 1.107.0: cada arquivo tem a trava dele
         try:
             return {"pareceres": _pareceres, "apagar_pesquisa": _apagar_pesquisa, "recursos": _recursos,
-                    "buscar_recursos": _buscar_recursos, "avaliar_varios": _avaliar_varios}[nome](srv, a)
+                    "buscar_recursos": _buscar_recursos, "avaliar_varios": _avaliar_varios,
+                    "conferir_novidades": _conferir_novidades}[nome](srv, a)
         except srv.ApiError as e:
             raise ErroFerramenta(e.msg) from None
     if nome in ("cadastrar_por_foto", "anexar_foto", "ler_arquivo"):  # as que recebem a foto (a leitura por IA fica fora da trava do Store)
@@ -1289,7 +1348,7 @@ def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
             if nome == "novidades":
                 return _novidades(srv, a)
             faz = {"cadastrar_itens": _cadastrar, "editar_item": _editar, "mover_itens": _mover, "apagar_item": _apagar,
-                   "novo_comodo": _novo_comodo, "comprei": _comprei, "editar_comodo": _editar_comodo, "categoria": _categoria}[nome]
+                   "alterar_itens": _alterar_itens, "novo_comodo": _novo_comodo, "comprei": _comprei, "editar_comodo": _editar_comodo, "categoria": _categoria}[nome]
             return faz(srv, a, quem)
     except srv.ApiError as e:  # as regras do Store (nome obrigatório, valor, cômodo que não existe…) viram 400 para a IA
         raise ErroFerramenta(e.msg) from None
