@@ -995,6 +995,7 @@ dialog.modal[open] { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .inews > .btn { margin-top: 14px; width: 100%; } /* Novidades, Buscar de novo e Nova tarefa: do mesmo tamanho */
 /* 1.63.0: Buscar de novo e Apagar lado a lado, do mesmo tamanho */
 .inews-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.btn.fipe-usar { display: flex; width: 100%; margin-top: 8px; justify-content: center; }
 .inews-acts > .btn { width: 100%; min-width: 0; justify-content: center; }
 .app-news-del { margin-top: 14px; }  /* 1.70.0: Apagar as novidades de um app */
 .inews > .formerr { margin: 10px 0 0; }

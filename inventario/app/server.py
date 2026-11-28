@@ -44,6 +44,7 @@ from datetime import date, datetime, timedelta
 from html.parser import HTMLParser
 
 import ferramentas
+import fipe
 import memoria_ia
 import relatorio
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -89,6 +90,8 @@ DATA_FILE = os.path.join(DATA_DIR, "inventario.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 USAGE_FILE = os.path.join(DATA_DIR, "uso_ia.json")
 NEWS_FILE = os.path.join(DATA_DIR, "novidades.json")  # novidades conferidas e a escolha da IA (não entra no inventário)
+FIPE_FILE = os.path.join(DATA_DIR, "fipe.json")  # 1.114.0: a Tabela FIPE de cada código consultado (guardada por FIPE_DIAS)
+FIPE_DIAS = 7
 PAR_FILE = os.path.join(DATA_DIR, "pareceres.json")  # 1.103.0: o parecer da IA de cada consumível (não entra no inventário)
 REC_FILE = os.path.join(DATA_DIR, "recursos.json")  # os recursos de cada equipamento, ditos pela IA (não entra no inventário)
 APPS_FILE = os.path.join(DATA_DIR, "apps.json")  # os apps usados nos celulares, pelo sensor Último app usado (não entra no inventário)
@@ -283,6 +286,70 @@ def clean_warranty(v) -> str:
     if not 2000 <= d.year <= 2100:
         raise ApiError(400, "Garantia até: um ano de 2000 a 2100.")
     return d.isoformat()
+
+
+def clean_fipe(v, ano=None):
+    """1.114.0: o código FIPE e o ano-modelo de um veículo: «005340-6 2014» (como a tela manda) ou o código com o ano à parte.
+    Vazio tira: ("", 0). Sem o código ou sem o ano, 400."""
+    s = str(v or "").strip()
+    if not s:
+        return "", 0
+    cod, a = fipe.separar(s)
+    a = fipe.ano(ano) if ano not in (None, "") else a
+    if not cod or not a or a == 32000:
+        raise ApiError(400, "Tabela FIPE: o código e o ano do veículo, como 005340-6 2014.")
+    return cod, a
+
+
+_fipe_lock = threading.Lock()
+
+
+def fipe_linhas(cod: str) -> list:
+    """As linhas do código na Tabela FIPE: as guardadas, se têm menos de FIPE_DIAS dias; senão consulta. Sem resposta, valem
+    as guardadas (mesmo velhas); sem nenhuma, o erro da consulta."""
+    with _fipe_lock:
+        d = read_json(FIPE_FILE, None)
+        d = d if isinstance(d, dict) else {}
+        g = d.get(cod) if isinstance(d.get(cod), dict) else {}
+        try:
+            novo = datetime.now() - datetime.fromisoformat(g.get("em") or "") < timedelta(days=FIPE_DIAS)
+        except ValueError:
+            novo = False
+        if novo and g.get("linhas"):
+            return g["linhas"]
+        try:
+            linhas = fipe.consultar(cod)
+        except fipe.Erro as e:
+            if g.get("linhas"):
+                return g["linhas"]
+            raise ApiError(502 if "respondeu" in str(e) else 404, str(e))
+        d[cod] = {"em": datetime.now().isoformat(timespec="seconds"), "linhas": linhas}
+        for k in sorted(d, key=lambda k: d[k].get("em") or "")[:-60]:  # no máximo 60 códigos guardados
+            d.pop(k, None)
+        write_json_atomic(FIPE_FILE, d)
+        return linhas
+
+
+def fipe_de(cod: str, ano: int) -> dict:
+    """{codigo, ano, valor, marca, modelo, combustivel, mes, anos}: o valor do ano-modelo na tabela de agora (valor 0 e a
+    lista dos anos quando o código não tem aquele ano)."""
+    linhas = fipe_linhas(cod)
+    x = fipe.do_ano(linhas, ano) or {}
+    return {"codigo": cod, "ano": ano, "valor": x.get("valor") or 0, "marca": (x or linhas[0])["marca"], "modelo": (x or linhas[0])["modelo"],
+            "combustivel": x.get("combustivel") or "", "mes": (x or linhas[0])["mes"], "anos": sorted({l["ano"] for l in linhas if l["ano"] != 32000})}
+
+
+def fipe_item(iid: str) -> dict:
+    it = STORE.item(str(iid or ""))
+    if not it:
+        raise ApiError(404, "Item não encontrado.")
+    if not it.get("fipe"):
+        raise ApiError(400, "Esse item não tem o código da Tabela FIPE.")
+    return fipe_de(it["fipe"], int(it.get("fipeYear") or 0))
+
+
+def r_fipe(h, query):
+    h.send_json(fipe_item((query.get("item") or [""])[0]))
 
 
 def warranty_days(it, hoje=None):
@@ -729,6 +796,8 @@ class Store:
                 it["qty"], it["value"] = "1", 0
         elif clean_warranty(body.get("warranty")):  # 1.113.0: a Garantia até (os itens da casa e os bens)
             it["warranty"] = clean_warranty(body["warranty"])
+        if room.get("kind") != "consumiveis" and it["cat"] == "veiculos" and body.get("fipe"):  # 1.114.0: a Tabela FIPE de um veículo
+            it["fipe"], it["fipeYear"] = clean_fipe(body["fipe"], body.get("fipeYear"))
         src = clean_photo_src(body.get("photoSrc"), it["photos"])
         if src:
             it["photoSrc"] = src
@@ -836,6 +905,14 @@ class Store:
                     new["warranty"] = clean_warranty(body["warranty"])
                 else:
                     new.pop("warranty", None)
+            if cons or new.get("cat") != "veiculos":  # 1.114.0: a Tabela FIPE é só de um veículo
+                new.pop("fipe", None), new.pop("fipeYear", None)
+            elif "fipe" in body:
+                cod, ano = clean_fipe(body["fipe"], body.get("fipeYear"))
+                if cod:
+                    new["fipe"], new["fipeYear"] = cod, ano
+                else:
+                    new.pop("fipe", None), new.pop("fipeYear", None)
             if "checked" in body:
                 new["checked"] = bool(body["checked"])
                 if new["checked"] and not it.get("checked"):
@@ -6538,6 +6615,7 @@ ROUTES = [(m, re.compile(p), fn) for m, p, fn in [
     ("POST", r"/api/news/apps/adicionar", r_news_apps_add),
     ("GET", r"/api/news/people", r_news_people),
     ("POST", r"/api/news/notify-test", r_news_notify_test),
+    ("GET", r"/api/fipe", r_fipe),  # 1.114.0: a Tabela FIPE de um veículo
     ("GET", r"/api/parecer/todos", r_par_todos),  # 1.107.0: Pesquisas da IA › Consumíveis e Avaliar consumíveis
     ("POST", r"/api/parecer/lote", r_par_lote),
     ("GET", r"/api/parecer", r_par_get),  # 1.103.0: Avaliar com IA (os consumíveis)

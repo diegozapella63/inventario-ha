@@ -42,6 +42,7 @@ _ZONA = {"type": "string", "description": "Parte do cômodo, como Estante ou Rac
 _DETALHES = {"type": "string", "description": "Marca, modelo, cor, tamanho e estado."}
 _OBS = {"type": "string", "description": "Algo para lembrar sobre o item (até 200 caracteres)."}
 _ITEM = {"type": "string", "description": "O id do item (sal-003) ou o código (SAL-003)."}
+_FIPE = {"type": "string", "description": "Só num veículo (um bem do tipo Veículos): o código da Tabela FIPE e o ano-modelo, como «005340-6 2014» (vazio tira)."}
 _GARANTIA = {"type": "string", "description": "Garantia até: a data em que a garantia acaba, AAAA-MM-DD (num item da casa ou num bem; vazio tira)."}
 _USADO = {"type": "string", "description": "Só num consumível, com Consumíveis por cômodo ligado (opcoes.consumiveis_por_comodo no resumo): "
                                            "o id ou o nome do cômodo onde é usado; mais de um, separados por ponto e vírgula (Cozinha; Lavanderia). Vazio tira."}
@@ -116,6 +117,12 @@ FERRAMENTAS = [
                   "cômodos. Com id, os de um item (também de uma utilidade ou de um veículo). Só lê o que já foi buscado: para buscar, use "
                   "inventario_buscar_recursos.",
      "entrada": _obj({"id": _ID, "so_sem": {"type": "boolean", "description": "true: só os eletrônicos que ainda não têm os recursos."}})},
+    {"nome": "fipe", "titulo": "Tabela FIPE", "grava": False,
+     "descricao": "O valor de um veículo na Tabela FIPE deste mês (o preço médio de mercado): pelo id de um bem que tem o código "
+                  "FIPE, ou pelo codigo e o ano. Diz também o valor gravado no bem; não muda nada (para usar o valor, "
+                  "inventario_editar_item com valor).",
+     "entrada": _obj({"id": _ITEM, "codigo": {"type": "string", "description": "O código FIPE, como 005340-6."},
+                      "ano": {"type": "integer", "minimum": 1950, "maximum": 2100, "description": "O ano-modelo."}})},
     {"nome": "tarefas_do_item", "titulo": "Tarefas do item", "grava": False,
      "descricao": "As tarefas abertas no ResolvIA ligadas a um item (a troca do filtro, o conserto), com a lista e o prazo, e as "
                   "listas onde dá para criar uma. Só com Usar equipamentos ligado no ResolvIA; um consumível não tem.",
@@ -142,14 +149,14 @@ FERRAMENTAS = [
                       "itens": {"type": "array", "minItems": 1, "maxItems": MAX_LOTE,
                                 "items": _obj({"nome": {"type": "string", "description": "Curto, como a pessoa diria."},
                                                "valor": _VALOR, "quantidade": _QTD, "categoria": _CATEGORIA, "duracao_dias": _DURACAO,
-                                               "usado_em": _USADO, "detalhes": _DETALHES, "observacao": _OBS, "zona": _ZONA, "garantia_ate": _GARANTIA}, ["nome"])}},
+                                               "usado_em": _USADO, "detalhes": _DETALHES, "observacao": _OBS, "zona": _ZONA, "garantia_ate": _GARANTIA, "fipe": _FIPE}, ["nome"])}},
                      ["comodo", "itens"])},
     {"nome": "editar_item", "titulo": "Editar item", "grava": True,
      "descricao": "Muda um item (só o que vier): nome, valor, quantidade, categoria, zona, detalhes ou observação; num consumível, "
                   "duracao_dias no lugar do valor e da quantidade. Texto vazio "
                   "apaga a zona, os detalhes ou a observação. Para levar a outro cômodo, use inventario_mover_itens.",
      "entrada": _obj({"id": _ID, "nome": {"type": "string"}, "valor": _VALOR, "quantidade": _QTD, "categoria": _CATEGORIA,
-                      "duracao_dias": _DURACAO, "usado_em": _USADO, "zona": _ZONA, "detalhes": _DETALHES, "observacao": _OBS, "garantia_ate": _GARANTIA}, ["id"])},
+                      "duracao_dias": _DURACAO, "usado_em": _USADO, "zona": _ZONA, "detalhes": _DETALHES, "observacao": _OBS, "garantia_ate": _GARANTIA, "fipe": _FIPE}, ["id"])},
     {"nome": "mover_itens", "titulo": "Mover itens", "grava": True,
      "descricao": "Leva um ou mais itens para outro cômodo (ou para Bens ou Consumíveis), ou muda a zona deles. Num cômodo novo, o item ganha "
                   "um código novo (o id continua o mesmo) e fica sem zona, se ela não vier.",
@@ -560,6 +567,36 @@ def _item_das_tarefas(srv, a):
     return it
 
 
+def _fipe(srv, a) -> str:
+    """1.114.0: o valor na Tabela FIPE de agora, de um bem com o código ou de um código e ano; só lê."""
+    it = None
+    if a.get("id") not in (None, ""):
+        with srv.STORE.lock:
+            it = dict(_achar_item(srv, a["id"]))
+        if not it.get("fipe"):
+            raise ErroFerramenta("Esse item não tem o código da Tabela FIPE: mande codigo e ano, ou guarde com inventario_editar_item (fipe).")
+        cod, ano = it["fipe"], int(it.get("fipeYear") or 0)
+    else:
+        cod, ano = srv.fipe.codigo(a.get("codigo")), srv.fipe.ano(a.get("ano"))
+        if not cod or not ano:
+            raise ErroFerramenta("Mande o id de um bem com o código FIPE, ou codigo (como 005340-6) e ano.")
+    r = srv.fipe_de(cod, ano)
+    out = {"codigo": r["codigo"], "ano": r["ano"], "veiculo": " ".join(x for x in (r["marca"], r["modelo"]) if x), "tabela_de": r["mes"]}
+    if r["valor"]:
+        out["valor_fipe"] = r["valor"]
+        if r["combustivel"]:
+            out["combustivel"] = r["combustivel"]
+    else:
+        out["aviso"] = f"O código não tem o ano {ano} na tabela."
+        out["anos_do_codigo"] = r["anos"]
+    if it:
+        out["item"], out["id"], out["valor_gravado"] = it.get("name") or "", it["id"], it.get("value") or 0
+        if r["valor"] and out["valor_gravado"]:
+            out["diferenca"] = round(r["valor"] - out["valor_gravado"], 2)
+    out["nota"] = "Referência de mercado da FIPE, pela BrasilAPI. O valor do bem só muda se a pessoa pedir."
+    return _json(out)
+
+
 def _tarefas_do_item(srv, a) -> str:
     """1.113.0: as Tarefas no ResolvIA da ficha do item (resolvia_tarefas) e as listas do Nova tarefa (resolvia_listas)."""
     it = _item_das_tarefas(srv, a)
@@ -774,6 +811,8 @@ def _ver(srv, a) -> str:
         if n > 1:
             out["valor_de_cada"] = round(out["valor"] / n, 2)
         out["valor_desde"] = str(it.get("valueAt") or it.get("createdAt") or "")[:10]
+        if it.get("fipe"):  # 1.114.0: o código da Tabela FIPE (o valor de agora, pela inventario_fipe)
+            out["fipe"] = f"{it['fipe']} {it.get('fipeYear') or ''}".strip()
         if srv.warranty_days(it) is not None:  # 1.113.0
             d = srv.warranty_days(it)
             out["garantia_ate"] = it["warranty"]
@@ -818,7 +857,7 @@ def _cadastrar(srv, a, quem, fotos=None) -> str:
             raise ErroFerramenta(f"Item {n}: mande um objeto, como {{\"nome\": \"Abajur\", \"valor\": 120}}.")
         sobra = sorted(set(x) - set(POR_NOME["cadastrar_itens"]["entrada"]["properties"]["itens"]["items"]["properties"]))
         if sobra:
-            raise ErroFerramenta(f"Item {n}: campo desconhecido: {', '.join(sobra)}. Valem: nome, valor, quantidade, categoria, duracao_dias, usado_em, detalhes, observacao, zona, garantia_ate.")
+            raise ErroFerramenta(f"Item {n}: campo desconhecido: {', '.join(sobra)}. Valem: nome, valor, quantidade, categoria, duracao_dias, usado_em, detalhes, observacao, zona, garantia_ate, fipe.")
         try:
             if cons:
                 _sem_valor(x)
@@ -834,6 +873,7 @@ def _cadastrar(srv, a, quem, fotos=None) -> str:
                            **({"usedIn": _usado_em(srv, x["usado_em"])} if cons and x.get("usado_em") not in (None, "") else {}),
                            "details": _texto(srv, x.get("detalhes"), 4000, "detalhes", linhas=True), "flag": _texto(srv, x.get("observacao"), 200, "observação"),
                            **({"warranty": _garantia(srv, x["garantia_ate"], cons)} if x.get("garantia_ate") not in (None, "") else {}),
+                           **({"fipe": x["fipe"]} if x.get("fipe") not in (None, "") else {}),
                            "zone": "" if bem else zona, "source": "correria"})
         except (ErroFerramenta, srv.ApiError) as e:
             raise ErroFerramenta(f"Item {n}: {getattr(e, 'msg', None) or e}") from None
@@ -874,6 +914,10 @@ def _editar(srv, a, quem) -> str:
         raise ErroFerramenta("usado_em só vale num consumível.")
     if "garantia_ate" in a:  # 1.113.0: vazio tira
         novo["warranty"] = _garantia(srv, a["garantia_ate"], cons)
+    if "fipe" in a:  # 1.114.0: só num veículo; vazio tira
+        if a["fipe"] not in (None, "") and (cons or (a.get("categoria") is None and it.get("cat") != "veiculos")):
+            raise ErroFerramenta("fipe só vale num veículo (um bem do tipo Veículos).")
+        novo["fipe"] = a["fipe"] or ""
     if "nome" in a:
         novo["name"] = _texto(srv, a["nome"], 200, "nome", obrig=True)
     if "valor" in a:
@@ -898,7 +942,7 @@ def _editar(srv, a, quem) -> str:
         raise ErroFerramenta("Diga o que muda: nome, categoria, duracao_dias, detalhes ou observacao." if cons
                              else "Diga o que muda: nome, valor, quantidade, categoria, zona, detalhes ou observacao.")
     rotulo = {"usedIn": "usado em", "name": "nome", "value": "valor", "qty": "quantidade", "cat": "categoria", "zone": "zona", "details": "detalhes", "flag": "observação",
-              "dur": "duração", "warranty": "garantia até"}
+              "dur": "duração", "warranty": "garantia até", "fipe": "Tabela FIPE", "fipeYear": "ano da FIPE"}
     cats = srv.STORE.cons_cat_map() if cons else srv.STORE.cat_map()
 
     def mostra(k, v):
@@ -1411,6 +1455,11 @@ def chamar(srv, nome, argumentos, pessoa=None, cliente=None, anexo=None) -> str:
             return {"pareceres": _pareceres, "apagar_pesquisa": _apagar_pesquisa, "recursos": _recursos,
                     "buscar_recursos": _buscar_recursos, "avaliar_varios": _avaliar_varios,
                     "conferir_novidades": _conferir_novidades}[nome](srv, a)
+        except srv.ApiError as e:
+            raise ErroFerramenta(e.msg) from None
+    if nome == "fipe":  # 1.114.0: consulta a internet, fora da trava do Store
+        try:
+            return _fipe(srv, a)
         except srv.ApiError as e:
             raise ErroFerramenta(e.msg) from None
     if nome in ("tarefas_do_item", "criar_tarefa_do_item"):  # 1.113.0: falam com o Home Assistant, fora da trava do Store

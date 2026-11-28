@@ -23,6 +23,8 @@
     ["c-outros", "Outros"]].map(([id, name]) => ({ id, name }));
   const ccatsOf = (d) => { if (!Array.isArray(d.consCats) || !d.consCats.length) d.consCats = clone(DEF_CCATS); return comCores(d.consCats); };
   const isCons = (d, rid) => (d.rooms.find((r) => r.id === rid) || {}).kind === "consumiveis";
+  // 1.114.0: «005340-6 2014» → { fipe, fipeYear } (ou null), como o clean_fipe do servidor
+  const fipeDe = (t) => { const m = /(\d{6})\s*-?\s*(\d)(?!\d)(.*)$/.exec(String(t || "")), a = m && /(19[5-9]\d|20\d\d)/.exec(m[3]); return m && a ? { fipe: `${m[1]}-${m[2]}`, fipeYear: +a[1] } : null; };
   // 1.91.0: os cômodos onde um consumível é usado: um id (o jeito de antes) ou uma lista; só os cômodos da casa
   const usados = (d, v) => [...new Set([].concat(v || []))].filter((id) => d.rooms.some((x) => x.id === id && !x.kind)).slice(0, 40);
   const consCat = (d, k) => (ccatsOf(d).some((c) => c.id === k) ? k : "c-outros");
@@ -75,6 +77,7 @@
       photos: Array.isArray(b.photos) ? [...b.photos] : [], ...(b.photoSrc && Object.keys(b.photoSrc).length ? { photoSrc: { ...b.photoSrc } } : {}),
       checked: !!b.checked, flag: (b.flag || "").trim() || null,
       ...(r.kind !== "consumiveis" && /^\d{4}-\d{2}-\d{2}$/.test(b.warranty || "") ? { warranty: b.warranty } : {}), // 1.113.0: a Garantia até
+      ...(r.kind !== "consumiveis" && b.cat === "veiculos" && fipeDe(b.fipe) ? fipeDe(b.fipe) : {}), // 1.114.0: a Tabela FIPE de um veículo
       approx: true, source: b.source || "manual", createdAt: restore && b.createdAt ? b.createdAt : t, updatedAt: t,
     };
   }
@@ -179,6 +182,8 @@
         for (const k of ["zone", "details", "flag", "source"]) if (k in body) it[k] = typeof body[k] === "string" ? body[k].trim() : body[k];
         if (isCons(d, it.room)) delete it.warranty;
         else if ("warranty" in body) { if (/^\d{4}-\d{2}-\d{2}$/.test(body.warranty || "")) it.warranty = body.warranty; else delete it.warranty; }
+        if (isCons(d, it.room) || it.cat !== "veiculos") { delete it.fipe; delete it.fipeYear; }
+        else if ("fipe" in body) { delete it.fipe; delete it.fipeYear; Object.assign(it, fipeDe(body.fipe) || {}); }
         if ("name" in body) { const n = String(body.name || "").trim(); if (!n) fail("Preencha o campo nome."); it.name = n; }
         if (isCons(d, it.room)) { it.cat = consCat(d, "cat" in body ? body.cat : it.cat); if ("dur" in body) { if (dur(body.dur) !== dur(it.dur)) it.durAt = now(); it.dur = dur(body.dur); }
           if ("usedIn" in body) { if (usados(d, body.usedIn).length) it.usedIn = usados(d, body.usedIn); else delete it.usedIn; } }
@@ -593,6 +598,12 @@
       const last = [...(body.messages || [])].reverse().find((m) => m.role === "user");
       if ((body.anexos || []).length) return { reply: `Exemplo da prévia: no Home Assistant, a IA olha ${body.anexos.length > 1 ? `os ${body.anexos.length} arquivos` : "o arquivo"} e responde de verdade.`, entity: "ai_task.exemplo" };
       return { reply: `Exemplo da prévia: no Home Assistant, a IA responde de verdade, com os dados desta tela.\n- Você perguntou: “${String(last ? last.text : "").slice(0, 120)}”`, entity: "ai_task.exemplo" };
+    }
+    // Tabela FIPE (1.114.0): aqui, um valor de exemplo (nada é consultado)
+    if (method === "GET" && path.startsWith("api/fipe?item=")) {
+      const it = d.items.find((i) => i.id === decodeURIComponent(path.slice("api/fipe?item=".length)));
+      if (!it || !it.fipe) throw Object.assign(new Error("Esse item não tem o código da Tabela FIPE."), { status: 400 });
+      return { codigo: it.fipe, ano: it.fipeYear, valor: 85608, marca: "Marca Exemplo", modelo: "Modelo Exemplo 2.0", combustivel: "Gasolina", mes: "novembro de 2026", anos: [it.fipeYear] };
     }
     // Avaliar com IA (1.103.0): o parecer de um consumível (aqui, um exemplo)
     if (method === "GET" && path.startsWith("api/parecer?item=")) {

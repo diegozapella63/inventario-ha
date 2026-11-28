@@ -254,3 +254,7 @@ Quando sai uma versão nova, o Home Assistant mostra **Atualizar** na página do
 - **A IA aparece como não configurada**: confira se a integração de IA tem uma tarefa de IA criada e se o modelo lê imagens; depois toque em "Verificar de novo".
 - **A IA demora**: modelos locais podem levar mais de um minuto por foto. Modelos na nuvem costumam responder em 5 a 20 segundos.
 - **Ver o que está acontecendo**: aba **Registro** do app.
+
+## Tabela FIPE
+
+Num bem do tipo **Veículo**, o editor tem o campo **Tabela FIPE**: escreva o código FIPE e o ano-modelo do veículo (por exemplo, `005340-6 2014`; o código está no site da FIPE e em muitos documentos do seguro). A ficha mostra o valor da tabela do mês e de quando ela é. **Usar este valor** troca o valor do bem pelo da tabela, com o Desfazer; sem esse toque, o valor que você informou continua o mesmo. A consulta é feita pela BrasilAPI, um serviço gratuito mantido pela comunidade: se ele estiver fora do ar, a ficha mostra o último valor guardado. A FIPE é um preço médio de referência, não uma avaliação do seu veículo.

@@ -3774,6 +3774,38 @@
     if (slot && it) slot.innerHTML = itemParHtml(it);
   }
   function stopItemPar() { IPAR.gen++; clearTimeout(IPAR.timer); }
+  // 1.114.0: a Tabela FIPE de um veículo (o valor do mês pela BrasilAPI, guardado no servidor por uma semana): na ficha,
+  // o valor e de quando é a tabela, e o Usar este valor (o valor do bem só muda por esse botão, com o Desfazer)
+  const IFIPE = {};
+  function loadItemFipe(it) {
+    const paint = () => {
+      const dd = $('[data-slot="fipe"]', sheet ? sheet.dlg : document), r = IFIPE[it.id];
+      if (!dd || !r || (sheet && sheet.itemId !== it.id)) return;
+      const cur = D.itemById.get(it.id) || it;
+      if (r.erro) { dd.textContent = `${it.fipe} · ${it.fipeYear || ""} · ${r.erro}`; return; }
+      if (!r.valor) { dd.textContent = `${it.fipe} · sem o ano ${it.fipeYear || ""} na tabela`; return; }
+      dd.innerHTML = `<b data-slot="fipe-valor">${esc(money(r.valor))}</b> · ${esc(r.mes || "")}${Math.abs((+cur.value || 0) - r.valor) >= 0.005 ? `<button type="button" class="btn fipe-usar" data-act="fipe-usar" data-id="${esc(it.id)}">${ic("check", "sm")}Usar este valor</button>` : ""}`;
+    };
+    if (IFIPE[it.id] && IFIPE[it.id].de === `${it.fipe} ${it.fipeYear}`) { paint(); return; }
+    API.get(`api/fipe?item=${encodeURIComponent(it.id)}`).then((r) => { IFIPE[it.id] = { ...r, de: `${it.fipe} ${it.fipeYear}` }; paint(); })
+      .catch((e) => { IFIPE[it.id] = { erro: (e && e.message) || "sem resposta agora", de: "" }; paint(); });
+  }
+  async function usarFipe(it) {
+    const r = IFIPE[it.id];
+    if (!r || !r.valor) return;
+    const antes = it.value;
+    try {
+      const res = await API.put(`api/items/${encodeURIComponent(it.id)}`, { value: r.valor, _base: it.updatedAt });
+      setRev(res.rev); upsertItem(res.item); derive(); refreshAll();
+      toast(`Valor: ${money(r.valor)}`, { action: "Desfazer", onAction: async () => {
+        try {
+          const now = D.itemById.get(it.id);
+          const back = await API.put(`api/items/${encodeURIComponent(it.id)}`, { value: antes, _base: now?.updatedAt });
+          setRev(back.rev); upsertItem(back.item); derive(); refreshAll();
+        } catch (e) { fail(e); }
+      } });
+    } catch (e) { fail(e); }
+  }
   function loadItemPar(it) {
     if (IPAR.id === it.id) { paintItemPar(); return; } // a ficha foi redesenhada: fica como estava
     stopItemPar();
@@ -4052,6 +4084,7 @@
       sheet.onClose = () => { sheet = null; stopItemNews(); INEWS.id = null; stopItemRec(); IREC.id = null; stopItemPar(); IPAR.id = null; };
     }
     if (recOn(it)) loadItemRec(it);
+    if (it.fipe && isBens(it.room)) loadItemFipe(it);
     if (parOn(it)) loadItemPar(it);
     if (newsOn() && it.cat === "eletronicos") loadItemNews(it); // as novidades são só dos eletrônicos
     if (S.resolvia) loadTarefas(it);
@@ -4258,6 +4291,7 @@
               : `<dt>Categoria</dt><dd><a href="#/buscar?cat=${esc(CAT[it.cat] ? it.cat : "outros")}&amp;ord=val"><span class="rnm">${esc(CAT[it.cat] || "Outros")}</span></a></dd>
           <dt>Quantidade</dt><dd>${esc(qtyLabel(it.qty))}</dd>`}
           ${room.kind !== "consumiveis" && garTxt(it) ? `<dt>Garantia até</dt><dd data-slot="garantia"${garDias(it) < 0 ? ' class="fim"' : ""}>${esc(garTxt(it))}</dd>` : ""}
+${room.kind === "bens" && it.fipe ? `<dt>Tabela FIPE</dt><dd data-slot="fipe">${esc(it.fipe)} · ${esc(String(it.fipeYear || ""))}</dd>` : ""}
           <dt>Origem</dt><dd>${esc(SOURCES[it.source] || "Cadastro manual")}</dd>
           ${it.createdAt ? `<dt>Cadastrado</dt><dd>${esc(dateTime(it.createdAt))}${by(it.createdBy)}</dd>` : ""}
           ${it.updatedAt && it.updatedAt !== it.createdAt ? `<dt>Alterado</dt><dd>${esc(dateTime(it.updatedAt))}${by(it.updatedBy)}</dd>` : ""}
@@ -4364,6 +4398,7 @@
       usedIn: usadoIds(from), // 1.88.0: onde se usa (Consumíveis por cômodo); 1.91.0: um ou vários
       flag: from.flag || "", photos: [...(from.photos || photos || [])], photoSrc: { ...(from.photoSrc || {}) },
       warranty: garBr(from.warranty), // 1.113.0: a Garantia até, DD/MM/AAAA
+      fipe: from.fipe ? `${from.fipe} ${from.fipeYear || ""}`.trim() : "", // 1.114.0: o código da Tabela FIPE e o ano (um veículo)
       source: item ? item.source || "manual" : dup ? dup.source || "manual" : "manual",
       dirty: !!(dup || (photos && photos.length)), busy: false, uploading: 0, aiBusy: false, hint: "",
     };
@@ -4427,6 +4462,7 @@
                   <p class="unit-hint" data-slot="unit"></p><p class="err" data-err="value" hidden></p></div>
               </div>
             </div>
+            ${bem ? `<div class="field dobravel${F.fipe ? "" : " shut"}" data-lembra="nao" data-f="fipe" id="f-fipe-f"${F.cat === "veiculos" ? "" : " hidden"}><span class="lbl" id="f-fipe-l">Tabela FIPE</span><input id="f-fipe" class="input" name="fipe" inputmode="text" maxlength="20" autocomplete="off" aria-labelledby="f-fipe-l" placeholder="Código e ano: 005340-6 2014" value="${esc(F.fipe)}"><p class="err" data-err="fipe" hidden></p></div>` : ""}
             ${cons ? "" : `<div class="field dobravel${F.warranty ? "" : " shut"}" data-lembra="nao" data-f="warranty" id="f-gar-f"><span class="lbl" id="f-gar-l">Garantia até</span><input id="f-gar" class="input" name="warranty" inputmode="numeric" maxlength="10" autocomplete="off" aria-labelledby="f-gar-l" placeholder="DD/MM/AAAA" value="${esc(F.warranty)}"><p class="err" data-err="warranty" hidden></p></div>`}
             <div class="field dobravel${F.flag ? "" : " shut"}" data-lembra="nao" data-f="flag"><span class="lbl" id="f-flag-l">Observação</span><textarea id="f-flag" class="input grow" rows="1" name="flag" maxlength="200" aria-labelledby="f-flag-l" placeholder="Algo para lembrar sobre este item">${esc(F.flag)}</textarea></div>
             <div class="formerr" data-slot="formerr" hidden></div>
@@ -4522,6 +4558,7 @@
         return;
       }
       if (t.name === "warranty") { const m = garMask(t.value); if (m !== t.value) t.value = m; fieldErr("warranty", ""); }
+      if (t.name === "fipe") fieldErr("fipe", "");
       F[t.name] = t.value;
       F.dirty = true;
       if (t.name === "durN" || t.name === "durU") { durConta(); fieldErr("dur", ""); }
@@ -4623,6 +4660,11 @@
       const zone = cons ? "" : zonesOn() ? F.zone.trim() : item && F.room === item.room ? item.zone || "" : "";
       const body = { name, details: F.details.trim(), room: F.room, zone, cat: F.cat || "outros", qty: F.qty.trim() || "1", value, photos: F.photos, photoSrc: F.photoSrc, flag: F.flag.trim(), source: F.source };
       if (!cons) body.warranty = gar;
+      if (bem) {
+        const fp = F.cat === "veiculos" ? String(F.fipe || "").trim() : "";
+        if (fp && !/\d{6}\s*-?\s*\d(?!\d).*(19[5-9]\d|20\d\d)/.test(fp)) { $("#f-fipe-f", dlg).classList.remove("shut"); fieldErr("fipe", "O código e o ano, como 005340-6 2014."); form.fipe.focus(); return; }
+        body.fipe = fp;
+      }
       if (cons) { delete body.qty; delete body.value; body.cat = CCAT[F.cat] ? F.cat : "c-outros"; body.dur = durNum(F.dur); if (consComodoOn()) body.usedIn = F.usedIn || []; } // 1.82.0: sem quantidade e sem valor
       setBusy(true);
       try {
@@ -4666,7 +4708,7 @@
         await deleteItem(it);
         if (!D.itemById.get(F.id)) requestClose(entry, { force: true });
       }
-      else if (act === "tipo") { F.cat = b.dataset.v || otherCat; F.dirty = true; slot("tipo").innerHTML = tipoBtns(); }
+      else if (act === "tipo") { F.cat = b.dataset.v || otherCat; F.dirty = true; slot("tipo").innerHTML = tipoBtns(); const ff = $("#f-fipe-f", dlg); if (ff) ff.hidden = F.cat !== "veiculos"; }
       else if (act === "save") save(false);
       else if (act === "again") save(true);
       else if (act === "upload") pickFiles(addFiles);
@@ -5952,6 +5994,7 @@
       case "item-par": if (item) avaliarItem(item); break;
       case "item-rec-del": if (item) dismissRec(item); break;
       case "item-par-del": if (item) dismissPar(item); break;
+      case "fipe-usar": if (item) usarFipe(item); break;
       case "item-dup": if (item) openEditor({ dup: item }); break;
       case "tarefa-nova": if (item) openTarefaNova(item); break;
       case "copy-field": copyField(b.dataset.target); break;

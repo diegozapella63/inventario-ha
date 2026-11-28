@@ -1,5 +1,10 @@
 # Mudanças
 
+## 1.114.0
+
+- **Tabela FIPE**: num bem do tipo Veículo, o campo novo **Tabela FIPE** guarda o código e o ano do carro (como 005340-6 2014). A ficha passa a mostrar o valor da tabela do mês e o botão **Usar este valor**. O valor do bem só muda se você tocar nele (e dá para desfazer).
+- Pelo CorrerIA: "quanto vale meu carro na FIPE?" compara o valor da tabela com o que está gravado.
+
 ## 1.113.0
 
 - **Garantia até**: no item (da casa ou um bem), um campo novo para a data em que a garantia acaba. A ficha mostra até quando e, nos últimos 60 dias, quantos dias faltam. Um consumível não tem.
